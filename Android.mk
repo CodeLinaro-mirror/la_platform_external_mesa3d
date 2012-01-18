@@ -7,7 +7,7 @@ USE_LLVM_EXECUTIONENGINE := false
 DEBUG_BUILD := false
 
 LOCAL_PATH := $(call my-dir)
-LLVM_ROOT_PATH := external/llvm
+LLVM_ROOT_PATH := $(call get_llvm_root_path)
 
 # These are for using llvm::ExecutionEngine, also remove libbcc
 # libLLVMX86CodeGen;libLLVMX86Info;libLLVMBitReader;libLLVMSelectionDAG;libLLVMAsmPrinter;libLLVMJIT;libLLVMCodeGen;libLLVMTarget;libLLVMMC;libLLVMScalarOpts;libLLVMipo;libLLVMTransformUtils;libLLVMCore;libLLVMSupport;libLLVMSystem;libLLVMAnalysis;libLLVMInstCombine;libLLVMipa;libLLVMMCParser;libLLVMExecutionEngine;

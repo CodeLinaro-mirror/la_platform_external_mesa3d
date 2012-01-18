@@ -1,7 +1,7 @@
 DEBUG_BUILD := true
 
 LOCAL_PATH := $(call my-dir)
-LLVM_ROOT_PATH := external/llvm
+LLVM_ROOT_PATH := $(call get_llvm_root_path)
 
 mesa_SRC_FILES :=	\
     egl.cpp \
@@ -46,6 +46,9 @@ endif
 LOCAL_MODULE := mesa
 LOCAL_SRC_FILES := $(mesa_SRC_FILES)
 LOCAL_STATIC_LIBRARIES := libMesa
+ifeq ($(BOARD_USE_QCOM_LLVM_CLANG_RS),true)
+LOCAL_STATIC_LIBRARIES  += libLLVMCore libLLVMSupport
+endif
 LOCAL_SHARED_LIBRARIES := libstlport libcutils libutils libhardware libgui libbcc libdl
 LOCAL_C_INCLUDES := $(mesa_C_INCLUDES)
 
