@@ -1,6 +1,6 @@
 # USE_LLVM_EXECUTIONENGINE is not fully implemented. We use libbcc instead.
 USE_LLVM_EXECUTIONENGINE := false
-# If using libLLVMExecutionEngine,
+# If using lib${LLVM_VER}LLVMExecutionEngine,
 # need to add files to several Android.mk in external/llvm, and comment out some stuff in
 # llvm DynamicLibrary.cpp and Intercept.cpp
 
@@ -8,28 +8,31 @@ DEBUG_BUILD := false
 
 LOCAL_PATH := $(call my-dir)
 LLVM_ROOT_PATH := $(call get_llvm_root_path)
-
+LLVM_VER :=
+ifeq ($(BOARD_USE_QCOM_LLVM_CLANG_RS),true)
+	LLVM_VER := RS
+endif
 # These are for using llvm::ExecutionEngine, also remove libbcc
-# libLLVMX86CodeGen;libLLVMX86Info;libLLVMBitReader;libLLVMSelectionDAG;libLLVMAsmPrinter;libLLVMJIT;libLLVMCodeGen;libLLVMTarget;libLLVMMC;libLLVMScalarOpts;libLLVMipo;libLLVMTransformUtils;libLLVMCore;libLLVMSupport;libLLVMSystem;libLLVMAnalysis;libLLVMInstCombine;libLLVMipa;libLLVMMCParser;libLLVMExecutionEngine;
+# lib${LLVM_VER}LLVMX86CodeGen;lib${LLVM_VER}LLVMX86Info;lib${LLVM_VER}LLVMBitReader;lib${LLVM_VER}LLVMSelectionDAG;lib${LLVM_VER}LLVMAsmPrinter;lib${LLVM_VER}LLVMJIT;lib${LLVM_VER}LLVMCodeGen;lib${LLVM_VER}LLVMTarget;lib${LLVM_VER}LLVMMC;lib${LLVM_VER}LLVMScalarOpts;lib${LLVM_VER}LLVMipo;lib${LLVM_VER}LLVMTransformUtils;lib${LLVM_VER}LLVMCore;lib${LLVM_VER}LLVMSupport;lib${LLVM_VER}LLVMSystem;lib${LLVM_VER}LLVMAnalysis;lib${LLVM_VER}LLVMInstCombine;lib${LLVM_VER}LLVMipa;lib${LLVM_VER}LLVMMCParser;lib${LLVM_VER}LLVMExecutionEngine;
 libMesa_STATIC_LIBS :=  \
-    libLLVMBitReader    \
-    libLLVMSelectionDAG \
-    libLLVMAsmPrinter   \
-    libLLVMJIT          \
-    libLLVMCodeGen      \
-    libLLVMTarget       \
-    libLLVMMC           \
-    libLLVMScalarOpts   \
-    libLLVMipo          \
-    libLLVMTransformUtils \
-    libLLVMCore         \
-    libLLVMSupport      \
-    libLLVMSystem       \
-    libLLVMAnalysis     \
-    libLLVMInstCombine  \
-    libLLVMipa          \
-    libLLVMMCParser     \
-    libLLVMExecutionEngine
+    lib${LLVM_VER}LLVMBitReader    \
+    lib${LLVM_VER}LLVMSelectionDAG \
+    lib${LLVM_VER}LLVMAsmPrinter   \
+    lib${LLVM_VER}LLVMJIT          \
+    lib${LLVM_VER}LLVMCodeGen      \
+    lib${LLVM_VER}LLVMTarget       \
+    lib${LLVM_VER}LLVMMC           \
+    lib${LLVM_VER}LLVMScalarOpts   \
+    lib${LLVM_VER}LLVMipo          \
+    lib${LLVM_VER}LLVMTransformUtils \
+    lib${LLVM_VER}LLVMCore         \
+    lib${LLVM_VER}LLVMSupport      \
+    lib${LLVM_VER}LLVMSystem       \
+    lib${LLVM_VER}LLVMAnalysis     \
+    lib${LLVM_VER}LLVMInstCombine  \
+    lib${LLVM_VER}LLVMipa          \
+    lib${LLVM_VER}LLVMMCParser     \
+    lib${LLVM_VER}LLVMExecutionEngine
 
 libMesa_SRC_FILES := \
     src/glsl/glcpp/pp.c \
@@ -140,7 +143,7 @@ LOCAL_SRC_FILES := $(libMesa_SRC_FILES)
 
 ifeq ($(USE_LLVM_EXECUTIONENGINE),true)
 LOCAL_CFLAGS += -DUSE_LLVM_EXECUTIONENGINE=1
-LOCAL_STATIC_LIBRARIES := libLLVMX86CodeGen libLLVMX86Info $(libMesa_STATIC_LIBS)
+LOCAL_STATIC_LIBRARIES := lib${LLVM_VER}LLVMX86CodeGen lib${LLVM_VER}LLVMX86Info $(libMesa_STATIC_LIBS)
 else
 LOCAL_CFLAGS += -DUSE_LLVM_EXECUTIONENGINE=0
 LOCAL_SHARED_LIBRARIES := libbcc
@@ -170,8 +173,8 @@ LOCAL_SHARED_LIBRARIES := libstlport libcutils libdl libutils
 
 ifeq ($(USE_LLVM_EXECUTIONENGINE),true)
 LOCAL_CFLAGS += -DUSE_LLVM_EXECUTIONENGINE=1
-LOCAL_STATIC_LIBRARIES :=  libLLVMARMCodeGen libLLVMARMInfo libLLVMARMDisassembler \
-    libLLVMARMAsmPrinter $(libMesa_STATIC_LIBS)
+LOCAL_STATIC_LIBRARIES :=  lib${LLVM_VER}LLVMARMCodeGen lib${LLVM_VER}LLVMARMInfo lib${LLVM_VER}LLVMARMDisassembler \
+    lib${LLVM_VER}LLVMARMAsmPrinter $(libMesa_STATIC_LIBS)
 else
 LOCAL_CFLAGS += -DUSE_LLVM_EXECUTIONENGINE=0
 LOCAL_SHARED_LIBRARIES += libbcc
