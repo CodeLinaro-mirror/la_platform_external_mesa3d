@@ -1013,6 +1013,7 @@ clear_color_attachment(struct anv_cmd_buffer *cmd_buffer,
 {
    const struct anv_subpass *subpass = cmd_buffer->state.subpass;
    const uint32_t color_att = attachment->colorAttachment;
+   assert(color_att < subpass->color_count);
    const uint32_t att_idx = subpass->color_attachments[color_att].attachment;
 
    if (att_idx == VK_ATTACHMENT_UNUSED)
@@ -1074,11 +1075,11 @@ clear_depth_stencil_attachment(struct anv_cmd_buffer *cmd_buffer,
 {
    static const union isl_color_value color_value = { .u32 = { 0, } };
    const struct anv_subpass *subpass = cmd_buffer->state.subpass;
-   const uint32_t att_idx = subpass->depth_stencil_attachment->attachment;
-
-   if (att_idx == VK_ATTACHMENT_UNUSED)
+   if (!subpass->depth_stencil_attachment)
       return;
 
+   const uint32_t att_idx = subpass->depth_stencil_attachment->attachment;
+   assert(att_idx != VK_ATTACHMENT_UNUSED);
    struct anv_render_pass_attachment *pass_att =
       &cmd_buffer->state.pass->attachments[att_idx];
 
@@ -1274,11 +1275,6 @@ void anv_CmdResolveImage(
 
       const uint32_t layer_count =
          anv_get_layerCount(dst_image, &pRegions[r].dstSubresource);
-
-      VkImageAspectFlags src_mask = pRegions[r].srcSubresource.aspectMask;
-      VkImageAspectFlags dst_mask = pRegions[r].dstSubresource.aspectMask;
-
-      assert(anv_image_aspects_compatible(src_mask, dst_mask));
 
       uint32_t aspect_bit;
       anv_foreach_image_aspect_bit(aspect_bit, src_image,

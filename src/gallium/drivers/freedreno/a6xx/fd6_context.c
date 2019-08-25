@@ -28,6 +28,7 @@
 #include "freedreno_query_acc.h"
 
 #include "fd6_context.h"
+#include "fd6_compute.h"
 #include "fd6_blend.h"
 #include "fd6_blitter.h"
 #include "fd6_draw.h"
@@ -83,6 +84,7 @@ fd6_context_create(struct pipe_screen *pscreen, void *priv, unsigned flags)
 		return NULL;
 
 	pctx = &fd6_ctx->base.base;
+	pctx->screen = pscreen;
 
 	fd6_ctx->base.dev = fd_device_ref(screen->dev);
 	fd6_ctx->base.screen = fd_screen(pscreen);
@@ -93,6 +95,7 @@ fd6_context_create(struct pipe_screen *pscreen, void *priv, unsigned flags)
 	pctx->create_depth_stencil_alpha_state = fd6_zsa_state_create;
 
 	fd6_draw_init(pctx);
+	fd6_compute_init(pctx);
 	fd6_gmem_init(pctx);
 	fd6_texture_init(pctx);
 	fd6_prog_init(pctx);
