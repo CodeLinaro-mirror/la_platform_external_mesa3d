@@ -116714,6 +116714,577 @@ CHICKEN3_L3AtomicDisableMask_start(const struct gen_device_info *devinfo)
 
 
 
+/* CHROMA_FILTER_COEFFICIENTS_ARRAY */
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_length  2
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_length  2
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* CHROMA_FILTER_COEFFICIENTS_ARRAY::Table 1X Filter Coefficient[[n],2] */
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn2_bits  8
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn2_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn2_start  0
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn2_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* CHROMA_FILTER_COEFFICIENTS_ARRAY::Table 1X Filter Coefficient[[n],3] */
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn3_bits  8
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn3_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn3_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn3_start  16
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn3_start  16
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn3_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* CHROMA_FILTER_COEFFICIENTS_ARRAY::Table 1X Filter Coefficient[[n],4] */
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn4_bits  8
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn4_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn4_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn4_start  32
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn4_start  32
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn4_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* CHROMA_FILTER_COEFFICIENTS_ARRAY::Table 1X Filter Coefficient[[n],5] */
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn5_bits  8
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn5_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn5_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn5_start  48
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn5_start  48
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1XFilterCoefficientn5_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 48;
+   case 10: return 48;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* CHROMA_FILTER_COEFFICIENTS_ARRAY::Table 1Y Filter Coefficient[[n],2] */
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn2_bits  8
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn2_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn2_start  8
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn2_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* CHROMA_FILTER_COEFFICIENTS_ARRAY::Table 1Y Filter Coefficient[[n],3] */
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn3_bits  8
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn3_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn3_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn3_start  24
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn3_start  24
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn3_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 24;
+   case 10: return 24;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* CHROMA_FILTER_COEFFICIENTS_ARRAY::Table 1Y Filter Coefficient[[n],4] */
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn4_bits  8
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn4_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn4_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn4_start  40
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn4_start  40
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn4_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 40;
+   case 10: return 40;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* CHROMA_FILTER_COEFFICIENTS_ARRAY::Table 1Y Filter Coefficient[[n],5] */
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn5_bits  8
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn5_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn5_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn5_start  56
+#define GEN10_CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn5_start  56
+
+static inline uint32_t ATTRIBUTE_PURE
+CHROMA_FILTER_COEFFICIENTS_ARRAY_Table1YFilterCoefficientn5_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 56;
+   case 10: return 56;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
 /* CLEAR_COLOR */
 
 
@@ -118837,7 +119408,7 @@ CLIP_STATE_SingleProgramFlow_start(const struct gen_device_info *devinfo)
 
 
 
-/* CLIP_STATE::Software  Exception Enable */
+/* CLIP_STATE::Software Exception Enable */
 
 
 #define GEN5_CLIP_STATE_SoftwareExceptionEnable_bits  1
@@ -123535,6 +124106,170 @@ COLOR_CALC_STATE_YDitherOffset_start(const struct gen_device_info *devinfo)
 
 
 
+/* COMMON_SLICE_CHICKEN3 */
+
+
+#define GEN11_COMMON_SLICE_CHICKEN3_length  1
+
+static inline uint32_t ATTRIBUTE_PURE
+COMMON_SLICE_CHICKEN3_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* COMMON_SLICE_CHICKEN3::PS Thread Panic Dispatch */
+
+
+#define GEN11_COMMON_SLICE_CHICKEN3_PSThreadPanicDispatch_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+COMMON_SLICE_CHICKEN3_PSThreadPanicDispatch_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_COMMON_SLICE_CHICKEN3_PSThreadPanicDispatch_start  6
+
+static inline uint32_t ATTRIBUTE_PURE
+COMMON_SLICE_CHICKEN3_PSThreadPanicDispatch_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* COMMON_SLICE_CHICKEN3::PS Thread Panic Dispatch Mask */
+
+
+#define GEN11_COMMON_SLICE_CHICKEN3_PSThreadPanicDispatchMask_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+COMMON_SLICE_CHICKEN3_PSThreadPanicDispatchMask_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_COMMON_SLICE_CHICKEN3_PSThreadPanicDispatchMask_start  22
+
+static inline uint32_t ATTRIBUTE_PURE
+COMMON_SLICE_CHICKEN3_PSThreadPanicDispatchMask_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 22;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
 /* CONSTANT_BUFFER */
 
 
@@ -128037,6 +128772,216 @@ FILTER_COEFFICIENT_FilterCoefficient_bits(const struct gen_device_info *devinfo)
 
 static inline uint32_t ATTRIBUTE_PURE
 FILTER_COEFFICIENT_FilterCoefficient_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* FRAMEDELTAQP */
+
+
+#define GEN11_FRAMEDELTAQP_length  2
+#define GEN10_FRAMEDELTAQP_length  2
+#define GEN9_FRAMEDELTAQP_length  2
+
+static inline uint32_t ATTRIBUTE_PURE
+FRAMEDELTAQP_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* FRAMEDELTAQP::Frame Delta QP */
+
+
+#define GEN11_FRAMEDELTAQP_FrameDeltaQP_bits  8
+#define GEN10_FRAMEDELTAQP_FrameDeltaQP_bits  8
+#define GEN9_FRAMEDELTAQP_FrameDeltaQP_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+FRAMEDELTAQP_FrameDeltaQP_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_FRAMEDELTAQP_FrameDeltaQP_start  0
+#define GEN10_FRAMEDELTAQP_FrameDeltaQP_start  0
+#define GEN9_FRAMEDELTAQP_FrameDeltaQP_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+FRAMEDELTAQP_FrameDeltaQP_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* FRAMEDELTAQPRANGE */
+
+
+#define GEN11_FRAMEDELTAQPRANGE_length  2
+#define GEN10_FRAMEDELTAQPRANGE_length  2
+#define GEN9_FRAMEDELTAQPRANGE_length  2
+
+static inline uint32_t ATTRIBUTE_PURE
+FRAMEDELTAQPRANGE_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* FRAMEDELTAQPRANGE::Frame Delta QP Range */
+
+
+#define GEN11_FRAMEDELTAQPRANGE_FrameDeltaQPRange_bits  8
+#define GEN10_FRAMEDELTAQPRANGE_FrameDeltaQPRange_bits  8
+#define GEN9_FRAMEDELTAQPRANGE_FrameDeltaQPRange_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+FRAMEDELTAQPRANGE_FrameDeltaQPRange_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_FRAMEDELTAQPRANGE_FrameDeltaQPRange_start  0
+#define GEN10_FRAMEDELTAQPRANGE_FrameDeltaQPRange_start  0
+#define GEN9_FRAMEDELTAQPRANGE_FrameDeltaQPRange_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+FRAMEDELTAQPRANGE_FrameDeltaQPRange_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
    case 11: return 0;
@@ -135129,7 +136074,7 @@ GS_STATE_SingleProgramFlow_start(const struct gen_device_info *devinfo)
 
 
 
-/* GS_STATE::Software  Exception Enable */
+/* GS_STATE::Software Exception Enable */
 
 
 #define GEN5_GS_STATE_SoftwareExceptionEnable_bits  1
@@ -135569,6 +136514,2303 @@ HALF_SLICE_CHICKEN7_EnabledTexelOffsetPrecisionFixMask_start(const struct gen_de
 
 
 
+/* HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD */
+
+
+#define GEN11_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_length  4
+#define GEN10_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_length  4
+#define GEN9_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_length  4
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 4;
+   case 10: return 4;
+   case 9: return 4;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD::Indirect Payload Base Address */
+
+
+#define GEN11_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress_bits  64
+#define GEN10_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress_bits  64
+#define GEN9_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress_bits  64
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 64;
+   case 9: return 64;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress_start  32
+#define GEN10_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress_start  32
+#define GEN9_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress_start  32
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 32;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD::Indirect Payload Base Address2 */
+
+
+#define GEN11_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress2_bits  33
+#define GEN10_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress2_bits  33
+#define GEN9_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress2_bits  33
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 33;
+   case 10: return 33;
+   case 9: return 33;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress2_start  96
+#define GEN10_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress2_start  96
+#define GEN9_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress2_start  96
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadBaseAddress2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 96;
+   case 10: return 96;
+   case 9: return 96;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD::Indirect Payload Data Size in bits */
+
+
+#define GEN11_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadDataSizeinbits_bits  32
+#define GEN10_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadDataSizeinbits_bits  32
+#define GEN9_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadDataSizeinbits_bits  32
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadDataSizeinbits_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 32;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadDataSizeinbits_start  0
+#define GEN10_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadDataSizeinbits_start  0
+#define GEN9_HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadDataSizeinbits_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_PAK_INSERT_OBJECT_INDIRECT_PAYLOAD_IndirectPayloadDataSizeinbits_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_REF_LIST_ENTRY */
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_length  1
+#define GEN10_HCP_REF_LIST_ENTRY_length  1
+#define GEN9_HCP_REF_LIST_ENTRY_length  1
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_REF_LIST_ENTRY::Chroma Weighted Prediction */
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_ChromaWeightedPrediction_bits  1
+#define GEN10_HCP_REF_LIST_ENTRY_ChromaWeightedPrediction_bits  1
+#define GEN9_HCP_REF_LIST_ENTRY_ChromaWeightedPrediction_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_ChromaWeightedPrediction_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_ChromaWeightedPrediction_start  11
+#define GEN10_HCP_REF_LIST_ENTRY_ChromaWeightedPrediction_start  11
+#define GEN9_HCP_REF_LIST_ENTRY_ChromaWeightedPrediction_start  11
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_ChromaWeightedPrediction_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_REF_LIST_ENTRY::Field Pic */
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_FieldPic_bits  1
+#define GEN10_HCP_REF_LIST_ENTRY_FieldPic_bits  1
+#define GEN9_HCP_REF_LIST_ENTRY_FieldPic_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_FieldPic_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_FieldPic_start  14
+#define GEN10_HCP_REF_LIST_ENTRY_FieldPic_start  14
+#define GEN9_HCP_REF_LIST_ENTRY_FieldPic_start  14
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_FieldPic_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 14;
+   case 10: return 14;
+   case 9: return 14;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_REF_LIST_ENTRY::List Entry */
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_ListEntry_bits  3
+#define GEN10_HCP_REF_LIST_ENTRY_ListEntry_bits  3
+#define GEN9_HCP_REF_LIST_ENTRY_ListEntry_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_ListEntry_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_ListEntry_start  8
+#define GEN10_HCP_REF_LIST_ENTRY_ListEntry_start  8
+#define GEN9_HCP_REF_LIST_ENTRY_ListEntry_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_ListEntry_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_REF_LIST_ENTRY::Long Term Reference */
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_LongTermReference_bits  1
+#define GEN10_HCP_REF_LIST_ENTRY_LongTermReference_bits  1
+#define GEN9_HCP_REF_LIST_ENTRY_LongTermReference_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_LongTermReference_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_LongTermReference_start  13
+#define GEN10_HCP_REF_LIST_ENTRY_LongTermReference_start  13
+#define GEN9_HCP_REF_LIST_ENTRY_LongTermReference_start  13
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_LongTermReference_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_REF_LIST_ENTRY::Luma Weighted Prediction */
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_LumaWeightedPrediction_bits  1
+#define GEN10_HCP_REF_LIST_ENTRY_LumaWeightedPrediction_bits  1
+#define GEN9_HCP_REF_LIST_ENTRY_LumaWeightedPrediction_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_LumaWeightedPrediction_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_LumaWeightedPrediction_start  12
+#define GEN10_HCP_REF_LIST_ENTRY_LumaWeightedPrediction_start  12
+#define GEN9_HCP_REF_LIST_ENTRY_LumaWeightedPrediction_start  12
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_LumaWeightedPrediction_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 12;
+   case 10: return 12;
+   case 9: return 12;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_REF_LIST_ENTRY::Reference Picture tb Value */
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_ReferencePicturetbValue_bits  8
+#define GEN10_HCP_REF_LIST_ENTRY_ReferencePicturetbValue_bits  8
+#define GEN9_HCP_REF_LIST_ENTRY_ReferencePicturetbValue_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_ReferencePicturetbValue_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_ReferencePicturetbValue_start  0
+#define GEN10_HCP_REF_LIST_ENTRY_ReferencePicturetbValue_start  0
+#define GEN9_HCP_REF_LIST_ENTRY_ReferencePicturetbValue_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_ReferencePicturetbValue_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_REF_LIST_ENTRY::Top Field */
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_TopField_bits  1
+#define GEN10_HCP_REF_LIST_ENTRY_TopField_bits  1
+#define GEN9_HCP_REF_LIST_ENTRY_TopField_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_TopField_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_REF_LIST_ENTRY_TopField_start  15
+#define GEN10_HCP_REF_LIST_ENTRY_TopField_start  15
+#define GEN9_HCP_REF_LIST_ENTRY_TopField_start  15
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_REF_LIST_ENTRY_TopField_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 15;
+   case 10: return 15;
+   case 9: return 15;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_TILE_POSITION_IN_CTB */
+
+
+#define GEN11_HCP_TILE_POSITION_IN_CTB_length  1
+#define GEN10_HCP_TILE_POSITION_IN_CTB_length  1
+#define GEN9_HCP_TILE_POSITION_IN_CTB_length  1
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_TILE_POSITION_IN_CTB_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_TILE_POSITION_IN_CTB::CtbPos0+i */
+
+
+#define GEN11_HCP_TILE_POSITION_IN_CTB_CtbPos0i_bits  8
+#define GEN10_HCP_TILE_POSITION_IN_CTB_CtbPos0i_bits  8
+#define GEN9_HCP_TILE_POSITION_IN_CTB_CtbPos0i_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_TILE_POSITION_IN_CTB_CtbPos0i_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_TILE_POSITION_IN_CTB_CtbPos0i_start  0
+#define GEN10_HCP_TILE_POSITION_IN_CTB_CtbPos0i_start  0
+#define GEN9_HCP_TILE_POSITION_IN_CTB_CtbPos0i_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_TILE_POSITION_IN_CTB_CtbPos0i_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_TILE_POSITION_IN_CTB::CtbPos1+i */
+
+
+#define GEN11_HCP_TILE_POSITION_IN_CTB_CtbPos1i_bits  8
+#define GEN10_HCP_TILE_POSITION_IN_CTB_CtbPos1i_bits  8
+#define GEN9_HCP_TILE_POSITION_IN_CTB_CtbPos1i_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_TILE_POSITION_IN_CTB_CtbPos1i_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_TILE_POSITION_IN_CTB_CtbPos1i_start  8
+#define GEN10_HCP_TILE_POSITION_IN_CTB_CtbPos1i_start  8
+#define GEN9_HCP_TILE_POSITION_IN_CTB_CtbPos1i_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_TILE_POSITION_IN_CTB_CtbPos1i_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_TILE_POSITION_IN_CTB::CtbPos2+i */
+
+
+#define GEN11_HCP_TILE_POSITION_IN_CTB_CtbPos2i_bits  8
+#define GEN10_HCP_TILE_POSITION_IN_CTB_CtbPos2i_bits  8
+#define GEN9_HCP_TILE_POSITION_IN_CTB_CtbPos2i_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_TILE_POSITION_IN_CTB_CtbPos2i_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_TILE_POSITION_IN_CTB_CtbPos2i_start  16
+#define GEN10_HCP_TILE_POSITION_IN_CTB_CtbPos2i_start  16
+#define GEN9_HCP_TILE_POSITION_IN_CTB_CtbPos2i_start  16
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_TILE_POSITION_IN_CTB_CtbPos2i_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_TILE_POSITION_IN_CTB::CtbPos3+i */
+
+
+#define GEN11_HCP_TILE_POSITION_IN_CTB_CtbPos3i_bits  8
+#define GEN10_HCP_TILE_POSITION_IN_CTB_CtbPos3i_bits  8
+#define GEN9_HCP_TILE_POSITION_IN_CTB_CtbPos3i_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_TILE_POSITION_IN_CTB_CtbPos3i_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_TILE_POSITION_IN_CTB_CtbPos3i_start  24
+#define GEN10_HCP_TILE_POSITION_IN_CTB_CtbPos3i_start  24
+#define GEN9_HCP_TILE_POSITION_IN_CTB_CtbPos3i_start  24
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_TILE_POSITION_IN_CTB_CtbPos3i_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 24;
+   case 10: return 24;
+   case 9: return 24;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_TILE_POSITION_IN_CTB_MSB */
+
+
+#define GEN11_HCP_TILE_POSITION_IN_CTB_MSB_length  2
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_TILE_POSITION_IN_CTB_MSB_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_TILE_POSITION_IN_CTB_MSB::Ctb Row Position of Tile Column */
+
+
+#define GEN11_HCP_TILE_POSITION_IN_CTB_MSB_CtbRowPositionofTileColumn_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_TILE_POSITION_IN_CTB_MSB_CtbRowPositionofTileColumn_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_TILE_POSITION_IN_CTB_MSB_CtbRowPositionofTileColumn_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_TILE_POSITION_IN_CTB_MSB_CtbRowPositionofTileColumn_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_CHROMA_ENTRY */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_ENTRY_length  1
+#define GEN10_HCP_WEIGHTOFFSET_CHROMA_ENTRY_length  1
+#define GEN9_HCP_WEIGHTOFFSET_CHROMA_ENTRY_length  1
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_ENTRY_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_CHROMA_ENTRY::Chroma Offset LX[0] */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX0_bits  8
+#define GEN10_HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX0_bits  8
+#define GEN9_HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX0_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX0_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX0_start  8
+#define GEN10_HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX0_start  8
+#define GEN9_HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX0_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX0_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_CHROMA_ENTRY::Chroma Offset LX[1] */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX1_bits  8
+#define GEN10_HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX1_bits  8
+#define GEN9_HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX1_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX1_start  24
+#define GEN10_HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX1_start  24
+#define GEN9_HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX1_start  24
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_ENTRY_ChromaOffsetLX1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 24;
+   case 10: return 24;
+   case 9: return 24;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_CHROMA_ENTRY::Delta Chroma Weight LX[0] */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX0_bits  8
+#define GEN10_HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX0_bits  8
+#define GEN9_HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX0_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX0_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX0_start  0
+#define GEN10_HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX0_start  0
+#define GEN9_HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX0_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX0_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_CHROMA_ENTRY::Delta Chroma Weight LX[1] */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX1_bits  8
+#define GEN10_HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX1_bits  8
+#define GEN9_HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX1_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX1_start  16
+#define GEN10_HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX1_start  16
+#define GEN9_HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX1_start  16
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_ENTRY_DeltaChromaWeightLX1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_length  1
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY::Chroma Offset LX[0] MSByte [i+1] */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX0MSBytei1_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX0MSBytei1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX0MSBytei1_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX0MSBytei1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY::Chroma Offset LX[0] MSByte [i] */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX0MSBytei_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX0MSBytei_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX0MSBytei_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX0MSBytei_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY::Chroma Offset LX[1] MSByte [i+1] */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX1MSBytei1_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX1MSBytei1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX1MSBytei1_start  24
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX1MSBytei1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 24;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY::Chroma Offset LX[1] MSByte [i] */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX1MSBytei_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX1MSBytei_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX1MSBytei_start  16
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_CHROMA_EXT_ENTRY_ChromaOffsetLX1MSBytei_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_LUMA_ENTRY */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_LUMA_ENTRY_length  1
+#define GEN10_HCP_WEIGHTOFFSET_LUMA_ENTRY_length  1
+#define GEN9_HCP_WEIGHTOFFSET_LUMA_ENTRY_length  1
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_LUMA_ENTRY_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_LUMA_ENTRY::Delta Luma Weight LX */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_LUMA_ENTRY_DeltaLumaWeightLX_bits  8
+#define GEN10_HCP_WEIGHTOFFSET_LUMA_ENTRY_DeltaLumaWeightLX_bits  8
+#define GEN9_HCP_WEIGHTOFFSET_LUMA_ENTRY_DeltaLumaWeightLX_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_LUMA_ENTRY_DeltaLumaWeightLX_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_WEIGHTOFFSET_LUMA_ENTRY_DeltaLumaWeightLX_start  0
+#define GEN10_HCP_WEIGHTOFFSET_LUMA_ENTRY_DeltaLumaWeightLX_start  0
+#define GEN9_HCP_WEIGHTOFFSET_LUMA_ENTRY_DeltaLumaWeightLX_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_LUMA_ENTRY_DeltaLumaWeightLX_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_LUMA_ENTRY::Luma Offset LX */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_LUMA_ENTRY_LumaOffsetLX_bits  8
+#define GEN10_HCP_WEIGHTOFFSET_LUMA_ENTRY_LumaOffsetLX_bits  8
+#define GEN9_HCP_WEIGHTOFFSET_LUMA_ENTRY_LumaOffsetLX_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_LUMA_ENTRY_LumaOffsetLX_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_WEIGHTOFFSET_LUMA_ENTRY_LumaOffsetLX_start  8
+#define GEN10_HCP_WEIGHTOFFSET_LUMA_ENTRY_LumaOffsetLX_start  8
+#define GEN9_HCP_WEIGHTOFFSET_LUMA_ENTRY_LumaOffsetLX_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_LUMA_ENTRY_LumaOffsetLX_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HCP_WEIGHTOFFSET_LUMA_ENTRY::Luma Offset LX MSByte */
+
+
+#define GEN11_HCP_WEIGHTOFFSET_LUMA_ENTRY_LumaOffsetLXMSByte_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_LUMA_ENTRY_LumaOffsetLXMSByte_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HCP_WEIGHTOFFSET_LUMA_ENTRY_LumaOffsetLXMSByte_start  24
+
+static inline uint32_t ATTRIBUTE_PURE
+HCP_WEIGHTOFFSET_LUMA_ENTRY_LumaOffsetLXMSByte_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 24;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HEVC_ARBITRATION_PRIORITY */
+
+
+#define GEN11_HEVC_ARBITRATION_PRIORITY_length  1
+#define GEN10_HEVC_ARBITRATION_PRIORITY_length  1
+#define GEN9_HEVC_ARBITRATION_PRIORITY_length  1
+
+static inline uint32_t ATTRIBUTE_PURE
+HEVC_ARBITRATION_PRIORITY_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HEVC_ARBITRATION_PRIORITY::Priority */
+
+
+#define GEN11_HEVC_ARBITRATION_PRIORITY_Priority_bits  2
+#define GEN10_HEVC_ARBITRATION_PRIORITY_Priority_bits  2
+#define GEN9_HEVC_ARBITRATION_PRIORITY_Priority_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+HEVC_ARBITRATION_PRIORITY_Priority_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HEVC_ARBITRATION_PRIORITY_Priority_start  0
+#define GEN10_HEVC_ARBITRATION_PRIORITY_Priority_start  0
+#define GEN9_HEVC_ARBITRATION_PRIORITY_Priority_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+HEVC_ARBITRATION_PRIORITY_Priority_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HEVC_VP9_RDOQ_LAMBDA_FIELDS */
+
+
+#define GEN11_HEVC_VP9_RDOQ_LAMBDA_FIELDS_length  1
+#define GEN10_HEVC_VP9_RDOQ_LAMBDA_FIELDS_length  1
+#define GEN9_HEVC_VP9_RDOQ_LAMBDA_FIELDS_length  1
+
+static inline uint32_t ATTRIBUTE_PURE
+HEVC_VP9_RDOQ_LAMBDA_FIELDS_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HEVC_VP9_RDOQ_LAMBDA_FIELDS::Lambda Value 0 */
+
+
+#define GEN11_HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue0_bits  16
+#define GEN10_HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue0_bits  16
+#define GEN9_HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue0_bits  16
+
+static inline uint32_t ATTRIBUTE_PURE
+HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue0_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue0_start  0
+#define GEN10_HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue0_start  0
+#define GEN9_HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue0_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue0_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HEVC_VP9_RDOQ_LAMBDA_FIELDS::Lambda Value 1 */
+
+
+#define GEN11_HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue1_bits  16
+#define GEN10_HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue1_bits  16
+#define GEN9_HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue1_bits  16
+
+static inline uint32_t ATTRIBUTE_PURE
+HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue1_start  16
+#define GEN10_HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue1_start  16
+#define GEN9_HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue1_start  16
+
+static inline uint32_t ATTRIBUTE_PURE
+HEVC_VP9_RDOQ_LAMBDA_FIELDS_LambdaValue1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
 /* HS_INVOCATION_COUNT */
 
 
@@ -135661,6 +138903,180 @@ HS_INVOCATION_COUNT_HSInvocationCountReport_start(const struct gen_device_info *
    case 11: return 0;
    case 10: return 0;
    case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HUC_VIRTUAL_ADDR_REGION */
+
+
+#define GEN11_HUC_VIRTUAL_ADDR_REGION_length  3
+#define GEN10_HUC_VIRTUAL_ADDR_REGION_length  3
+#define GEN9_HUC_VIRTUAL_ADDR_REGION_length  3
+
+static inline uint32_t ATTRIBUTE_PURE
+HUC_VIRTUAL_ADDR_REGION_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HUC_VIRTUAL_ADDR_REGION::Address */
+
+
+#define GEN11_HUC_VIRTUAL_ADDR_REGION_Address_bits  64
+#define GEN10_HUC_VIRTUAL_ADDR_REGION_Address_bits  64
+#define GEN9_HUC_VIRTUAL_ADDR_REGION_Address_bits  64
+
+static inline uint32_t ATTRIBUTE_PURE
+HUC_VIRTUAL_ADDR_REGION_Address_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 64;
+   case 9: return 64;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HUC_VIRTUAL_ADDR_REGION_Address_start  0
+#define GEN10_HUC_VIRTUAL_ADDR_REGION_Address_start  0
+#define GEN9_HUC_VIRTUAL_ADDR_REGION_Address_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+HUC_VIRTUAL_ADDR_REGION_Address_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* HUC_VIRTUAL_ADDR_REGION::Memory Address Attributes */
+
+
+#define GEN11_HUC_VIRTUAL_ADDR_REGION_MemoryAddressAttributes_bits  32
+#define GEN10_HUC_VIRTUAL_ADDR_REGION_MemoryAddressAttributes_bits  32
+#define GEN9_HUC_VIRTUAL_ADDR_REGION_MemoryAddressAttributes_bits  32
+
+static inline uint32_t ATTRIBUTE_PURE
+HUC_VIRTUAL_ADDR_REGION_MemoryAddressAttributes_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 32;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_HUC_VIRTUAL_ADDR_REGION_MemoryAddressAttributes_start  64
+#define GEN10_HUC_VIRTUAL_ADDR_REGION_MemoryAddressAttributes_start  64
+#define GEN9_HUC_VIRTUAL_ADDR_REGION_MemoryAddressAttributes_start  64
+
+static inline uint32_t ATTRIBUTE_PURE
+HUC_VIRTUAL_ADDR_REGION_MemoryAddressAttributes_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 64;
+   case 9: return 64;
    case 8: return 0;
    case 7:
       if (devinfo->is_haswell) {
@@ -135893,6 +139309,3366 @@ IA_VERTICES_COUNT_IAVerticesCountReport_start(const struct gen_device_info *devi
    case 7:
       if (devinfo->is_haswell) {
          return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* IMAGE_STATE_COST */
+
+
+#define GEN11_IMAGE_STATE_COST_length  2
+#define GEN10_IMAGE_STATE_COST_length  2
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* IMAGE_STATE_COST::MV 0 Cost */
+
+
+#define GEN11_IMAGE_STATE_COST_MV0Cost_bits  8
+#define GEN10_IMAGE_STATE_COST_MV0Cost_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV0Cost_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_IMAGE_STATE_COST_MV0Cost_start  0
+#define GEN10_IMAGE_STATE_COST_MV0Cost_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV0Cost_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* IMAGE_STATE_COST::MV 1 Cost */
+
+
+#define GEN11_IMAGE_STATE_COST_MV1Cost_bits  8
+#define GEN10_IMAGE_STATE_COST_MV1Cost_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV1Cost_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_IMAGE_STATE_COST_MV1Cost_start  8
+#define GEN10_IMAGE_STATE_COST_MV1Cost_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV1Cost_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* IMAGE_STATE_COST::MV 2 Cost */
+
+
+#define GEN11_IMAGE_STATE_COST_MV2Cost_bits  8
+#define GEN10_IMAGE_STATE_COST_MV2Cost_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV2Cost_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_IMAGE_STATE_COST_MV2Cost_start  16
+#define GEN10_IMAGE_STATE_COST_MV2Cost_start  16
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV2Cost_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* IMAGE_STATE_COST::MV 3 Cost */
+
+
+#define GEN11_IMAGE_STATE_COST_MV3Cost_bits  8
+#define GEN10_IMAGE_STATE_COST_MV3Cost_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV3Cost_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_IMAGE_STATE_COST_MV3Cost_start  24
+#define GEN10_IMAGE_STATE_COST_MV3Cost_start  24
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV3Cost_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 24;
+   case 10: return 24;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* IMAGE_STATE_COST::MV 4 Cost */
+
+
+#define GEN11_IMAGE_STATE_COST_MV4Cost_bits  8
+#define GEN10_IMAGE_STATE_COST_MV4Cost_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV4Cost_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_IMAGE_STATE_COST_MV4Cost_start  32
+#define GEN10_IMAGE_STATE_COST_MV4Cost_start  32
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV4Cost_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* IMAGE_STATE_COST::MV 5 Cost */
+
+
+#define GEN11_IMAGE_STATE_COST_MV5Cost_bits  8
+#define GEN10_IMAGE_STATE_COST_MV5Cost_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV5Cost_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_IMAGE_STATE_COST_MV5Cost_start  40
+#define GEN10_IMAGE_STATE_COST_MV5Cost_start  40
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV5Cost_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 40;
+   case 10: return 40;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* IMAGE_STATE_COST::MV 6 Cost */
+
+
+#define GEN11_IMAGE_STATE_COST_MV6Cost_bits  8
+#define GEN10_IMAGE_STATE_COST_MV6Cost_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV6Cost_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_IMAGE_STATE_COST_MV6Cost_start  48
+#define GEN10_IMAGE_STATE_COST_MV6Cost_start  48
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV6Cost_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 48;
+   case 10: return 48;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* IMAGE_STATE_COST::MV 7 Cost */
+
+
+#define GEN11_IMAGE_STATE_COST_MV7Cost_bits  8
+#define GEN10_IMAGE_STATE_COST_MV7Cost_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV7Cost_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_IMAGE_STATE_COST_MV7Cost_start  56
+#define GEN10_IMAGE_STATE_COST_MV7Cost_start  56
+
+static inline uint32_t ATTRIBUTE_PURE
+IMAGE_STATE_COST_MV7Cost_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 56;
+   case 10: return 56;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_length  3
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_length  3
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_length  3
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_length  3
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_length  3
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_length  2
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 3;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 3;
+      } else {
+         return 2;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::B Slice Concealment Mode */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceConcealmentMode_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceConcealmentMode_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceConcealmentMode_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceConcealmentMode_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceConcealmentMode_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceConcealmentMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceConcealmentMode_start  79
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceConcealmentMode_start  79
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceConcealmentMode_start  79
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceConcealmentMode_start  79
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceConcealmentMode_start  79
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceConcealmentMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 79;
+   case 10: return 79;
+   case 9: return 79;
+   case 8: return 79;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 79;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::B Slice Inter Direct Type Concealment Mode */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceInterDirectTypeConcealmentMode_bits  2
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceInterDirectTypeConcealmentMode_bits  2
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceInterDirectTypeConcealmentMode_bits  2
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceInterDirectTypeConcealmentMode_bits  2
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceInterDirectTypeConcealmentMode_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceInterDirectTypeConcealmentMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 2;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 2;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceInterDirectTypeConcealmentMode_start  76
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceInterDirectTypeConcealmentMode_start  76
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceInterDirectTypeConcealmentMode_start  76
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceInterDirectTypeConcealmentMode_start  76
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceInterDirectTypeConcealmentMode_start  76
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceInterDirectTypeConcealmentMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 76;
+   case 10: return 76;
+   case 9: return 76;
+   case 8: return 76;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 76;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::B Slice Spatial Inter Concealment Mode */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceSpatialInterConcealmentMode_bits  3
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceSpatialInterConcealmentMode_bits  3
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceSpatialInterConcealmentMode_bits  3
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceSpatialInterConcealmentMode_bits  3
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceSpatialInterConcealmentMode_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceSpatialInterConcealmentMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 3;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 3;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceSpatialInterConcealmentMode_start  72
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceSpatialInterConcealmentMode_start  72
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceSpatialInterConcealmentMode_start  72
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceSpatialInterConcealmentMode_start  72
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceSpatialInterConcealmentMode_start  72
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceSpatialInterConcealmentMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 72;
+   case 10: return 72;
+   case 9: return 72;
+   case 8: return 72;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 72;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::B Slice Temporal Inter Concealment Mode */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceTemporalInterConcealmentMode_bits  3
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceTemporalInterConcealmentMode_bits  3
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceTemporalInterConcealmentMode_bits  3
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceTemporalInterConcealmentMode_bits  3
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceTemporalInterConcealmentMode_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceTemporalInterConcealmentMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 3;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 3;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceTemporalInterConcealmentMode_start  68
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceTemporalInterConcealmentMode_start  68
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceTemporalInterConcealmentMode_start  68
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceTemporalInterConcealmentMode_start  68
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceTemporalInterConcealmentMode_start  68
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSliceTemporalInterConcealmentMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 68;
+   case 10: return 68;
+   case 9: return 68;
+   case 8: return 68;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 68;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::BSD Premature Complete Error Handling */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_start  14
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_start  14
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_start  14
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_start  14
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_start  14
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_start  14
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_BSDPrematureCompleteErrorHandling_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 14;
+   case 10: return 14;
+   case 9: return 14;
+   case 8: return 14;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 14;
+      } else {
+         return 14;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::Concealment Method */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_start  31
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_start  31
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_start  31
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_start  31
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_start  31
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_start  31
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentMethod_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 31;
+   case 10: return 31;
+   case 9: return 31;
+   case 8: return 31;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 31;
+      } else {
+         return 31;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::Concealment Picture ID */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_bits  6
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_bits  6
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_bits  6
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_bits  6
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_bits  6
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_bits  6
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 6;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 6;
+      } else {
+         return 6;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_start  16
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_start  16
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_start  16
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_start  16
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_start  16
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_start  16
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentPictureID_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 16;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 16;
+      } else {
+         return 16;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::Concealment Reference Picture + Field Bit */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentReferencePictureFieldBit_bits  6
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentReferencePictureFieldBit_bits  6
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentReferencePictureFieldBit_bits  6
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentReferencePictureFieldBit_bits  6
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentReferencePictureFieldBit_bits  6
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentReferencePictureFieldBit_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 6;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 6;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentReferencePictureFieldBit_start  88
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentReferencePictureFieldBit_start  88
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentReferencePictureFieldBit_start  88
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentReferencePictureFieldBit_start  88
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentReferencePictureFieldBit_start  88
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ConcealmentReferencePictureFieldBit_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 88;
+   case 10: return 88;
+   case 9: return 88;
+   case 8: return 88;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 88;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::Emulation Prevention Byte Present */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_start  36
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_start  36
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_start  36
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_start  36
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_start  36
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_start  36
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EmulationPreventionBytePresent_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 36;
+   case 10: return 36;
+   case 9: return 36;
+   case 8: return 36;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 36;
+      } else {
+         return 36;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::Entropy Error Handling */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_start  10
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_start  10
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_start  10
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_start  10
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_start  10
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_start  10
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_EntropyErrorHandling_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 10;
+   case 10: return 10;
+   case 9: return 10;
+   case 8: return 10;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 10;
+      } else {
+         return 10;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::First MB Bit Offset */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_bits  3
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_bits  3
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_bits  3
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_bits  3
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_bits  3
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 3;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 3;
+      } else {
+         return 3;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_start  32
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_start  32
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_start  32
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_start  32
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_start  32
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_start  32
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBBitOffset_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 32;
+   case 8: return 32;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 32;
+      } else {
+         return 32;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::First MB Byte Offset of Slice Data or Slice Header */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_bits  16
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_bits  16
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_bits  16
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_bits  16
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_bits  16
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_bits  16
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 16;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 16;
+      } else {
+         return 16;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_start  48
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_start  48
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_start  48
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_start  48
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_start  48
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_start  48
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FirstMBByteOffsetofSliceDataorSliceHeader_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 48;
+   case 10: return 48;
+   case 9: return 48;
+   case 8: return 48;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 48;
+      } else {
+         return 48;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::Fix Prev MB Skipped */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_start  39
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_start  39
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_start  39
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_start  39
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_start  39
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_start  39
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_FixPrevMBSkipped_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 39;
+   case 10: return 39;
+   case 9: return 39;
+   case 8: return 39;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 39;
+      } else {
+         return 39;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::I Slice Concealment Mode */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ISliceConcealmentMode_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ISliceConcealmentMode_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ISliceConcealmentMode_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ISliceConcealmentMode_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ISliceConcealmentMode_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ISliceConcealmentMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ISliceConcealmentMode_start  95
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ISliceConcealmentMode_start  95
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ISliceConcealmentMode_start  95
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ISliceConcealmentMode_start  95
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ISliceConcealmentMode_start  95
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_ISliceConcealmentMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 95;
+   case 10: return 95;
+   case 9: return 95;
+   case 8: return 95;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 95;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::Init Current MB Number */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_start  30
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_start  30
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_start  30
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_start  30
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_start  30
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_start  30
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_InitCurrentMBNumber_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 30;
+   case 10: return 30;
+   case 9: return 30;
+   case 8: return 30;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 30;
+      } else {
+         return 30;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::Intra 8x8/4x4 Prediction Error Concealment Control */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_Intra8x84x4PredictionErrorConcealmentControl_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_Intra8x84x4PredictionErrorConcealmentControl_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_Intra8x84x4PredictionErrorConcealmentControl_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_Intra8x84x4PredictionErrorConcealmentControl_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_Intra8x84x4PredictionErrorConcealmentControl_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_Intra8x84x4PredictionErrorConcealmentControl_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_Intra8x84x4PredictionErrorConcealmentControl_start  65
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_Intra8x84x4PredictionErrorConcealmentControl_start  65
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_Intra8x84x4PredictionErrorConcealmentControl_start  65
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_Intra8x84x4PredictionErrorConcealmentControl_start  65
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_Intra8x84x4PredictionErrorConcealmentControl_start  65
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_Intra8x84x4PredictionErrorConcealmentControl_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 65;
+   case 10: return 65;
+   case 9: return 65;
+   case 8: return 65;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 65;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::Intra PredMode (4x4/8x8 Luma) Error Control */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredMode4x48x8LumaErrorControl_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredMode4x48x8LumaErrorControl_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredMode4x48x8LumaErrorControl_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredMode4x48x8LumaErrorControl_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredMode4x48x8LumaErrorControl_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredMode4x48x8LumaErrorControl_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredMode4x48x8LumaErrorControl_start  29
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredMode4x48x8LumaErrorControl_start  29
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredMode4x48x8LumaErrorControl_start  29
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredMode4x48x8LumaErrorControl_start  29
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredMode4x48x8LumaErrorControl_start  29
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredMode4x48x8LumaErrorControl_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 29;
+   case 10: return 29;
+   case 9: return 29;
+   case 8: return 29;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 29;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::Intra Prediction Error Control */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredictionErrorControl_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredictionErrorControl_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredictionErrorControl_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredictionErrorControl_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredictionErrorControl_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredictionErrorControl_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredictionErrorControl_start  64
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredictionErrorControl_start  64
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredictionErrorControl_start  64
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredictionErrorControl_start  64
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredictionErrorControl_start  64
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_IntraPredictionErrorControl_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 64;
+   case 9: return 64;
+   case 8: return 64;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 64;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::Last Slice */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_start  35
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_start  35
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_start  35
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_start  35
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_start  35
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_start  35
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_LastSlice_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 35;
+   case 10: return 35;
+   case 9: return 35;
+   case 8: return 35;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 35;
+      } else {
+         return 35;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment B Spatial Motion Vectors Override Disable */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisable_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisable_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisable_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisable_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 0;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisable_start  4
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisable_start  4
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisable_start  4
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisable_start  4
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisable_start  4
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 4;
+   case 10: return 0;
+   case 9: return 4;
+   case 8: return 4;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 4;
+      } else {
+         return 4;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment B Spatial Motion Vectors Override Disable Flag */
+
+
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisableFlag_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisableFlag_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 1;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisableFlag_start  4
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialMotionVectorsOverrideDisableFlag_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 4;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment B Spatial Prediction Mode */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_bits  2
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_bits  2
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_bits  2
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_bits  2
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_bits  2
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 2;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 2;
+      } else {
+         return 2;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_start  6
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_start  6
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_start  6
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_start  6
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_start  6
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_start  6
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialPredictionMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 6;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 6;
+      } else {
+         return 6;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment B Spatial Reference Index Override Disable */
+
+
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialReferenceIndexOverrideDisable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialReferenceIndexOverrideDisable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialReferenceIndexOverrideDisable_start  5
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialReferenceIndexOverrideDisable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 5;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment B Spatial Weight Prediction Disable */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisable_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisable_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisable_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisable_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 0;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisable_start  3
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisable_start  3
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisable_start  3
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisable_start  3
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisable_start  3
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 0;
+   case 9: return 3;
+   case 8: return 3;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 3;
+      } else {
+         return 3;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment B Spatial Weight Prediction Disable Flag */
+
+
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisableFlag_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisableFlag_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 1;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisableFlag_start  3
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBSpatialWeightPredictionDisableFlag_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 3;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment B Temporal Motion Vectors Override Enable */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_start  25
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_start  25
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_start  25
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_start  25
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_start  25
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_start  25
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalMotionVectorsOverrideEnable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 25;
+   case 10: return 25;
+   case 9: return 25;
+   case 8: return 25;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 25;
+      } else {
+         return 25;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment B Temporal Prediction Mode */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_bits  2
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_bits  2
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_bits  2
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_bits  2
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_bits  2
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 2;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 2;
+      } else {
+         return 2;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_start  27
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_start  27
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_start  27
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_start  27
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_start  27
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_start  27
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalPredictionMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 27;
+   case 10: return 27;
+   case 9: return 27;
+   case 8: return 27;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 27;
+      } else {
+         return 27;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment B Temporal Reference Index Override Enable */
+
+
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalReferenceIndexOverrideEnable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalReferenceIndexOverrideEnable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalReferenceIndexOverrideEnable_start  26
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalReferenceIndexOverrideEnable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 26;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment B Temporal Weight Prediction Disable */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_start  24
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_start  24
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_start  24
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_start  24
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_start  24
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_start  24
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentBTemporalWeightPredictionDisable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 24;
+   case 10: return 24;
+   case 9: return 24;
+   case 8: return 24;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 24;
+      } else {
+         return 24;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment P Slice Motion Vectors Override Disable */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisable_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisable_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisable_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisable_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 0;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisable_start  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisable_start  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisable_start  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisable_start  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisable_start  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 0;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment P Slice Motion Vectors Override Disable Flag */
+
+
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisableFlag_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisableFlag_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 1;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisableFlag_start  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceMotionVectorsOverrideDisableFlag_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 1;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment P Slice Reference Index Override Disable */
+
+
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceReferenceIndexOverrideDisable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceReferenceIndexOverrideDisable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceReferenceIndexOverrideDisable_start  2
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceReferenceIndexOverrideDisable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 2;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment P Slice Weight Prediction Disable */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisable_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisable_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisable_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisable_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 0;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisable_start  0
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisable_start  0
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisable_start  0
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisable_start  0
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisable_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Error Concealment P Slice Weight Prediction Disable Flag */
+
+
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisableFlag_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisableFlag_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 1;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisableFlag_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBErrorConcealmentPSliceWeightPredictionDisableFlag_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MB Header Error Handling */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_start  8
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_start  8
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_start  8
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_start  8
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_start  8
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MBHeaderErrorHandling_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 8;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 8;
+      } else {
+         return 8;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::MPR Error Handling */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_bits  1
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_start  12
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_start  12
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_start  12
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_start  12
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_start  12
+#define GEN7_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_start  12
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_MPRErrorHandling_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 12;
+   case 10: return 12;
+   case 9: return 12;
+   case 8: return 12;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 12;
+      } else {
+         return 12;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::P Slice Concealment Mode */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceConcealmentMode_bits  1
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceConcealmentMode_bits  1
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceConcealmentMode_bits  1
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceConcealmentMode_bits  1
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceConcealmentMode_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceConcealmentMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceConcealmentMode_start  87
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceConcealmentMode_start  87
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceConcealmentMode_start  87
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceConcealmentMode_start  87
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceConcealmentMode_start  87
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceConcealmentMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 87;
+   case 10: return 87;
+   case 9: return 87;
+   case 8: return 87;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 87;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT::P Slice Inter Concealment Mode */
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceInterConcealmentMode_bits  3
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceInterConcealmentMode_bits  3
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceInterConcealmentMode_bits  3
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceInterConcealmentMode_bits  3
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceInterConcealmentMode_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceInterConcealmentMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 3;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 3;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceInterConcealmentMode_start  80
+#define GEN10_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceInterConcealmentMode_start  80
+#define GEN9_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceInterConcealmentMode_start  80
+#define GEN8_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceInterConcealmentMode_start  80
+#define GEN75_INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceInterConcealmentMode_start  80
+
+static inline uint32_t ATTRIBUTE_PURE
+INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT_PSliceInterConcealmentMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 80;
+   case 10: return 80;
+   case 9: return 80;
+   case 8: return 80;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 80;
       } else {
          return 0;
       }
@@ -146088,6 +152864,1113 @@ L3SQCREG1_ConvertT_UC_start(const struct gen_device_info *devinfo)
          return 27;
       } else {
          return 27;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_length  4
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_length  4
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 4;
+   case 10: return 4;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0X Filter Coefficient[[n],0] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn0_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn0_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn0_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn0_start  0
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn0_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn0_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0X Filter Coefficient[[n],1] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn1_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn1_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn1_start  16
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn1_start  16
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0X Filter Coefficient[[n],2] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn2_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn2_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn2_start  32
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn2_start  32
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0X Filter Coefficient[[n],3] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn3_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn3_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn3_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn3_start  48
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn3_start  48
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn3_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 48;
+   case 10: return 48;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0X Filter Coefficient[[n],4] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn4_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn4_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn4_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn4_start  64
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn4_start  64
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn4_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 64;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0X Filter Coefficient[[n],5] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn5_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn5_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn5_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn5_start  80
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn5_start  80
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn5_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 80;
+   case 10: return 80;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0X Filter Coefficient[[n],6] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn6_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn6_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn6_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn6_start  96
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn6_start  96
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn6_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 96;
+   case 10: return 96;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0X Filter Coefficient[[n],7] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn7_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn7_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn7_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn7_start  112
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn7_start  112
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0XFilterCoefficientn7_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 112;
+   case 10: return 112;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0Y Filter Coefficient[[n],0] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn0_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn0_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn0_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn0_start  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn0_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn0_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0Y Filter Coefficient[[n],1] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn1_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn1_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn1_start  24
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn1_start  24
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 24;
+   case 10: return 24;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0Y Filter Coefficient[[n],2] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn2_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn2_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn2_start  40
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn2_start  40
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 40;
+   case 10: return 40;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0Y Filter Coefficient[[n],3] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn3_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn3_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn3_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn3_start  56
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn3_start  56
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn3_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 56;
+   case 10: return 56;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0Y Filter Coefficient[[n],4] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn4_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn4_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn4_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn4_start  72
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn4_start  72
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn4_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 72;
+   case 10: return 72;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0Y Filter Coefficient[[n],5] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn5_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn5_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn5_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn5_start  88
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn5_start  88
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn5_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 88;
+   case 10: return 88;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0Y Filter Coefficient[[n],6] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn6_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn6_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn6_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn6_start  104
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn6_start  104
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn6_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 104;
+   case 10: return 104;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* LUMA_FILTER_COEFFICIENTS_ARRAY::Table 0Y Filter Coefficient[[n],7] */
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn7_bits  8
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn7_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn7_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn7_start  120
+#define GEN10_LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn7_start  120
+
+static inline uint32_t ATTRIBUTE_PURE
+LUMA_FILTER_COEFFICIENTS_ARRAY_Table0YFilterCoefficientn7_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 120;
+   case 10: return 120;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
       }
    case 6: return 0;
    case 5: return 0;
@@ -159189,6 +167072,587 @@ MEDIA_VFE_STATE_URBEntryAllocationSize_start(const struct gen_device_info *devin
 
 
 
+/* MEMORYADDRESSATTRIBUTES */
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_length  1
+#define GEN10_MEMORYADDRESSATTRIBUTES_length  1
+#define GEN9_MEMORYADDRESSATTRIBUTES_length  1
+#define GEN8_MEMORYADDRESSATTRIBUTES_length  1
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MEMORYADDRESSATTRIBUTES::Age for QUADLRU */
+
+
+#define GEN8_MEMORYADDRESSATTRIBUTES_AgeforQUADLRU_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_AgeforQUADLRU_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 2;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN8_MEMORYADDRESSATTRIBUTES_AgeforQUADLRU_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_AgeforQUADLRU_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MEMORYADDRESSATTRIBUTES::Arbitration Priority Control */
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_ArbitrationPriorityControl_bits  2
+#define GEN10_MEMORYADDRESSATTRIBUTES_ArbitrationPriorityControl_bits  2
+#define GEN9_MEMORYADDRESSATTRIBUTES_ArbitrationPriorityControl_bits  2
+#define GEN8_MEMORYADDRESSATTRIBUTES_ArbitrationPriorityControl_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_ArbitrationPriorityControl_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 2;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_ArbitrationPriorityControl_start  7
+#define GEN10_MEMORYADDRESSATTRIBUTES_ArbitrationPriorityControl_start  7
+#define GEN9_MEMORYADDRESSATTRIBUTES_ArbitrationPriorityControl_start  7
+#define GEN8_MEMORYADDRESSATTRIBUTES_ArbitrationPriorityControl_start  7
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_ArbitrationPriorityControl_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 7;
+   case 10: return 7;
+   case 9: return 7;
+   case 8: return 7;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MEMORYADDRESSATTRIBUTES::MOCS */
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_MOCS_bits  6
+#define GEN10_MEMORYADDRESSATTRIBUTES_MOCS_bits  6
+#define GEN9_MEMORYADDRESSATTRIBUTES_MOCS_bits  6
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_MOCS_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_MOCS_start  1
+#define GEN10_MEMORYADDRESSATTRIBUTES_MOCS_start  1
+#define GEN9_MEMORYADDRESSATTRIBUTES_MOCS_start  1
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_MOCS_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MEMORYADDRESSATTRIBUTES::Memory Compression Enable */
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_MemoryCompressionEnable_bits  1
+#define GEN10_MEMORYADDRESSATTRIBUTES_MemoryCompressionEnable_bits  1
+#define GEN9_MEMORYADDRESSATTRIBUTES_MemoryCompressionEnable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_MemoryCompressionEnable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_MemoryCompressionEnable_start  9
+#define GEN10_MEMORYADDRESSATTRIBUTES_MemoryCompressionEnable_start  9
+#define GEN9_MEMORYADDRESSATTRIBUTES_MemoryCompressionEnable_start  9
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_MemoryCompressionEnable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 9;
+   case 10: return 9;
+   case 9: return 9;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MEMORYADDRESSATTRIBUTES::Memory Compression Mode */
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_MemoryCompressionMode_bits  1
+#define GEN10_MEMORYADDRESSATTRIBUTES_MemoryCompressionMode_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_MemoryCompressionMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_MemoryCompressionMode_start  10
+#define GEN10_MEMORYADDRESSATTRIBUTES_MemoryCompressionMode_start  10
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_MemoryCompressionMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 10;
+   case 10: return 10;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MEMORYADDRESSATTRIBUTES::Row Store Scratch Buffer Cache Select */
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_RowStoreScratchBufferCacheSelect_bits  1
+#define GEN10_MEMORYADDRESSATTRIBUTES_RowStoreScratchBufferCacheSelect_bits  1
+#define GEN9_MEMORYADDRESSATTRIBUTES_RowStoreScratchBufferCacheSelect_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_RowStoreScratchBufferCacheSelect_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_RowStoreScratchBufferCacheSelect_start  12
+#define GEN10_MEMORYADDRESSATTRIBUTES_RowStoreScratchBufferCacheSelect_start  12
+#define GEN9_MEMORYADDRESSATTRIBUTES_RowStoreScratchBufferCacheSelect_start  12
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_RowStoreScratchBufferCacheSelect_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 12;
+   case 10: return 12;
+   case 9: return 12;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MEMORYADDRESSATTRIBUTES::Target Cache */
+
+
+#define GEN8_MEMORYADDRESSATTRIBUTES_TargetCache_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_TargetCache_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 2;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN8_MEMORYADDRESSATTRIBUTES_TargetCache_start  3
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_TargetCache_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 3;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MEMORYADDRESSATTRIBUTES::Tiled Resource Mode */
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_TiledResourceMode_bits  2
+#define GEN10_MEMORYADDRESSATTRIBUTES_TiledResourceMode_bits  2
+#define GEN9_MEMORYADDRESSATTRIBUTES_TiledResourceMode_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_TiledResourceMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MEMORYADDRESSATTRIBUTES_TiledResourceMode_start  13
+#define GEN10_MEMORYADDRESSATTRIBUTES_TiledResourceMode_start  13
+#define GEN9_MEMORYADDRESSATTRIBUTES_TiledResourceMode_start  13
+
+static inline uint32_t ATTRIBUTE_PURE
+MEMORYADDRESSATTRIBUTES_TiledResourceMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
 /* MEMORY_OBJECT_CONTROL_STATE */
 
 
@@ -159804,6 +168268,862 @@ MEMORY_OBJECT_CONTROL_STATE_TargetCache_start(const struct gen_device_info *devi
          return 0;
       } else {
          return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION */
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_length  2
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_length  2
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_length  2
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_length  2
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_length  2
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_length  2
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 2;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 2;
+      } else {
+         return 2;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION::First MB Bit Offset */
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_bits  3
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_bits  3
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_bits  3
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_bits  3
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_bits  3
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 3;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 3;
+      } else {
+         return 3;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_start  0
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_start  0
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_start  0
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_start  0
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_start  0
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_FirstMBBitOffset_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION::Last MB */
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_bits  1
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_bits  1
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_bits  1
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_bits  1
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_bits  1
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_start  3
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_start  3
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_start  3
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_start  3
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_start  3
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_start  3
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastMB_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 3;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 3;
+      } else {
+         return 3;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION::Last Pic Slice */
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_bits  1
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_bits  1
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_bits  1
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_bits  1
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_bits  1
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_start  5
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_start  5
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_start  5
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_start  5
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_start  5
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_start  5
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_LastPicSlice_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 5;
+   case 10: return 5;
+   case 9: return 5;
+   case 8: return 5;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 5;
+      } else {
+         return 5;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION::MB Count */
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_bits  8
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_bits  8
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_bits  8
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_bits  8
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_bits  8
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_bits  7
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 8;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 8;
+      } else {
+         return 7;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_start  8
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_start  8
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_start  8
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_start  8
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_start  8
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_MBCount_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 8;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 8;
+      } else {
+         return 8;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION::Next Slice Horizontal Position */
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceHorizontalPosition_bits  8
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceHorizontalPosition_bits  8
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceHorizontalPosition_bits  8
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceHorizontalPosition_bits  8
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceHorizontalPosition_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceHorizontalPosition_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 8;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 8;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceHorizontalPosition_start  32
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceHorizontalPosition_start  32
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceHorizontalPosition_start  32
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceHorizontalPosition_start  32
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceHorizontalPosition_start  32
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceHorizontalPosition_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 32;
+   case 8: return 32;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 32;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION::Next Slice Vertical Position */
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceVerticalPosition_bits  9
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceVerticalPosition_bits  9
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceVerticalPosition_bits  9
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceVerticalPosition_bits  9
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceVerticalPosition_bits  9
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceVerticalPosition_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 9;
+   case 10: return 9;
+   case 9: return 9;
+   case 8: return 9;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 9;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceVerticalPosition_start  40
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceVerticalPosition_start  40
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceVerticalPosition_start  40
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceVerticalPosition_start  40
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceVerticalPosition_start  40
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_NextSliceVerticalPosition_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 40;
+   case 10: return 40;
+   case 9: return 40;
+   case 8: return 40;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 40;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION::Quantizer Scale Code */
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_bits  5
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_bits  5
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_bits  5
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_bits  5
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_bits  5
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_bits  5
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 5;
+   case 10: return 5;
+   case 9: return 5;
+   case 8: return 5;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 5;
+      } else {
+         return 5;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_start  56
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_start  56
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_start  56
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_start  56
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_start  56
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_start  56
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_QuantizerScaleCode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 56;
+   case 10: return 56;
+   case 9: return 56;
+   case 8: return 56;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 56;
+      } else {
+         return 56;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION::Slice Concealment Override */
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentOverride_bits  1
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentOverride_bits  1
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentOverride_bits  1
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentOverride_bits  1
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentOverride_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentOverride_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentOverride_start  7
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentOverride_start  7
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentOverride_start  7
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentOverride_start  7
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentOverride_start  7
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentOverride_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 7;
+   case 10: return 7;
+   case 9: return 7;
+   case 8: return 7;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 7;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION::Slice Concealment Type */
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentType_bits  1
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentType_bits  1
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentType_bits  1
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentType_bits  1
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentType_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentType_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 1;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 1;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentType_start  6
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentType_start  6
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentType_start  6
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentType_start  6
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentType_start  6
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceConcealmentType_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 6;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 6;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION::Slice Horizontal Position */
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_bits  8
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_bits  8
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_bits  8
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_bits  8
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_bits  8
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_bits  7
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 8;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 8;
+      } else {
+         return 7;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_start  24
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_start  24
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_start  24
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_start  24
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_start  24
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_start  24
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceHorizontalPosition_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 24;
+   case 10: return 24;
+   case 9: return 24;
+   case 8: return 24;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 24;
+      } else {
+         return 24;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION::Slice Vertical Position */
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_bits  8
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_bits  8
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_bits  8
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_bits  8
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_bits  8
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_bits  7
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 8;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 8;
+      } else {
+         return 7;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_start  16
+#define GEN10_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_start  16
+#define GEN9_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_start  16
+#define GEN8_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_start  16
+#define GEN75_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_start  16
+#define GEN7_MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_start  16
+
+static inline uint32_t ATTRIBUTE_PURE
+MFD_MPEG2_BSD_OBJECT_INLINE_DATA_DESCRIPTION_SliceVerticalPosition_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 16;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 16;
+      } else {
+         return 16;
       }
    case 6: return 0;
    case 5: return 0;
@@ -205331,21 +214651,87 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_length(const struct gen_device_info *devinfo)
 
 
 
+/* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0 Filter Coefficient */
+
+
+#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0FilterCoefficient_bits  8
+#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0FilterCoefficient_bits  8
+#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0FilterCoefficient_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0FilterCoefficient_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0FilterCoefficient_start  0
+#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0FilterCoefficient_start  0
+#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0FilterCoefficient_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0FilterCoefficient_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0X Filter Coefficient[n,0] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn0_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn0_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn0_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn0_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn0_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -205368,9 +214754,6 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn0_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn0_start  0
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn0_start  0
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn0_start  0
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn0_start  0
 
 static inline uint32_t ATTRIBUTE_PURE
@@ -205405,18 +214788,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn0_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0X Filter Coefficient[n,1] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn1_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn1_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn1_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn1_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn1_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -205439,18 +214819,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn1_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn1_start  16
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn1_start  16
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn1_start  16
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn1_start  16
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn1_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 16;
-   case 10: return 16;
-   case 9: return 16;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 16;
    case 7:
       if (devinfo->is_haswell) {
@@ -205476,18 +214853,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn1_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0X Filter Coefficient[n,2] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn2_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn2_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn2_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn2_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn2_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -205510,18 +214884,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn2_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn2_start  32
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn2_start  32
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn2_start  32
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn2_start  32
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn2_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 32;
-   case 10: return 32;
-   case 9: return 32;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 32;
    case 7:
       if (devinfo->is_haswell) {
@@ -205547,18 +214918,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn2_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0X Filter Coefficient[n,3] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn3_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn3_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn3_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn3_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn3_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -205581,18 +214949,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn3_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn3_start  48
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn3_start  48
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn3_start  48
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn3_start  48
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn3_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 48;
-   case 10: return 48;
-   case 9: return 48;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 48;
    case 7:
       if (devinfo->is_haswell) {
@@ -205618,18 +214983,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn3_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0X Filter Coefficient[n,4] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn4_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn4_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn4_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn4_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn4_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -205652,18 +215014,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn4_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn4_start  64
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn4_start  64
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn4_start  64
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn4_start  64
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn4_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 64;
-   case 10: return 64;
-   case 9: return 64;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 64;
    case 7:
       if (devinfo->is_haswell) {
@@ -205689,18 +215048,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn4_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0X Filter Coefficient[n,5] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn5_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn5_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn5_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn5_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn5_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -205723,18 +215079,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn5_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn5_start  80
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn5_start  80
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn5_start  80
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn5_start  80
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn5_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 80;
-   case 10: return 80;
-   case 9: return 80;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 80;
    case 7:
       if (devinfo->is_haswell) {
@@ -205760,18 +215113,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn5_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0X Filter Coefficient[n,6] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn6_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn6_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn6_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn6_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn6_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -205794,18 +215144,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn6_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn6_start  96
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn6_start  96
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn6_start  96
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn6_start  96
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn6_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 96;
-   case 10: return 96;
-   case 9: return 96;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 96;
    case 7:
       if (devinfo->is_haswell) {
@@ -205831,18 +215178,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn6_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0X Filter Coefficient[n,7] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn7_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn7_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn7_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn7_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn7_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -205865,18 +215209,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn7_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn7_start  112
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn7_start  112
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn7_start  112
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn7_start  112
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn7_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 112;
-   case 10: return 112;
-   case 9: return 112;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 112;
    case 7:
       if (devinfo->is_haswell) {
@@ -205902,18 +215243,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0XFilterCoefficientn7_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0Y Filter Coefficient[n,0] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn0_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn0_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn0_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn0_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn0_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -205936,18 +215274,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn0_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn0_start  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn0_start  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn0_start  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn0_start  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn0_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -205973,18 +215308,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn0_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0Y Filter Coefficient[n,1] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn1_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn1_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn1_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn1_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn1_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206007,18 +215339,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn1_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn1_start  24
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn1_start  24
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn1_start  24
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn1_start  24
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn1_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 24;
-   case 10: return 24;
-   case 9: return 24;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 24;
    case 7:
       if (devinfo->is_haswell) {
@@ -206044,18 +215373,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn1_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0Y Filter Coefficient[n,2] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn2_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn2_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn2_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn2_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn2_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206078,18 +215404,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn2_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn2_start  40
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn2_start  40
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn2_start  40
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn2_start  40
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn2_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 40;
-   case 10: return 40;
-   case 9: return 40;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 40;
    case 7:
       if (devinfo->is_haswell) {
@@ -206115,18 +215438,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn2_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0Y Filter Coefficient[n,3] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn3_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn3_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn3_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn3_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn3_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206149,18 +215469,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn3_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn3_start  56
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn3_start  56
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn3_start  56
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn3_start  56
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn3_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 56;
-   case 10: return 56;
-   case 9: return 56;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 56;
    case 7:
       if (devinfo->is_haswell) {
@@ -206186,18 +215503,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn3_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0Y Filter Coefficient[n,4] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn4_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn4_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn4_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn4_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn4_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206220,18 +215534,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn4_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn4_start  72
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn4_start  72
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn4_start  72
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn4_start  72
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn4_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 72;
-   case 10: return 72;
-   case 9: return 72;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 72;
    case 7:
       if (devinfo->is_haswell) {
@@ -206257,18 +215568,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn4_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0Y Filter Coefficient[n,5] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn5_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn5_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn5_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn5_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn5_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206291,18 +215599,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn5_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn5_start  88
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn5_start  88
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn5_start  88
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn5_start  88
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn5_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 88;
-   case 10: return 88;
-   case 9: return 88;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 88;
    case 7:
       if (devinfo->is_haswell) {
@@ -206328,18 +215633,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn5_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0Y Filter Coefficient[n,6] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn6_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn6_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn6_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn6_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn6_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206362,18 +215664,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn6_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn6_start  104
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn6_start  104
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn6_start  104
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn6_start  104
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn6_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 104;
-   case 10: return 104;
-   case 9: return 104;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 104;
    case 7:
       if (devinfo->is_haswell) {
@@ -206399,18 +215698,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn6_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 0Y Filter Coefficient[n,7] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn7_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn7_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn7_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn7_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn7_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206433,19 +215729,154 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn7_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn7_start  120
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn7_start  120
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn7_start  120
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn7_start  120
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn7_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 120;
-   case 10: return 120;
-   case 9: return 120;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 120;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 1 Filter Coefficient0 */
+
+
+#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient0_bits  8
+#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient0_bits  8
+#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient0_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient0_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient0_start  0
+#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient0_start  0
+#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient0_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient0_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 1 Filter Coefficient1 */
+
+
+#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient1_bits  8
+#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient1_bits  8
+#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient1_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient1_start  8
+#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient1_start  8
+#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient1_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1FilterCoefficient1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
    case 7:
       if (devinfo->is_haswell) {
          return 0;
@@ -206470,18 +215901,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table0YFilterCoefficientn7_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 1X Filter Coefficient[n,2] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn2_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn2_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn2_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn2_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn2_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206504,18 +215932,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn2_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn2_start  144
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn2_start  144
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn2_start  144
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn2_start  144
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn2_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 144;
-   case 10: return 144;
-   case 9: return 144;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 144;
    case 7:
       if (devinfo->is_haswell) {
@@ -206541,18 +215966,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn2_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 1X Filter Coefficient[n,3] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn3_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn3_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn3_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn3_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn3_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206575,18 +215997,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn3_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn3_start  152
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn3_start  152
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn3_start  152
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn3_start  152
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn3_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 152;
-   case 10: return 152;
-   case 9: return 152;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 152;
    case 7:
       if (devinfo->is_haswell) {
@@ -206612,18 +216031,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn3_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 1X Filter Coefficient[n,4] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn4_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn4_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn4_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn4_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn4_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206646,18 +216062,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn4_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn4_start  160
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn4_start  160
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn4_start  160
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn4_start  160
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn4_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 160;
-   case 10: return 160;
-   case 9: return 160;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 160;
    case 7:
       if (devinfo->is_haswell) {
@@ -206683,18 +216096,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn4_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 1X Filter Coefficient[n,5] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn5_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn5_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn5_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn5_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn5_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206717,18 +216127,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn5_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn5_start  168
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn5_start  168
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn5_start  168
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn5_start  168
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn5_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 168;
-   case 10: return 168;
-   case 9: return 168;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 168;
    case 7:
       if (devinfo->is_haswell) {
@@ -206754,18 +216161,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1XFilterCoefficientn5_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 1Y Filter Coefficient[n,2] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn2_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn2_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn2_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn2_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn2_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206788,18 +216192,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn2_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn2_start  208
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn2_start  208
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn2_start  208
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn2_start  208
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn2_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 208;
-   case 10: return 208;
-   case 9: return 208;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 208;
    case 7:
       if (devinfo->is_haswell) {
@@ -206825,18 +216226,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn2_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 1Y Filter Coefficient[n,3] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn3_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn3_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn3_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn3_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn3_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206859,18 +216257,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn3_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn3_start  216
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn3_start  216
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn3_start  216
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn3_start  216
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn3_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 216;
-   case 10: return 216;
-   case 9: return 216;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 216;
    case 7:
       if (devinfo->is_haswell) {
@@ -206896,18 +216291,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn3_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 1Y Filter Coefficient[n,4] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn4_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn4_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn4_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn4_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn4_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -206930,18 +216322,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn4_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn4_start  224
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn4_start  224
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn4_start  224
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn4_start  224
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn4_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 224;
-   case 10: return 224;
-   case 9: return 224;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 224;
    case 7:
       if (devinfo->is_haswell) {
@@ -206967,18 +216356,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn4_start(const struct
 /* SAMPLER_STATE_8X8_AVS_COEFFICIENTS::Table 1Y Filter Coefficient[n,5] */
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn5_bits  8
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn5_bits  8
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn5_bits  8
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn5_bits  8
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn5_bits(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 8;
-   case 10: return 8;
-   case 9: return 8;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 8;
    case 7:
       if (devinfo->is_haswell) {
@@ -207001,18 +216387,15 @@ SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn5_bits(const struct 
 
 
 
-#define GEN11_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn5_start  232
-#define GEN10_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn5_start  232
-#define GEN9_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn5_start  232
 #define GEN8_SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn5_start  232
 
 static inline uint32_t ATTRIBUTE_PURE
 SAMPLER_STATE_8X8_AVS_COEFFICIENTS_Table1YFilterCoefficientn5_start(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 232;
-   case 10: return 232;
-   case 9: return 232;
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 232;
    case 7:
       if (devinfo->is_haswell) {
@@ -209414,6 +218797,7703 @@ SC_INSTDONE_WMFEDone_start(const struct gen_device_info *devinfo)
          return 1;
       } else {
          return 1;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_CHROMA_COEFF_TABLE_BODY */
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_length  64
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_length  64
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_length  64
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 64;
+   case 9: return 64;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_CHROMA_COEFF_TABLE_BODY::Filter Coefficients */
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_FilterCoefficients_bits  64
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_FilterCoefficients_bits  64
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_FilterCoefficients_bits  64
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_FilterCoefficients_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 64;
+   case 9: return 64;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_FilterCoefficients_start  0
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_FilterCoefficients_start  0
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_FilterCoefficients_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_FilterCoefficients_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_CHROMA_COEFF_TABLE_BODY::Table 1X Filter Coefficient[[n],2] */
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn2_bits  8
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn2_bits  8
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn2_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn2_start  0
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn2_start  0
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn2_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_CHROMA_COEFF_TABLE_BODY::Table 1X Filter Coefficient[[n],3] */
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn3_bits  8
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn3_bits  8
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn3_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn3_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn3_start  16
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn3_start  16
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn3_start  16
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn3_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_CHROMA_COEFF_TABLE_BODY::Table 1X Filter Coefficient[[n],4] */
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn4_bits  8
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn4_bits  8
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn4_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn4_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn4_start  32
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn4_start  32
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn4_start  32
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn4_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 32;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_CHROMA_COEFF_TABLE_BODY::Table 1X Filter Coefficient[[n],5] */
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn5_bits  8
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn5_bits  8
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn5_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn5_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn5_start  48
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn5_start  48
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn5_start  48
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1XFilterCoefficientn5_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 48;
+   case 10: return 48;
+   case 9: return 48;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_CHROMA_COEFF_TABLE_BODY::Table 1Y Filter Coefficient[[n],2] */
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn2_bits  8
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn2_bits  8
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn2_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn2_start  8
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn2_start  8
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn2_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_CHROMA_COEFF_TABLE_BODY::Table 1Y Filter Coefficient[[n],3] */
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn3_bits  8
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn3_bits  8
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn3_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn3_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn3_start  24
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn3_start  24
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn3_start  24
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn3_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 24;
+   case 10: return 24;
+   case 9: return 24;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_CHROMA_COEFF_TABLE_BODY::Table 1Y Filter Coefficient[[n],4] */
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn4_bits  8
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn4_bits  8
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn4_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn4_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn4_start  40
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn4_start  40
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn4_start  40
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn4_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 40;
+   case 10: return 40;
+   case 9: return 40;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_CHROMA_COEFF_TABLE_BODY::Table 1Y Filter Coefficient[[n],5] */
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn5_bits  8
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn5_bits  8
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn5_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn5_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn5_start  56
+#define GEN10_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn5_start  56
+#define GEN9_SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn5_start  56
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_CHROMA_COEFF_TABLE_BODY_Table1YFilterCoefficientn5_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 56;
+   case 10: return 56;
+   case 9: return 56;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_length  128
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_length  128
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_length  128
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 128;
+   case 10: return 128;
+   case 9: return 128;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Filter Coefficients */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_FilterCoefficients_bits  128
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_FilterCoefficients_bits  128
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_FilterCoefficients_bits  128
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_FilterCoefficients_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 128;
+   case 10: return 128;
+   case 9: return 128;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_FilterCoefficients_start  0
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_FilterCoefficients_start  0
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_FilterCoefficients_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_FilterCoefficients_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0X Filter Coefficient[[n],0] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn0_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn0_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn0_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn0_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn0_start  0
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn0_start  0
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn0_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn0_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0X Filter Coefficient[[n],1] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn1_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn1_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn1_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn1_start  16
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn1_start  16
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn1_start  16
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0X Filter Coefficient[[n],2] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn2_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn2_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn2_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn2_start  32
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn2_start  32
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn2_start  32
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 32;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0X Filter Coefficient[[n],3] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn3_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn3_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn3_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn3_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn3_start  48
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn3_start  48
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn3_start  48
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn3_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 48;
+   case 10: return 48;
+   case 9: return 48;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0X Filter Coefficient[[n],4] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn4_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn4_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn4_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn4_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn4_start  64
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn4_start  64
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn4_start  64
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn4_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 64;
+   case 9: return 64;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0X Filter Coefficient[[n],5] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn5_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn5_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn5_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn5_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn5_start  80
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn5_start  80
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn5_start  80
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn5_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 80;
+   case 10: return 80;
+   case 9: return 80;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0X Filter Coefficient[[n],6] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn6_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn6_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn6_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn6_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn6_start  96
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn6_start  96
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn6_start  96
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn6_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 96;
+   case 10: return 96;
+   case 9: return 96;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0X Filter Coefficient[[n],7] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn7_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn7_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn7_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn7_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn7_start  112
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn7_start  112
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn7_start  112
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0XFilterCoefficientn7_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 112;
+   case 10: return 112;
+   case 9: return 112;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0Y Filter Coefficient[[n],0] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn0_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn0_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn0_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn0_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn0_start  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn0_start  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn0_start  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn0_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0Y Filter Coefficient[[n],1] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn1_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn1_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn1_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn1_start  24
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn1_start  24
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn1_start  24
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 24;
+   case 10: return 24;
+   case 9: return 24;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0Y Filter Coefficient[[n],2] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn2_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn2_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn2_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn2_start  40
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn2_start  40
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn2_start  40
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 40;
+   case 10: return 40;
+   case 9: return 40;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0Y Filter Coefficient[[n],3] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn3_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn3_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn3_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn3_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn3_start  56
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn3_start  56
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn3_start  56
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn3_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 56;
+   case 10: return 56;
+   case 9: return 56;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0Y Filter Coefficient[[n],4] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn4_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn4_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn4_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn4_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn4_start  72
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn4_start  72
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn4_start  72
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn4_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 72;
+   case 10: return 72;
+   case 9: return 72;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0Y Filter Coefficient[[n],5] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn5_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn5_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn5_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn5_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn5_start  88
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn5_start  88
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn5_start  88
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn5_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 88;
+   case 10: return 88;
+   case 9: return 88;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0Y Filter Coefficient[[n],6] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn6_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn6_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn6_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn6_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn6_start  104
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn6_start  104
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn6_start  104
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn6_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 104;
+   case 10: return 104;
+   case 9: return 104;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_LUMA_COEFF_TABLE_BODY::Table 0Y Filter Coefficient[[n],7] */
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn7_bits  8
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn7_bits  8
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn7_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn7_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn7_start  120
+#define GEN10_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn7_start  120
+#define GEN9_SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn7_start  120
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_LUMA_COEFF_TABLE_BODY_Table0YFilterCoefficientn7_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 120;
+   case 10: return 120;
+   case 9: return 120;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_STATE_BODY */
+
+
+#define GEN11_SFC_AVS_STATE_BODY_length  3
+#define GEN10_SFC_AVS_STATE_BODY_length  2
+#define GEN9_SFC_AVS_STATE_BODY_length  2
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_STATE_BODY::Input Vertical Siting */
+
+
+#define GEN11_SFC_AVS_STATE_BODY_InputVerticalSiting_bits  4
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_InputVerticalSiting_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 4;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_STATE_BODY_InputVerticalSiting_start  64
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_InputVerticalSiting_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_STATE_BODY::Max Derivative 4 Pixels */
+
+
+#define GEN11_SFC_AVS_STATE_BODY_MaxDerivative4Pixels_bits  8
+#define GEN10_SFC_AVS_STATE_BODY_MaxDerivative4Pixels_bits  8
+#define GEN9_SFC_AVS_STATE_BODY_MaxDerivative4Pixels_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_MaxDerivative4Pixels_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_STATE_BODY_MaxDerivative4Pixels_start  48
+#define GEN10_SFC_AVS_STATE_BODY_MaxDerivative4Pixels_start  48
+#define GEN9_SFC_AVS_STATE_BODY_MaxDerivative4Pixels_start  48
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_MaxDerivative4Pixels_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 48;
+   case 10: return 48;
+   case 9: return 48;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_STATE_BODY::Max Derivative 8 Pixels */
+
+
+#define GEN11_SFC_AVS_STATE_BODY_MaxDerivative8Pixels_bits  8
+#define GEN10_SFC_AVS_STATE_BODY_MaxDerivative8Pixels_bits  8
+#define GEN9_SFC_AVS_STATE_BODY_MaxDerivative8Pixels_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_MaxDerivative8Pixels_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_STATE_BODY_MaxDerivative8Pixels_start  32
+#define GEN10_SFC_AVS_STATE_BODY_MaxDerivative8Pixels_start  32
+#define GEN9_SFC_AVS_STATE_BODY_MaxDerivative8Pixels_start  32
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_MaxDerivative8Pixels_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 32;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_STATE_BODY::Sharpness Level */
+
+
+#define GEN11_SFC_AVS_STATE_BODY_SharpnessLevel_bits  8
+#define GEN10_SFC_AVS_STATE_BODY_SharpnessLevel_bits  8
+#define GEN9_SFC_AVS_STATE_BODY_SharpnessLevel_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_SharpnessLevel_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_STATE_BODY_SharpnessLevel_start  24
+#define GEN10_SFC_AVS_STATE_BODY_SharpnessLevel_start  24
+#define GEN9_SFC_AVS_STATE_BODY_SharpnessLevel_start  24
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_SharpnessLevel_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 24;
+   case 10: return 24;
+   case 9: return 24;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_STATE_BODY::Transition Area with 4 Pixels */
+
+
+#define GEN11_SFC_AVS_STATE_BODY_TransitionAreawith4Pixels_bits  3
+#define GEN10_SFC_AVS_STATE_BODY_TransitionAreawith4Pixels_bits  3
+#define GEN9_SFC_AVS_STATE_BODY_TransitionAreawith4Pixels_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_TransitionAreawith4Pixels_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_STATE_BODY_TransitionAreawith4Pixels_start  4
+#define GEN10_SFC_AVS_STATE_BODY_TransitionAreawith4Pixels_start  4
+#define GEN9_SFC_AVS_STATE_BODY_TransitionAreawith4Pixels_start  4
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_TransitionAreawith4Pixels_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 4;
+   case 10: return 4;
+   case 9: return 4;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_AVS_STATE_BODY::Transition Area with 8 Pixels */
+
+
+#define GEN11_SFC_AVS_STATE_BODY_TransitionAreawith8Pixels_bits  3
+#define GEN10_SFC_AVS_STATE_BODY_TransitionAreawith8Pixels_bits  3
+#define GEN9_SFC_AVS_STATE_BODY_TransitionAreawith8Pixels_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_TransitionAreawith8Pixels_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_AVS_STATE_BODY_TransitionAreawith8Pixels_start  0
+#define GEN10_SFC_AVS_STATE_BODY_TransitionAreawith8Pixels_start  0
+#define GEN9_SFC_AVS_STATE_BODY_TransitionAreawith8Pixels_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_AVS_STATE_BODY_TransitionAreawith8Pixels_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_length  23
+#define GEN10_SFC_IEF_STATE_BODY_length  23
+#define GEN9_SFC_IEF_STATE_BODY_length  23
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 23;
+   case 10: return 23;
+   case 9: return 23;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::B0L */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B0L_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_B0L_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_B0L_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B0L_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B0L_start  272
+#define GEN10_SFC_IEF_STATE_BODY_B0L_start  272
+#define GEN9_SFC_IEF_STATE_BODY_B0L_start  272
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B0L_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 272;
+   case 10: return 272;
+   case 9: return 272;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::B0U */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B0U_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_B0U_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_B0U_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B0U_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B0U_start  400
+#define GEN10_SFC_IEF_STATE_BODY_B0U_start  400
+#define GEN9_SFC_IEF_STATE_BODY_B0U_start  400
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B0U_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 400;
+   case 10: return 400;
+   case 9: return 400;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::B1L */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B1L_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_B1L_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_B1L_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B1L_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B1L_start  280
+#define GEN10_SFC_IEF_STATE_BODY_B1L_start  280
+#define GEN9_SFC_IEF_STATE_BODY_B1L_start  280
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B1L_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 280;
+   case 10: return 280;
+   case 9: return 280;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::B1U */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B1U_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_B1U_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_B1U_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B1U_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B1U_start  408
+#define GEN10_SFC_IEF_STATE_BODY_B1U_start  408
+#define GEN9_SFC_IEF_STATE_BODY_B1U_start  408
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B1U_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 408;
+   case 10: return 408;
+   case 9: return 408;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::B2L */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B2L_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_B2L_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_B2L_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B2L_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B2L_start  288
+#define GEN10_SFC_IEF_STATE_BODY_B2L_start  288
+#define GEN9_SFC_IEF_STATE_BODY_B2L_start  288
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B2L_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 288;
+   case 10: return 288;
+   case 9: return 288;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::B2U */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B2U_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_B2U_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_B2U_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B2U_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B2U_start  416
+#define GEN10_SFC_IEF_STATE_BODY_B2U_start  416
+#define GEN9_SFC_IEF_STATE_BODY_B2U_start  416
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B2U_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 416;
+   case 10: return 416;
+   case 9: return 416;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::B3L */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B3L_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_B3L_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_B3L_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B3L_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B3L_start  296
+#define GEN10_SFC_IEF_STATE_BODY_B3L_start  296
+#define GEN9_SFC_IEF_STATE_BODY_B3L_start  296
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B3L_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 296;
+   case 10: return 296;
+   case 9: return 296;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::B3U */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B3U_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_B3U_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_B3U_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B3U_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_B3U_start  424
+#define GEN10_SFC_IEF_STATE_BODY_B3U_start  424
+#define GEN9_SFC_IEF_STATE_BODY_B3U_start  424
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_B3U_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 424;
+   case 10: return 424;
+   case 9: return 424;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::C0 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C0_bits  13
+#define GEN10_SFC_IEF_STATE_BODY_C0_bits  13
+#define GEN9_SFC_IEF_STATE_BODY_C0_bits  13
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C0_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C0_start  483
+#define GEN10_SFC_IEF_STATE_BODY_C0_start  483
+#define GEN9_SFC_IEF_STATE_BODY_C0_start  483
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C0_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 483;
+   case 10: return 483;
+   case 9: return 483;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::C1 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C1_bits  13
+#define GEN10_SFC_IEF_STATE_BODY_C1_bits  13
+#define GEN9_SFC_IEF_STATE_BODY_C1_bits  13
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C1_start  496
+#define GEN10_SFC_IEF_STATE_BODY_C1_start  496
+#define GEN9_SFC_IEF_STATE_BODY_C1_start  496
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 496;
+   case 10: return 496;
+   case 9: return 496;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::C2 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C2_bits  13
+#define GEN10_SFC_IEF_STATE_BODY_C2_bits  13
+#define GEN9_SFC_IEF_STATE_BODY_C2_bits  13
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C2_start  512
+#define GEN10_SFC_IEF_STATE_BODY_C2_start  512
+#define GEN9_SFC_IEF_STATE_BODY_C2_start  512
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 512;
+   case 10: return 512;
+   case 9: return 512;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::C3 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C3_bits  13
+#define GEN10_SFC_IEF_STATE_BODY_C3_bits  13
+#define GEN9_SFC_IEF_STATE_BODY_C3_bits  13
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C3_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C3_start  525
+#define GEN10_SFC_IEF_STATE_BODY_C3_start  525
+#define GEN9_SFC_IEF_STATE_BODY_C3_start  525
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C3_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 525;
+   case 10: return 525;
+   case 9: return 525;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::C4 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C4_bits  13
+#define GEN10_SFC_IEF_STATE_BODY_C4_bits  13
+#define GEN9_SFC_IEF_STATE_BODY_C4_bits  13
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C4_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C4_start  544
+#define GEN10_SFC_IEF_STATE_BODY_C4_start  544
+#define GEN9_SFC_IEF_STATE_BODY_C4_start  544
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C4_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 544;
+   case 10: return 544;
+   case 9: return 544;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::C5 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C5_bits  13
+#define GEN10_SFC_IEF_STATE_BODY_C5_bits  13
+#define GEN9_SFC_IEF_STATE_BODY_C5_bits  13
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C5_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C5_start  557
+#define GEN10_SFC_IEF_STATE_BODY_C5_start  557
+#define GEN9_SFC_IEF_STATE_BODY_C5_start  557
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C5_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 557;
+   case 10: return 557;
+   case 9: return 557;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::C6 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C6_bits  13
+#define GEN10_SFC_IEF_STATE_BODY_C6_bits  13
+#define GEN9_SFC_IEF_STATE_BODY_C6_bits  13
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C6_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C6_start  576
+#define GEN10_SFC_IEF_STATE_BODY_C6_start  576
+#define GEN9_SFC_IEF_STATE_BODY_C6_start  576
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C6_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 576;
+   case 10: return 576;
+   case 9: return 576;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::C7 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C7_bits  13
+#define GEN10_SFC_IEF_STATE_BODY_C7_bits  13
+#define GEN9_SFC_IEF_STATE_BODY_C7_bits  13
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C7_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C7_start  589
+#define GEN10_SFC_IEF_STATE_BODY_C7_start  589
+#define GEN9_SFC_IEF_STATE_BODY_C7_start  589
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C7_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 589;
+   case 10: return 589;
+   case 9: return 589;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::C8 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C8_bits  13
+#define GEN10_SFC_IEF_STATE_BODY_C8_bits  13
+#define GEN9_SFC_IEF_STATE_BODY_C8_bits  13
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C8_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_C8_start  608
+#define GEN10_SFC_IEF_STATE_BODY_C8_start  608
+#define GEN9_SFC_IEF_STATE_BODY_C8_start  608
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_C8_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 608;
+   case 10: return 608;
+   case 9: return 608;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Diamond Margin */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_DiamondMargin_bits  3
+#define GEN10_SFC_IEF_STATE_BODY_DiamondMargin_bits  3
+#define GEN9_SFC_IEF_STATE_BODY_DiamondMargin_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_DiamondMargin_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_DiamondMargin_start  108
+#define GEN10_SFC_IEF_STATE_BODY_DiamondMargin_start  108
+#define GEN9_SFC_IEF_STATE_BODY_DiamondMargin_start  108
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_DiamondMargin_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 108;
+   case 10: return 108;
+   case 9: return 108;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Diamond_Th */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Diamond_Th_bits  6
+#define GEN10_SFC_IEF_STATE_BODY_Diamond_Th_bits  6
+#define GEN9_SFC_IEF_STATE_BODY_Diamond_Th_bits  6
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Diamond_Th_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Diamond_Th_start  135
+#define GEN10_SFC_IEF_STATE_BODY_Diamond_Th_start  135
+#define GEN9_SFC_IEF_STATE_BODY_Diamond_Th_start  135
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Diamond_Th_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 135;
+   case 10: return 135;
+   case 9: return 135;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Diamond_alpha */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Diamond_alpha_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_Diamond_alpha_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_Diamond_alpha_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Diamond_alpha_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Diamond_alpha_start  141
+#define GEN10_SFC_IEF_STATE_BODY_Diamond_alpha_start  141
+#define GEN9_SFC_IEF_STATE_BODY_Diamond_alpha_start  141
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Diamond_alpha_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 141;
+   case 10: return 141;
+   case 9: return 141;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Diamond_du */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Diamond_du_bits  7
+#define GEN10_SFC_IEF_STATE_BODY_Diamond_du_bits  7
+#define GEN9_SFC_IEF_STATE_BODY_Diamond_du_bits  7
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Diamond_du_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 7;
+   case 10: return 7;
+   case 9: return 7;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Diamond_du_start  152
+#define GEN10_SFC_IEF_STATE_BODY_Diamond_du_start  152
+#define GEN9_SFC_IEF_STATE_BODY_Diamond_du_start  152
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Diamond_du_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 152;
+   case 10: return 152;
+   case 9: return 152;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Diamond_dv */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Diamond_dv_bits  7
+#define GEN10_SFC_IEF_STATE_BODY_Diamond_dv_bits  7
+#define GEN9_SFC_IEF_STATE_BODY_Diamond_dv_bits  7
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Diamond_dv_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 7;
+   case 10: return 7;
+   case 9: return 7;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Diamond_dv_start  128
+#define GEN10_SFC_IEF_STATE_BODY_Diamond_dv_start  128
+#define GEN9_SFC_IEF_STATE_BODY_Diamond_dv_start  128
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Diamond_dv_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 128;
+   case 10: return 128;
+   case 9: return 128;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Gain Factor */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_GainFactor_bits  6
+#define GEN10_SFC_IEF_STATE_BODY_GainFactor_bits  6
+#define GEN9_SFC_IEF_STATE_BODY_GainFactor_bits  6
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_GainFactor_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_GainFactor_start  0
+#define GEN10_SFC_IEF_STATE_BODY_GainFactor_start  0
+#define GEN9_SFC_IEF_STATE_BODY_GainFactor_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_GainFactor_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Global Noise Estimation */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_GlobalNoiseEstimation_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_GlobalNoiseEstimation_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_GlobalNoiseEstimation_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_GlobalNoiseEstimation_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_GlobalNoiseEstimation_start  32
+#define GEN10_SFC_IEF_STATE_BODY_GlobalNoiseEstimation_start  32
+#define GEN9_SFC_IEF_STATE_BODY_GlobalNoiseEstimation_start  32
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_GlobalNoiseEstimation_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 32;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::HS_margin */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_HS_margin_bits  3
+#define GEN10_SFC_IEF_STATE_BODY_HS_margin_bits  3
+#define GEN9_SFC_IEF_STATE_BODY_HS_margin_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_HS_margin_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_HS_margin_start  149
+#define GEN10_SFC_IEF_STATE_BODY_HS_margin_start  149
+#define GEN9_SFC_IEF_STATE_BODY_HS_margin_start  149
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_HS_margin_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 149;
+   case 10: return 149;
+   case 9: return 149;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Hue_Max */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Hue_Max_bits  6
+#define GEN10_SFC_IEF_STATE_BODY_Hue_Max_bits  6
+#define GEN9_SFC_IEF_STATE_BODY_Hue_Max_bits  6
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Hue_Max_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Hue_Max_start  86
+#define GEN10_SFC_IEF_STATE_BODY_Hue_Max_start  86
+#define GEN9_SFC_IEF_STATE_BODY_Hue_Max_start  86
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Hue_Max_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 86;
+   case 10: return 86;
+   case 9: return 86;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::INV_Margin_VYL */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_INV_Margin_VYL_bits  16
+#define GEN10_SFC_IEF_STATE_BODY_INV_Margin_VYL_bits  16
+#define GEN9_SFC_IEF_STATE_BODY_INV_Margin_VYL_bits  16
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_INV_Margin_VYL_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_INV_Margin_VYL_start  192
+#define GEN10_SFC_IEF_STATE_BODY_INV_Margin_VYL_start  192
+#define GEN9_SFC_IEF_STATE_BODY_INV_Margin_VYL_start  192
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_INV_Margin_VYL_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 192;
+   case 10: return 192;
+   case 9: return 192;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::INV_Margin_VYU */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_INV_Margin_VYU_bits  16
+#define GEN10_SFC_IEF_STATE_BODY_INV_Margin_VYU_bits  16
+#define GEN9_SFC_IEF_STATE_BODY_INV_Margin_VYU_bits  16
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_INV_Margin_VYU_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_INV_Margin_VYU_start  224
+#define GEN10_SFC_IEF_STATE_BODY_INV_Margin_VYU_start  224
+#define GEN9_SFC_IEF_STATE_BODY_INV_Margin_VYU_start  224
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_INV_Margin_VYU_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 224;
+   case 10: return 224;
+   case 9: return 224;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Non Edge Weight */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_NonEdgeWeight_bits  3
+#define GEN10_SFC_IEF_STATE_BODY_NonEdgeWeight_bits  3
+#define GEN9_SFC_IEF_STATE_BODY_NonEdgeWeight_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_NonEdgeWeight_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_NonEdgeWeight_start  40
+#define GEN10_SFC_IEF_STATE_BODY_NonEdgeWeight_start  40
+#define GEN9_SFC_IEF_STATE_BODY_NonEdgeWeight_start  40
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_NonEdgeWeight_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 40;
+   case 10: return 40;
+   case 9: return 40;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Offset In 1 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_OffsetIn1_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_OffsetIn1_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_OffsetIn1_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_OffsetIn1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_OffsetIn1_start  640
+#define GEN10_SFC_IEF_STATE_BODY_OffsetIn1_start  640
+#define GEN9_SFC_IEF_STATE_BODY_OffsetIn1_start  640
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_OffsetIn1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 640;
+   case 10: return 640;
+   case 9: return 640;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Offset In 2 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_OffsetIn2_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_OffsetIn2_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_OffsetIn2_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_OffsetIn2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_OffsetIn2_start  672
+#define GEN10_SFC_IEF_STATE_BODY_OffsetIn2_start  672
+#define GEN9_SFC_IEF_STATE_BODY_OffsetIn2_start  672
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_OffsetIn2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 672;
+   case 10: return 672;
+   case 9: return 672;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Offset In 3 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_OffsetIn3_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_OffsetIn3_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_OffsetIn3_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_OffsetIn3_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_OffsetIn3_start  704
+#define GEN10_SFC_IEF_STATE_BODY_OffsetIn3_start  704
+#define GEN9_SFC_IEF_STATE_BODY_OffsetIn3_start  704
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_OffsetIn3_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 704;
+   case 10: return 704;
+   case 9: return 704;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Offset Out 1 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_OffsetOut1_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_OffsetOut1_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_OffsetOut1_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_OffsetOut1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_OffsetOut1_start  651
+#define GEN10_SFC_IEF_STATE_BODY_OffsetOut1_start  651
+#define GEN9_SFC_IEF_STATE_BODY_OffsetOut1_start  651
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_OffsetOut1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 651;
+   case 10: return 651;
+   case 9: return 651;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Offset Out 2 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_OffsetOut2_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_OffsetOut2_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_OffsetOut2_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_OffsetOut2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_OffsetOut2_start  683
+#define GEN10_SFC_IEF_STATE_BODY_OffsetOut2_start  683
+#define GEN9_SFC_IEF_STATE_BODY_OffsetOut2_start  683
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_OffsetOut2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 683;
+   case 10: return 683;
+   case 9: return 683;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Offset Out 3 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_OffsetOut3_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_OffsetOut3_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_OffsetOut3_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_OffsetOut3_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_OffsetOut3_start  715
+#define GEN10_SFC_IEF_STATE_BODY_OffsetOut3_start  715
+#define GEN9_SFC_IEF_STATE_BODY_OffsetOut3_start  715
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_OffsetOut3_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 715;
+   case 10: return 715;
+   case 9: return 715;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::P0L */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P0L_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_P0L_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_P0L_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P0L_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P0L_start  240
+#define GEN10_SFC_IEF_STATE_BODY_P0L_start  240
+#define GEN9_SFC_IEF_STATE_BODY_P0L_start  240
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P0L_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 240;
+   case 10: return 240;
+   case 9: return 240;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::P0U */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P0U_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_P0U_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_P0U_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P0U_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P0U_start  363
+#define GEN10_SFC_IEF_STATE_BODY_P0U_start  363
+#define GEN9_SFC_IEF_STATE_BODY_P0U_start  363
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P0U_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 363;
+   case 10: return 363;
+   case 9: return 363;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::P1L */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P1L_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_P1L_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_P1L_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P1L_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P1L_start  248
+#define GEN10_SFC_IEF_STATE_BODY_P1L_start  248
+#define GEN9_SFC_IEF_STATE_BODY_P1L_start  248
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P1L_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 248;
+   case 10: return 248;
+   case 9: return 248;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::P1U */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P1U_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_P1U_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_P1U_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P1U_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P1U_start  371
+#define GEN10_SFC_IEF_STATE_BODY_P1U_start  371
+#define GEN9_SFC_IEF_STATE_BODY_P1U_start  371
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P1U_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 371;
+   case 10: return 371;
+   case 9: return 371;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::P2L */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P2L_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_P2L_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_P2L_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P2L_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P2L_start  256
+#define GEN10_SFC_IEF_STATE_BODY_P2L_start  256
+#define GEN9_SFC_IEF_STATE_BODY_P2L_start  256
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P2L_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 256;
+   case 10: return 256;
+   case 9: return 256;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::P2U */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P2U_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_P2U_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_P2U_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P2U_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P2U_start  384
+#define GEN10_SFC_IEF_STATE_BODY_P2U_start  384
+#define GEN9_SFC_IEF_STATE_BODY_P2U_start  384
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P2U_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 384;
+   case 10: return 384;
+   case 9: return 384;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::P3L */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P3L_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_P3L_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_P3L_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P3L_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P3L_start  264
+#define GEN10_SFC_IEF_STATE_BODY_P3L_start  264
+#define GEN9_SFC_IEF_STATE_BODY_P3L_start  264
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P3L_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 264;
+   case 10: return 264;
+   case 9: return 264;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::P3U */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P3U_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_P3U_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_P3U_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P3U_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_P3U_start  392
+#define GEN10_SFC_IEF_STATE_BODY_P3U_start  392
+#define GEN9_SFC_IEF_STATE_BODY_P3U_start  392
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_P3U_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 392;
+   case 10: return 392;
+   case 9: return 392;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::R3c Coefficient */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_R3cCoefficient_bits  5
+#define GEN10_SFC_IEF_STATE_BODY_R3cCoefficient_bits  5
+#define GEN9_SFC_IEF_STATE_BODY_R3cCoefficient_bits  5
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_R3cCoefficient_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 5;
+   case 10: return 5;
+   case 9: return 5;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_R3cCoefficient_start  23
+#define GEN10_SFC_IEF_STATE_BODY_R3cCoefficient_start  23
+#define GEN9_SFC_IEF_STATE_BODY_R3cCoefficient_start  23
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_R3cCoefficient_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 23;
+   case 10: return 23;
+   case 9: return 23;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::R3x Coefficient */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_R3xCoefficient_bits  5
+#define GEN10_SFC_IEF_STATE_BODY_R3xCoefficient_bits  5
+#define GEN9_SFC_IEF_STATE_BODY_R3xCoefficient_bits  5
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_R3xCoefficient_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 5;
+   case 10: return 5;
+   case 9: return 5;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_R3xCoefficient_start  18
+#define GEN10_SFC_IEF_STATE_BODY_R3xCoefficient_start  18
+#define GEN9_SFC_IEF_STATE_BODY_R3xCoefficient_start  18
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_R3xCoefficient_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 18;
+   case 10: return 18;
+   case 9: return 18;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::R5c Coefficient */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_R5cCoefficient_bits  5
+#define GEN10_SFC_IEF_STATE_BODY_R5cCoefficient_bits  5
+#define GEN9_SFC_IEF_STATE_BODY_R5cCoefficient_bits  5
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_R5cCoefficient_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 5;
+   case 10: return 5;
+   case 9: return 5;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_R5cCoefficient_start  59
+#define GEN10_SFC_IEF_STATE_BODY_R5cCoefficient_start  59
+#define GEN9_SFC_IEF_STATE_BODY_R5cCoefficient_start  59
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_R5cCoefficient_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 59;
+   case 10: return 59;
+   case 9: return 59;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::R5cx Coefficient */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_R5cxCoefficient_bits  5
+#define GEN10_SFC_IEF_STATE_BODY_R5cxCoefficient_bits  5
+#define GEN9_SFC_IEF_STATE_BODY_R5cxCoefficient_bits  5
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_R5cxCoefficient_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 5;
+   case 10: return 5;
+   case 9: return 5;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_R5cxCoefficient_start  54
+#define GEN10_SFC_IEF_STATE_BODY_R5cxCoefficient_start  54
+#define GEN9_SFC_IEF_STATE_BODY_R5cxCoefficient_start  54
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_R5cxCoefficient_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 54;
+   case 10: return 54;
+   case 9: return 54;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::R5x Coefficient */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_R5xCoefficient_bits  5
+#define GEN10_SFC_IEF_STATE_BODY_R5xCoefficient_bits  5
+#define GEN9_SFC_IEF_STATE_BODY_R5xCoefficient_bits  5
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_R5xCoefficient_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 5;
+   case 10: return 5;
+   case 9: return 5;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_R5xCoefficient_start  49
+#define GEN10_SFC_IEF_STATE_BODY_R5xCoefficient_start  49
+#define GEN9_SFC_IEF_STATE_BODY_R5xCoefficient_start  49
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_R5xCoefficient_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 49;
+   case 10: return 49;
+   case 9: return 49;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Regular Weight */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_RegularWeight_bits  3
+#define GEN10_SFC_IEF_STATE_BODY_RegularWeight_bits  3
+#define GEN9_SFC_IEF_STATE_BODY_RegularWeight_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_RegularWeight_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_RegularWeight_start  43
+#define GEN10_SFC_IEF_STATE_BODY_RegularWeight_start  43
+#define GEN9_SFC_IEF_STATE_BODY_RegularWeight_start  43
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_RegularWeight_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 43;
+   case 10: return 43;
+   case 9: return 43;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::S0L */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S0L_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_S0L_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_S0L_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S0L_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S0L_start  304
+#define GEN10_SFC_IEF_STATE_BODY_S0L_start  304
+#define GEN9_SFC_IEF_STATE_BODY_S0L_start  304
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S0L_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 304;
+   case 10: return 304;
+   case 9: return 304;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::S0U */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S0U_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_S0U_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_S0U_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S0U_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S0U_start  432
+#define GEN10_SFC_IEF_STATE_BODY_S0U_start  432
+#define GEN9_SFC_IEF_STATE_BODY_S0U_start  432
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S0U_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 432;
+   case 10: return 432;
+   case 9: return 432;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::S1L */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S1L_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_S1L_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_S1L_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S1L_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S1L_start  320
+#define GEN10_SFC_IEF_STATE_BODY_S1L_start  320
+#define GEN9_SFC_IEF_STATE_BODY_S1L_start  320
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S1L_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 320;
+   case 10: return 320;
+   case 9: return 320;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::S1U */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S1U_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_S1U_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_S1U_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S1U_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S1U_start  448
+#define GEN10_SFC_IEF_STATE_BODY_S1U_start  448
+#define GEN9_SFC_IEF_STATE_BODY_S1U_start  448
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S1U_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 448;
+   case 10: return 448;
+   case 9: return 448;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::S2L */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S2L_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_S2L_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_S2L_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S2L_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S2L_start  331
+#define GEN10_SFC_IEF_STATE_BODY_S2L_start  331
+#define GEN9_SFC_IEF_STATE_BODY_S2L_start  331
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S2L_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 331;
+   case 10: return 331;
+   case 9: return 331;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::S2U */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S2U_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_S2U_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_S2U_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S2U_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S2U_start  459
+#define GEN10_SFC_IEF_STATE_BODY_S2U_start  459
+#define GEN9_SFC_IEF_STATE_BODY_S2U_start  459
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S2U_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 459;
+   case 10: return 459;
+   case 9: return 459;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::S3L */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S3L_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_S3L_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_S3L_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S3L_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S3L_start  352
+#define GEN10_SFC_IEF_STATE_BODY_S3L_start  352
+#define GEN9_SFC_IEF_STATE_BODY_S3L_start  352
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S3L_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 352;
+   case 10: return 352;
+   case 9: return 352;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::S3U */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S3U_bits  11
+#define GEN10_SFC_IEF_STATE_BODY_S3U_bits  11
+#define GEN9_SFC_IEF_STATE_BODY_S3U_bits  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S3U_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 11;
+   case 9: return 11;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_S3U_start  96
+#define GEN10_SFC_IEF_STATE_BODY_S3U_start  96
+#define GEN9_SFC_IEF_STATE_BODY_S3U_start  96
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_S3U_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 96;
+   case 10: return 96;
+   case 9: return 96;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::STD Cos(alpha) */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_STDCosalpha_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_STDCosalpha_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_STDCosalpha_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_STDCosalpha_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_STDCosalpha_start  72
+#define GEN10_SFC_IEF_STATE_BODY_STDCosalpha_start  72
+#define GEN9_SFC_IEF_STATE_BODY_STDCosalpha_start  72
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_STDCosalpha_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 72;
+   case 10: return 72;
+   case 9: return 72;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::STD Sin(alpha) */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_STDSinalpha_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_STDSinalpha_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_STDSinalpha_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_STDSinalpha_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_STDSinalpha_start  64
+#define GEN10_SFC_IEF_STATE_BODY_STDSinalpha_start  64
+#define GEN9_SFC_IEF_STATE_BODY_STDSinalpha_start  64
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_STDSinalpha_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 64;
+   case 9: return 64;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Sat_Max */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Sat_Max_bits  6
+#define GEN10_SFC_IEF_STATE_BODY_Sat_Max_bits  6
+#define GEN9_SFC_IEF_STATE_BODY_Sat_Max_bits  6
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Sat_Max_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Sat_Max_start  80
+#define GEN10_SFC_IEF_STATE_BODY_Sat_Max_start  80
+#define GEN9_SFC_IEF_STATE_BODY_Sat_Max_start  80
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Sat_Max_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 80;
+   case 10: return 80;
+   case 9: return 80;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Skin Detail Factor */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_SkinDetailFactor_bits  1
+#define GEN10_SFC_IEF_STATE_BODY_SkinDetailFactor_bits  1
+#define GEN9_SFC_IEF_STATE_BODY_SkinDetailFactor_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_SkinDetailFactor_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_SkinDetailFactor_start  159
+#define GEN10_SFC_IEF_STATE_BODY_SkinDetailFactor_start  159
+#define GEN9_SFC_IEF_STATE_BODY_SkinDetailFactor_start  159
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_SkinDetailFactor_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 159;
+   case 10: return 159;
+   case 9: return 159;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Strong Edge Threshold */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_StrongEdgeThreshold_bits  6
+#define GEN10_SFC_IEF_STATE_BODY_StrongEdgeThreshold_bits  6
+#define GEN9_SFC_IEF_STATE_BODY_StrongEdgeThreshold_bits  6
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_StrongEdgeThreshold_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_StrongEdgeThreshold_start  12
+#define GEN10_SFC_IEF_STATE_BODY_StrongEdgeThreshold_start  12
+#define GEN9_SFC_IEF_STATE_BODY_StrongEdgeThreshold_start  12
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_StrongEdgeThreshold_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 12;
+   case 10: return 12;
+   case 9: return 12;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Strong Edge Weight */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_StrongEdgeWeight_bits  3
+#define GEN10_SFC_IEF_STATE_BODY_StrongEdgeWeight_bits  3
+#define GEN9_SFC_IEF_STATE_BODY_StrongEdgeWeight_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_StrongEdgeWeight_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_StrongEdgeWeight_start  46
+#define GEN10_SFC_IEF_STATE_BODY_StrongEdgeWeight_start  46
+#define GEN9_SFC_IEF_STATE_BODY_StrongEdgeWeight_start  46
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_StrongEdgeWeight_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 46;
+   case 10: return 46;
+   case 9: return 46;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Transform Enable */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_TransformEnable_bits  1
+#define GEN10_SFC_IEF_STATE_BODY_TransformEnable_bits  1
+#define GEN9_SFC_IEF_STATE_BODY_TransformEnable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_TransformEnable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_TransformEnable_start  480
+#define GEN10_SFC_IEF_STATE_BODY_TransformEnable_start  480
+#define GEN9_SFC_IEF_STATE_BODY_TransformEnable_start  480
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_TransformEnable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 480;
+   case 10: return 480;
+   case 9: return 480;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::U_Mid */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_U_Mid_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_U_Mid_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_U_Mid_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_U_Mid_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_U_Mid_start  112
+#define GEN10_SFC_IEF_STATE_BODY_U_Mid_start  112
+#define GEN9_SFC_IEF_STATE_BODY_U_Mid_start  112
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_U_Mid_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 112;
+   case 10: return 112;
+   case 9: return 112;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::VY_STD_Enable */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_VY_STD_Enable_bits  1
+#define GEN10_SFC_IEF_STATE_BODY_VY_STD_Enable_bits  1
+#define GEN9_SFC_IEF_STATE_BODY_VY_STD_Enable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_VY_STD_Enable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_VY_STD_Enable_start  111
+#define GEN10_SFC_IEF_STATE_BODY_VY_STD_Enable_start  111
+#define GEN9_SFC_IEF_STATE_BODY_VY_STD_Enable_start  111
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_VY_STD_Enable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 111;
+   case 10: return 111;
+   case 9: return 111;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::V_Mid */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_V_Mid_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_V_Mid_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_V_Mid_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_V_Mid_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_V_Mid_start  120
+#define GEN10_SFC_IEF_STATE_BODY_V_Mid_start  120
+#define GEN9_SFC_IEF_STATE_BODY_V_Mid_start  120
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_V_Mid_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 120;
+   case 10: return 120;
+   case 9: return 120;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Weak Edge Threshold */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_WeakEdgeThreshold_bits  6
+#define GEN10_SFC_IEF_STATE_BODY_WeakEdgeThreshold_bits  6
+#define GEN9_SFC_IEF_STATE_BODY_WeakEdgeThreshold_bits  6
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_WeakEdgeThreshold_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_WeakEdgeThreshold_start  6
+#define GEN10_SFC_IEF_STATE_BODY_WeakEdgeThreshold_start  6
+#define GEN9_SFC_IEF_STATE_BODY_WeakEdgeThreshold_start  6
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_WeakEdgeThreshold_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::YUV Channel Swap */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_YUVChannelSwap_bits  1
+#define GEN10_SFC_IEF_STATE_BODY_YUVChannelSwap_bits  1
+#define GEN9_SFC_IEF_STATE_BODY_YUVChannelSwap_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_YUVChannelSwap_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_YUVChannelSwap_start  481
+#define GEN10_SFC_IEF_STATE_BODY_YUVChannelSwap_start  481
+#define GEN9_SFC_IEF_STATE_BODY_YUVChannelSwap_start  481
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_YUVChannelSwap_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 481;
+   case 10: return 481;
+   case 9: return 481;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Y_Slope1 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Y_Slope1_bits  5
+#define GEN10_SFC_IEF_STATE_BODY_Y_Slope1_bits  5
+#define GEN9_SFC_IEF_STATE_BODY_Y_Slope1_bits  5
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Y_Slope1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 5;
+   case 10: return 5;
+   case 9: return 5;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Y_Slope1_start  379
+#define GEN10_SFC_IEF_STATE_BODY_Y_Slope1_start  379
+#define GEN9_SFC_IEF_STATE_BODY_Y_Slope1_start  379
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Y_Slope1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 379;
+   case 10: return 379;
+   case 9: return 379;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Y_Slope_2 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Y_Slope_2_bits  5
+#define GEN10_SFC_IEF_STATE_BODY_Y_Slope_2_bits  5
+#define GEN9_SFC_IEF_STATE_BODY_Y_Slope_2_bits  5
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Y_Slope_2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 5;
+   case 10: return 5;
+   case 9: return 5;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Y_Slope_2_start  315
+#define GEN10_SFC_IEF_STATE_BODY_Y_Slope_2_start  315
+#define GEN9_SFC_IEF_STATE_BODY_Y_Slope_2_start  315
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Y_Slope_2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 315;
+   case 10: return 315;
+   case 9: return 315;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Y_point_1 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Y_point_1_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_Y_point_1_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_Y_point_1_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Y_point_1_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Y_point_1_start  160
+#define GEN10_SFC_IEF_STATE_BODY_Y_point_1_start  160
+#define GEN9_SFC_IEF_STATE_BODY_Y_point_1_start  160
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Y_point_1_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 160;
+   case 10: return 160;
+   case 9: return 160;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Y_point_2 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Y_point_2_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_Y_point_2_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_Y_point_2_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Y_point_2_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Y_point_2_start  168
+#define GEN10_SFC_IEF_STATE_BODY_Y_point_2_start  168
+#define GEN9_SFC_IEF_STATE_BODY_Y_point_2_start  168
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Y_point_2_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 168;
+   case 10: return 168;
+   case 9: return 168;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Y_point_3 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Y_point_3_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_Y_point_3_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_Y_point_3_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Y_point_3_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Y_point_3_start  176
+#define GEN10_SFC_IEF_STATE_BODY_Y_point_3_start  176
+#define GEN9_SFC_IEF_STATE_BODY_Y_point_3_start  176
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Y_point_3_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 176;
+   case 10: return 176;
+   case 9: return 176;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_IEF_STATE_BODY::Y_point_4 */
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Y_point_4_bits  8
+#define GEN10_SFC_IEF_STATE_BODY_Y_point_4_bits  8
+#define GEN9_SFC_IEF_STATE_BODY_Y_point_4_bits  8
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Y_point_4_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 8;
+   case 10: return 8;
+   case 9: return 8;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_IEF_STATE_BODY_Y_point_4_start  184
+#define GEN10_SFC_IEF_STATE_BODY_Y_point_4_start  184
+#define GEN9_SFC_IEF_STATE_BODY_Y_point_4_start  184
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_IEF_STATE_BODY_Y_point_4_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 184;
+   case 10: return 184;
+   case 9: return 184;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_LOCK_BODY */
+
+
+#define GEN11_SFC_LOCK_BODY_length  1
+#define GEN10_SFC_LOCK_BODY_length  1
+#define GEN9_SFC_LOCK_BODY_length  1
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_LOCK_BODY_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_LOCK_BODY::Pre-Scaled Output Surface Output Enable */
+
+
+#define GEN11_SFC_LOCK_BODY_PreScaledOutputSurfaceOutputEnable_bits  1
+#define GEN10_SFC_LOCK_BODY_PreScaledOutputSurfaceOutputEnable_bits  1
+#define GEN9_SFC_LOCK_BODY_PreScaledOutputSurfaceOutputEnable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_LOCK_BODY_PreScaledOutputSurfaceOutputEnable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_LOCK_BODY_PreScaledOutputSurfaceOutputEnable_start  1
+#define GEN10_SFC_LOCK_BODY_PreScaledOutputSurfaceOutputEnable_start  1
+#define GEN9_SFC_LOCK_BODY_PreScaledOutputSurfaceOutputEnable_start  1
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_LOCK_BODY_PreScaledOutputSurfaceOutputEnable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SFC_LOCK_BODY::VE-SFC Pipe Select */
+
+
+#define GEN11_SFC_LOCK_BODY_VESFCPipeSelect_bits  1
+#define GEN10_SFC_LOCK_BODY_VESFCPipeSelect_bits  1
+#define GEN9_SFC_LOCK_BODY_VESFCPipeSelect_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_LOCK_BODY_VESFCPipeSelect_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SFC_LOCK_BODY_VESFCPipeSelect_start  0
+#define GEN10_SFC_LOCK_BODY_VESFCPipeSelect_start  0
+#define GEN9_SFC_LOCK_BODY_VESFCPipeSelect_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+SFC_LOCK_BODY_VESFCPipeSelect_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
       }
    case 6: return 0;
    case 5: return 0;
@@ -213332,7 +230412,7 @@ SF_STATE_SingleProgramFlow_start(const struct gen_device_info *devinfo)
 
 
 
-/* SF_STATE::Software  Exception Enable */
+/* SF_STATE::Software Exception Enable */
 
 
 #define GEN5_SF_STATE_SoftwareExceptionEnable_bits  1
@@ -214691,13 +231771,14 @@ SF_VIEWPORT_ViewportMatrixElementm32_start(const struct gen_device_info *devinfo
 /* SLICE_COMMON_ECO_CHICKEN1 */
 
 
+#define GEN11_SLICE_COMMON_ECO_CHICKEN1_length  1
 #define GEN9_SLICE_COMMON_ECO_CHICKEN1_length  1
 
 static inline uint32_t ATTRIBUTE_PURE
 SLICE_COMMON_ECO_CHICKEN1_length(const struct gen_device_info *devinfo)
 {
    switch (devinfo->gen) {
-   case 11: return 0;
+   case 11: return 1;
    case 10: return 0;
    case 9: return 1;
    case 8: return 0;
@@ -214830,6 +231911,136 @@ SLICE_COMMON_ECO_CHICKEN1_GLKBarrierModeMask_start(const struct gen_device_info 
    case 11: return 0;
    case 10: return 0;
    case 9: return 23;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SLICE_COMMON_ECO_CHICKEN1::State Cache Redirect To CS Section Enable */
+
+
+#define GEN11_SLICE_COMMON_ECO_CHICKEN1_StateCacheRedirectToCSSectionEnable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+SLICE_COMMON_ECO_CHICKEN1_StateCacheRedirectToCSSectionEnable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SLICE_COMMON_ECO_CHICKEN1_StateCacheRedirectToCSSectionEnable_start  11
+
+static inline uint32_t ATTRIBUTE_PURE
+SLICE_COMMON_ECO_CHICKEN1_StateCacheRedirectToCSSectionEnable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 11;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* SLICE_COMMON_ECO_CHICKEN1::State Cache Redirect To CS Section Enable Mask */
+
+
+#define GEN11_SLICE_COMMON_ECO_CHICKEN1_StateCacheRedirectToCSSectionEnableMask_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+SLICE_COMMON_ECO_CHICKEN1_StateCacheRedirectToCSSectionEnableMask_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_SLICE_COMMON_ECO_CHICKEN1_StateCacheRedirectToCSSectionEnableMask_start  27
+
+static inline uint32_t ATTRIBUTE_PURE
+SLICE_COMMON_ECO_CHICKEN1_StateCacheRedirectToCSSectionEnableMask_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 27;
+   case 10: return 0;
+   case 9: return 0;
    case 8: return 0;
    case 7:
       if (devinfo->is_haswell) {
@@ -227099,6 +244310,1831 @@ VCS_RING_BUFFER_CTL_SemaphoreWait_start(const struct gen_device_info *devinfo)
 
 
 
+/* VDENC_PICTURE */
+
+
+#define GEN11_VDENC_PICTURE_length  3
+#define GEN10_VDENC_PICTURE_length  3
+#define GEN9_VDENC_PICTURE_length  3
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_PICTURE_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 3;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_PICTURE::Address */
+
+
+#define GEN11_VDENC_PICTURE_Address_bits  64
+#define GEN10_VDENC_PICTURE_Address_bits  64
+#define GEN9_VDENC_PICTURE_Address_bits  64
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_PICTURE_Address_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 64;
+   case 9: return 64;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_PICTURE_Address_start  0
+#define GEN10_VDENC_PICTURE_Address_start  0
+#define GEN9_VDENC_PICTURE_Address_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_PICTURE_Address_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_PICTURE::Picture Fields */
+
+
+#define GEN11_VDENC_PICTURE_PictureFields_bits  32
+#define GEN10_VDENC_PICTURE_PictureFields_bits  32
+#define GEN9_VDENC_PICTURE_PictureFields_bits  32
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_PICTURE_PictureFields_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 32;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_PICTURE_PictureFields_start  64
+#define GEN10_VDENC_PICTURE_PictureFields_start  64
+#define GEN9_VDENC_PICTURE_PictureFields_start  64
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_PICTURE_PictureFields_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 64;
+   case 9: return 64;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_CONTROL_BITS */
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_length  1
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_length  1
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_length  1
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_CONTROL_BITS::Arbitration Priority Control */
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_ArbitrationPriorityControl_bits  2
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_ArbitrationPriorityControl_bits  2
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_ArbitrationPriorityControl_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_ArbitrationPriorityControl_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_ArbitrationPriorityControl_start  7
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_ArbitrationPriorityControl_start  7
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_ArbitrationPriorityControl_start  7
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_ArbitrationPriorityControl_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 7;
+   case 10: return 7;
+   case 9: return 7;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_CONTROL_BITS::Cache Select */
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_CacheSelect_bits  1
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_CacheSelect_bits  1
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_CacheSelect_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_CacheSelect_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_CacheSelect_start  12
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_CacheSelect_start  12
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_CacheSelect_start  12
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_CacheSelect_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 12;
+   case 10: return 12;
+   case 9: return 12;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_CONTROL_BITS::MOCS */
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_MOCS_bits  6
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_MOCS_bits  6
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_MOCS_bits  6
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_MOCS_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 6;
+   case 10: return 6;
+   case 9: return 6;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_MOCS_start  1
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_MOCS_start  1
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_MOCS_start  1
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_MOCS_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_CONTROL_BITS::Memory Compression Enable */
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_MemoryCompressionEnable_bits  1
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_MemoryCompressionEnable_bits  1
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_MemoryCompressionEnable_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_MemoryCompressionEnable_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_MemoryCompressionEnable_start  9
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_MemoryCompressionEnable_start  9
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_MemoryCompressionEnable_start  9
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_MemoryCompressionEnable_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 9;
+   case 10: return 9;
+   case 9: return 9;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_CONTROL_BITS::Memory Compression Mode */
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_MemoryCompressionMode_bits  1
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_MemoryCompressionMode_bits  1
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_MemoryCompressionMode_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_MemoryCompressionMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_MemoryCompressionMode_start  10
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_MemoryCompressionMode_start  10
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_MemoryCompressionMode_start  10
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_MemoryCompressionMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 10;
+   case 10: return 10;
+   case 9: return 10;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_CONTROL_BITS::Tiled Resource Mode */
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_TiledResourceMode_bits  2
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_TiledResourceMode_bits  2
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_TiledResourceMode_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_TiledResourceMode_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_CONTROL_BITS_TiledResourceMode_start  13
+#define GEN10_VDENC_SURFACE_CONTROL_BITS_TiledResourceMode_start  13
+#define GEN9_VDENC_SURFACE_CONTROL_BITS_TiledResourceMode_start  13
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_CONTROL_BITS_TiledResourceMode_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_length  4
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_length  4
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_length  4
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_length(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 4;
+   case 10: return 4;
+   case 9: return 4;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Chroma Downsample Filter Control */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_ChromaDownsampleFilterControl_bits  3
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_ChromaDownsampleFilterControl_bits  3
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_ChromaDownsampleFilterControl_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 3;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_ChromaDownsampleFilterControl_start  52
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_ChromaDownsampleFilterControl_start  52
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_ChromaDownsampleFilterControl_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 52;
+   case 10: return 52;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Color Space Selection */
+
+
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_ColorSpaceSelection_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_ColorSpaceSelection_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 1;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_ColorSpaceSelection_start  3
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_ColorSpaceSelection_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 3;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Color space selection */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_Colorspaceselection_bits  1
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_Colorspaceselection_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_Colorspaceselection_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 0;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_Colorspaceselection_start  3
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_Colorspaceselection_start  3
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_Colorspaceselection_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 3;
+   case 10: return 0;
+   case 9: return 3;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Cr(V)/Cb(U) Pixel Offset V Direction */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_CrVCbUPixelOffsetVDirection_bits  2
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_CrVCbUPixelOffsetVDirection_bits  2
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_CrVCbUPixelOffsetVDirection_bits  2
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_CrVCbUPixelOffsetVDirection_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_CrVCbUPixelOffsetVDirection_start  0
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_CrVCbUPixelOffsetVDirection_start  0
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_CrVCbUPixelOffsetVDirection_start  0
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_CrVCbUPixelOffsetVDirection_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 0;
+   case 10: return 0;
+   case 9: return 0;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Format */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_Format_bits  5
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_Format_bits  5
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_Format_bits  5
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_Format_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 5;
+   case 10: return 5;
+   case 9: return 5;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_Format_start  59
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_Format_start  59
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_Format_start  59
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_Format_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 59;
+   case 10: return 59;
+   case 9: return 59;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Half Pitch for Chroma */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_HalfPitchforChroma_bits  1
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_HalfPitchforChroma_bits  1
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_HalfPitchforChroma_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_HalfPitchforChroma_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_HalfPitchforChroma_start  34
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_HalfPitchforChroma_start  34
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_HalfPitchforChroma_start  34
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_HalfPitchforChroma_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 34;
+   case 10: return 34;
+   case 9: return 34;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Height */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_Height_bits  14
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_Height_bits  14
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_Height_bits  14
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_Height_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 14;
+   case 10: return 14;
+   case 9: return 14;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_Height_start  18
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_Height_start  18
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_Height_start  18
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_Height_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 18;
+   case 10: return 18;
+   case 9: return 18;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Surface Format */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_SurfaceFormat_bits  4
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_SurfaceFormat_bits  4
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_SurfaceFormat_bits  4
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_SurfaceFormat_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 4;
+   case 10: return 4;
+   case 9: return 4;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_SurfaceFormat_start  60
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_SurfaceFormat_start  60
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_SurfaceFormat_start  60
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_SurfaceFormat_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 60;
+   case 10: return 60;
+   case 9: return 60;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Surface Format Byte Swizzle */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_SurfaceFormatByteSwizzle_bits  1
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_SurfaceFormatByteSwizzle_bits  1
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_SurfaceFormatByteSwizzle_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_SurfaceFormatByteSwizzle_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_SurfaceFormatByteSwizzle_start  2
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_SurfaceFormatByteSwizzle_start  2
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_SurfaceFormatByteSwizzle_start  2
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_SurfaceFormatByteSwizzle_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 2;
+   case 10: return 2;
+   case 9: return 2;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Surface Pitch */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_SurfacePitch_bits  17
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_SurfacePitch_bits  17
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_SurfacePitch_bits  17
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_SurfacePitch_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 17;
+   case 10: return 17;
+   case 9: return 17;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_SurfacePitch_start  35
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_SurfacePitch_start  35
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_SurfacePitch_start  35
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_SurfacePitch_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 35;
+   case 10: return 35;
+   case 9: return 35;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Tile Walk */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_TileWalk_bits  1
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_TileWalk_bits  1
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_TileWalk_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_TileWalk_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_TileWalk_start  32
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_TileWalk_start  32
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_TileWalk_start  32
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_TileWalk_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 32;
+   case 10: return 32;
+   case 9: return 32;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Tiled Surface */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_TiledSurface_bits  1
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_TiledSurface_bits  1
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_TiledSurface_bits  1
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_TiledSurface_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 1;
+   case 10: return 1;
+   case 9: return 1;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_TiledSurface_start  33
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_TiledSurface_start  33
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_TiledSurface_start  33
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_TiledSurface_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 33;
+   case 10: return 33;
+   case 9: return 33;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Width */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_Width_bits  14
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_Width_bits  14
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_Width_bits  14
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_Width_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 14;
+   case 10: return 14;
+   case 9: return 14;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_Width_start  4
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_Width_start  4
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_Width_start  4
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_Width_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 4;
+   case 10: return 4;
+   case 9: return 4;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::X Offset for U(Cb) */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_XOffsetforUCb_bits  15
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_XOffsetforUCb_bits  15
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_XOffsetforUCb_bits  15
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_XOffsetforUCb_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 15;
+   case 10: return 15;
+   case 9: return 15;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_XOffsetforUCb_start  80
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_XOffsetforUCb_start  80
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_XOffsetforUCb_start  80
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_XOffsetforUCb_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 80;
+   case 10: return 80;
+   case 9: return 80;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::X Offset for V(Cr) */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_XOffsetforVCr_bits  13
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_XOffsetforVCr_bits  13
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_XOffsetforVCr_bits  13
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_XOffsetforVCr_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 13;
+   case 10: return 13;
+   case 9: return 13;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_XOffsetforVCr_start  112
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_XOffsetforVCr_start  112
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_XOffsetforVCr_start  112
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_XOffsetforVCr_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 112;
+   case 10: return 112;
+   case 9: return 112;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Y Offset for U(Cb) */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_YOffsetforUCb_bits  15
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_YOffsetforUCb_bits  15
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_YOffsetforUCb_bits  15
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_YOffsetforUCb_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 15;
+   case 10: return 15;
+   case 9: return 15;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_YOffsetforUCb_start  64
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_YOffsetforUCb_start  64
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_YOffsetforUCb_start  64
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_YOffsetforUCb_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 64;
+   case 10: return 64;
+   case 9: return 64;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+/* VDENC_SURFACE_STATE_FIELDS::Y Offset for V(Cr) */
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_YOffsetforVCr_bits  16
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_YOffsetforVCr_bits  16
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_YOffsetforVCr_bits  16
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_YOffsetforVCr_bits(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 16;
+   case 10: return 16;
+   case 9: return 16;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
+#define GEN11_VDENC_SURFACE_STATE_FIELDS_YOffsetforVCr_start  96
+#define GEN10_VDENC_SURFACE_STATE_FIELDS_YOffsetforVCr_start  96
+#define GEN9_VDENC_SURFACE_STATE_FIELDS_YOffsetforVCr_start  96
+
+static inline uint32_t ATTRIBUTE_PURE
+VDENC_SURFACE_STATE_FIELDS_YOffsetforVCr_start(const struct gen_device_info *devinfo)
+{
+   switch (devinfo->gen) {
+   case 11: return 96;
+   case 10: return 96;
+   case 9: return 96;
+   case 8: return 0;
+   case 7:
+      if (devinfo->is_haswell) {
+         return 0;
+      } else {
+         return 0;
+      }
+   case 6: return 0;
+   case 5: return 0;
+   case 4:
+      if (devinfo->is_g4x) {
+         return 0;
+      } else {
+         return 0;
+      }
+   default:
+      unreachable("Invalid hardware generation");
+   }
+}
+
+
+
 /* VECS_ACTHD_UDW */
 
 
@@ -231387,7 +250423,7 @@ VS_STATE_SingleProgramFlow_start(const struct gen_device_info *devinfo)
 
 
 
-/* VS_STATE::Software  Exception Enable */
+/* VS_STATE::Software Exception Enable */
 
 
 #define GEN5_VS_STATE_SoftwareExceptionEnable_bits  1
@@ -235036,7 +254072,7 @@ WM_STATE_SingleProgramFlow_start(const struct gen_device_info *devinfo)
 
 
 
-/* WM_STATE::Software  Exception Enable */
+/* WM_STATE::Software Exception Enable */
 
 
 #define GEN5_WM_STATE_SoftwareExceptionEnable_bits  1
@@ -235304,4497 +254340,6 @@ WM_STATE_ThreadPriority_start(const struct gen_device_info *devinfo)
          return 49;
       } else {
          return 49;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT */
-
-
-#define GEN5_XY_COLOR_BLT_length  6
-#define GEN45_XY_COLOR_BLT_length  6
-#define GEN4_XY_COLOR_BLT_length  6
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_length(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 6;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 6;
-      } else {
-         return 6;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::2D Command Opcode */
-
-
-#define GEN5_XY_COLOR_BLT_2DCommandOpcode_bits  7
-#define GEN45_XY_COLOR_BLT_2DCommandOpcode_bits  7
-#define GEN4_XY_COLOR_BLT_2DCommandOpcode_bits  7
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_2DCommandOpcode_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 7;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 7;
-      } else {
-         return 7;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_2DCommandOpcode_start  22
-#define GEN45_XY_COLOR_BLT_2DCommandOpcode_start  22
-#define GEN4_XY_COLOR_BLT_2DCommandOpcode_start  22
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_2DCommandOpcode_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 22;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 22;
-      } else {
-         return 22;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::32bpp Byte Mask */
-
-
-#define GEN5_XY_COLOR_BLT_32bppByteMask_bits  2
-#define GEN45_XY_COLOR_BLT_32bppByteMask_bits  2
-#define GEN4_XY_COLOR_BLT_32bppByteMask_bits  2
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_32bppByteMask_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 2;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 2;
-      } else {
-         return 2;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_32bppByteMask_start  20
-#define GEN45_XY_COLOR_BLT_32bppByteMask_start  20
-#define GEN4_XY_COLOR_BLT_32bppByteMask_start  20
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_32bppByteMask_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 20;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 20;
-      } else {
-         return 20;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::Clipping Enabled */
-
-
-#define GEN5_XY_COLOR_BLT_ClippingEnabled_bits  1
-#define GEN45_XY_COLOR_BLT_ClippingEnabled_bits  1
-#define GEN4_XY_COLOR_BLT_ClippingEnabled_bits  1
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_ClippingEnabled_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 1;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 1;
-      } else {
-         return 1;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_ClippingEnabled_start  62
-#define GEN45_XY_COLOR_BLT_ClippingEnabled_start  62
-#define GEN4_XY_COLOR_BLT_ClippingEnabled_start  62
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_ClippingEnabled_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 62;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 62;
-      } else {
-         return 62;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::Color Depth */
-
-
-#define GEN5_XY_COLOR_BLT_ColorDepth_bits  3
-#define GEN45_XY_COLOR_BLT_ColorDepth_bits  2
-#define GEN4_XY_COLOR_BLT_ColorDepth_bits  2
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_ColorDepth_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 3;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 2;
-      } else {
-         return 2;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_ColorDepth_start  56
-#define GEN45_XY_COLOR_BLT_ColorDepth_start  56
-#define GEN4_XY_COLOR_BLT_ColorDepth_start  56
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_ColorDepth_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 56;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 56;
-      } else {
-         return 56;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::Command Type */
-
-
-#define GEN5_XY_COLOR_BLT_CommandType_bits  3
-#define GEN45_XY_COLOR_BLT_CommandType_bits  3
-#define GEN4_XY_COLOR_BLT_CommandType_bits  3
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_CommandType_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 3;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 3;
-      } else {
-         return 3;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_CommandType_start  29
-#define GEN45_XY_COLOR_BLT_CommandType_start  29
-#define GEN4_XY_COLOR_BLT_CommandType_start  29
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_CommandType_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 29;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 29;
-      } else {
-         return 29;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::DWord Length */
-
-
-#define GEN5_XY_COLOR_BLT_DWordLength_bits  8
-#define GEN45_XY_COLOR_BLT_DWordLength_bits  8
-#define GEN4_XY_COLOR_BLT_DWordLength_bits  8
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DWordLength_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 8;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 8;
-      } else {
-         return 8;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_DWordLength_start  0
-#define GEN45_XY_COLOR_BLT_DWordLength_start  0
-#define GEN4_XY_COLOR_BLT_DWordLength_start  0
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DWordLength_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 0;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 0;
-      } else {
-         return 0;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::Destination Base Address */
-
-
-#define GEN5_XY_COLOR_BLT_DestinationBaseAddress_bits  32
-#define GEN45_XY_COLOR_BLT_DestinationBaseAddress_bits  32
-#define GEN4_XY_COLOR_BLT_DestinationBaseAddress_bits  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DestinationBaseAddress_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_DestinationBaseAddress_start  128
-#define GEN45_XY_COLOR_BLT_DestinationBaseAddress_start  128
-#define GEN4_XY_COLOR_BLT_DestinationBaseAddress_start  128
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DestinationBaseAddress_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 128;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 128;
-      } else {
-         return 128;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::Destination Pitch */
-
-
-#define GEN5_XY_COLOR_BLT_DestinationPitch_bits  16
-#define GEN45_XY_COLOR_BLT_DestinationPitch_bits  16
-#define GEN4_XY_COLOR_BLT_DestinationPitch_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DestinationPitch_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_DestinationPitch_start  32
-#define GEN45_XY_COLOR_BLT_DestinationPitch_start  32
-#define GEN4_XY_COLOR_BLT_DestinationPitch_start  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DestinationPitch_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::Destination X1 Coordinate */
-
-
-#define GEN5_XY_COLOR_BLT_DestinationX1Coordinate_bits  16
-#define GEN45_XY_COLOR_BLT_DestinationX1Coordinate_bits  16
-#define GEN4_XY_COLOR_BLT_DestinationX1Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DestinationX1Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_DestinationX1Coordinate_start  64
-#define GEN45_XY_COLOR_BLT_DestinationX1Coordinate_start  64
-#define GEN4_XY_COLOR_BLT_DestinationX1Coordinate_start  64
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DestinationX1Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 64;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 64;
-      } else {
-         return 64;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::Destination X2 Coordinate */
-
-
-#define GEN5_XY_COLOR_BLT_DestinationX2Coordinate_bits  16
-#define GEN45_XY_COLOR_BLT_DestinationX2Coordinate_bits  16
-#define GEN4_XY_COLOR_BLT_DestinationX2Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DestinationX2Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_DestinationX2Coordinate_start  96
-#define GEN45_XY_COLOR_BLT_DestinationX2Coordinate_start  96
-#define GEN4_XY_COLOR_BLT_DestinationX2Coordinate_start  96
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DestinationX2Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 96;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 96;
-      } else {
-         return 96;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::Destination Y1 Coordinate */
-
-
-#define GEN5_XY_COLOR_BLT_DestinationY1Coordinate_bits  16
-#define GEN45_XY_COLOR_BLT_DestinationY1Coordinate_bits  16
-#define GEN4_XY_COLOR_BLT_DestinationY1Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DestinationY1Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_DestinationY1Coordinate_start  80
-#define GEN45_XY_COLOR_BLT_DestinationY1Coordinate_start  80
-#define GEN4_XY_COLOR_BLT_DestinationY1Coordinate_start  80
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DestinationY1Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 80;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 80;
-      } else {
-         return 80;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::Destination Y2 Coordinate */
-
-
-#define GEN5_XY_COLOR_BLT_DestinationY2Coordinate_bits  16
-#define GEN45_XY_COLOR_BLT_DestinationY2Coordinate_bits  16
-#define GEN4_XY_COLOR_BLT_DestinationY2Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DestinationY2Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_DestinationY2Coordinate_start  112
-#define GEN45_XY_COLOR_BLT_DestinationY2Coordinate_start  112
-#define GEN4_XY_COLOR_BLT_DestinationY2Coordinate_start  112
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_DestinationY2Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 112;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 112;
-      } else {
-         return 112;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::Raster Operation */
-
-
-#define GEN5_XY_COLOR_BLT_RasterOperation_bits  8
-#define GEN45_XY_COLOR_BLT_RasterOperation_bits  8
-#define GEN4_XY_COLOR_BLT_RasterOperation_bits  8
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_RasterOperation_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 8;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 8;
-      } else {
-         return 8;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_RasterOperation_start  48
-#define GEN45_XY_COLOR_BLT_RasterOperation_start  48
-#define GEN4_XY_COLOR_BLT_RasterOperation_start  48
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_RasterOperation_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 48;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 48;
-      } else {
-         return 48;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::Solid Pattern Color */
-
-
-#define GEN5_XY_COLOR_BLT_SolidPatternColor_bits  32
-#define GEN45_XY_COLOR_BLT_SolidPatternColor_bits  32
-#define GEN4_XY_COLOR_BLT_SolidPatternColor_bits  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_SolidPatternColor_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_SolidPatternColor_start  160
-#define GEN45_XY_COLOR_BLT_SolidPatternColor_start  160
-#define GEN4_XY_COLOR_BLT_SolidPatternColor_start  160
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_SolidPatternColor_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 160;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 160;
-      } else {
-         return 160;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_COLOR_BLT::Tiling Enable */
-
-
-#define GEN5_XY_COLOR_BLT_TilingEnable_bits  1
-#define GEN45_XY_COLOR_BLT_TilingEnable_bits  1
-#define GEN4_XY_COLOR_BLT_TilingEnable_bits  1
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_TilingEnable_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 1;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 1;
-      } else {
-         return 1;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_COLOR_BLT_TilingEnable_start  11
-#define GEN45_XY_COLOR_BLT_TilingEnable_start  11
-#define GEN4_XY_COLOR_BLT_TilingEnable_start  11
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_COLOR_BLT_TilingEnable_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 11;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 11;
-      } else {
-         return 11;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT */
-
-
-#define GEN5_XY_SETUP_BLT_length  8
-#define GEN45_XY_SETUP_BLT_length  8
-#define GEN4_XY_SETUP_BLT_length  8
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_length(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 8;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 8;
-      } else {
-         return 8;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::2D Command Opcode */
-
-
-#define GEN5_XY_SETUP_BLT_2DCommandOpcode_bits  7
-#define GEN45_XY_SETUP_BLT_2DCommandOpcode_bits  7
-#define GEN4_XY_SETUP_BLT_2DCommandOpcode_bits  7
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_2DCommandOpcode_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 7;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 7;
-      } else {
-         return 7;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_2DCommandOpcode_start  22
-#define GEN45_XY_SETUP_BLT_2DCommandOpcode_start  22
-#define GEN4_XY_SETUP_BLT_2DCommandOpcode_start  22
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_2DCommandOpcode_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 22;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 22;
-      } else {
-         return 22;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::32bpp Byte Mask */
-
-
-#define GEN5_XY_SETUP_BLT_32bppByteMask_bits  2
-#define GEN45_XY_SETUP_BLT_32bppByteMask_bits  2
-#define GEN4_XY_SETUP_BLT_32bppByteMask_bits  2
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_32bppByteMask_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 2;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 2;
-      } else {
-         return 2;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_32bppByteMask_start  20
-#define GEN45_XY_SETUP_BLT_32bppByteMask_start  20
-#define GEN4_XY_SETUP_BLT_32bppByteMask_start  20
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_32bppByteMask_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 20;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 20;
-      } else {
-         return 20;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::Background Color */
-
-
-#define GEN5_XY_SETUP_BLT_BackgroundColor_bits  32
-#define GEN45_XY_SETUP_BLT_BackgroundColor_bits  32
-#define GEN4_XY_SETUP_BLT_BackgroundColor_bits  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_BackgroundColor_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_BackgroundColor_start  160
-#define GEN45_XY_SETUP_BLT_BackgroundColor_start  160
-#define GEN4_XY_SETUP_BLT_BackgroundColor_start  160
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_BackgroundColor_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 160;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 160;
-      } else {
-         return 160;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::ClipRect X1 Coordinate */
-
-
-#define GEN5_XY_SETUP_BLT_ClipRectX1Coordinate_bits  16
-#define GEN45_XY_SETUP_BLT_ClipRectX1Coordinate_bits  16
-#define GEN4_XY_SETUP_BLT_ClipRectX1Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ClipRectX1Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_ClipRectX1Coordinate_start  64
-#define GEN45_XY_SETUP_BLT_ClipRectX1Coordinate_start  64
-#define GEN4_XY_SETUP_BLT_ClipRectX1Coordinate_start  64
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ClipRectX1Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 64;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 64;
-      } else {
-         return 64;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::ClipRect X2 Coordinate */
-
-
-#define GEN5_XY_SETUP_BLT_ClipRectX2Coordinate_bits  16
-#define GEN45_XY_SETUP_BLT_ClipRectX2Coordinate_bits  16
-#define GEN4_XY_SETUP_BLT_ClipRectX2Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ClipRectX2Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_ClipRectX2Coordinate_start  96
-#define GEN45_XY_SETUP_BLT_ClipRectX2Coordinate_start  96
-#define GEN4_XY_SETUP_BLT_ClipRectX2Coordinate_start  96
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ClipRectX2Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 96;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 96;
-      } else {
-         return 96;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::ClipRect Y1 Coordinate */
-
-
-#define GEN5_XY_SETUP_BLT_ClipRectY1Coordinate_bits  16
-#define GEN45_XY_SETUP_BLT_ClipRectY1Coordinate_bits  16
-#define GEN4_XY_SETUP_BLT_ClipRectY1Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ClipRectY1Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_ClipRectY1Coordinate_start  80
-#define GEN45_XY_SETUP_BLT_ClipRectY1Coordinate_start  80
-#define GEN4_XY_SETUP_BLT_ClipRectY1Coordinate_start  80
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ClipRectY1Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 80;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 80;
-      } else {
-         return 80;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::ClipRect Y2 Coordinate */
-
-
-#define GEN5_XY_SETUP_BLT_ClipRectY2Coordinate_bits  16
-#define GEN45_XY_SETUP_BLT_ClipRectY2Coordinate_bits  16
-#define GEN4_XY_SETUP_BLT_ClipRectY2Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ClipRectY2Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_ClipRectY2Coordinate_start  112
-#define GEN45_XY_SETUP_BLT_ClipRectY2Coordinate_start  112
-#define GEN4_XY_SETUP_BLT_ClipRectY2Coordinate_start  112
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ClipRectY2Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 112;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 112;
-      } else {
-         return 112;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::Clipping Enabled */
-
-
-#define GEN5_XY_SETUP_BLT_ClippingEnabled_bits  1
-#define GEN45_XY_SETUP_BLT_ClippingEnabled_bits  1
-#define GEN4_XY_SETUP_BLT_ClippingEnabled_bits  1
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ClippingEnabled_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 1;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 1;
-      } else {
-         return 1;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_ClippingEnabled_start  62
-#define GEN45_XY_SETUP_BLT_ClippingEnabled_start  62
-#define GEN4_XY_SETUP_BLT_ClippingEnabled_start  62
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ClippingEnabled_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 62;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 62;
-      } else {
-         return 62;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::Color Depth */
-
-
-#define GEN5_XY_SETUP_BLT_ColorDepth_bits  2
-#define GEN45_XY_SETUP_BLT_ColorDepth_bits  2
-#define GEN4_XY_SETUP_BLT_ColorDepth_bits  2
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ColorDepth_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 2;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 2;
-      } else {
-         return 2;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_ColorDepth_start  56
-#define GEN45_XY_SETUP_BLT_ColorDepth_start  56
-#define GEN4_XY_SETUP_BLT_ColorDepth_start  56
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ColorDepth_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 56;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 56;
-      } else {
-         return 56;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::Command Type */
-
-
-#define GEN5_XY_SETUP_BLT_CommandType_bits  3
-#define GEN45_XY_SETUP_BLT_CommandType_bits  3
-#define GEN4_XY_SETUP_BLT_CommandType_bits  3
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_CommandType_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 3;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 3;
-      } else {
-         return 3;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_CommandType_start  29
-#define GEN45_XY_SETUP_BLT_CommandType_start  29
-#define GEN4_XY_SETUP_BLT_CommandType_start  29
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_CommandType_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 29;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 29;
-      } else {
-         return 29;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::DWord Length */
-
-
-#define GEN5_XY_SETUP_BLT_DWordLength_bits  8
-#define GEN45_XY_SETUP_BLT_DWordLength_bits  8
-#define GEN4_XY_SETUP_BLT_DWordLength_bits  8
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_DWordLength_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 8;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 8;
-      } else {
-         return 8;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_DWordLength_start  0
-#define GEN45_XY_SETUP_BLT_DWordLength_start  0
-#define GEN4_XY_SETUP_BLT_DWordLength_start  0
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_DWordLength_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 0;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 0;
-      } else {
-         return 0;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::Destination Base Address */
-
-
-#define GEN5_XY_SETUP_BLT_DestinationBaseAddress_bits  32
-#define GEN45_XY_SETUP_BLT_DestinationBaseAddress_bits  32
-#define GEN4_XY_SETUP_BLT_DestinationBaseAddress_bits  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_DestinationBaseAddress_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_DestinationBaseAddress_start  128
-#define GEN45_XY_SETUP_BLT_DestinationBaseAddress_start  128
-#define GEN4_XY_SETUP_BLT_DestinationBaseAddress_start  128
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_DestinationBaseAddress_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 128;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 128;
-      } else {
-         return 128;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::Destination Pitch */
-
-
-#define GEN5_XY_SETUP_BLT_DestinationPitch_bits  16
-#define GEN45_XY_SETUP_BLT_DestinationPitch_bits  16
-#define GEN4_XY_SETUP_BLT_DestinationPitch_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_DestinationPitch_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_DestinationPitch_start  32
-#define GEN45_XY_SETUP_BLT_DestinationPitch_start  32
-#define GEN4_XY_SETUP_BLT_DestinationPitch_start  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_DestinationPitch_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::Foreground Color */
-
-
-#define GEN5_XY_SETUP_BLT_ForegroundColor_bits  32
-#define GEN45_XY_SETUP_BLT_ForegroundColor_bits  32
-#define GEN4_XY_SETUP_BLT_ForegroundColor_bits  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ForegroundColor_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_ForegroundColor_start  192
-#define GEN45_XY_SETUP_BLT_ForegroundColor_start  192
-#define GEN4_XY_SETUP_BLT_ForegroundColor_start  192
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_ForegroundColor_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 192;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 192;
-      } else {
-         return 192;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::Mono Source Transparency Mode */
-
-
-#define GEN5_XY_SETUP_BLT_MonoSourceTransparencyMode_bits  1
-#define GEN45_XY_SETUP_BLT_MonoSourceTransparencyMode_bits  1
-#define GEN4_XY_SETUP_BLT_MonoSourceTransparencyMode_bits  1
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_MonoSourceTransparencyMode_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 1;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 1;
-      } else {
-         return 1;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_MonoSourceTransparencyMode_start  60
-#define GEN45_XY_SETUP_BLT_MonoSourceTransparencyMode_start  61
-#define GEN4_XY_SETUP_BLT_MonoSourceTransparencyMode_start  61
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_MonoSourceTransparencyMode_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 60;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 61;
-      } else {
-         return 61;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::Pattern Base Address */
-
-
-#define GEN5_XY_SETUP_BLT_PatternBaseAddress_bits  32
-#define GEN45_XY_SETUP_BLT_PatternBaseAddress_bits  32
-#define GEN4_XY_SETUP_BLT_PatternBaseAddress_bits  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_PatternBaseAddress_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_PatternBaseAddress_start  224
-#define GEN45_XY_SETUP_BLT_PatternBaseAddress_start  224
-#define GEN4_XY_SETUP_BLT_PatternBaseAddress_start  224
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_PatternBaseAddress_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 224;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 224;
-      } else {
-         return 224;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::Raster Operation */
-
-
-#define GEN5_XY_SETUP_BLT_RasterOperation_bits  8
-#define GEN45_XY_SETUP_BLT_RasterOperation_bits  8
-#define GEN4_XY_SETUP_BLT_RasterOperation_bits  8
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_RasterOperation_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 8;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 8;
-      } else {
-         return 8;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_RasterOperation_start  48
-#define GEN45_XY_SETUP_BLT_RasterOperation_start  48
-#define GEN4_XY_SETUP_BLT_RasterOperation_start  48
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_RasterOperation_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 48;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 48;
-      } else {
-         return 48;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SETUP_BLT::Tiling Enable */
-
-
-#define GEN5_XY_SETUP_BLT_TilingEnable_bits  1
-#define GEN45_XY_SETUP_BLT_TilingEnable_bits  1
-#define GEN4_XY_SETUP_BLT_TilingEnable_bits  1
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_TilingEnable_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 1;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 1;
-      } else {
-         return 1;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SETUP_BLT_TilingEnable_start  11
-#define GEN45_XY_SETUP_BLT_TilingEnable_start  11
-#define GEN4_XY_SETUP_BLT_TilingEnable_start  11
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SETUP_BLT_TilingEnable_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 11;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 11;
-      } else {
-         return 11;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT */
-
-
-#define GEN5_XY_SRC_COPY_BLT_length  8
-#define GEN45_XY_SRC_COPY_BLT_length  8
-#define GEN4_XY_SRC_COPY_BLT_length  8
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_length(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 8;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 8;
-      } else {
-         return 8;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::2D Command Opcode */
-
-
-#define GEN5_XY_SRC_COPY_BLT_2DCommandOpcode_bits  7
-#define GEN45_XY_SRC_COPY_BLT_2DCommandOpcode_bits  7
-#define GEN4_XY_SRC_COPY_BLT_2DCommandOpcode_bits  7
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_2DCommandOpcode_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 7;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 7;
-      } else {
-         return 7;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_2DCommandOpcode_start  22
-#define GEN45_XY_SRC_COPY_BLT_2DCommandOpcode_start  22
-#define GEN4_XY_SRC_COPY_BLT_2DCommandOpcode_start  22
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_2DCommandOpcode_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 22;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 22;
-      } else {
-         return 22;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::32bpp Byte Mask */
-
-
-#define GEN5_XY_SRC_COPY_BLT_32bppByteMask_bits  2
-#define GEN45_XY_SRC_COPY_BLT_32bppByteMask_bits  2
-#define GEN4_XY_SRC_COPY_BLT_32bppByteMask_bits  2
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_32bppByteMask_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 2;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 2;
-      } else {
-         return 2;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_32bppByteMask_start  20
-#define GEN45_XY_SRC_COPY_BLT_32bppByteMask_start  20
-#define GEN4_XY_SRC_COPY_BLT_32bppByteMask_start  20
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_32bppByteMask_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 20;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 20;
-      } else {
-         return 20;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Clipping Enabled */
-
-
-#define GEN5_XY_SRC_COPY_BLT_ClippingEnabled_bits  1
-#define GEN45_XY_SRC_COPY_BLT_ClippingEnabled_bits  1
-#define GEN4_XY_SRC_COPY_BLT_ClippingEnabled_bits  1
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_ClippingEnabled_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 1;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 1;
-      } else {
-         return 1;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_ClippingEnabled_start  62
-#define GEN45_XY_SRC_COPY_BLT_ClippingEnabled_start  62
-#define GEN4_XY_SRC_COPY_BLT_ClippingEnabled_start  62
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_ClippingEnabled_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 62;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 62;
-      } else {
-         return 62;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Color Depth */
-
-
-#define GEN5_XY_SRC_COPY_BLT_ColorDepth_bits  3
-#define GEN45_XY_SRC_COPY_BLT_ColorDepth_bits  2
-#define GEN4_XY_SRC_COPY_BLT_ColorDepth_bits  2
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_ColorDepth_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 3;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 2;
-      } else {
-         return 2;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_ColorDepth_start  56
-#define GEN45_XY_SRC_COPY_BLT_ColorDepth_start  56
-#define GEN4_XY_SRC_COPY_BLT_ColorDepth_start  56
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_ColorDepth_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 56;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 56;
-      } else {
-         return 56;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Command Type */
-
-
-#define GEN5_XY_SRC_COPY_BLT_CommandType_bits  3
-#define GEN45_XY_SRC_COPY_BLT_CommandType_bits  3
-#define GEN4_XY_SRC_COPY_BLT_CommandType_bits  3
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_CommandType_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 3;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 3;
-      } else {
-         return 3;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_CommandType_start  29
-#define GEN45_XY_SRC_COPY_BLT_CommandType_start  29
-#define GEN4_XY_SRC_COPY_BLT_CommandType_start  29
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_CommandType_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 29;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 29;
-      } else {
-         return 29;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::DWord Length */
-
-
-#define GEN5_XY_SRC_COPY_BLT_DWordLength_bits  8
-#define GEN45_XY_SRC_COPY_BLT_DWordLength_bits  8
-#define GEN4_XY_SRC_COPY_BLT_DWordLength_bits  8
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DWordLength_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 8;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 8;
-      } else {
-         return 8;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_DWordLength_start  0
-#define GEN45_XY_SRC_COPY_BLT_DWordLength_start  0
-#define GEN4_XY_SRC_COPY_BLT_DWordLength_start  0
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DWordLength_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 0;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 0;
-      } else {
-         return 0;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Destination Base Address */
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationBaseAddress_bits  32
-#define GEN45_XY_SRC_COPY_BLT_DestinationBaseAddress_bits  32
-#define GEN4_XY_SRC_COPY_BLT_DestinationBaseAddress_bits  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationBaseAddress_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationBaseAddress_start  128
-#define GEN45_XY_SRC_COPY_BLT_DestinationBaseAddress_start  128
-#define GEN4_XY_SRC_COPY_BLT_DestinationBaseAddress_start  128
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationBaseAddress_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 128;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 128;
-      } else {
-         return 128;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Destination Pitch */
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationPitch_bits  16
-#define GEN45_XY_SRC_COPY_BLT_DestinationPitch_bits  16
-#define GEN4_XY_SRC_COPY_BLT_DestinationPitch_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationPitch_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationPitch_start  32
-#define GEN45_XY_SRC_COPY_BLT_DestinationPitch_start  32
-#define GEN4_XY_SRC_COPY_BLT_DestinationPitch_start  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationPitch_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Destination Tiling Enable */
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationTilingEnable_bits  1
-#define GEN45_XY_SRC_COPY_BLT_DestinationTilingEnable_bits  1
-#define GEN4_XY_SRC_COPY_BLT_DestinationTilingEnable_bits  1
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationTilingEnable_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 1;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 1;
-      } else {
-         return 1;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationTilingEnable_start  11
-#define GEN45_XY_SRC_COPY_BLT_DestinationTilingEnable_start  11
-#define GEN4_XY_SRC_COPY_BLT_DestinationTilingEnable_start  11
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationTilingEnable_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 11;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 11;
-      } else {
-         return 11;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Destination X1 Coordinate */
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationX1Coordinate_bits  16
-#define GEN45_XY_SRC_COPY_BLT_DestinationX1Coordinate_bits  16
-#define GEN4_XY_SRC_COPY_BLT_DestinationX1Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationX1Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationX1Coordinate_start  64
-#define GEN45_XY_SRC_COPY_BLT_DestinationX1Coordinate_start  64
-#define GEN4_XY_SRC_COPY_BLT_DestinationX1Coordinate_start  64
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationX1Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 64;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 64;
-      } else {
-         return 64;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Destination X2 Coordinate */
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationX2Coordinate_bits  16
-#define GEN45_XY_SRC_COPY_BLT_DestinationX2Coordinate_bits  16
-#define GEN4_XY_SRC_COPY_BLT_DestinationX2Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationX2Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationX2Coordinate_start  96
-#define GEN45_XY_SRC_COPY_BLT_DestinationX2Coordinate_start  96
-#define GEN4_XY_SRC_COPY_BLT_DestinationX2Coordinate_start  96
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationX2Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 96;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 96;
-      } else {
-         return 96;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Destination Y1 Coordinate */
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationY1Coordinate_bits  16
-#define GEN45_XY_SRC_COPY_BLT_DestinationY1Coordinate_bits  16
-#define GEN4_XY_SRC_COPY_BLT_DestinationY1Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationY1Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationY1Coordinate_start  80
-#define GEN45_XY_SRC_COPY_BLT_DestinationY1Coordinate_start  80
-#define GEN4_XY_SRC_COPY_BLT_DestinationY1Coordinate_start  80
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationY1Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 80;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 80;
-      } else {
-         return 80;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Destination Y2 Coordinate */
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationY2Coordinate_bits  16
-#define GEN45_XY_SRC_COPY_BLT_DestinationY2Coordinate_bits  16
-#define GEN4_XY_SRC_COPY_BLT_DestinationY2Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationY2Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_DestinationY2Coordinate_start  112
-#define GEN45_XY_SRC_COPY_BLT_DestinationY2Coordinate_start  112
-#define GEN4_XY_SRC_COPY_BLT_DestinationY2Coordinate_start  112
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_DestinationY2Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 112;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 112;
-      } else {
-         return 112;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Raster Operation */
-
-
-#define GEN5_XY_SRC_COPY_BLT_RasterOperation_bits  8
-#define GEN45_XY_SRC_COPY_BLT_RasterOperation_bits  8
-#define GEN4_XY_SRC_COPY_BLT_RasterOperation_bits  8
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_RasterOperation_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 8;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 8;
-      } else {
-         return 8;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_RasterOperation_start  48
-#define GEN45_XY_SRC_COPY_BLT_RasterOperation_start  48
-#define GEN4_XY_SRC_COPY_BLT_RasterOperation_start  48
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_RasterOperation_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 48;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 48;
-      } else {
-         return 48;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Source Base Address */
-
-
-#define GEN5_XY_SRC_COPY_BLT_SourceBaseAddress_bits  32
-#define GEN45_XY_SRC_COPY_BLT_SourceBaseAddress_bits  32
-#define GEN4_XY_SRC_COPY_BLT_SourceBaseAddress_bits  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_SourceBaseAddress_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_SourceBaseAddress_start  224
-#define GEN45_XY_SRC_COPY_BLT_SourceBaseAddress_start  224
-#define GEN4_XY_SRC_COPY_BLT_SourceBaseAddress_start  224
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_SourceBaseAddress_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 224;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 224;
-      } else {
-         return 224;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Source Pitch */
-
-
-#define GEN5_XY_SRC_COPY_BLT_SourcePitch_bits  16
-#define GEN45_XY_SRC_COPY_BLT_SourcePitch_bits  16
-#define GEN4_XY_SRC_COPY_BLT_SourcePitch_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_SourcePitch_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_SourcePitch_start  192
-#define GEN45_XY_SRC_COPY_BLT_SourcePitch_start  192
-#define GEN4_XY_SRC_COPY_BLT_SourcePitch_start  192
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_SourcePitch_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 192;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 192;
-      } else {
-         return 192;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Source Tiling Enable */
-
-
-#define GEN5_XY_SRC_COPY_BLT_SourceTilingEnable_bits  1
-#define GEN45_XY_SRC_COPY_BLT_SourceTilingEnable_bits  1
-#define GEN4_XY_SRC_COPY_BLT_SourceTilingEnable_bits  1
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_SourceTilingEnable_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 1;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 1;
-      } else {
-         return 1;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_SourceTilingEnable_start  15
-#define GEN45_XY_SRC_COPY_BLT_SourceTilingEnable_start  15
-#define GEN4_XY_SRC_COPY_BLT_SourceTilingEnable_start  15
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_SourceTilingEnable_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 15;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 15;
-      } else {
-         return 15;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Source X1 Coordinate */
-
-
-#define GEN5_XY_SRC_COPY_BLT_SourceX1Coordinate_bits  16
-#define GEN45_XY_SRC_COPY_BLT_SourceX1Coordinate_bits  16
-#define GEN4_XY_SRC_COPY_BLT_SourceX1Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_SourceX1Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_SourceX1Coordinate_start  160
-#define GEN45_XY_SRC_COPY_BLT_SourceX1Coordinate_start  160
-#define GEN4_XY_SRC_COPY_BLT_SourceX1Coordinate_start  160
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_SourceX1Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 160;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 160;
-      } else {
-         return 160;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_SRC_COPY_BLT::Source Y1 Coordinate */
-
-
-#define GEN5_XY_SRC_COPY_BLT_SourceY1Coordinate_bits  16
-#define GEN45_XY_SRC_COPY_BLT_SourceY1Coordinate_bits  16
-#define GEN4_XY_SRC_COPY_BLT_SourceY1Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_SourceY1Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_SRC_COPY_BLT_SourceY1Coordinate_start  176
-#define GEN45_XY_SRC_COPY_BLT_SourceY1Coordinate_start  176
-#define GEN4_XY_SRC_COPY_BLT_SourceY1Coordinate_start  176
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_SRC_COPY_BLT_SourceY1Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 176;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 176;
-      } else {
-         return 176;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_TEXT_IMMEDIATE_BLT */
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_length  3
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_length  3
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_length  3
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_length(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 3;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 3;
-      } else {
-         return 3;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_TEXT_IMMEDIATE_BLT::2D Command Opcode */
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_2DCommandOpcode_bits  7
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_2DCommandOpcode_bits  7
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_2DCommandOpcode_bits  7
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_2DCommandOpcode_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 7;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 7;
-      } else {
-         return 7;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_2DCommandOpcode_start  22
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_2DCommandOpcode_start  22
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_2DCommandOpcode_start  22
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_2DCommandOpcode_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 22;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 22;
-      } else {
-         return 22;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_TEXT_IMMEDIATE_BLT::32bpp Byte Mask */
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_32bppByteMask_bits  2
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_32bppByteMask_bits  2
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_32bppByteMask_bits  2
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_32bppByteMask_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 2;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 2;
-      } else {
-         return 2;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_32bppByteMask_start  20
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_32bppByteMask_start  20
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_32bppByteMask_start  20
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_32bppByteMask_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 20;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 20;
-      } else {
-         return 20;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_TEXT_IMMEDIATE_BLT::Command Type */
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_CommandType_bits  3
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_CommandType_bits  3
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_CommandType_bits  3
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_CommandType_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 3;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 3;
-      } else {
-         return 3;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_CommandType_start  29
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_CommandType_start  29
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_CommandType_start  29
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_CommandType_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 29;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 29;
-      } else {
-         return 29;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_TEXT_IMMEDIATE_BLT::DWord Length */
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_DWordLength_bits  8
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_DWordLength_bits  8
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_DWordLength_bits  8
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_DWordLength_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 8;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 8;
-      } else {
-         return 8;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_DWordLength_start  0
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_DWordLength_start  0
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_DWordLength_start  0
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_DWordLength_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 0;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 0;
-      } else {
-         return 0;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_TEXT_IMMEDIATE_BLT::Destination Pitch */
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_DestinationPitch_bits  16
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_DestinationPitch_bits  16
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_DestinationPitch_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_DestinationPitch_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_DestinationPitch_start  32
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_DestinationPitch_start  32
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_DestinationPitch_start  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_DestinationPitch_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_TEXT_IMMEDIATE_BLT::Destination X1 Coordinate */
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_DestinationX1Coordinate_bits  16
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_DestinationX1Coordinate_bits  16
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_DestinationX1Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_DestinationX1Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_DestinationX1Coordinate_start  32
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_DestinationX1Coordinate_start  32
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_DestinationX1Coordinate_start  32
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_DestinationX1Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 32;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 32;
-      } else {
-         return 32;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_TEXT_IMMEDIATE_BLT::Destination X2 Coordinate */
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_DestinationX2Coordinate_bits  16
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_DestinationX2Coordinate_bits  16
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_DestinationX2Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_DestinationX2Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_DestinationX2Coordinate_start  64
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_DestinationX2Coordinate_start  64
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_DestinationX2Coordinate_start  64
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_DestinationX2Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 64;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 64;
-      } else {
-         return 64;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_TEXT_IMMEDIATE_BLT::Destination Y1 Coordinate */
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_DestinationY1Coordinate_bits  16
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_DestinationY1Coordinate_bits  16
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_DestinationY1Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_DestinationY1Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_DestinationY1Coordinate_start  48
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_DestinationY1Coordinate_start  48
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_DestinationY1Coordinate_start  48
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_DestinationY1Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 48;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 48;
-      } else {
-         return 48;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_TEXT_IMMEDIATE_BLT::Destination Y2 Coordinate */
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_DestinationY2Coordinate_bits  16
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_DestinationY2Coordinate_bits  16
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_DestinationY2Coordinate_bits  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_DestinationY2Coordinate_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_DestinationY2Coordinate_start  80
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_DestinationY2Coordinate_start  80
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_DestinationY2Coordinate_start  80
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_DestinationY2Coordinate_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 80;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 80;
-      } else {
-         return 80;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_TEXT_IMMEDIATE_BLT::Packing */
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_Packing_bits  1
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_Packing_bits  1
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_Packing_bits  1
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_Packing_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 1;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 1;
-      } else {
-         return 1;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_Packing_start  16
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_Packing_start  16
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_Packing_start  16
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_Packing_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 16;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 16;
-      } else {
-         return 16;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-/* XY_TEXT_IMMEDIATE_BLT::Tiling Enable */
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_TilingEnable_bits  1
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_TilingEnable_bits  1
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_TilingEnable_bits  1
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_TilingEnable_bits(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 1;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 1;
-      } else {
-         return 1;
-      }
-   default:
-      unreachable("Invalid hardware generation");
-   }
-}
-
-
-
-#define GEN5_XY_TEXT_IMMEDIATE_BLT_TilingEnable_start  11
-#define GEN45_XY_TEXT_IMMEDIATE_BLT_TilingEnable_start  11
-#define GEN4_XY_TEXT_IMMEDIATE_BLT_TilingEnable_start  11
-
-static inline uint32_t ATTRIBUTE_PURE
-XY_TEXT_IMMEDIATE_BLT_TilingEnable_start(const struct gen_device_info *devinfo)
-{
-   switch (devinfo->gen) {
-   case 11: return 0;
-   case 10: return 0;
-   case 9: return 0;
-   case 8: return 0;
-   case 7:
-      if (devinfo->is_haswell) {
-         return 0;
-      } else {
-         return 0;
-      }
-   case 6: return 0;
-   case 5: return 11;
-   case 4:
-      if (devinfo->is_g4x) {
-         return 11;
-      } else {
-         return 11;
       }
    default:
       unreachable("Invalid hardware generation");
