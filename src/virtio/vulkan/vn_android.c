@@ -15,6 +15,8 @@
 #include <vndk/hardware_buffer.h>
 #include <vulkan/vk_icd.h>
 
+#include <hardware/gralloc.h>
+
 #include "util/os_file.h"
 #include "util/u_gralloc/u_gralloc.h"
 #include "vk_android.h"
@@ -26,6 +28,10 @@
 #include "vn_instance.h"
 #include "vn_physical_device.h"
 #include "vn_queue.h"
+
+/* Reserve the GRALLOC_USAGE_PRIVATE_1 bit from hardware/gralloc.h for buffers
+ * used for Guest VRAM blobs in parity with CrOS Gralloc */
+#define CROS_GRALLOC_USAGE_GUEST_VRAM (GRALLOC_USAGE_PRIVATE_1)
 
 struct vn_android_gralloc {
    struct u_gralloc *gralloc;
@@ -343,6 +349,9 @@ vn_GetSwapchainGrallocUsage2ANDROID(
       *grallocProducerUsage |= vn_android_gralloc_get_shared_present_usage();
 
    vn_tls_set_async_pipeline_create();
+
+   /* For swapchain images always used Guest VRAM */
+   *grallocConsumerUsage |= CROS_GRALLOC_USAGE_GUEST_VRAM;
 
    return VK_SUCCESS;
 }
