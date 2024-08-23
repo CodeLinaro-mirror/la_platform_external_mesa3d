@@ -69,7 +69,7 @@ def close_output_file():
 
 
 def load_config_file():
-  impl.load_config_file('python-build/generate_android_build.config')
+  impl.load_config_file('meson-to-hermetic/generate_android_build.config')
 
 
 def include_directories(*paths, is_system=False):
@@ -692,6 +692,10 @@ def custom_target(
     relative_inputs.append(python_script)
   relative_inputs.extend(impl.get_list_of_relative_inputs(depend_files))
 
+  relative_inputs_set = set()
+  for src in relative_inputs:
+    relative_inputs_set.add(src)
+
   relative_outputs = []
   if isinstance(output, list):
     for file in output:
@@ -751,7 +755,7 @@ def custom_target(
     impl.fprint('genrule {')
     impl.fprint('  name: "%s",' % custom_target.target_name_h())
     impl.fprint('  srcs: [')
-    for src in relative_inputs:
+    for src in relative_inputs_set:
       impl.fprint('    "%s",' % src)
     for dep in depends:
       assert type(dep) is CustomTarget
@@ -810,7 +814,7 @@ def custom_target(
     impl.fprint('genrule {')
     impl.fprint('  name: "%s",' % custom_target.target_name_c())
     impl.fprint('  srcs: [')
-    for src in relative_inputs:
+    for src in relative_inputs_set:
       impl.fprint('    "%s",' % src)
     for dep in depends:
       assert type(dep) is CustomTarget
@@ -857,7 +861,7 @@ def custom_target(
     impl.fprint('genrule {')
     impl.fprint('  name: "%s",' % custom_target.target_name())
     impl.fprint('  srcs: [')
-    for src in relative_inputs:
+    for src in relative_inputs_set:
       impl.fprint('    "%s",' % src)
     for dep in depends:
       assert type(dep) is impl.CustomTarget
