@@ -127,7 +127,7 @@ class Dependency:
         return hash(self.unique_id)
 
     def __eq__(self, other):
-        return self.unique_id == other._unique_id
+        return self.unique_id == other.unique_id
 
 
 class CommandReturn:
@@ -596,6 +596,8 @@ def load_config_file(filename):
                     global _gCpu
                     _gCpu = cpu
                     print(f'Config: cpu={_gCpu}')
+                case 'host_machine' | 'build_machine':
+                    continue
                 case _:  # Default case
                     exit(f'Unhandled config key: {key}')
 
