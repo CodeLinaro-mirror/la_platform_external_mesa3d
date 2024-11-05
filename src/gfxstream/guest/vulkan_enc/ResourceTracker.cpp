@@ -1413,7 +1413,7 @@ void ResourceTracker::setupCaps(uint32_t& noRenderControlEnc) {
         mFeatureInfo.hasVulkanCreateResourcesWithRequirements = true;
         mFeatureInfo.hasVirtioGpuNext = true;
         mFeatureInfo.hasVirtioGpuNativeSync = true;
-        mFeatureInfo.hasVulkanBatchedDescriptorSetUpdate = true;
+        mFeatureInfo.hasVulkanBatchedDescriptorSetUpdate = mCaps.vulkanCapset.vulkanBatchedDescriptorSetUpdate;
         mFeatureInfo.hasVulkanAsyncQsri = true;
 
         ResourceTracker::streamFeatureBits |= VULKAN_STREAM_FEATURE_NULL_OPTIONAL_STRINGS_BIT;
@@ -1742,6 +1742,7 @@ VkResult ResourceTracker::on_vkEnumerateDeviceExtensionProperties(
         "VK_KHR_shader_subgroup_extended_types",
         "VK_EXT_subgroup_size_control",
         "VK_EXT_provoking_vertex",
+        "VK_KHR_line_rasterization",
         "VK_EXT_line_rasterization",
         "VK_KHR_shader_terminate_invocation",
         "VK_EXT_transform_feedback",
