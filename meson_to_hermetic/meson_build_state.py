@@ -37,6 +37,7 @@ class StaticLibrary(IncludeDirectories):
         self.generated_headers: list[str] = []
         self.generated_sources: list[str] = []
         # In Bazel, these c options are copts
+        self.copts: list[str] = []
         self.cstd: str = ''
         self.cpp_std: str = ''
         self.conlyflags: list[str] = []
@@ -50,6 +51,13 @@ class StaticLibrary(IncludeDirectories):
         self.whole_static_libs: list[str] = []
         self.shared_libs: list[str] = []
         self.header_libs: list[str] = []
+
+    @property
+    def hdrs(self):
+        return self.generated_headers + self.generated_sources
+
+    def __str__(self):
+        return f"@StaticLibrary: name: {self.name}, LibraryType: {self.library_type}"
 
 
 class CustomTarget:

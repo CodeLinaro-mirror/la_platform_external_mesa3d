@@ -1,17 +1,22 @@
 {# Copyright © 2024 Google Inc.
    SPDX-License-Identifier: MIT
 #}
-py_binary(
+genrule(
   name = "{{ name }}",
-  main = "{{ main }}",
   srcs = [
   {%- for src in srcs %}
     "{{ src }}",
   {%- endfor %}
   ],
-  imports = [
-  {%- for import in imports %}
-    "{{ import }}",
+  outs = [
+  {%- for out in outs %}
+    "{{ out }}",
   {%- endfor %}
   ],
+  tools = [
+  {%- for tool in tools %}
+    "{{ tool }}",
+  {%- endfor %}
+  ],
+  cmd = "{{ cmd }}"
 )
