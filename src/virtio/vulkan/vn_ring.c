@@ -307,7 +307,7 @@ vn_ring_create(struct vn_instance *instance,
    ring->shared.buffer = shared + layout->buffer_offset;
    ring->shared.extra = shared + layout->extra_offset;
 
-   mtx_init(&ring->mutex, mtx_plain);
+   mtx_init(&ring->mutex, mtx_plain | mtx_recursive);
 
    ring->direct_size = layout->buffer_size >> direct_order;
    assert(ring->direct_size);
