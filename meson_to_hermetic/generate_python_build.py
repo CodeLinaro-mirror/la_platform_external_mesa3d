@@ -66,7 +66,7 @@ def process_meson(file_name: str, output_indent: str = ''):
             exit('Unhandled literal in line: ' + line)
 
         # Recurse into subdirs
-        match = re.match("( *)subdir\('([a-zA-Z0-9_/]+)'\)", line)
+        match = re.match("( *)subdir\('([a-zA-Z0-9_\-/]+)'\)", line)
         if match is not None:
             subdir_output_indent = match.group(1) + output_indent
             current_dir = os.path.dirname(file_name)
