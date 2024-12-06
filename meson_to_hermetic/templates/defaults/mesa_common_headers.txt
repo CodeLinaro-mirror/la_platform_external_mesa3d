@@ -4,7 +4,7 @@
 cc_library_headers {
     name: "mesa_common_headers",
     vendor_available: true,
-    host_supported: true,
+    host_supported: false,
     export_include_dirs: [
         "src",
         "include",
