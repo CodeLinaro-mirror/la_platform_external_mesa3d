@@ -3,7 +3,7 @@
 #}
 cc_defaults {
     name: "mesa_gfxstream_guest_cc_defaults",
-    host_supported: true,
+    host_supported: false,
     vendor: true,
     cflags: [
         "-DVK_GFXSTREAM_STRUCTURE_TYPE_EXT",
