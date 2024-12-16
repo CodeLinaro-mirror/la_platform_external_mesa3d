@@ -42,6 +42,7 @@ bool CoherentMemory::subAllocate(uint64_t size, uint8_t** ptr, uint64_t& offset)
     if (!block) return false;
 
     *ptr = mBaseAddr + block->ofs;
+    offset = block->ofs;
     return true;
 }
 
