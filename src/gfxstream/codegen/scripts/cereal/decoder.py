@@ -642,10 +642,16 @@ custom_decodes = {
     "vkBindBufferMemory2KHR" : emit_global_state_wrapped_decoding,
 
     "vkCreateDevice" : emit_global_state_wrapped_decoding,
-    "vkGetDeviceQueue" : emit_global_state_wrapped_decoding,
     "vkDestroyDevice" : emit_global_state_wrapped_decoding,
 
+    "vkGetDeviceQueue" : emit_global_state_wrapped_decoding,
     "vkGetDeviceQueue2" : emit_global_state_wrapped_decoding,
+
+    "vkGetPhysicalDeviceQueueFamilyProperties" : emit_global_state_wrapped_decoding,
+    "vkGetPhysicalDeviceQueueFamilyProperties2" : emit_global_state_wrapped_decoding,
+
+    "vkQueueBindSparse" : emit_global_state_wrapped_decoding,
+    "vkQueuePresentKHR" : emit_global_state_wrapped_decoding,
 
     "vkBindImageMemory" : emit_global_state_wrapped_decoding,
     "vkBindImageMemory2" : emit_global_state_wrapped_decoding,
@@ -684,6 +690,7 @@ custom_decodes = {
     "vkDestroyShaderModule": emit_global_state_wrapped_decoding,
     "vkCreatePipelineCache": emit_global_state_wrapped_decoding,
     "vkDestroyPipelineCache": emit_global_state_wrapped_decoding,
+    "vkCreateComputePipelines": emit_global_state_wrapped_decoding,
     "vkCreateGraphicsPipelines": emit_global_state_wrapped_decoding,
     "vkDestroyPipeline": emit_global_state_wrapped_decoding,
 

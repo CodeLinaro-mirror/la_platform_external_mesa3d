@@ -28,11 +28,11 @@ cc_library_static {
     header_libs: [
         "mesa_gfxstream_guest_iostream",
         "mesa_common_headers",
+        "mesa_gfxstream_aemu_headers",
     ],
     static_libs: [
         "mesa_util",
         "mesa_goldfish_address_space",
-        "libringbuffer",
         "libqemupipe.ranchu",
     ],
     shared_libs: [

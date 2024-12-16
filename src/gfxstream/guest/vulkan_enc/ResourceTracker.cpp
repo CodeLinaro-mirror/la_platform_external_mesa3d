@@ -13,6 +13,7 @@
 #include "gfxstream_vk_private.h"
 #include "goldfish_address_space.h"
 #include "goldfish_vk_private_defs.h"
+#include "util/anon_file.h"
 #include "util/macros.h"
 #include "virtgpu_gfxstream_protocol.h"
 #include "vulkan/vulkan_core.h"
@@ -35,22 +36,6 @@
 
 #if defined(__linux__)
 #include <drm_fourcc.h>
-#endif
-
-#if defined(__ANDROID__) || defined(__linux__) || defined(__APPLE__)
-
-#include <sys/mman.h>
-#include <sys/syscall.h>
-
-static inline int inline_memfd_create(const char* name, unsigned int flags) {
-#if defined(__ANDROID__)
-    return syscall(SYS_memfd_create, name, flags);
-#else
-    return -1;
-#endif
-}
-
-#define memfd_create inline_memfd_create
 #endif
 
 #ifndef VK_USE_PLATFORM_FUCHSIA
@@ -266,6 +251,10 @@ VkDescriptorImageInfo createImmutableSamplersFilteredImageInfo(
 
 bool descriptorBindingIsImmutableSampler(VkDescriptorSet dstSet, uint32_t dstBinding) {
     return as_goldfish_VkDescriptorSet(dstSet)->reified->bindingIsImmutableSampler[dstBinding];
+}
+
+static bool isHostVisible(const VkPhysicalDeviceMemoryProperties* memoryProps, uint32_t index) {
+    return memoryProps->memoryTypes[index].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 }
 
 VkDescriptorImageInfo ResourceTracker::filterNonexistentSampler(
@@ -1413,7 +1402,7 @@ void ResourceTracker::setupCaps(uint32_t& noRenderControlEnc) {
         mFeatureInfo.hasVulkanCreateResourcesWithRequirements = true;
         mFeatureInfo.hasVirtioGpuNext = true;
         mFeatureInfo.hasVirtioGpuNativeSync = true;
-        mFeatureInfo.hasVulkanBatchedDescriptorSetUpdate = true;
+        mFeatureInfo.hasVulkanBatchedDescriptorSetUpdate = mCaps.vulkanCapset.vulkanBatchedDescriptorSetUpdate;
         mFeatureInfo.hasVulkanAsyncQsri = true;
 
         ResourceTracker::streamFeatureBits |= VULKAN_STREAM_FEATURE_NULL_OPTIONAL_STRINGS_BIT;
@@ -1742,6 +1731,7 @@ VkResult ResourceTracker::on_vkEnumerateDeviceExtensionProperties(
         "VK_KHR_shader_subgroup_extended_types",
         "VK_EXT_subgroup_size_control",
         "VK_EXT_provoking_vertex",
+        "VK_KHR_line_rasterization",
         "VK_EXT_line_rasterization",
         "VK_KHR_shader_terminate_invocation",
         "VK_EXT_transform_feedback",
@@ -5754,11 +5744,12 @@ VkResult ResourceTracker::on_vkGetSemaphoreFdKHR(void* context, VkResult, VkDevi
     } else {
         // opaque fd
         int hostFd = 0;
+        int32_t size = 0;
         VkResult result = enc->vkGetSemaphoreFdKHR(device, pGetFdInfo, &hostFd, true /* do lock */);
         if (result != VK_SUCCESS) {
             return result;
         }
-        *pFd = memfd_create("vk_opaque_fd", 0);
+        *pFd = os_create_anonymous_file(size, "vk_opaque_fd");
         write(*pFd, &hostFd, sizeof(hostFd));
         return VK_SUCCESS;
     }
