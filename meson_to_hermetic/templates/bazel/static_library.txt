@@ -33,4 +33,9 @@ cc_library(
     {%- endfor %}
     ],
     visibility = [ "//visibility:public" ],
+    {# Bazel doesn't seem to have a 'whole_static_libs'
+      option for targets that link against static libs;
+      workaround is to specify every static lib as alwaysLink
+    #}
+    alwayslink = True,
 )

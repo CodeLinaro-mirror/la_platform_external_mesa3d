@@ -1,9 +1,46 @@
 # Copyright 2024 Google LLC
 # SPDX-License-Identifier: Apache-2.0
+# Base project config which contain shared attributes which
+# all other projects must contain / override
+[base_project_config]
+name = 'base_project_config'
+inherits_from = ''
+
+[base_project_config.host_machine]
+cpu_family = ''
+cpu = ''
+host_machine = ''
+build_machine = ''
+
+[base_project_config.meson_options]
+platforms = ''
+gallium-drivers = ''
+vulkan-drivers = ''
+
+[base_project_config.header_not_supported]
+headers = []
+
+[base_project_config.symbol_not_supported]
+symbols = []
+
+[base_project_config.function_not_supported]
+functions = []
+
+[base_project_config.link_not_supported]
+links = []
+
+[base_project_config.ext_dependencies]
+# DependencyTargetType
+#   SHARED_LIBRARY = 1
+#   STATIC_LIBRARY = 2
+#   HEADER_LIBRARY = 3
+# See meson_impl.py
+
 build = 'bazel'
 
 [[project_config]]
 name = 'fuchsia_aarch64_drivers'
+inherits_from = 'base_project_config'
 
 [project_config.host_machine]
 cpu_family = 'aarch64'
@@ -54,6 +91,9 @@ libmagma = [
 ]
 libmagma_virt = [
     # No targets
+]
+fuchsia_io = [
+    { target_name = '@fuchsia_sdk//fidl/fuchsia.io:fuchsia.io_cpp', target_type = 2 }
 ]
 
 # Define new project configs
