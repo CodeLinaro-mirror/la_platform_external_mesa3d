@@ -23,6 +23,9 @@ class Stream;
 } // namespace base {
 } // namespace android {
 
+namespace gfxstream {
+namespace vk {
+
 class VkDecoderSnapshot {
 public:
     VkDecoderSnapshot();
@@ -31,7 +34,9 @@ public:
     void save(android::base::Stream* stream);
     void load(android::base::Stream* stream, emugl::GfxApiLogger& gfx_logger,
               emugl::HealthMonitor<>* healthMonitor);
-    void createExtraHandlesForNextApi(const uint64_t* created, uint32_t count);
+
+    VkSnapshotApiCallInfo* createApiCallInfo();
+    void destroyApiCallInfoIfUnused(VkSnapshotApiCallInfo* info);
 """
 
 decoder_snapshot_decl_postamble = """
@@ -40,37 +45,48 @@ private:
     std::unique_ptr<Impl> mImpl;
 
 };
+
+}  // namespace vk
+}  // namespace gfxstream
 """
 
 decoder_snapshot_impl_preamble ="""
 
-using namespace gfxstream::vk;
 using emugl::GfxApiLogger;
 using emugl::HealthMonitor;
+
+namespace gfxstream {
+namespace vk {
 
 class VkDecoderSnapshot::Impl {
 public:
     Impl() { }
 
     void save(android::base::Stream* stream) {
+        std::lock_guard<std::mutex> lock(mReconstructionMutex);
         mReconstruction.save(stream);
     }
 
-    void load(android::base::Stream* stream, GfxApiLogger& gfx_logger,
-              HealthMonitor<>* healthMonitor) {
+    void load(android::base::Stream* stream, GfxApiLogger& gfx_logger, HealthMonitor<>* healthMonitor) {
+        std::lock_guard<std::mutex> lock(mReconstructionMutex);
         mReconstruction.load(stream, gfx_logger, healthMonitor);
     }
 
-    void createExtraHandlesForNextApi(const uint64_t* created, uint32_t count) {
-        mLock.lock();
-        mReconstruction.createExtraHandlesForNextApi(created, count);
+    VkSnapshotApiCallInfo* createApiCallInfo() {
+        std::lock_guard<std::mutex> lock(mReconstructionMutex);
+        return mReconstruction.createApiCallInfo();
+    }
+
+    void destroyApiCallInfoIfUnused(VkSnapshotApiCallInfo* info) {
+        std::lock_guard<std::mutex> lock(mReconstructionMutex);
+        return mReconstruction.destroyApiCallInfoIfUnused(info);
     }
 """
 
 decoder_snapshot_impl_postamble = """
 private:
-    android::base::Lock mLock;
-    VkReconstruction mReconstruction;
+    std::mutex mReconstructionMutex;
+    VkReconstruction mReconstruction GUARDED_BY(mReconstructionMutex);
 };
 
 VkDecoderSnapshot::VkDecoderSnapshot() :
@@ -80,17 +96,28 @@ void VkDecoderSnapshot::save(android::base::Stream* stream) {
     mImpl->save(stream);
 }
 
-void VkDecoderSnapshot::load(android::base::Stream* stream, GfxApiLogger& gfx_logger,
-                             HealthMonitor<>* healthMonitor) {
+void VkDecoderSnapshot::load(android::base::Stream* stream, GfxApiLogger& gfx_logger, HealthMonitor<>* healthMonitor) {
     mImpl->load(stream, gfx_logger, healthMonitor);
 }
 
-void VkDecoderSnapshot::createExtraHandlesForNextApi(const uint64_t* created, uint32_t count) {
-    mImpl->createExtraHandlesForNextApi(created, count);
+VkSnapshotApiCallInfo* VkDecoderSnapshot::createApiCallInfo() {
+    return mImpl->createApiCallInfo();
+}
+
+void VkDecoderSnapshot::destroyApiCallInfoIfUnused(VkSnapshotApiCallInfo* info) {
+    mImpl->destroyApiCallInfoIfUnused(info);
 }
 
 VkDecoderSnapshot::~VkDecoderSnapshot() = default;
 """
+
+decoder_snapshot_namespace_postamble = """
+
+}  // namespace vk
+}  // namespace gfxstream
+
+"""
+
 
 AUXILIARY_SNAPSHOT_API_BASE_PARAM_COUNT = 3
 
@@ -203,11 +230,6 @@ apiSequences = {
     "vkAllocateMemory" : ["vkAllocateMemory", "vkMapMemoryIntoAddressSpaceGOOGLE"]
 }
 
-apiCrreateExtraHandles = [
-    "vkCreateDevice",
-    "vkCreateDescriptorPool",
-]
-
 @dataclass(frozen=True)
 class VkObjectState:
     vk_object : str
@@ -224,7 +246,7 @@ def api_special_implementation_vkBindImageMemory2(api, cgen):
     parentType = "VkDeviceMemory"
     childObj = "boxed_%s" % childType
     parentObj = "boxed_%s" % parentType
-    cgen.stmt("android::base::AutoLock lock(mLock)")
+    cgen.stmt("std::lock_guard<std::mutex> lock(mReconstructionMutex)")
     cgen.beginFor("uint32_t i = 0", "i < bindInfoCount", "++i")
     cgen.stmt("%s boxed_%s = unboxed_to_boxed_non_dispatchable_%s(pBindInfos[i].image)"
               % (childType, childType, childType))
@@ -236,14 +258,13 @@ def api_special_implementation_vkBindImageMemory2(api, cgen):
               (childObj, "1", childObj))
     cgen.endFor()
 
-    cgen.stmt("auto apiHandle = mReconstruction.createApiInfo()")
-    cgen.stmt("auto apiInfo = mReconstruction.getApiInfo(apiHandle)")
-    cgen.stmt("mReconstruction.setApiTrace(apiInfo, OP_%s, snapshotTraceBegin, snapshotTraceBytes)" % api.name)
+    cgen.stmt("auto apiCallHandle = apiCallInfo->handle")
+    cgen.stmt("mReconstruction.setApiTrace(apiCallInfo, apiCallPacket, apiCallPacketSize)")
     cgen.line("// Note: the implementation does not work with bindInfoCount > 1");
     cgen.beginFor("uint32_t i = 0", "i < bindInfoCount", "++i")
     cgen.stmt("%s boxed_%s = unboxed_to_boxed_non_dispatchable_%s(pBindInfos[i].image)"
               % (childType, childType, childType))
-    cgen.stmt(f"mReconstruction.forEachHandleAddApi((const uint64_t*)&{childObj}, {1}, apiHandle, VkReconstruction::BOUND_MEMORY)")
+    cgen.stmt(f"mReconstruction.forEachHandleAddApi((const uint64_t*)&{childObj}, {1}, apiCallHandle, VkReconstruction::BOUND_MEMORY)")
     cgen.endFor()
 
 apiSpecialImplementation = {
@@ -342,11 +363,8 @@ def emit_impl(typeInfo, api, cgen):
                 boxed_access = "&boxed_%s" % p.typeName
             if p.pointerIndirectionLevels > 0:
                 cgen.stmt("if (!%s) return" % access)
-            isCreateExtraHandleApi = api.name in apiCrreateExtraHandles
-            if isCreateExtraHandleApi:
-                cgen.stmt("mLock.tryLock()");
-            else:
-                cgen.stmt("android::base::AutoLock lock(mLock)")
+
+            cgen.stmt("std::lock_guard<std::mutex> lock(mReconstructionMutex)")
             cgen.line("// %s create" % p.paramName)
             if p.isCreatedBy(api):
                 cgen.stmt("mReconstruction.addHandles((const uint64_t*)%s, %s)" % (boxed_access, lenExpr));
@@ -359,21 +377,18 @@ def emit_impl(typeInfo, api, cgen):
             if api.name in specialCaseDependencyExtractors:
                 specialCaseDependencyExtractors[api.name](p, boxed_access, lenExpr, api, cgen)
 
-            cgen.stmt("auto apiHandle = mReconstruction.createApiInfo()")
-            cgen.stmt("auto apiInfo = mReconstruction.getApiInfo(apiHandle)")
-            cgen.stmt("mReconstruction.setApiTrace(apiInfo, OP_%s, snapshotTraceBegin, snapshotTraceBytes)" % api.name)
+            cgen.stmt("auto apiCallHandle = apiCallInfo->handle")
+            cgen.stmt("mReconstruction.setApiTrace(apiCallInfo, apiCallPacket, apiCallPacketSize)")
             if lenAccessGuard is not None:
                 cgen.beginIf(lenAccessGuard)
-            cgen.stmt(f"mReconstruction.forEachHandleAddApi((const uint64_t*){boxed_access}, {lenExpr}, apiHandle, {get_target_state(api, p)})")
+            cgen.stmt(f"mReconstruction.forEachHandleAddApi((const uint64_t*){boxed_access}, {lenExpr}, apiCallHandle, {get_target_state(api, p)})")
             if p.isCreatedBy(api):
-                cgen.stmt("mReconstruction.setCreatedHandlesForApi(apiHandle, (const uint64_t*)%s, %s)" % (boxed_access, lenExpr))
+                cgen.stmt("mReconstruction.setCreatedHandlesForApi(apiCallHandle, (const uint64_t*)%s, %s)" % (boxed_access, lenExpr))
             if lenAccessGuard is not None:
                 cgen.endIf()
-            if isCreateExtraHandleApi:
-                cgen.stmt("mLock.unlock()")
 
         if p.isDestroyedBy(api):
-            cgen.stmt("android::base::AutoLock lock(mLock)")
+            cgen.stmt("std::lock_guard<std::mutex> lock(mReconstructionMutex)")
             cgen.line("// %s destroy" % p.paramName)
             if lenAccessGuard is not None:
                 cgen.beginIf(lenAccessGuard)
@@ -383,7 +398,7 @@ def emit_impl(typeInfo, api, cgen):
                 cgen.endIf()
 
         if is_action_operation(api, p):
-            cgen.stmt("android::base::AutoLock lock(mLock)")
+            cgen.stmt("std::lock_guard<std::mutex> lock(mReconstructionMutex)")
             cgen.line("// %s action" % p.paramName)
             cgen.stmt("VkDecoderGlobalState* m_state = VkDecoderGlobalState::get()")
             cgen.beginIf("m_state->batchedDescriptorSetUpdateEnabled()")
@@ -391,20 +406,18 @@ def emit_impl(typeInfo, api, cgen):
             cgen.endIf();
             cgen.stmt("uint64_t handle = m_state->newGlobalVkGenericHandle()")
             cgen.stmt("mReconstruction.addHandles((const uint64_t*)(&handle), 1)");
-            cgen.stmt("auto apiHandle = mReconstruction.createApiInfo()")
-            cgen.stmt("auto apiInfo = mReconstruction.getApiInfo(apiHandle)")
-            cgen.stmt("mReconstruction.setApiTrace(apiInfo, OP_%s, snapshotTraceBegin, snapshotTraceBytes)" % api.name)
+            cgen.stmt("auto apiCallHandle = apiCallInfo->handle")
+            cgen.stmt("mReconstruction.setApiTrace(apiCallInfo, apiCallPacket, apiCallPacketSize)")
             if api.name in specialCaseDependencyExtractors:
                 specialCaseDependencyExtractors[api.name](p, None, None, api, cgen)
-            cgen.stmt(f"mReconstruction.forEachHandleAddApi((const uint64_t*)(&handle), 1, apiHandle, {get_target_state(api, p)})")
-            cgen.stmt("mReconstruction.setCreatedHandlesForApi(apiHandle, (const uint64_t*)(&handle), 1)")
+            cgen.stmt(f"mReconstruction.forEachHandleAddApi((const uint64_t*)(&handle), 1, apiCallHandle, {get_target_state(api, p)})")
+            cgen.stmt("mReconstruction.setCreatedHandlesForApi(apiCallHandle, (const uint64_t*)(&handle), 1)")
 
         elif is_modify_operation(api, p) or is_clear_modifier_operation(api, p):
-            cgen.stmt("android::base::AutoLock lock(mLock)")
+            cgen.stmt("std::lock_guard<std::mutex> lock(mReconstructionMutex)")
             cgen.line("// %s modify" % p.paramName)
-            cgen.stmt("auto apiHandle = mReconstruction.createApiInfo()")
-            cgen.stmt("auto apiInfo = mReconstruction.getApiInfo(apiHandle)")
-            cgen.stmt("mReconstruction.setApiTrace(apiInfo, OP_%s, snapshotTraceBegin, snapshotTraceBytes)" % api.name)
+            cgen.stmt("auto apiCallHandle = apiCallInfo->handle")
+            cgen.stmt("mReconstruction.setApiTrace(apiCallInfo, apiCallPacket, apiCallPacketSize)")
             if lenAccessGuard is not None:
                 cgen.beginIf(lenAccessGuard)
             cgen.beginFor("uint32_t i = 0", "i < %s" % lenExpr, "++i")
@@ -414,7 +427,7 @@ def emit_impl(typeInfo, api, cgen):
                 cgen.line("// %s is already boxed, no need to box again" % p.paramName)
                 cgen.stmt("%s boxed = %s(%s[i])" % (p.typeName, p.typeName, access))
             if is_modify_operation(api, p):
-                cgen.stmt("mReconstruction.forEachHandleAddModifyApi((const uint64_t*)(&boxed), 1, apiHandle)")
+                cgen.stmt("mReconstruction.forEachHandleAddModifyApi((const uint64_t*)(&boxed), 1, apiCallHandle)")
             else: # is clear modifier operation
                 cgen.stmt("mReconstruction.forEachHandleClearModifyApi((const uint64_t*)(&boxed), 1)")
             cgen.endFor()
@@ -453,9 +466,11 @@ class VulkanDecoderSnapshot(VulkanWrapperGenerator):
         api = self.typeInfo.apis[name]
 
         additionalParams = [ \
-            makeVulkanTypeSimple(True, "uint8_t", 1, "snapshotTraceBegin"),
-            makeVulkanTypeSimple(False, "size_t", 0, "snapshotTraceBytes"),
-            makeVulkanTypeSimple(False, "android::base::BumpPool", 1, "pool"),]
+            makeVulkanTypeSimple(False, "android::base::BumpPool", 1, "pool"),
+            makeVulkanTypeSimple(False, "VkSnapshotApiCallInfo", 1, "apiCallInfo"),
+            makeVulkanTypeSimple(True, "uint8_t", 1, "apiCallPacket"),
+            makeVulkanTypeSimple(False, "size_t", 0, "apiCallPacketSize"),
+        ]
 
         if api.retType.typeName != "void":
             additionalParams.append( \
@@ -495,4 +510,4 @@ class VulkanDecoderSnapshot(VulkanWrapperGenerator):
                 self.cgenImpl.line("#endif")
 
         self.module.appendImpl(self.cgenImpl.swapCode())
-
+        self.module.appendImpl(decoder_snapshot_namespace_postamble)
