@@ -50,6 +50,7 @@ def generate_build_file(translator, build_type: str):
                 cflags=static_lib.conlyflags,
                 cppflags=static_lib.cppflags,
                 include_directories=static_lib.local_include_dirs,
+                system_include_directories=static_lib.system_include_dirs,
                 static_libs=static_lib.static_libs,
                 whole_static_libs=static_lib.whole_static_libs,
                 shared_libs=static_lib.shared_libs,
@@ -216,18 +217,14 @@ class BazelPkgConfigModule(impl.PkgConfigModule):
         libraries=None,
         libraries_private=None,
     ):
-        if extra_cflags is None:
-            extra_cflags = []
-        impl.fprint('# package library')
-        impl.fprint('cc_library(')
-        impl.fprint('  name = "%s",' % name)
         assert type(lib) is impl.StaticLibrary
-        impl.fprint('  deps = [ "%s" ],' % lib.target_name)
-        # This line tells Bazel to use -isystem for targets that depend on this one,
-        # which is needed for clients that include package headers with angle brackets.
-        impl.fprint('  includes = [ "." ],')
-        impl.fprint('  visibility = [ "//visibility:public" ],')
-        impl.fprint(')')
+        sl = StaticLibrary()
+        sl.name = name
+        sl.deps = lib.target_name
+        sl.system_include_dirs.append(".")
+        sl.visibility.append('//visibility:public')
+        meson_translator.meson_state.static_libraries.append(sl)
+
 
 
 class MesonTranslator:
@@ -1154,7 +1151,7 @@ def custom_target(
         python_custom_target = PythonCustomTarget()
         python_custom_target.name = python_script_target_name
         python_custom_target.main = python_script
-        for src in srcs:
+        for src in set(srcs):
             if src.endswith('.py'):
                 python_custom_target.srcs.append(src)
         for src in set(srcs):
