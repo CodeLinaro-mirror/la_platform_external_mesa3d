@@ -1,5 +1,7 @@
 # Copyright 2024 Google LLC
 # SPDX-License-Identifier: Apache-2.0
+build = 'bazel'
+
 # Base project config which contain shared attributes which
 # all other projects must contain / override
 [base_project_config]
@@ -35,8 +37,6 @@ links = []
 #   STATIC_LIBRARY = 2
 #   HEADER_LIBRARY = 3
 # See meson_impl.py
-
-build = 'bazel'
 
 [[project_config]]
 name = 'fuchsia_aarch64_drivers'

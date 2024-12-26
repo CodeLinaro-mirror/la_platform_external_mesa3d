@@ -47,6 +47,7 @@ class StaticLibrary(IncludeDirectories):
         self.target_compatible_with: list[str] = []
 
         self.local_include_dirs: list[str] = []
+        self.system_include_dirs: list[str] = []
         self.static_libs: list[str] = []
         self.whole_static_libs: list[str] = []
         self.shared_libs: list[str] = []
