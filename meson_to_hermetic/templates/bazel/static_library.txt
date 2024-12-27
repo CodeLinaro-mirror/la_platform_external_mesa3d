@@ -17,9 +17,17 @@ cc_library(
         + glob(["{{ include_dir }}"])
     {%- endfor %}
     ,
+    {# Tells Bazel to use -isystem for targets that depend on this one,
+       which is needed for clients that include package headers with angle brackets.
+    #}
+    includes = [
+    {%- for include_dir in system_include_directories %}
+        "{{ include_dir }}"
+    {%- endfor %}
+    ],
     copts = [
     {%- for copt in copts %}
-        "{{ copt }}",
+        '{{ copt }}',
     {%- endfor %}
     ],
     deps = [
