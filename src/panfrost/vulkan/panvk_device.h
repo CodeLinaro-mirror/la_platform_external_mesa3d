@@ -17,11 +17,11 @@
 #include "panvk_mempool.h"
 #include "panvk_meta.h"
 #include "panvk_physical_device.h"
+#include "panvk_utrace_perfetto.h"
 
 #include "kmod/pan_kmod.h"
 #include "util/pan_ir.h"
-#include "pan_blend.h"
-#include "pan_blitter.h"
+#include "util/perf/u_trace.h"
 
 #include "util/vma.h"
 
@@ -31,6 +31,7 @@ struct panvk_device {
    struct vk_device vk;
 
    struct {
+      simple_mtx_t lock;
       struct util_vma_heap heap;
    } as;
 
@@ -43,29 +44,13 @@ struct panvk_device {
    struct panvk_priv_bo *tiler_heap;
    struct panvk_priv_bo *sample_positions;
 
-   /* Access to the blitter pools are protected by the blitter
-    * shader/rsd locks. They can't be merged with other binary/desc
-    * pools unless we patch pan_blitter.c to support external pool locks.
-    *
-    * FIXME: The blitter infrastructure is only needed for FB preload.
-    * We should probably consider getting rid of the dependency we have
-    * on pan_desc.c and implement preload ourselves so we don't have
-    * to duplicate caches.
-    */
    struct {
-      struct panvk_pool bin_pool;
-      struct panvk_pool desc_pool;
-      struct pan_blitter_cache cache;
-      struct pan_blend_shader_cache blend_shader_cache;
-   } blitter;
+      struct panvk_priv_bo *handlers_bo;
+      uint32_t handler_stride;
+      uint32_t dump_region_size;
+   } tiler_oom;
 
-   struct panvk_blend_shader_cache blend_shader_cache;
    struct vk_meta_device meta;
-
-   struct {
-      struct panvk_priv_mem shader;
-      struct panvk_priv_mem rsd;
-   } desc_copy;
 
    struct {
       struct panvk_pool rw;
@@ -77,6 +62,13 @@ struct panvk_device {
 
    struct panvk_queue *queues[PANVK_MAX_QUEUE_FAMILIES];
    int queue_count[PANVK_MAX_QUEUE_FAMILIES];
+
+   struct {
+      struct u_trace_context utctx;
+#ifdef HAVE_PERFETTO
+      struct panvk_utrace_perfetto utp;
+#endif
+   } utrace;
 
    struct {
       struct pandecode_context *decode_ctx;
@@ -113,6 +105,12 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
 
 void panvk_per_arch(destroy_device)(struct panvk_device *device,
                                     const VkAllocationCallbacks *pAllocator);
+
+#if PAN_ARCH >= 10
+VkResult panvk_per_arch(device_check_status)(struct vk_device *vk_dev);
+
+VkResult panvk_per_arch(init_tiler_oom)(struct panvk_device *device);
+#endif
 #endif
 
 #endif

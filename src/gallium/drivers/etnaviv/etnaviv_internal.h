@@ -35,6 +35,8 @@
 
 #include "drm/etnaviv_drmif.h"
 
+#include "pipe/p_state.h"
+
 #define ETNA_NUM_INPUTS (16)
 #define ETNA_NUM_VARYINGS 16
 #define ETNA_NUM_LOD (14)
@@ -123,6 +125,8 @@ struct etna_specs {
    unsigned max_rendertarget_size;
    /* available pixel pipes */
    unsigned pixel_pipes;
+   /* number of render targets */
+   unsigned num_rts;
    /* architecture version of NN cores */
    unsigned nn_core_version;
 };
@@ -135,8 +139,11 @@ struct etna_specs {
 struct compiled_blend_color {
    float color[4];
    uint32_t PE_ALPHA_BLEND_COLOR;
-   uint32_t PE_ALPHA_COLOR_EXT0;
-   uint32_t PE_ALPHA_COLOR_EXT1;
+
+   struct {
+      uint32_t PE_ALPHA_COLOR_EXT0;
+      uint32_t PE_ALPHA_COLOR_EXT1;
+   } rt[PIPE_MAX_COLOR_BUFS];
 };
 
 /* Compiled pipe_stencil_ref */
@@ -163,6 +170,8 @@ struct compiled_viewport_state {
 
 /* Compiled pipe_framebuffer_state */
 struct compiled_framebuffer_state {
+   unsigned ps_output_remap[8];
+   uint8_t num_rt;
    uint32_t GL_MULTI_SAMPLE_CONFIG;
    uint32_t PE_COLOR_FORMAT;
    uint32_t PE_DEPTH_CONFIG;
@@ -171,6 +180,7 @@ struct compiled_framebuffer_state {
    uint32_t PE_DEPTH_STRIDE;
    uint32_t PE_HDEPTH_CONTROL;
    uint32_t PE_DEPTH_NORMALIZE;
+   float depth_mrd;
    struct etna_reloc PE_COLOR_ADDR;
    struct etna_reloc PE_PIPE_COLOR_ADDR[ETNA_MAX_PIXELPIPES];
    uint32_t PE_COLOR_STRIDE;
@@ -189,6 +199,15 @@ struct compiled_framebuffer_state {
    uint32_t PE_LOGIC_OP;
    uint32_t PS_CONTROL;
    uint32_t PS_CONTROL_EXT;
+   uint32_t PS_OUTPUT_REG2;
+   struct etna_reloc PE_RT_COLOR_ADDR[7];
+   struct etna_reloc PE_RT_PIPE_COLOR_ADDR[7][ETNA_MAX_PIXELPIPES];
+   uint32_t PE_RT_CONFIG[7];
+   uint32_t RT_TS_MEM_CONFIG[7];
+   uint32_t RT_TS_COLOR_CLEAR_VALUE[7];
+   uint32_t RT_TS_COLOR_CLEAR_VALUE_EXT[7];
+   struct etna_reloc RT_TS_COLOR_STATUS_BASE[7];
+   struct etna_reloc RT_TS_COLOR_SURFACE_BASE[7];
    bool msaa_mode; /* adds input (and possible temp) to PS */
 };
 
@@ -215,6 +234,7 @@ struct compiled_shader_state {
    uint32_t PA_ATTRIBUTE_ELEMENT_COUNT;
    uint32_t PA_CONFIG;
    uint32_t PA_SHADER_ATTRIBUTES[VIVS_PA_SHADER_ATTRIBUTES__LEN];
+   int pa_shader_attributes_states;
    uint32_t VS_END_PC;
    uint32_t VS_OUTPUT_COUNT; /* number of outputs if point size per vertex disabled */
    uint32_t VS_OUTPUT_COUNT_PSIZE; /* number of outputs of point size per vertex enabled */
@@ -225,7 +245,7 @@ struct compiled_shader_state {
    uint32_t VS_LOAD_BALANCING;
    uint32_t VS_START_PC;
    uint32_t PS_END_PC;
-   uint32_t PS_OUTPUT_REG;
+   uint32_t PS_OUTPUT_REG[2];
    uint32_t PS_INPUT_COUNT;
    uint32_t PS_INPUT_COUNT_MSAA; /* Adds an input */
    uint32_t PS_TEMP_REGISTER_CONTROL;
@@ -233,7 +253,9 @@ struct compiled_shader_state {
    uint32_t PS_START_PC;
    uint32_t GL_VARYING_TOTAL_COMPONENTS;
    uint32_t GL_VARYING_NUM_COMPONENTS[2];
-   uint32_t GL_VARYING_COMPONENT_USE[2];
+   uint32_t GL_VARYING_COMPONENT_USE[4];
+   uint32_t GL_HALTI5_SHADER_ATTRIBUTES[VIVS_GL_HALTI5_SHADER_ATTRIBUTES__LEN];
+   int halti5_shader_attributes_states;
    uint32_t GL_HALTI5_SH_SPECIALS;
    uint32_t FE_HALTI5_ID_CONFIG;
    unsigned vs_inst_mem_size;

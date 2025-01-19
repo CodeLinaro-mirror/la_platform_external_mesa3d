@@ -753,6 +753,7 @@ struct zink_shader_info {
    bool have_sparse;
    bool have_vulkan_memory_model;
    bool have_workgroup_memory_explicit_layout;
+   bool broken_arbitary_type_const;
    struct {
       uint8_t flush_denorms:3; // 16, 32, 64
       uint8_t preserve_denorms:3; // 16, 32, 64
@@ -1272,7 +1273,6 @@ struct zink_resource_object {
    VkFormatFeatureFlags vkfeats;
    uint64_t modifier;
    VkImageAspectFlags modifier_aspect;
-   VkSamplerYcbcrConversion sampler_conversion;
    unsigned plane_offsets[3];
    unsigned plane_strides[3];
    unsigned plane_count;
@@ -1371,7 +1371,7 @@ struct zink_transfer {
 
 
 /** screen types */
-struct zink_modifier_prop {
+struct zink_modifier_props {
     uint32_t                             drmFormatModifierCount;
     VkDrmFormatModifierPropertiesEXT*    pDrmFormatModifierProperties;
 };
@@ -1480,6 +1480,7 @@ struct zink_screen {
    bool have_D24_UNORM_S8_UINT;
    bool have_D32_SFLOAT_S8_UINT;
    bool have_triangle_fans;
+   bool have_dynamic_state_vertex_input_binding_stride;
    bool need_decompose_attrs;
    bool need_2D_zs;
    bool need_2D_sparse;
@@ -1523,7 +1524,8 @@ struct zink_screen {
    } driconf;
 
    struct zink_format_props format_props[PIPE_FORMAT_COUNT];
-   struct zink_modifier_prop modifier_props[PIPE_FORMAT_COUNT];
+   struct zink_modifier_props modifier_props[PIPE_FORMAT_COUNT];
+   bool format_props_init[PIPE_FORMAT_COUNT];
 
    VkExtent2D maxSampleLocationGridSize[5];
    VkPipelineLayout gfx_push_constant_layout;
@@ -1534,6 +1536,7 @@ struct zink_screen {
       bool needs_zs_shader_swizzle;
       bool needs_sanitised_layer;
       bool io_opt;
+      bool broken_const;
    } driver_compiler_workarounds;
    struct {
       bool broken_l4a4;

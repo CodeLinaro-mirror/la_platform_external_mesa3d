@@ -51,7 +51,7 @@
 #include "platform_android.h"
 #include "dri_util.h"
 
-static __DRIimage *
+static struct dri_image *
 droid_create_image_from_buffer_info(
    struct dri2_egl_display *dri2_dpy, int width, int height,
    struct u_gralloc_buffer_basic_info *buf_info,
@@ -67,7 +67,7 @@ droid_create_image_from_buffer_info(
       color_info->vertical_siting, 0, &error, priv);
 }
 
-static __DRIimage *
+static struct dri_image *
 droid_create_image_from_native_buffer(_EGLDisplay *disp,
                                       struct ANativeWindowBuffer *buf,
                                       void *priv)
@@ -85,7 +85,7 @@ droid_create_image_from_native_buffer(_EGLDisplay *disp,
       .hal_format = buf->format,
       .pixel_stride = buf->stride,
    };
-   __DRIimage *img = NULL;
+   struct dri_image *img = NULL;
 
    if (u_gralloc_get_buffer_basic_info(dri2_dpy->gralloc, &gr_handle,
                                        &buf_info))
@@ -113,7 +113,7 @@ droid_create_image_from_native_buffer(_EGLDisplay *disp,
 }
 
 static void
-handle_in_fence_fd(struct dri2_egl_surface *dri2_surf, __DRIimage *img)
+handle_in_fence_fd(struct dri2_egl_surface *dri2_surf, struct dri_image *img)
 {
    _EGLDisplay *disp = dri2_surf->base.Resource.Display;
    struct dri2_egl_display *dri2_dpy = dri2_egl_display(disp);
@@ -280,7 +280,7 @@ droid_create_surface(_EGLDisplay *disp, EGLint type, _EGLConfig *conf,
    struct dri2_egl_config *dri2_conf = dri2_egl_config(conf);
    struct dri2_egl_surface *dri2_surf;
    struct ANativeWindow *window = native_window;
-   const __DRIconfig *config;
+   const struct dri_config *config;
 
    dri2_surf = calloc(1, sizeof *dri2_surf);
    if (!dri2_surf) {
@@ -550,7 +550,7 @@ get_back_bo(struct dri2_egl_surface *dri2_surf)
  * return error when the allocation for supported buffer failed.
  */
 static int
-droid_image_get_buffers(__DRIdrawable *driDrawable, unsigned int format,
+droid_image_get_buffers(struct dri_drawable *driDrawable, unsigned int format,
                         uint32_t *stamp, void *loaderPrivate,
                         uint32_t buffer_mask, struct __DRIimageList *images)
 {
@@ -728,7 +728,7 @@ dri2_create_image_android_native_buffer(_EGLDisplay *disp, _EGLContext *ctx,
       return NULL;
    }
 
-   __DRIimage *dri_image =
+   struct dri_image *dri_image =
       droid_create_image_from_native_buffer(disp, buf, buf);
 
    if (dri_image) {
@@ -755,7 +755,7 @@ droid_create_image_khr(_EGLDisplay *disp, _EGLContext *ctx, EGLenum target,
 }
 
 static void
-droid_flush_front_buffer(__DRIdrawable *driDrawable, void *loaderPrivate)
+droid_flush_front_buffer(struct dri_drawable *driDrawable, void *loaderPrivate)
 {
 }
 
@@ -894,7 +894,7 @@ static const __DRIimageLoaderExtension droid_image_loader_extension = {
 };
 
 static void
-droid_display_shared_buffer(__DRIdrawable *driDrawable, int fence_fd,
+droid_display_shared_buffer(struct dri_drawable *driDrawable, int fence_fd,
                             void *loaderPrivate)
 {
    struct dri2_egl_surface *dri2_surf = loaderPrivate;
@@ -953,7 +953,7 @@ droid_display_shared_buffer(__DRIdrawable *driDrawable, int fence_fd,
 }
 
 static void
-droid_swrast_get_drawable_info(__DRIdrawable *drawable,
+droid_swrast_get_drawable_info(struct dri_drawable *drawable,
 	        int *x, int *y, int *width, int *height,
 	        void *loaderPrivate)
 {
@@ -968,21 +968,21 @@ droid_swrast_get_drawable_info(__DRIdrawable *drawable,
 }
 
 static void
-droid_swrast_put_image2(__DRIdrawable *draw, int op, int x, int y, int w,
+droid_swrast_put_image2(struct dri_drawable *draw, int op, int x, int y, int w,
                           int h, int stride, char *data, void *loaderPrivate)
 {
    return;
 }
 
 static void
-droid_swrast_put_image(__DRIdrawable *draw, int op, int x, int y, int w,
+droid_swrast_put_image(struct dri_drawable *draw, int op, int x, int y, int w,
                          int h, char *data, void *loaderPrivate)
 {
    return;
 }
 
 static void
-droid_swrast_get_image(__DRIdrawable *read, int x, int y, int w, int h,
+droid_swrast_get_image(struct dri_drawable *read, int x, int y, int w, int h,
                          char *data, void *loaderPrivate)
 {
    return;

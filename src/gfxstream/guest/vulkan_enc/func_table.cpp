@@ -42,7 +42,7 @@
 // required extensions, but the approach will be to
 // implement them completely on the guest side.
 #undef VK_KHR_android_surface
-#if defined(LINUX_GUEST_BUILD) || defined(__Fuchsia__)
+#if defined(LINUX_GUEST_BUILD) || DETECT_OS_FUCHSIA || DETECT_OS_WINDOWS
 #undef VK_ANDROID_native_buffer
 #endif
 #ifdef VK_VERSION_1_0
@@ -2835,6 +2835,301 @@ void gfxstream_vk_GetDeviceImageSparseMemoryRequirements(
     }
 }
 #endif
+#ifdef VK_VERSION_1_4
+void gfxstream_vk_CmdSetLineStipple(VkCommandBuffer commandBuffer, uint32_t lineStippleFactor,
+                                    uint16_t lineStipplePattern) {
+    MESA_TRACE_SCOPE("vkCmdSetLineStipple");
+    VK_FROM_HANDLE(gfxstream_vk_command_buffer, gfxstream_commandBuffer, commandBuffer);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getCommandBufferEncoder(
+            gfxstream_commandBuffer->internal_object);
+        vkEnc->vkCmdSetLineStipple(gfxstream_commandBuffer->internal_object, lineStippleFactor,
+                                   lineStipplePattern, true /* do lock */);
+    }
+}
+VkResult gfxstream_vk_MapMemory2(VkDevice device, const VkMemoryMapInfo* pMemoryMapInfo,
+                                 void** ppData) {
+    MESA_TRACE_SCOPE("vkMapMemory2");
+    VkResult vkMapMemory2_VkResult_return = (VkResult)0;
+    VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getThreadLocalEncoder();
+        vkMapMemory2_VkResult_return = vkEnc->vkMapMemory2(
+            gfxstream_device->internal_object, pMemoryMapInfo, ppData, true /* do lock */);
+    }
+    return vkMapMemory2_VkResult_return;
+}
+VkResult gfxstream_vk_UnmapMemory2(VkDevice device, const VkMemoryUnmapInfo* pMemoryUnmapInfo) {
+    MESA_TRACE_SCOPE("vkUnmapMemory2");
+    VkResult vkUnmapMemory2_VkResult_return = (VkResult)0;
+    VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getThreadLocalEncoder();
+        vkUnmapMemory2_VkResult_return = vkEnc->vkUnmapMemory2(
+            gfxstream_device->internal_object, pMemoryUnmapInfo, true /* do lock */);
+    }
+    return vkUnmapMemory2_VkResult_return;
+}
+void gfxstream_vk_CmdBindIndexBuffer2(VkCommandBuffer commandBuffer, VkBuffer buffer,
+                                      VkDeviceSize offset, VkDeviceSize size,
+                                      VkIndexType indexType) {
+    MESA_TRACE_SCOPE("vkCmdBindIndexBuffer2");
+    VK_FROM_HANDLE(gfxstream_vk_command_buffer, gfxstream_commandBuffer, commandBuffer);
+    VK_FROM_HANDLE(gfxstream_vk_buffer, gfxstream_buffer, buffer);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getCommandBufferEncoder(
+            gfxstream_commandBuffer->internal_object);
+        vkEnc->vkCmdBindIndexBuffer2(
+            gfxstream_commandBuffer->internal_object,
+            gfxstream_buffer ? gfxstream_buffer->internal_object : VK_NULL_HANDLE, offset, size,
+            indexType, true /* do lock */);
+    }
+}
+void gfxstream_vk_GetRenderingAreaGranularity(VkDevice device,
+                                              const VkRenderingAreaInfo* pRenderingAreaInfo,
+                                              VkExtent2D* pGranularity) {
+    MESA_TRACE_SCOPE("vkGetRenderingAreaGranularity");
+    VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getThreadLocalEncoder();
+        vkEnc->vkGetRenderingAreaGranularity(gfxstream_device->internal_object, pRenderingAreaInfo,
+                                             pGranularity, true /* do lock */);
+    }
+}
+void gfxstream_vk_GetDeviceImageSubresourceLayout(VkDevice device,
+                                                  const VkDeviceImageSubresourceInfo* pInfo,
+                                                  VkSubresourceLayout2* pLayout) {
+    MESA_TRACE_SCOPE("vkGetDeviceImageSubresourceLayout");
+    VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getThreadLocalEncoder();
+        vkEnc->vkGetDeviceImageSubresourceLayout(gfxstream_device->internal_object, pInfo, pLayout,
+                                                 true /* do lock */);
+    }
+}
+void gfxstream_vk_GetImageSubresourceLayout2(VkDevice device, VkImage image,
+                                             const VkImageSubresource2* pSubresource,
+                                             VkSubresourceLayout2* pLayout) {
+    MESA_TRACE_SCOPE("vkGetImageSubresourceLayout2");
+    VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getThreadLocalEncoder();
+        vkEnc->vkGetImageSubresourceLayout2(gfxstream_device->internal_object, image, pSubresource,
+                                            pLayout, true /* do lock */);
+    }
+}
+void gfxstream_vk_CmdPushDescriptorSet(VkCommandBuffer commandBuffer,
+                                       VkPipelineBindPoint pipelineBindPoint,
+                                       VkPipelineLayout layout, uint32_t set,
+                                       uint32_t descriptorWriteCount,
+                                       const VkWriteDescriptorSet* pDescriptorWrites) {
+    MESA_TRACE_SCOPE("vkCmdPushDescriptorSet");
+    VK_FROM_HANDLE(gfxstream_vk_command_buffer, gfxstream_commandBuffer, commandBuffer);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getCommandBufferEncoder(
+            gfxstream_commandBuffer->internal_object);
+        std::vector<VkWriteDescriptorSet> internal_pDescriptorWrites(descriptorWriteCount);
+        std::vector<std::vector<VkDescriptorBufferInfo>> internal_VkWriteDescriptorSet_pBufferInfo;
+        for (uint32_t i = 0; i < descriptorWriteCount; ++i) {
+            internal_pDescriptorWrites[i] = pDescriptorWrites[i];
+            /* VkWriteDescriptorSet::pBufferInfo */
+            internal_VkWriteDescriptorSet_pBufferInfo.push_back(
+                std::vector<VkDescriptorBufferInfo>());
+            internal_VkWriteDescriptorSet_pBufferInfo[i].resize(
+                internal_pDescriptorWrites[i].descriptorCount);
+            for (uint32_t j = 0; j < internal_pDescriptorWrites[i].descriptorCount; ++j) {
+                if (internal_pDescriptorWrites[i].pBufferInfo) {
+                    internal_VkWriteDescriptorSet_pBufferInfo[i][j] =
+                        internal_pDescriptorWrites[i].pBufferInfo[j];
+                    /* VkDescriptorBufferInfo::buffer */
+                    if (internal_VkWriteDescriptorSet_pBufferInfo[i][j].buffer) {
+                        VK_FROM_HANDLE(gfxstream_vk_buffer, gfxstream_buffer,
+                                       internal_VkWriteDescriptorSet_pBufferInfo[i][j].buffer);
+                        internal_VkWriteDescriptorSet_pBufferInfo[i][j].buffer =
+                            gfxstream_buffer->internal_object;
+                    }
+                }
+            }
+            internal_pDescriptorWrites[i].pBufferInfo =
+                internal_VkWriteDescriptorSet_pBufferInfo[i].data();
+        }
+        vkEnc->vkCmdPushDescriptorSet(gfxstream_commandBuffer->internal_object, pipelineBindPoint,
+                                      layout, set, descriptorWriteCount,
+                                      internal_pDescriptorWrites.data(), true /* do lock */);
+    }
+}
+void gfxstream_vk_CmdPushDescriptorSetWithTemplate(
+    VkCommandBuffer commandBuffer, VkDescriptorUpdateTemplate descriptorUpdateTemplate,
+    VkPipelineLayout layout, uint32_t set, const void* pData) {
+    MESA_TRACE_SCOPE("vkCmdPushDescriptorSetWithTemplate");
+    VK_FROM_HANDLE(gfxstream_vk_command_buffer, gfxstream_commandBuffer, commandBuffer);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getCommandBufferEncoder(
+            gfxstream_commandBuffer->internal_object);
+        vkEnc->vkCmdPushDescriptorSetWithTemplate(gfxstream_commandBuffer->internal_object,
+                                                  descriptorUpdateTemplate, layout, set, pData,
+                                                  true /* do lock */);
+    }
+}
+void gfxstream_vk_CmdSetRenderingAttachmentLocations(
+    VkCommandBuffer commandBuffer, const VkRenderingAttachmentLocationInfo* pLocationInfo) {
+    MESA_TRACE_SCOPE("vkCmdSetRenderingAttachmentLocations");
+    VK_FROM_HANDLE(gfxstream_vk_command_buffer, gfxstream_commandBuffer, commandBuffer);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getCommandBufferEncoder(
+            gfxstream_commandBuffer->internal_object);
+        vkEnc->vkCmdSetRenderingAttachmentLocations(gfxstream_commandBuffer->internal_object,
+                                                    pLocationInfo, true /* do lock */);
+    }
+}
+void gfxstream_vk_CmdSetRenderingInputAttachmentIndices(
+    VkCommandBuffer commandBuffer,
+    const VkRenderingInputAttachmentIndexInfo* pInputAttachmentIndexInfo) {
+    MESA_TRACE_SCOPE("vkCmdSetRenderingInputAttachmentIndices");
+    VK_FROM_HANDLE(gfxstream_vk_command_buffer, gfxstream_commandBuffer, commandBuffer);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getCommandBufferEncoder(
+            gfxstream_commandBuffer->internal_object);
+        vkEnc->vkCmdSetRenderingInputAttachmentIndices(gfxstream_commandBuffer->internal_object,
+                                                       pInputAttachmentIndexInfo,
+                                                       true /* do lock */);
+    }
+}
+void gfxstream_vk_CmdBindDescriptorSets2(VkCommandBuffer commandBuffer,
+                                         const VkBindDescriptorSetsInfo* pBindDescriptorSetsInfo) {
+    MESA_TRACE_SCOPE("vkCmdBindDescriptorSets2");
+    VK_FROM_HANDLE(gfxstream_vk_command_buffer, gfxstream_commandBuffer, commandBuffer);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getCommandBufferEncoder(
+            gfxstream_commandBuffer->internal_object);
+        vkEnc->vkCmdBindDescriptorSets2(gfxstream_commandBuffer->internal_object,
+                                        pBindDescriptorSetsInfo, true /* do lock */);
+    }
+}
+void gfxstream_vk_CmdPushConstants2(VkCommandBuffer commandBuffer,
+                                    const VkPushConstantsInfo* pPushConstantsInfo) {
+    MESA_TRACE_SCOPE("vkCmdPushConstants2");
+    VK_FROM_HANDLE(gfxstream_vk_command_buffer, gfxstream_commandBuffer, commandBuffer);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getCommandBufferEncoder(
+            gfxstream_commandBuffer->internal_object);
+        vkEnc->vkCmdPushConstants2(gfxstream_commandBuffer->internal_object, pPushConstantsInfo,
+                                   true /* do lock */);
+    }
+}
+void gfxstream_vk_CmdPushDescriptorSet2(VkCommandBuffer commandBuffer,
+                                        const VkPushDescriptorSetInfo* pPushDescriptorSetInfo) {
+    MESA_TRACE_SCOPE("vkCmdPushDescriptorSet2");
+    VK_FROM_HANDLE(gfxstream_vk_command_buffer, gfxstream_commandBuffer, commandBuffer);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getCommandBufferEncoder(
+            gfxstream_commandBuffer->internal_object);
+        std::vector<VkPushDescriptorSetInfo> internal_pPushDescriptorSetInfo(1);
+        std::vector<std::vector<VkWriteDescriptorSet>>
+            internal_VkPushDescriptorSetInfo_pDescriptorWrites;
+        std::vector<std::vector<VkDescriptorBufferInfo>> internal_VkWriteDescriptorSet_pBufferInfo;
+        for (uint32_t i = 0; i < 1; ++i) {
+            internal_pPushDescriptorSetInfo[i] = pPushDescriptorSetInfo[i];
+            /* VkPushDescriptorSetInfo::pDescriptorWrites */
+            internal_VkPushDescriptorSetInfo_pDescriptorWrites.push_back(
+                std::vector<VkWriteDescriptorSet>());
+            internal_VkPushDescriptorSetInfo_pDescriptorWrites[i].resize(
+                internal_pPushDescriptorSetInfo[i].descriptorWriteCount);
+            for (uint32_t j = 0; j < internal_pPushDescriptorSetInfo[i].descriptorWriteCount; ++j) {
+                internal_VkPushDescriptorSetInfo_pDescriptorWrites[i][j] =
+                    internal_pPushDescriptorSetInfo[i].pDescriptorWrites[j];
+                /* VkWriteDescriptorSet::pBufferInfo */
+                internal_VkWriteDescriptorSet_pBufferInfo.push_back(
+                    std::vector<VkDescriptorBufferInfo>());
+                internal_VkWriteDescriptorSet_pBufferInfo[j].resize(
+                    internal_VkPushDescriptorSetInfo_pDescriptorWrites[i][j].descriptorCount);
+                for (uint32_t k = 0;
+                     k < internal_VkPushDescriptorSetInfo_pDescriptorWrites[i][j].descriptorCount;
+                     ++k) {
+                    if (internal_VkPushDescriptorSetInfo_pDescriptorWrites[i][j].pBufferInfo) {
+                        internal_VkWriteDescriptorSet_pBufferInfo[j][k] =
+                            internal_VkPushDescriptorSetInfo_pDescriptorWrites[i][j].pBufferInfo[k];
+                        /* VkDescriptorBufferInfo::buffer */
+                        if (internal_VkWriteDescriptorSet_pBufferInfo[j][k].buffer) {
+                            VK_FROM_HANDLE(gfxstream_vk_buffer, gfxstream_buffer,
+                                           internal_VkWriteDescriptorSet_pBufferInfo[j][k].buffer);
+                            internal_VkWriteDescriptorSet_pBufferInfo[j][k].buffer =
+                                gfxstream_buffer->internal_object;
+                        }
+                    }
+                }
+                internal_VkPushDescriptorSetInfo_pDescriptorWrites[i][j].pBufferInfo =
+                    internal_VkWriteDescriptorSet_pBufferInfo[j].data();
+            }
+            internal_pPushDescriptorSetInfo[i].pDescriptorWrites =
+                internal_VkPushDescriptorSetInfo_pDescriptorWrites[i].data();
+        }
+        vkEnc->vkCmdPushDescriptorSet2(gfxstream_commandBuffer->internal_object,
+                                       internal_pPushDescriptorSetInfo.data(), true /* do lock */);
+    }
+}
+void gfxstream_vk_CmdPushDescriptorSetWithTemplate2(
+    VkCommandBuffer commandBuffer,
+    const VkPushDescriptorSetWithTemplateInfo* pPushDescriptorSetWithTemplateInfo) {
+    MESA_TRACE_SCOPE("vkCmdPushDescriptorSetWithTemplate2");
+    VK_FROM_HANDLE(gfxstream_vk_command_buffer, gfxstream_commandBuffer, commandBuffer);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getCommandBufferEncoder(
+            gfxstream_commandBuffer->internal_object);
+        vkEnc->vkCmdPushDescriptorSetWithTemplate2(gfxstream_commandBuffer->internal_object,
+                                                   pPushDescriptorSetWithTemplateInfo,
+                                                   true /* do lock */);
+    }
+}
+VkResult gfxstream_vk_CopyMemoryToImage(VkDevice device,
+                                        const VkCopyMemoryToImageInfo* pCopyMemoryToImageInfo) {
+    MESA_TRACE_SCOPE("vkCopyMemoryToImage");
+    VkResult vkCopyMemoryToImage_VkResult_return = (VkResult)0;
+    VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getThreadLocalEncoder();
+        vkCopyMemoryToImage_VkResult_return = vkEnc->vkCopyMemoryToImage(
+            gfxstream_device->internal_object, pCopyMemoryToImageInfo, true /* do lock */);
+    }
+    return vkCopyMemoryToImage_VkResult_return;
+}
+VkResult gfxstream_vk_CopyImageToMemory(VkDevice device,
+                                        const VkCopyImageToMemoryInfo* pCopyImageToMemoryInfo) {
+    MESA_TRACE_SCOPE("vkCopyImageToMemory");
+    VkResult vkCopyImageToMemory_VkResult_return = (VkResult)0;
+    VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getThreadLocalEncoder();
+        vkCopyImageToMemory_VkResult_return = vkEnc->vkCopyImageToMemory(
+            gfxstream_device->internal_object, pCopyImageToMemoryInfo, true /* do lock */);
+    }
+    return vkCopyImageToMemory_VkResult_return;
+}
+VkResult gfxstream_vk_CopyImageToImage(VkDevice device,
+                                       const VkCopyImageToImageInfo* pCopyImageToImageInfo) {
+    MESA_TRACE_SCOPE("vkCopyImageToImage");
+    VkResult vkCopyImageToImage_VkResult_return = (VkResult)0;
+    VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getThreadLocalEncoder();
+        vkCopyImageToImage_VkResult_return = vkEnc->vkCopyImageToImage(
+            gfxstream_device->internal_object, pCopyImageToImageInfo, true /* do lock */);
+    }
+    return vkCopyImageToImage_VkResult_return;
+}
+VkResult gfxstream_vk_TransitionImageLayout(VkDevice device, uint32_t transitionCount,
+                                            const VkHostImageLayoutTransitionInfo* pTransitions) {
+    MESA_TRACE_SCOPE("vkTransitionImageLayout");
+    VkResult vkTransitionImageLayout_VkResult_return = (VkResult)0;
+    VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getThreadLocalEncoder();
+        vkTransitionImageLayout_VkResult_return = vkEnc->vkTransitionImageLayout(
+            gfxstream_device->internal_object, transitionCount, pTransitions, true /* do lock */);
+    }
+    return vkTransitionImageLayout_VkResult_return;
+}
+#endif
 #ifdef VK_KHR_android_surface
 VkResult gfxstream_vk_CreateAndroidSurfaceKHR(VkInstance instance,
                                               const VkAndroidSurfaceCreateInfoKHR* pCreateInfo,
@@ -3649,31 +3944,6 @@ VkResult gfxstream_vk_QueueSubmit2KHR(VkQueue queue, uint32_t submitCount,
     }
     return vkQueueSubmit2KHR_VkResult_return;
 }
-void gfxstream_vk_CmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer,
-                                           VkPipelineStageFlags2 stage, VkBuffer dstBuffer,
-                                           VkDeviceSize dstOffset, uint32_t marker) {
-    MESA_TRACE_SCOPE("vkCmdWriteBufferMarker2AMD");
-    VK_FROM_HANDLE(gfxstream_vk_command_buffer, gfxstream_commandBuffer, commandBuffer);
-    VK_FROM_HANDLE(gfxstream_vk_buffer, gfxstream_dstBuffer, dstBuffer);
-    {
-        auto vkEnc = gfxstream::vk::ResourceTracker::getCommandBufferEncoder(
-            gfxstream_commandBuffer->internal_object);
-        vkEnc->vkCmdWriteBufferMarker2AMD(gfxstream_commandBuffer->internal_object, stage,
-                                          gfxstream_dstBuffer->internal_object, dstOffset, marker,
-                                          true /* do lock */);
-    }
-}
-void gfxstream_vk_GetQueueCheckpointData2NV(VkQueue queue, uint32_t* pCheckpointDataCount,
-                                            VkCheckpointData2NV* pCheckpointData) {
-    MESA_TRACE_SCOPE("vkGetQueueCheckpointData2NV");
-    VK_FROM_HANDLE(gfxstream_vk_queue, gfxstream_queue, queue);
-    {
-        auto vkEnc =
-            gfxstream::vk::ResourceTracker::getQueueEncoder(gfxstream_queue->internal_object);
-        vkEnc->vkGetQueueCheckpointData2NV(gfxstream_queue->internal_object, pCheckpointDataCount,
-                                           pCheckpointData, true /* do lock */);
-    }
-}
 #endif
 #ifdef VK_KHR_copy_commands2
 void gfxstream_vk_CmdCopyBuffer2KHR(VkCommandBuffer commandBuffer,
@@ -3827,7 +4097,7 @@ void gfxstream_vk_CmdBindIndexBuffer2KHR(VkCommandBuffer commandBuffer, VkBuffer
     }
 }
 void gfxstream_vk_GetRenderingAreaGranularityKHR(VkDevice device,
-                                                 const VkRenderingAreaInfoKHR* pRenderingAreaInfo,
+                                                 const VkRenderingAreaInfo* pRenderingAreaInfo,
                                                  VkExtent2D* pGranularity) {
     MESA_TRACE_SCOPE("vkGetRenderingAreaGranularityKHR");
     VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
@@ -3839,8 +4109,8 @@ void gfxstream_vk_GetRenderingAreaGranularityKHR(VkDevice device,
     }
 }
 void gfxstream_vk_GetDeviceImageSubresourceLayoutKHR(VkDevice device,
-                                                     const VkDeviceImageSubresourceInfoKHR* pInfo,
-                                                     VkSubresourceLayout2KHR* pLayout) {
+                                                     const VkDeviceImageSubresourceInfo* pInfo,
+                                                     VkSubresourceLayout2* pLayout) {
     MESA_TRACE_SCOPE("vkGetDeviceImageSubresourceLayoutKHR");
     VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
     {
@@ -3850,8 +4120,8 @@ void gfxstream_vk_GetDeviceImageSubresourceLayoutKHR(VkDevice device,
     }
 }
 void gfxstream_vk_GetImageSubresourceLayout2KHR(VkDevice device, VkImage image,
-                                                const VkImageSubresource2KHR* pSubresource,
-                                                VkSubresourceLayout2KHR* pLayout) {
+                                                const VkImageSubresource2* pSubresource,
+                                                VkSubresourceLayout2* pLayout) {
     MESA_TRACE_SCOPE("vkGetImageSubresourceLayout2KHR");
     VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
     {
@@ -4248,8 +4518,8 @@ void gfxstream_vk_CmdSetStencilOpEXT(VkCommandBuffer commandBuffer, VkStencilFac
 }
 #endif
 #ifdef VK_EXT_host_image_copy
-VkResult gfxstream_vk_CopyMemoryToImageEXT(
-    VkDevice device, const VkCopyMemoryToImageInfoEXT* pCopyMemoryToImageInfo) {
+VkResult gfxstream_vk_CopyMemoryToImageEXT(VkDevice device,
+                                           const VkCopyMemoryToImageInfo* pCopyMemoryToImageInfo) {
     MESA_TRACE_SCOPE("vkCopyMemoryToImageEXT");
     VkResult vkCopyMemoryToImageEXT_VkResult_return = (VkResult)0;
     VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
@@ -4260,8 +4530,8 @@ VkResult gfxstream_vk_CopyMemoryToImageEXT(
     }
     return vkCopyMemoryToImageEXT_VkResult_return;
 }
-VkResult gfxstream_vk_CopyImageToMemoryEXT(
-    VkDevice device, const VkCopyImageToMemoryInfoEXT* pCopyImageToMemoryInfo) {
+VkResult gfxstream_vk_CopyImageToMemoryEXT(VkDevice device,
+                                           const VkCopyImageToMemoryInfo* pCopyImageToMemoryInfo) {
     MESA_TRACE_SCOPE("vkCopyImageToMemoryEXT");
     VkResult vkCopyImageToMemoryEXT_VkResult_return = (VkResult)0;
     VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
@@ -4273,7 +4543,7 @@ VkResult gfxstream_vk_CopyImageToMemoryEXT(
     return vkCopyImageToMemoryEXT_VkResult_return;
 }
 VkResult gfxstream_vk_CopyImageToImageEXT(VkDevice device,
-                                          const VkCopyImageToImageInfoEXT* pCopyImageToImageInfo) {
+                                          const VkCopyImageToImageInfo* pCopyImageToImageInfo) {
     MESA_TRACE_SCOPE("vkCopyImageToImageEXT");
     VkResult vkCopyImageToImageEXT_VkResult_return = (VkResult)0;
     VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
@@ -4286,7 +4556,7 @@ VkResult gfxstream_vk_CopyImageToImageEXT(VkDevice device,
 }
 VkResult gfxstream_vk_TransitionImageLayoutEXT(
     VkDevice device, uint32_t transitionCount,
-    const VkHostImageLayoutTransitionInfoEXT* pTransitions) {
+    const VkHostImageLayoutTransitionInfo* pTransitions) {
     MESA_TRACE_SCOPE("vkTransitionImageLayoutEXT");
     VkResult vkTransitionImageLayoutEXT_VkResult_return = (VkResult)0;
     VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
@@ -4298,8 +4568,8 @@ VkResult gfxstream_vk_TransitionImageLayoutEXT(
     return vkTransitionImageLayoutEXT_VkResult_return;
 }
 void gfxstream_vk_GetImageSubresourceLayout2EXT(VkDevice device, VkImage image,
-                                                const VkImageSubresource2KHR* pSubresource,
-                                                VkSubresourceLayout2KHR* pLayout) {
+                                                const VkImageSubresource2* pSubresource,
+                                                VkSubresourceLayout2* pLayout) {
     MESA_TRACE_SCOPE("vkGetImageSubresourceLayout2EXT");
     VK_FROM_HANDLE(gfxstream_vk_device, gfxstream_device, device);
     {

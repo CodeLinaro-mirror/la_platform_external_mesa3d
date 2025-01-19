@@ -1491,6 +1491,67 @@ dump_tex_const(uint32_t *texconst, int num_unit, int level)
 }
 
 static void
+dump_bindless_descriptors(bool is_compute, int level)
+{
+   if (!options->dump_bindless)
+      return;
+
+   printl(2, "%sdraw[%i] bindless descriptors\n", levels[level], draw_count);
+
+   for (unsigned i = 0; i < 128; i++) {
+      static char reg_name[64];
+      if (is_compute) {
+         sprintf(reg_name, "SP_CS_BINDLESS_BASE[%u].DESCRIPTOR", i);
+      } else {
+         sprintf(reg_name, "SP_BINDLESS_BASE[%u].DESCRIPTOR", i);
+      }
+      const unsigned base_reg = regbase(reg_name);
+      if (!base_reg)
+         break;
+
+      printl(2, "%sset[%u]:\n", levels[level + 1], i);
+
+      uint64_t ext_src_addr;
+      if (is_64b()) {
+         const unsigned reg = base_reg + i * 2;
+         if (!reg_written(reg))
+            continue;
+
+         ext_src_addr = reg_val(reg) & 0xfffffffc;
+         ext_src_addr |= ((uint64_t)reg_val(reg + 1)) << 32;
+      } else {
+         const unsigned reg = base_reg + i;
+         if (!reg_written(reg))
+            continue;
+
+         ext_src_addr = reg_val(reg) & 0xfffffffc;
+      }
+
+      uint32_t *contents = NULL;
+      if (ext_src_addr)
+         contents = hostptr(ext_src_addr);
+
+      if (!contents)
+         continue;
+
+      unsigned length = hostlen(ext_src_addr);
+      unsigned desc_count = length / (16 * sizeof(uint32_t));
+      for (unsigned desc_idx = 0; desc_idx < desc_count; desc_idx++) {
+         printl(2, "%sUBO[%u]:\n", levels[level + 1], desc_idx);
+         dump_domain(contents, 2, level + 2, "A6XX_UBO");
+
+         printl(2, "%sSTORAGE/TEXEL/IMAGE[%u]:\n", levels[level + 1], desc_idx);
+         dump_tex_const(contents, 1, level);
+
+         printl(2, "%sSAMPLER[%u]:\n", levels[level + 1], desc_idx);
+         dump_tex_samp(contents, STATE_SRC_BINDLESS, 1, level);
+
+         contents += 16;
+      }
+   }
+}
+
+static void
 cp_load_state(uint32_t *dwords, uint32_t sizedwords, int level)
 {
    gl_shader_stage stage;
@@ -1686,9 +1747,16 @@ cp_load_state(uint32_t *dwords, uint32_t sizedwords, int level)
          // TODO probably similar on a4xx..
          if (options->info->chip == 5)
             dump_domain(uboconst, 2, level + 2, "A5XX_UBO");
-         else if (options->info->chip == 6)
+         else if (options->info->chip >= 6)
             dump_domain(uboconst, 2, level + 2, "A6XX_UBO");
          dump_hex(uboconst, 2, level + 1);
+         if (options->dump_textures) {
+            uint64_t addr =
+               (((uint64_t)uboconst[1] & 0x1ffff) << 32) | uboconst[0];
+            /* Size encoded in descriptor is in units of vec4: */
+            unsigned sizedwords = 4 * (uboconst[1] >> 17);
+            dump_gpuaddr_size(addr, level -2, sizedwords, 3);
+         }
          uboconst += src == STATE_SRC_BINDLESS ? 16 : 2;
       }
       break;
@@ -2027,8 +2095,10 @@ cp_draw_indx(uint32_t *dwords, uint32_t sizedwords, int level)
    }
 
    /* don't bother dumping registers for the dummy draw_indx's.. */
-   if (num_indices > 0)
+   if (num_indices > 0) {
+      dump_bindless_descriptors(false, level);
       dump_register_summary(level);
+   }
 
    needs_wfi = true;
 }
@@ -2069,8 +2139,10 @@ cp_draw_indx_2(uint32_t *dwords, uint32_t sizedwords, int level)
    }
 
    /* don't bother dumping registers for the dummy draw_indx's.. */
-   if (num_indices > 0)
+   if (num_indices > 0) {
+      dump_bindless_descriptors(false, level);
       dump_register_summary(level);
+   }
 }
 
 static void
@@ -2083,8 +2155,10 @@ cp_draw_indx_offset(uint32_t *dwords, uint32_t sizedwords, int level)
    print_mode(level);
 
    /* don't bother dumping registers for the dummy draw_indx's.. */
-   if (num_indices > 0)
+   if (num_indices > 0) {
+      dump_bindless_descriptors(false, level);
       dump_register_summary(level);
+   }
 }
 
 static void
@@ -2108,6 +2182,7 @@ cp_draw_indx_indirect(uint32_t *dwords, uint32_t sizedwords, int level)
       addr = dwords[3];
    dump_gpuaddr_size(addr, level, 0x10, 2);
 
+   dump_bindless_descriptors(false, level);
    dump_register_summary(level);
 }
 
@@ -2123,6 +2198,7 @@ cp_draw_indirect(uint32_t *dwords, uint32_t sizedwords, int level)
    addr = (((uint64_t)dwords[2] & 0x1ffff) << 32) | dwords[1];
    dump_gpuaddr_size(addr, level, 0x10, 2);
 
+   dump_bindless_descriptors(false, level);
    dump_register_summary(level);
 }
 
@@ -2182,6 +2258,7 @@ cp_draw_indirect_multi(uint32_t *dwords, uint32_t sizedwords, int level)
       }
    }
 
+   dump_bindless_descriptors(false, level);
    dump_register_summary(level);
 }
 
@@ -2193,6 +2270,7 @@ cp_draw_auto(uint32_t *dwords, uint32_t sizedwords, int level)
    do_query(rnn_enumname(rnn, "pc_di_primtype", prim_type), 0);
    print_mode(level);
 
+   dump_bindless_descriptors(false, level);
    dump_register_summary(level);
 }
 
@@ -2619,6 +2697,7 @@ static void
 cp_exec_cs(uint32_t *dwords, uint32_t sizedwords, int level)
 {
    do_query("compute", 0);
+   dump_bindless_descriptors(true, level);
    dump_register_summary(level);
 }
 
@@ -2637,6 +2716,7 @@ cp_exec_cs_indirect(uint32_t *dwords, uint32_t sizedwords, int level)
    dump_gpuaddr_size(addr, level, 0x10, 2);
 
    do_query("compute", 0);
+   dump_bindless_descriptors(true, level);
    dump_register_summary(level);
 }
 
@@ -2655,11 +2735,11 @@ cp_set_marker(uint32_t *dwords, uint32_t sizedwords, int level)
 
    render_mode = mode;
 
-   if (!strcmp(render_mode, "RM6_BINNING")) {
+   if (!strcmp(render_mode, "RM6_BIN_VISIBILITY")) {
       enable_mask = MODE_BINNING;
-   } else if (!strcmp(render_mode, "RM6_GMEM")) {
+   } else if (!strcmp(render_mode, "RM6_BIN_RENDER_START")) {
       enable_mask = MODE_GMEM;
-   } else if (!strcmp(render_mode, "RM6_BYPASS")) {
+   } else if (!strcmp(render_mode, "RM6_DIRECT_RENDER")) {
       enable_mask = MODE_BYPASS;
    }
 }

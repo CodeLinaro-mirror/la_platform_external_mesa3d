@@ -163,6 +163,7 @@ struct vk_pipeline {
 
    VkPipelineBindPoint bind_point;
    VkPipelineCreateFlags2KHR flags;
+   VkShaderStageFlags stages;
 };
 
 VK_DEFINE_NONDISP_HANDLE_CASTS(vk_pipeline, base, VkPipeline,
@@ -193,6 +194,9 @@ struct vk_pipeline_ops {
 
    void (*cmd_bind)(struct vk_command_buffer *cmd_buffer,
                     struct vk_pipeline *pipeline);
+
+   struct vk_shader *(*get_shader)(struct vk_pipeline *pipeline,
+                                   gl_shader_stage stage);
 };
 
 void *vk_pipeline_zalloc(struct vk_device *device,
@@ -205,6 +209,16 @@ void *vk_pipeline_zalloc(struct vk_device *device,
 void vk_pipeline_free(struct vk_device *device,
                       const VkAllocationCallbacks *alloc,
                       struct vk_pipeline *pipeline);
+
+static inline struct vk_shader *
+vk_pipeline_get_shader(struct vk_pipeline *pipeline,
+                       gl_shader_stage stage)
+{
+   if (pipeline->ops->get_shader == NULL)
+      return NULL;
+
+   return pipeline->ops->get_shader(pipeline, stage);
+}
 
 void
 vk_cmd_unbind_pipelines_for_stages(struct vk_command_buffer *cmd_buffer,

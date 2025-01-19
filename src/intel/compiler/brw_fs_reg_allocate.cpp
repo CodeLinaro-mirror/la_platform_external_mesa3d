@@ -48,7 +48,7 @@ void
 brw_assign_regs_trivial(fs_visitor &s)
 {
    const struct intel_device_info *devinfo = s.devinfo;
-   unsigned hw_reg_mapping[s.alloc.count + 1];
+   unsigned *hw_reg_mapping = ralloc_array(NULL, unsigned, s.alloc.count + 1);
    unsigned i;
    int reg_width = s.dispatch_width / 8;
 
@@ -75,6 +75,7 @@ brw_assign_regs_trivial(fs_visitor &s)
       s.alloc.count = s.grf_used;
    }
 
+   ralloc_free(hw_reg_mapping);
 }
 
 extern "C" void
@@ -199,7 +200,7 @@ void fs_visitor::calculate_payload_ranges(bool allow_spilling,
                continue;
 
             for (unsigned j = reg_nr / reg_unit(devinfo);
-                 j < DIV_ROUND_UP(reg_nr + regs_read(inst, i),
+                 j < DIV_ROUND_UP(reg_nr + regs_read(devinfo, inst, i),
                                   reg_unit(devinfo));
                  j++) {
                payload_last_use_ip[j] = use_ip;
@@ -220,12 +221,6 @@ void fs_visitor::calculate_payload_ranges(bool allow_spilling,
             }
          }
       }
-
-      /* The generator implicitly uses g0 to construct extended message
-       * descriptors for scratch send messages when this bit is set.
-       */
-      if (inst->send_ex_desc_scratch)
-         payload_last_use_ip[0] = use_ip;
 
       ip++;
    }
@@ -293,6 +288,8 @@ private:
 
    void build_interference_graph(bool allow_spilling);
 
+   brw_reg build_ex_desc(const fs_builder &bld, unsigned reg_size, bool unspill);
+
    brw_reg build_lane_offsets(const fs_builder &bld,
                              uint32_t spill_offset, int ip);
    brw_reg build_single_offset(const fs_builder &bld,
@@ -300,9 +297,9 @@ private:
    brw_reg build_legacy_scratch_header(const fs_builder &bld,
                                        uint32_t spill_offset, int ip);
 
-   void emit_unspill(const fs_builder &bld, struct shader_stats *stats,
+   void emit_unspill(const fs_builder &bld, struct brw_shader_stats *stats,
                      brw_reg dst, uint32_t spill_offset, unsigned count, int ip);
-   void emit_spill(const fs_builder &bld, struct shader_stats *stats,
+   void emit_spill(const fs_builder &bld, struct brw_shader_stats *stats,
                    brw_reg src, uint32_t spill_offset, unsigned count, int ip);
 
    void set_spill_costs();
@@ -356,9 +353,9 @@ namespace {
    unsigned
    spill_max_size(const fs_visitor *s)
    {
-      /* LSC is limited to SIMD16 sends */
+      /* LSC is limited to SIMD16 sends (SIMD32 on Xe2) */
       if (s->devinfo->has_lsc)
-         return 2;
+         return 2 * reg_unit(s->devinfo);
 
       /* FINISHME - On Gfx7+ it should be possible to avoid this limit
        *            altogether by spilling directly from the temporary GRF
@@ -405,13 +402,127 @@ fs_reg_alloc::setup_live_interference(unsigned node,
    }
 }
 
+/**
+ * Returns true if this instruction's sources and destinations cannot
+ * safely be the same register.
+ *
+ * In most cases, a register can be written over safely by the same
+ * instruction that is its last use.  For a single instruction, the
+ * sources are dereferenced before writing of the destination starts
+ * (naturally).
+ *
+ * However, there are a few cases where this can be problematic:
+ *
+ * - Virtual opcodes that translate to multiple instructions in the
+ *   code generator: if src == dst and one instruction writes the
+ *   destination before a later instruction reads the source, then
+ *   src will have been clobbered.
+ *
+ * - SIMD16 compressed instructions with certain regioning (see below).
+ *
+ * The register allocator uses this information to set up conflicts between
+ * GRF sources and the destination.
+ */
+static bool
+brw_inst_has_source_and_destination_hazard(const fs_inst *inst)
+{
+   switch (inst->opcode) {
+   case FS_OPCODE_PACK_HALF_2x16_SPLIT:
+      /* Multiple partial writes to the destination */
+      return true;
+   case SHADER_OPCODE_SHUFFLE:
+      /* This instruction returns an arbitrary channel from the source and
+       * gets split into smaller instructions in the generator.  It's possible
+       * that one of the instructions will read from a channel corresponding
+       * to an earlier instruction.
+       */
+   case SHADER_OPCODE_SEL_EXEC:
+      /* This is implemented as
+       *
+       * mov(16)      g4<1>D      0D            { align1 WE_all 1H };
+       * mov(16)      g4<1>D      g5<8,8,1>D    { align1 1H }
+       *
+       * Because the source is only read in the second instruction, the first
+       * may stomp all over it.
+       */
+      return true;
+   case SHADER_OPCODE_QUAD_SWIZZLE:
+      switch (inst->src[1].ud) {
+      case BRW_SWIZZLE_XXXX:
+      case BRW_SWIZZLE_YYYY:
+      case BRW_SWIZZLE_ZZZZ:
+      case BRW_SWIZZLE_WWWW:
+      case BRW_SWIZZLE_XXZZ:
+      case BRW_SWIZZLE_YYWW:
+      case BRW_SWIZZLE_XYXY:
+      case BRW_SWIZZLE_ZWZW:
+         /* These can be implemented as a single Align1 region on all
+          * platforms, so there's never a hazard between source and
+          * destination.  C.f. brw_generator::generate_quad_swizzle().
+          */
+         return false;
+      default:
+         return !is_uniform(inst->src[0]);
+      }
+   case BRW_OPCODE_DPAS:
+      /* This is overly conservative. The actual hazard is more complicated to
+       * describe. When the repeat count is N, the single instruction behaves
+       * like N instructions with a repeat count of one, but the destination
+       * and source registers are incremented (in somewhat complex ways) for
+       * each instruction.
+       *
+       * This means the source and destination register is actually a range of
+       * registers. The hazard exists of an earlier iteration would write a
+       * register that should be read by a later iteration.
+       *
+       * There may be some advantage to properly modeling this, but for now,
+       * be overly conservative.
+       */
+      return inst->rcount > 1;
+   default:
+      /* The SIMD16 compressed instruction
+       *
+       * add(16)      g4<1>F      g4<8,8,1>F   g6<8,8,1>F
+       *
+       * is actually decoded in hardware as:
+       *
+       * add(8)       g4<1>F      g4<8,8,1>F   g6<8,8,1>F
+       * add(8)       g5<1>F      g5<8,8,1>F   g7<8,8,1>F
+       *
+       * Which is safe.  However, if we have uniform accesses
+       * happening, we get into trouble:
+       *
+       * add(8)       g4<1>F      g4<0,1,0>F   g6<8,8,1>F
+       * add(8)       g5<1>F      g4<0,1,0>F   g7<8,8,1>F
+       *
+       * Now our destination for the first instruction overwrote the
+       * second instruction's src0, and we get garbage for those 8
+       * pixels.  There's a similar issue for the pre-gfx6
+       * pixel_x/pixel_y, which are registers of 16-bit values and thus
+       * would get stomped by the first decode as well.
+       */
+      if (inst->exec_size == 16) {
+         for (int i = 0; i < inst->sources; i++) {
+            if (inst->src[i].file == VGRF && (inst->src[i].stride == 0 ||
+                                              inst->src[i].type == BRW_TYPE_UW ||
+                                              inst->src[i].type == BRW_TYPE_W ||
+                                              inst->src[i].type == BRW_TYPE_UB ||
+                                              inst->src[i].type == BRW_TYPE_B)) {
+               return true;
+            }
+         }
+      }
+      return false;
+   }
+}
+
 void
 fs_reg_alloc::setup_inst_interference(const fs_inst *inst)
 {
    /* Certain instructions can't safely use the same register for their
     * sources and destination.  Add interference.
     */
-   if (inst->dst.file == VGRF && inst->has_source_and_destination_hazard()) {
+   if (inst->dst.file == VGRF && brw_inst_has_source_and_destination_hazard(inst)) {
       for (unsigned i = 0; i < inst->sources; i++) {
          if (inst->src[i].file == VGRF) {
             ra_add_node_interference(g, first_vgrf_node + inst->dst.nr,
@@ -486,7 +597,7 @@ fs_reg_alloc::setup_inst_interference(const fs_inst *inst)
     * We could just do "something high".  Instead, we just pick the highest
     * register that works.
     */
-   if (inst->eot) {
+   if (inst->eot && devinfo->ver < 30) {
       const int vgrf = inst->opcode == SHADER_OPCODE_SEND ?
                        inst->src[2].nr : inst->src[0].nr;
       const int size = DIV_ROUND_UP(fs->alloc.sizes[vgrf], reg_unit(devinfo));
@@ -575,10 +686,47 @@ fs_reg_alloc::build_single_offset(const fs_builder &bld, uint32_t spill_offset, 
 }
 
 brw_reg
+fs_reg_alloc::build_ex_desc(const fs_builder &bld, unsigned reg_size, bool unspill)
+{
+   /* Use a different area of the address register than what is used in
+    * brw_lower_logical_sends.c (brw_address_reg(2)) so we don't have
+    * interactions between the spill/fill instructions and the other send
+    * messages.
+    */
+   brw_reg ex_desc = bld.vaddr(BRW_TYPE_UD,
+                               BRW_ADDRESS_SUBREG_INDIRECT_SPILL_DESC);
+   fs_inst *inst = bld.exec_all().group(1, 0).AND(
+      ex_desc,
+      retype(brw_vec1_grf(0, 5), BRW_TYPE_UD),
+      brw_imm_ud(INTEL_MASK(31, 10)));
+   _mesa_set_add(spill_insts, inst);
+
+   const intel_device_info *devinfo = bld.shader->devinfo;
+   if (devinfo->verx10 >= 200) {
+      inst = bld.exec_all().group(1, 0).SHR(
+         ex_desc, ex_desc, brw_imm_ud(4));
+      _mesa_set_add(spill_insts, inst);
+   } else {
+      if (unspill) {
+         inst = bld.exec_all().group(1, 0).OR(
+            ex_desc, ex_desc, brw_imm_ud(GFX12_SFID_UGM));
+         _mesa_set_add(spill_insts, inst);
+      } else {
+         inst = bld.exec_all().group(1, 0).OR(
+            ex_desc, ex_desc,
+            brw_imm_ud(brw_message_ex_desc(devinfo, reg_size) |
+                       GFX12_SFID_UGM));
+         _mesa_set_add(spill_insts, inst);
+      }
+   }
+
+   return ex_desc;
+}
+
+brw_reg
 fs_reg_alloc::build_lane_offsets(const fs_builder &bld, uint32_t spill_offset, int ip)
 {
-   /* LSC messages are limited to SIMD16 */
-   assert(bld.dispatch_width() <= 16);
+   assert(bld.dispatch_width() <= 16 * reg_unit(bld.shader->devinfo));
 
    const fs_builder ubld = bld.exec_all();
    const unsigned reg_count = ubld.dispatch_width() / 8;
@@ -606,9 +754,20 @@ fs_reg_alloc::build_lane_offsets(const fs_builder &bld, uint32_t spill_offset, i
    inst = ubld.SHL(offset, offset, brw_imm_ud(2));
    _mesa_set_add(spill_insts, inst);
 
+   /* Build offsets in the upper 16 lanes of SIMD32 */
+   if (ubld.dispatch_width() > 16) {
+      inst = ubld.group(16, 0).ADD(
+         byte_offset(offset, 2 * REG_SIZE),
+         byte_offset(offset, 0),
+         brw_imm_ud(16 << 2));
+      _mesa_set_add(spill_insts, inst);
+   }
+
    /* Add the base offset */
-   inst = ubld.ADD(offset, offset, brw_imm_ud(spill_offset));
-   _mesa_set_add(spill_insts, inst);
+   if (spill_offset) {
+      inst = ubld.ADD(offset, offset, brw_imm_ud(spill_offset));
+      _mesa_set_add(spill_insts, inst);
+   }
 
    return offset;
 }
@@ -641,7 +800,7 @@ fs_reg_alloc::build_legacy_scratch_header(const fs_builder &bld,
 
 void
 fs_reg_alloc::emit_unspill(const fs_builder &bld,
-                           struct shader_stats *stats,
+                           struct brw_shader_stats *stats,
                            brw_reg dst,
                            uint32_t spill_offset, unsigned count, int ip)
 {
@@ -654,10 +813,12 @@ fs_reg_alloc::emit_unspill(const fs_builder &bld,
 
       fs_inst *unspill_inst;
       if (devinfo->verx10 >= 125) {
-         /* LSC is limited to SIMD16 load/store but we can load more using
-          * transpose messages.
+         /* LSC is limited to SIMD16 (SIMD32 on Xe2) load/store but we can
+          * load more using transpose messages.
           */
-         const bool use_transpose = bld.dispatch_width() > 16;
+         const bool use_transpose =
+            bld.dispatch_width() > 16 * reg_unit(devinfo) ||
+            bld.has_writemask_all();
          const fs_builder ubld = use_transpose ? bld.exec_all().group(1, 0) : bld;
          brw_reg offset;
          if (use_transpose) {
@@ -665,28 +826,26 @@ fs_reg_alloc::emit_unspill(const fs_builder &bld,
          } else {
             offset = build_lane_offsets(ubld, spill_offset, ip);
          }
-         /* We leave the extended descriptor empty and flag the instruction to
-          * ask the generated to insert the extended descriptor in the address
-          * register. That way we don't need to burn an additional register
-          * for register allocation spill/fill.
-          */
+
          brw_reg srcs[] = {
             brw_imm_ud(0), /* desc */
-            brw_imm_ud(0), /* ex_desc */
+            build_ex_desc(bld, reg_size, true),
             offset,        /* payload */
             brw_reg(),      /* payload2 */
          };
 
+         uint32_t desc = lsc_msg_desc(devinfo, LSC_OP_LOAD,
+                                      LSC_ADDR_SURFTYPE_SS,
+                                      LSC_ADDR_SIZE_A32,
+                                      LSC_DATA_SIZE_D32,
+                                      use_transpose ? reg_size * 8 : 1 /* num_channels */,
+                                      use_transpose,
+                                      LSC_CACHE(devinfo, LOAD, L1STATE_L3MOCS));
+
+
          unspill_inst = ubld.emit(SHADER_OPCODE_SEND, dst,
                                   srcs, ARRAY_SIZE(srcs));
          unspill_inst->sfid = GFX12_SFID_UGM;
-         unspill_inst->desc = lsc_msg_desc(devinfo, LSC_OP_LOAD,
-                                           LSC_ADDR_SURFTYPE_SS,
-                                           LSC_ADDR_SIZE_A32,
-                                           LSC_DATA_SIZE_D32,
-                                           use_transpose ? reg_size * 8 : 1 /* num_channels */,
-                                           use_transpose,
-                                           LSC_CACHE(devinfo, LOAD, L1STATE_L3MOCS));
          unspill_inst->header_size = 0;
          unspill_inst->mlen = lsc_msg_addr_len(devinfo, LSC_ADDR_SIZE_A32,
                                                unspill_inst->exec_size);
@@ -695,14 +854,23 @@ fs_reg_alloc::emit_unspill(const fs_builder &bld,
             lsc_msg_dest_len(devinfo, LSC_DATA_SIZE_D32, bld.dispatch_width()) * REG_SIZE;
          unspill_inst->send_has_side_effects = false;
          unspill_inst->send_is_volatile = true;
-         unspill_inst->send_ex_desc_scratch = true;
+
+         unspill_inst->src[0] = brw_imm_ud(
+            desc |
+            brw_message_desc(devinfo,
+                             unspill_inst->mlen,
+                             unspill_inst->size_written / REG_SIZE,
+                             unspill_inst->header_size));
       } else {
          brw_reg header = build_legacy_scratch_header(bld, spill_offset, ip);
 
          const unsigned bti = GFX8_BTI_STATELESS_NON_COHERENT;
-         const brw_reg ex_desc = brw_imm_ud(0);
 
-         brw_reg srcs[] = { brw_imm_ud(0), ex_desc, header };
+         brw_reg srcs[] = {
+            brw_imm_ud(0), /* desc */
+            brw_imm_ud(0), /* ex_desc */
+            header
+         };
          unspill_inst = bld.emit(SHADER_OPCODE_SEND, dst,
                                  srcs, ARRAY_SIZE(srcs));
          unspill_inst->mlen = 1;
@@ -711,10 +879,15 @@ fs_reg_alloc::emit_unspill(const fs_builder &bld,
          unspill_inst->send_has_side_effects = false;
          unspill_inst->send_is_volatile = true;
          unspill_inst->sfid = GFX7_SFID_DATAPORT_DATA_CACHE;
-         unspill_inst->desc =
+
+         unspill_inst->src[0] = brw_imm_ud(
             brw_dp_desc(devinfo, bti,
                         BRW_DATAPORT_READ_MESSAGE_OWORD_BLOCK_READ,
-                        BRW_DATAPORT_OWORD_BLOCK_DWORDS(reg_size * 8));
+                        BRW_DATAPORT_OWORD_BLOCK_DWORDS(reg_size * 8)) |
+            brw_message_desc(devinfo,
+                             unspill_inst->mlen,
+                             unspill_inst->size_written / REG_SIZE,
+                             unspill_inst->header_size));
       }
       _mesa_set_add(spill_insts, unspill_inst);
       assert(unspill_inst->force_writemask_all || count % reg_size == 0);
@@ -726,7 +899,7 @@ fs_reg_alloc::emit_unspill(const fs_builder &bld,
 
 void
 fs_reg_alloc::emit_spill(const fs_builder &bld,
-                         struct shader_stats *stats,
+                         struct brw_shader_stats *stats,
                          brw_reg src,
                          uint32_t spill_offset, unsigned count, int ip)
 {
@@ -740,27 +913,23 @@ fs_reg_alloc::emit_spill(const fs_builder &bld,
       fs_inst *spill_inst;
       if (devinfo->verx10 >= 125) {
          brw_reg offset = build_lane_offsets(bld, spill_offset, ip);
-         /* We leave the extended descriptor empty and flag the instruction
-          * relocate the extended descriptor. That way the surface offset is
-          * directly put into the instruction and we don't need to use a
-          * register to hold it.
-          */
+
          brw_reg srcs[] = {
-            brw_imm_ud(0),        /* desc */
-            brw_imm_ud(0),        /* ex_desc */
-            offset,               /* payload */
-            src,                  /* payload2 */
+            brw_imm_ud(0), /* desc */
+            build_ex_desc(bld, reg_size, false),
+            offset,        /* payload */
+            src,           /* payload2 */
          };
          spill_inst = bld.emit(SHADER_OPCODE_SEND, bld.null_reg_f(),
                                srcs, ARRAY_SIZE(srcs));
          spill_inst->sfid = GFX12_SFID_UGM;
-         spill_inst->desc = lsc_msg_desc(devinfo, LSC_OP_STORE,
-                                         LSC_ADDR_SURFTYPE_SS,
-                                         LSC_ADDR_SIZE_A32,
-                                         LSC_DATA_SIZE_D32,
-                                         1 /* num_channels */,
-                                         false /* transpose */,
-                                         LSC_CACHE(devinfo, LOAD, L1STATE_L3MOCS));
+         uint32_t desc = lsc_msg_desc(devinfo, LSC_OP_STORE,
+                                      LSC_ADDR_SURFTYPE_SS,
+                                      LSC_ADDR_SIZE_A32,
+                                      LSC_DATA_SIZE_D32,
+                                      1 /* num_channels */,
+                                      false /* transpose */,
+                                      LSC_CACHE(devinfo, LOAD, L1STATE_L3MOCS));
          spill_inst->header_size = 0;
          spill_inst->mlen = lsc_msg_addr_len(devinfo, LSC_ADDR_SIZE_A32,
                                              bld.dispatch_width());
@@ -768,14 +937,23 @@ fs_reg_alloc::emit_spill(const fs_builder &bld,
          spill_inst->size_written = 0;
          spill_inst->send_has_side_effects = true;
          spill_inst->send_is_volatile = false;
-         spill_inst->send_ex_desc_scratch = true;
+
+         spill_inst->src[0] = brw_imm_ud(
+            desc |
+            brw_message_desc(devinfo,
+                             spill_inst->mlen,
+                             spill_inst->size_written / REG_SIZE,
+                             spill_inst->header_size));
       } else {
          brw_reg header = build_legacy_scratch_header(bld, spill_offset, ip);
 
          const unsigned bti = GFX8_BTI_STATELESS_NON_COHERENT;
-         const brw_reg ex_desc = brw_imm_ud(0);
-
-         brw_reg srcs[] = { brw_imm_ud(0), ex_desc, header, src };
+         brw_reg srcs[] = {
+            brw_imm_ud(0), /* desc */
+            brw_imm_ud(0), /* ex_desc */
+            header,
+            src
+         };
          spill_inst = bld.emit(SHADER_OPCODE_SEND, bld.null_reg_f(),
                                srcs, ARRAY_SIZE(srcs));
          spill_inst->mlen = 1;
@@ -785,10 +963,17 @@ fs_reg_alloc::emit_spill(const fs_builder &bld,
          spill_inst->send_has_side_effects = true;
          spill_inst->send_is_volatile = false;
          spill_inst->sfid = GFX7_SFID_DATAPORT_DATA_CACHE;
-         spill_inst->desc =
+
+         spill_inst->src[0] = brw_imm_ud(
             brw_dp_desc(devinfo, bti,
                         GFX6_DATAPORT_WRITE_MESSAGE_OWORD_BLOCK_WRITE,
-                        BRW_DATAPORT_OWORD_BLOCK_DWORDS(reg_size * 8));
+                        BRW_DATAPORT_OWORD_BLOCK_DWORDS(reg_size * 8)) |
+            brw_message_desc(devinfo,
+                             spill_inst->mlen,
+                             spill_inst->size_written / REG_SIZE,
+                             spill_inst->header_size));
+         spill_inst->src[1] = brw_imm_ud(
+            brw_message_ex_desc(devinfo, spill_inst->ex_mlen));
       }
       _mesa_set_add(spill_insts, spill_inst);
       assert(spill_inst->force_writemask_all || count % reg_size == 0);
@@ -802,13 +987,7 @@ void
 fs_reg_alloc::set_spill_costs()
 {
    float block_scale = 1.0;
-   float spill_costs[fs->alloc.count];
-   bool no_spill[fs->alloc.count];
-
-   for (unsigned i = 0; i < fs->alloc.count; i++) {
-      spill_costs[i] = 0.0;
-      no_spill[i] = false;
-   }
+   float *spill_costs = rzalloc_array(NULL, float, fs->alloc.count);
 
    /* Calculate costs for spilling nodes.  Call it a cost of 1 per
     * spill/unspill we'll have to do, and guess that the insides of
@@ -817,7 +996,7 @@ fs_reg_alloc::set_spill_costs()
    foreach_block_and_inst(block, fs_inst, inst, fs->cfg) {
       for (unsigned int i = 0; i < inst->sources; i++) {
 	 if (inst->src[i].file == VGRF)
-            spill_costs[inst->src[i].nr] += regs_read(inst, i) * block_scale;
+            spill_costs[inst->src[i].nr] += regs_read(devinfo, inst, i) * block_scale;
       }
 
       if (inst->dst.file == VGRF)
@@ -827,10 +1006,10 @@ fs_reg_alloc::set_spill_costs()
       if (_mesa_set_search(spill_insts, inst)) {
          for (unsigned int i = 0; i < inst->sources; i++) {
 	    if (inst->src[i].file == VGRF)
-               no_spill[inst->src[i].nr] = true;
+               spill_costs[inst->src[i].nr] = INFINITY;
          }
 	 if (inst->dst.file == VGRF)
-            no_spill[inst->dst.nr] = true;
+            spill_costs[inst->dst.nr] = INFINITY;
       }
 
       switch (inst->opcode) {
@@ -863,7 +1042,7 @@ fs_reg_alloc::set_spill_costs()
        * used in SCRATCH_READ/WRITE instructions so they'll always be flagged
        * no_spill.
        */
-      if (no_spill[i])
+      if (isinf(spill_costs[i]))
          continue;
 
       int live_length = live.vgrf_end[i] - live.vgrf_start[i];
@@ -882,6 +1061,8 @@ fs_reg_alloc::set_spill_costs()
    }
 
    have_spill_costs = true;
+
+   ralloc_free(spill_costs);
 }
 
 int
@@ -962,13 +1143,19 @@ fs_reg_alloc::spill_reg(unsigned spill_reg)
       for (unsigned int i = 0; i < inst->sources; i++) {
 	 if (inst->src[i].file == VGRF &&
              inst->src[i].nr == spill_reg) {
-            int count = regs_read(inst, i);
+            /* Count registers needed in units of physical registers */
+            int count = align(regs_read(devinfo, inst, i), reg_unit(devinfo));
+            /* Align the spilling offset the physical register size */
             int subset_spill_offset = spill_offset +
                ROUND_DOWN_TO(inst->src[i].offset, REG_SIZE * reg_unit(devinfo));
             brw_reg unspill_dst = alloc_spill_reg(count, ip);
 
             inst->src[i].nr = unspill_dst.nr;
-            inst->src[i].offset %= REG_SIZE;
+            /* The unspilled register is aligned to physical register, so
+             * adjust the offset to the remaining within the physical register
+             * size.
+             */
+            inst->src[i].offset %= REG_SIZE * reg_unit(devinfo);
 
             /* We read the largest power-of-two divisor of the register count
              * (because only POT scratch read blocks are allowed by the
@@ -992,12 +1179,18 @@ fs_reg_alloc::spill_reg(unsigned spill_reg)
       if (inst->dst.file == VGRF &&
           inst->dst.nr == spill_reg &&
           inst->opcode != SHADER_OPCODE_UNDEF) {
+         /* Count registers needed in units of physical registers */
+         int count = align(regs_written(inst), reg_unit(devinfo));
+         /* Align the spilling offset the physical register size */
          int subset_spill_offset = spill_offset +
             ROUND_DOWN_TO(inst->dst.offset, reg_unit(devinfo) * REG_SIZE);
-         brw_reg spill_src = alloc_spill_reg(regs_written(inst), ip);
+         brw_reg spill_src = alloc_spill_reg(count, ip);
 
          inst->dst.nr = spill_src.nr;
-         inst->dst.offset %= REG_SIZE;
+         /* The spilled register is aligned to physical register, so adjust
+          * the offset to the remaining within the physical register size.
+          */
+         inst->dst.offset %= REG_SIZE * reg_unit(devinfo);
 
          /* If we're immediately spilling the register, we should not use
           * destination dependency hints.  Doing so will cause the GPU do
@@ -1114,7 +1307,7 @@ fs_reg_alloc::assign_regs(bool allow_spilling, bool spill_all)
     * regs in the register classes back down to real hardware reg
     * numbers.
     */
-   unsigned hw_reg_mapping[fs->alloc.count];
+   unsigned *hw_reg_mapping = ralloc_array(NULL, unsigned, fs->alloc.count);
    fs->grf_used = fs->first_non_payload_grf;
    for (unsigned i = 0; i < fs->alloc.count; i++) {
       int reg = ra_get_node_reg(g, first_vgrf_node + i);
@@ -1134,6 +1327,8 @@ fs_reg_alloc::assign_regs(bool allow_spilling, bool spill_all)
 
    fs->alloc.count = fs->grf_used;
 
+   ralloc_free(hw_reg_mapping);
+
    return true;
 }
 
@@ -1144,7 +1339,7 @@ brw_assign_regs(fs_visitor &s, bool allow_spilling, bool spill_all)
    bool success = alloc.assign_regs(allow_spilling, spill_all);
    if (!success && allow_spilling) {
       s.fail("no register to spill:\n");
-      brw_print_instructions(s, NULL);
+      brw_print_instructions(s);
    }
    return success;
 }

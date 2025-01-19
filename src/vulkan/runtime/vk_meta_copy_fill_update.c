@@ -1144,6 +1144,13 @@ build_buffer_to_image_cs(const struct vk_meta_device *meta,
 
    texel = convert_texel(b, buf_fmt, img_fmt, texel);
 
+   /* If the image view format matches buf_fmt, convert_texel() does nothing,
+    * but we still need to promote the texel to a 32-bit unsigned integer,
+    * because write_img() wants a 32-bit value.
+    */
+   if (texel->bit_size < 32)
+      texel = nir_u2u32(b, texel);
+
    write_img(b, &key->img.view, key->img.aspect, VK_SAMPLE_COUNT_1_BIT,
              image_deref, img_coords, NULL, texel);
 
@@ -1186,14 +1193,6 @@ copy_buffer_image_prepare_gfx_push_const(
 {
    struct vk_device *dev = cmd->base.device;
    const struct vk_device_dispatch_table *disp = &dev->dispatch_table;
-   uint32_t depth_or_layer_count =
-      MAX2(region->imageExtent.depth,
-           vk_image_subresource_layer_count(img, &region->imageSubresource));
-   VkImageViewType img_view_type =
-      vk_image_render_view_type(img, depth_or_layer_count);
-   VkOffset3D img_offs =
-      base_layer_as_offset(img_view_type, region->imageOffset,
-                           region->imageSubresource.baseArrayLayer);
 
    /* vk_meta_copy_buffer_image_info::image_stride is 32-bit for now.
     * We might want to make it a 64-bit integer (and patch the shader code
@@ -1209,9 +1208,9 @@ copy_buffer_image_prepare_gfx_push_const(
                                         VK_WHOLE_SIZE),
       },
       .img.offset = {
-         .x = img_offs.x,
-         .y = img_offs.y,
-         .z = img_offs.z,
+         .x = region->imageOffset.x,
+         .y = region->imageOffset.y,
+         .z = region->imageOffset.z,
       },
    };
 

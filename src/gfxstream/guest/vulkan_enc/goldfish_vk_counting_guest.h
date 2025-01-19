@@ -1032,6 +1032,196 @@ void count_VkDeviceImageMemoryRequirements(uint32_t featureBits, VkStructureType
                                            size_t* count);
 
 #endif
+#ifdef VK_VERSION_1_4
+void count_VkPhysicalDeviceVulkan14Features(uint32_t featureBits, VkStructureType rootType,
+                                            const VkPhysicalDeviceVulkan14Features* toCount,
+                                            size_t* count);
+
+void count_VkPhysicalDeviceVulkan14Properties(uint32_t featureBits, VkStructureType rootType,
+                                              const VkPhysicalDeviceVulkan14Properties* toCount,
+                                              size_t* count);
+
+void count_VkDeviceQueueGlobalPriorityCreateInfo(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkDeviceQueueGlobalPriorityCreateInfo* toCount, size_t* count);
+
+void count_VkPhysicalDeviceGlobalPriorityQueryFeatures(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceGlobalPriorityQueryFeatures* toCount, size_t* count);
+
+void count_VkQueueFamilyGlobalPriorityProperties(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkQueueFamilyGlobalPriorityProperties* toCount, size_t* count);
+
+void count_VkPhysicalDeviceShaderSubgroupRotateFeatures(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceShaderSubgroupRotateFeatures* toCount, size_t* count);
+
+void count_VkPhysicalDeviceShaderFloatControls2Features(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceShaderFloatControls2Features* toCount, size_t* count);
+
+void count_VkPhysicalDeviceShaderExpectAssumeFeatures(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceShaderExpectAssumeFeatures* toCount, size_t* count);
+
+void count_VkPhysicalDeviceLineRasterizationFeatures(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceLineRasterizationFeatures* toCount, size_t* count);
+
+void count_VkPhysicalDeviceLineRasterizationProperties(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceLineRasterizationProperties* toCount, size_t* count);
+
+void count_VkPipelineRasterizationLineStateCreateInfo(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPipelineRasterizationLineStateCreateInfo* toCount, size_t* count);
+
+void count_VkPhysicalDeviceVertexAttributeDivisorProperties(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceVertexAttributeDivisorProperties* toCount, size_t* count);
+
+void count_VkVertexInputBindingDivisorDescription(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkVertexInputBindingDivisorDescription* toCount, size_t* count);
+
+void count_VkPipelineVertexInputDivisorStateCreateInfo(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPipelineVertexInputDivisorStateCreateInfo* toCount, size_t* count);
+
+void count_VkPhysicalDeviceVertexAttributeDivisorFeatures(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceVertexAttributeDivisorFeatures* toCount, size_t* count);
+
+void count_VkPhysicalDeviceIndexTypeUint8Features(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceIndexTypeUint8Features* toCount, size_t* count);
+
+void count_VkMemoryMapInfo(uint32_t featureBits, VkStructureType rootType,
+                           const VkMemoryMapInfo* toCount, size_t* count);
+
+void count_VkMemoryUnmapInfo(uint32_t featureBits, VkStructureType rootType,
+                             const VkMemoryUnmapInfo* toCount, size_t* count);
+
+void count_VkPhysicalDeviceMaintenance5Features(uint32_t featureBits, VkStructureType rootType,
+                                                const VkPhysicalDeviceMaintenance5Features* toCount,
+                                                size_t* count);
+
+void count_VkPhysicalDeviceMaintenance5Properties(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceMaintenance5Properties* toCount, size_t* count);
+
+void count_VkRenderingAreaInfo(uint32_t featureBits, VkStructureType rootType,
+                               const VkRenderingAreaInfo* toCount, size_t* count);
+
+void count_VkImageSubresource2(uint32_t featureBits, VkStructureType rootType,
+                               const VkImageSubresource2* toCount, size_t* count);
+
+void count_VkDeviceImageSubresourceInfo(uint32_t featureBits, VkStructureType rootType,
+                                        const VkDeviceImageSubresourceInfo* toCount, size_t* count);
+
+void count_VkSubresourceLayout2(uint32_t featureBits, VkStructureType rootType,
+                                const VkSubresourceLayout2* toCount, size_t* count);
+
+void count_VkPipelineCreateFlags2CreateInfo(uint32_t featureBits, VkStructureType rootType,
+                                            const VkPipelineCreateFlags2CreateInfo* toCount,
+                                            size_t* count);
+
+void count_VkBufferUsageFlags2CreateInfo(uint32_t featureBits, VkStructureType rootType,
+                                         const VkBufferUsageFlags2CreateInfo* toCount,
+                                         size_t* count);
+
+void count_VkPhysicalDevicePushDescriptorProperties(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDevicePushDescriptorProperties* toCount, size_t* count);
+
+void count_VkPhysicalDeviceDynamicRenderingLocalReadFeatures(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceDynamicRenderingLocalReadFeatures* toCount, size_t* count);
+
+void count_VkRenderingAttachmentLocationInfo(uint32_t featureBits, VkStructureType rootType,
+                                             const VkRenderingAttachmentLocationInfo* toCount,
+                                             size_t* count);
+
+void count_VkRenderingInputAttachmentIndexInfo(uint32_t featureBits, VkStructureType rootType,
+                                               const VkRenderingInputAttachmentIndexInfo* toCount,
+                                               size_t* count);
+
+void count_VkPhysicalDeviceMaintenance6Features(uint32_t featureBits, VkStructureType rootType,
+                                                const VkPhysicalDeviceMaintenance6Features* toCount,
+                                                size_t* count);
+
+void count_VkPhysicalDeviceMaintenance6Properties(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceMaintenance6Properties* toCount, size_t* count);
+
+void count_VkBindMemoryStatus(uint32_t featureBits, VkStructureType rootType,
+                              const VkBindMemoryStatus* toCount, size_t* count);
+
+void count_VkBindDescriptorSetsInfo(uint32_t featureBits, VkStructureType rootType,
+                                    const VkBindDescriptorSetsInfo* toCount, size_t* count);
+
+void count_VkPushConstantsInfo(uint32_t featureBits, VkStructureType rootType,
+                               const VkPushConstantsInfo* toCount, size_t* count);
+
+void count_VkPushDescriptorSetInfo(uint32_t featureBits, VkStructureType rootType,
+                                   const VkPushDescriptorSetInfo* toCount, size_t* count);
+
+void count_VkPushDescriptorSetWithTemplateInfo(uint32_t featureBits, VkStructureType rootType,
+                                               const VkPushDescriptorSetWithTemplateInfo* toCount,
+                                               size_t* count);
+
+void count_VkPhysicalDevicePipelineProtectedAccessFeatures(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDevicePipelineProtectedAccessFeatures* toCount, size_t* count);
+
+void count_VkPhysicalDevicePipelineRobustnessFeatures(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDevicePipelineRobustnessFeatures* toCount, size_t* count);
+
+void count_VkPhysicalDevicePipelineRobustnessProperties(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDevicePipelineRobustnessProperties* toCount, size_t* count);
+
+void count_VkPipelineRobustnessCreateInfo(uint32_t featureBits, VkStructureType rootType,
+                                          const VkPipelineRobustnessCreateInfo* toCount,
+                                          size_t* count);
+
+void count_VkPhysicalDeviceHostImageCopyFeatures(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceHostImageCopyFeatures* toCount, size_t* count);
+
+void count_VkPhysicalDeviceHostImageCopyProperties(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDeviceHostImageCopyProperties* toCount, size_t* count);
+
+void count_VkMemoryToImageCopy(uint32_t featureBits, VkStructureType rootType,
+                               const VkMemoryToImageCopy* toCount, size_t* count);
+
+void count_VkImageToMemoryCopy(uint32_t featureBits, VkStructureType rootType,
+                               const VkImageToMemoryCopy* toCount, size_t* count);
+
+void count_VkCopyMemoryToImageInfo(uint32_t featureBits, VkStructureType rootType,
+                                   const VkCopyMemoryToImageInfo* toCount, size_t* count);
+
+void count_VkCopyImageToMemoryInfo(uint32_t featureBits, VkStructureType rootType,
+                                   const VkCopyImageToMemoryInfo* toCount, size_t* count);
+
+void count_VkCopyImageToImageInfo(uint32_t featureBits, VkStructureType rootType,
+                                  const VkCopyImageToImageInfo* toCount, size_t* count);
+
+void count_VkHostImageLayoutTransitionInfo(uint32_t featureBits, VkStructureType rootType,
+                                           const VkHostImageLayoutTransitionInfo* toCount,
+                                           size_t* count);
+
+void count_VkSubresourceHostMemcpySize(uint32_t featureBits, VkStructureType rootType,
+                                       const VkSubresourceHostMemcpySize* toCount, size_t* count);
+
+void count_VkHostImageCopyDevicePerformanceQuery(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkHostImageCopyDevicePerformanceQuery* toCount, size_t* count);
+
+#endif
 #ifdef VK_KHR_dynamic_rendering
 DEFINE_ALIAS_FUNCTION(count_VkRenderingInfo, count_VkRenderingInfoKHR)
 
@@ -1044,24 +1234,6 @@ DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceDynamicRenderingFeatures,
 
 DEFINE_ALIAS_FUNCTION(count_VkCommandBufferInheritanceRenderingInfo,
                       count_VkCommandBufferInheritanceRenderingInfoKHR)
-
-void count_VkRenderingFragmentShadingRateAttachmentInfoKHR(
-    uint32_t featureBits, VkStructureType rootType,
-    const VkRenderingFragmentShadingRateAttachmentInfoKHR* toCount, size_t* count);
-
-void count_VkRenderingFragmentDensityMapAttachmentInfoEXT(
-    uint32_t featureBits, VkStructureType rootType,
-    const VkRenderingFragmentDensityMapAttachmentInfoEXT* toCount, size_t* count);
-
-void count_VkAttachmentSampleCountInfoAMD(uint32_t featureBits, VkStructureType rootType,
-                                          const VkAttachmentSampleCountInfoAMD* toCount,
-                                          size_t* count);
-
-DEFINE_ALIAS_FUNCTION(count_VkAttachmentSampleCountInfoAMD, count_VkAttachmentSampleCountInfoNV)
-
-void count_VkMultiviewPerViewAttributesInfoNVX(uint32_t featureBits, VkStructureType rootType,
-                                               const VkMultiviewPerViewAttributesInfoNVX* toCount,
-                                               size_t* count);
 
 #endif
 #ifdef VK_KHR_get_physical_device_properties2
@@ -1366,13 +1538,6 @@ DEFINE_ALIAS_FUNCTION(count_VkCommandBufferSubmitInfo, count_VkCommandBufferSubm
 DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceSynchronization2Features,
                       count_VkPhysicalDeviceSynchronization2FeaturesKHR)
 
-void count_VkQueueFamilyCheckpointProperties2NV(uint32_t featureBits, VkStructureType rootType,
-                                                const VkQueueFamilyCheckpointProperties2NV* toCount,
-                                                size_t* count);
-
-void count_VkCheckpointData2NV(uint32_t featureBits, VkStructureType rootType,
-                               const VkCheckpointData2NV* toCount, size_t* count);
-
 #endif
 #ifdef VK_KHR_zero_initialize_workgroup_memory
 DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures,
@@ -1422,48 +1587,35 @@ DEFINE_ALIAS_FUNCTION(count_VkDeviceImageMemoryRequirements,
 
 #endif
 #ifdef VK_KHR_maintenance5
-void count_VkPhysicalDeviceMaintenance5FeaturesKHR(
-    uint32_t featureBits, VkStructureType rootType,
-    const VkPhysicalDeviceMaintenance5FeaturesKHR* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceMaintenance5Features,
+                      count_VkPhysicalDeviceMaintenance5FeaturesKHR)
 
-void count_VkPhysicalDeviceMaintenance5PropertiesKHR(
-    uint32_t featureBits, VkStructureType rootType,
-    const VkPhysicalDeviceMaintenance5PropertiesKHR* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceMaintenance5Properties,
+                      count_VkPhysicalDeviceMaintenance5PropertiesKHR)
 
-void count_VkRenderingAreaInfoKHR(uint32_t featureBits, VkStructureType rootType,
-                                  const VkRenderingAreaInfoKHR* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkRenderingAreaInfo, count_VkRenderingAreaInfoKHR)
 
-void count_VkImageSubresource2KHR(uint32_t featureBits, VkStructureType rootType,
-                                  const VkImageSubresource2KHR* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkDeviceImageSubresourceInfo, count_VkDeviceImageSubresourceInfoKHR)
 
-void count_VkDeviceImageSubresourceInfoKHR(uint32_t featureBits, VkStructureType rootType,
-                                           const VkDeviceImageSubresourceInfoKHR* toCount,
-                                           size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkImageSubresource2, count_VkImageSubresource2KHR)
 
-void count_VkSubresourceLayout2KHR(uint32_t featureBits, VkStructureType rootType,
-                                   const VkSubresourceLayout2KHR* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkSubresourceLayout2, count_VkSubresourceLayout2KHR)
 
-void count_VkPipelineCreateFlags2CreateInfoKHR(uint32_t featureBits, VkStructureType rootType,
-                                               const VkPipelineCreateFlags2CreateInfoKHR* toCount,
-                                               size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkPipelineCreateFlags2CreateInfo,
+                      count_VkPipelineCreateFlags2CreateInfoKHR)
 
-void count_VkBufferUsageFlags2CreateInfoKHR(uint32_t featureBits, VkStructureType rootType,
-                                            const VkBufferUsageFlags2CreateInfoKHR* toCount,
-                                            size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkBufferUsageFlags2CreateInfo, count_VkBufferUsageFlags2CreateInfoKHR)
 
 #endif
 #ifdef VK_KHR_line_rasterization
-void count_VkPhysicalDeviceLineRasterizationFeaturesKHR(
-    uint32_t featureBits, VkStructureType rootType,
-    const VkPhysicalDeviceLineRasterizationFeaturesKHR* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceLineRasterizationFeatures,
+                      count_VkPhysicalDeviceLineRasterizationFeaturesKHR)
 
-void count_VkPhysicalDeviceLineRasterizationPropertiesKHR(
-    uint32_t featureBits, VkStructureType rootType,
-    const VkPhysicalDeviceLineRasterizationPropertiesKHR* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceLineRasterizationProperties,
+                      count_VkPhysicalDeviceLineRasterizationPropertiesKHR)
 
-void count_VkPipelineRasterizationLineStateCreateInfoKHR(
-    uint32_t featureBits, VkStructureType rootType,
-    const VkPipelineRasterizationLineStateCreateInfoKHR* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkPipelineRasterizationLineStateCreateInfo,
+                      count_VkPipelineRasterizationLineStateCreateInfoKHR)
 
 #endif
 #ifdef VK_ANDROID_native_buffer
@@ -1564,13 +1716,13 @@ void count_VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT(
     uint32_t featureBits, VkStructureType rootType,
     const VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT* toCount, size_t* count);
 
-DEFINE_ALIAS_FUNCTION(count_VkVertexInputBindingDivisorDescriptionKHR,
+DEFINE_ALIAS_FUNCTION(count_VkVertexInputBindingDivisorDescription,
                       count_VkVertexInputBindingDivisorDescriptionEXT)
 
-DEFINE_ALIAS_FUNCTION(count_VkPipelineVertexInputDivisorStateCreateInfoKHR,
+DEFINE_ALIAS_FUNCTION(count_VkPipelineVertexInputDivisorStateCreateInfo,
                       count_VkPipelineVertexInputDivisorStateCreateInfoEXT)
 
-DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR,
+DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceVertexAttributeDivisorFeatures,
                       count_VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT)
 
 #endif
@@ -1593,6 +1745,10 @@ void count_VkPhysicalDeviceFragmentDensityMapPropertiesEXT(
 void count_VkRenderPassFragmentDensityMapCreateInfoEXT(
     uint32_t featureBits, VkStructureType rootType,
     const VkRenderPassFragmentDensityMapCreateInfoEXT* toCount, size_t* count);
+
+void count_VkRenderingFragmentDensityMapAttachmentInfoEXT(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkRenderingFragmentDensityMapAttachmentInfoEXT* toCount, size_t* count);
 
 #endif
 #ifdef VK_EXT_scalar_block_layout
@@ -1630,18 +1786,18 @@ void count_VkPipelineRasterizationProvokingVertexStateCreateInfoEXT(
 
 #endif
 #ifdef VK_EXT_line_rasterization
-DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceLineRasterizationFeaturesKHR,
+DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceLineRasterizationFeatures,
                       count_VkPhysicalDeviceLineRasterizationFeaturesEXT)
 
-DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceLineRasterizationPropertiesKHR,
+DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceLineRasterizationProperties,
                       count_VkPhysicalDeviceLineRasterizationPropertiesEXT)
 
-DEFINE_ALIAS_FUNCTION(count_VkPipelineRasterizationLineStateCreateInfoKHR,
+DEFINE_ALIAS_FUNCTION(count_VkPipelineRasterizationLineStateCreateInfo,
                       count_VkPipelineRasterizationLineStateCreateInfoEXT)
 
 #endif
 #ifdef VK_EXT_index_type_uint8
-DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceIndexTypeUint8FeaturesKHR,
+DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceIndexTypeUint8Features,
                       count_VkPhysicalDeviceIndexTypeUint8FeaturesEXT)
 
 #endif
@@ -1652,44 +1808,33 @@ void count_VkPhysicalDeviceExtendedDynamicStateFeaturesEXT(
 
 #endif
 #ifdef VK_EXT_host_image_copy
-void count_VkPhysicalDeviceHostImageCopyFeaturesEXT(
-    uint32_t featureBits, VkStructureType rootType,
-    const VkPhysicalDeviceHostImageCopyFeaturesEXT* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceHostImageCopyFeatures,
+                      count_VkPhysicalDeviceHostImageCopyFeaturesEXT)
 
-void count_VkPhysicalDeviceHostImageCopyPropertiesEXT(
-    uint32_t featureBits, VkStructureType rootType,
-    const VkPhysicalDeviceHostImageCopyPropertiesEXT* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceHostImageCopyProperties,
+                      count_VkPhysicalDeviceHostImageCopyPropertiesEXT)
 
-void count_VkMemoryToImageCopyEXT(uint32_t featureBits, VkStructureType rootType,
-                                  const VkMemoryToImageCopyEXT* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkMemoryToImageCopy, count_VkMemoryToImageCopyEXT)
 
-void count_VkImageToMemoryCopyEXT(uint32_t featureBits, VkStructureType rootType,
-                                  const VkImageToMemoryCopyEXT* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkImageToMemoryCopy, count_VkImageToMemoryCopyEXT)
 
-void count_VkCopyMemoryToImageInfoEXT(uint32_t featureBits, VkStructureType rootType,
-                                      const VkCopyMemoryToImageInfoEXT* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkCopyMemoryToImageInfo, count_VkCopyMemoryToImageInfoEXT)
 
-void count_VkCopyImageToMemoryInfoEXT(uint32_t featureBits, VkStructureType rootType,
-                                      const VkCopyImageToMemoryInfoEXT* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkCopyImageToMemoryInfo, count_VkCopyImageToMemoryInfoEXT)
 
-void count_VkCopyImageToImageInfoEXT(uint32_t featureBits, VkStructureType rootType,
-                                     const VkCopyImageToImageInfoEXT* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkCopyImageToImageInfo, count_VkCopyImageToImageInfoEXT)
 
-void count_VkHostImageLayoutTransitionInfoEXT(uint32_t featureBits, VkStructureType rootType,
-                                              const VkHostImageLayoutTransitionInfoEXT* toCount,
-                                              size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkHostImageLayoutTransitionInfo,
+                      count_VkHostImageLayoutTransitionInfoEXT)
 
-void count_VkSubresourceHostMemcpySizeEXT(uint32_t featureBits, VkStructureType rootType,
-                                          const VkSubresourceHostMemcpySizeEXT* toCount,
-                                          size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkSubresourceHostMemcpySize, count_VkSubresourceHostMemcpySizeEXT)
 
-void count_VkHostImageCopyDevicePerformanceQueryEXT(
-    uint32_t featureBits, VkStructureType rootType,
-    const VkHostImageCopyDevicePerformanceQueryEXT* toCount, size_t* count);
+DEFINE_ALIAS_FUNCTION(count_VkHostImageCopyDevicePerformanceQuery,
+                      count_VkHostImageCopyDevicePerformanceQueryEXT)
 
-DEFINE_ALIAS_FUNCTION(count_VkSubresourceLayout2KHR, count_VkSubresourceLayout2EXT)
+DEFINE_ALIAS_FUNCTION(count_VkSubresourceLayout2, count_VkSubresourceLayout2EXT)
 
-DEFINE_ALIAS_FUNCTION(count_VkImageSubresource2KHR, count_VkImageSubresource2EXT)
+DEFINE_ALIAS_FUNCTION(count_VkImageSubresource2, count_VkImageSubresource2EXT)
 
 #endif
 #ifdef VK_EXT_shader_demote_to_helper_invocation

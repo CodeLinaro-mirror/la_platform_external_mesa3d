@@ -473,7 +473,7 @@ iris_resource_alloc_flags(const struct iris_screen *screen,
 
    switch (templ->usage) {
    case PIPE_USAGE_STAGING:
-      flags |= BO_ALLOC_SMEM | BO_ALLOC_COHERENT;
+      flags |= BO_ALLOC_SMEM | BO_ALLOC_CACHED_COHERENT;
       break;
    case PIPE_USAGE_STREAM:
       flags |= BO_ALLOC_SMEM;
@@ -490,7 +490,7 @@ iris_resource_alloc_flags(const struct iris_screen *screen,
 
    if (templ->flags & (PIPE_RESOURCE_FLAG_MAP_COHERENT |
                        PIPE_RESOURCE_FLAG_MAP_PERSISTENT))
-      flags |= BO_ALLOC_SMEM | BO_ALLOC_COHERENT;
+      flags |= BO_ALLOC_SMEM | BO_ALLOC_CACHED_COHERENT;
 
    if (screen->devinfo->verx10 >= 125 && screen->devinfo->has_local_mem &&
        isl_aux_usage_has_ccs(res->aux.usage)) {
@@ -545,7 +545,7 @@ static struct iris_resource *
 iris_alloc_resource(struct pipe_screen *pscreen,
                     const struct pipe_resource *templ)
 {
-   struct iris_resource *res = calloc(1, sizeof(struct iris_resource));
+   struct iris_resource *res = CALLOC_STRUCT(iris_resource);
    if (!res)
       return NULL;
 
@@ -1037,7 +1037,7 @@ iris_resource_image_is_pat_compressible(const struct iris_screen *screen,
       return false;
 
    if (flags & (BO_ALLOC_PROTECTED |
-                BO_ALLOC_COHERENT |
+                BO_ALLOC_CACHED_COHERENT |
                 BO_ALLOC_CPU_VISIBLE))
       return false;
 
@@ -1157,7 +1157,12 @@ iris_resource_create_for_image(struct pipe_screen *pscreen,
 
    /* Allocate space for the indirect clear color. */
    if (iris_get_aux_clear_color_state_size(screen, res) > 0) {
-      res->aux.clear_color_offset = align64(bo_size, 64);
+      /* Kernel expects a 4k alignment, otherwise the display rejects the
+       * surface.
+       */
+      const uint64_t clear_color_alignment =
+         (res->mod_info && res->mod_info->supports_clear_color) ? 4096 : 64;
+      res->aux.clear_color_offset = align64(bo_size, clear_color_alignment);
       bo_size = res->aux.clear_color_offset +
                 iris_get_aux_clear_color_state_size(screen, res);
    }
@@ -1878,6 +1883,9 @@ iris_resource_get_handle(struct pipe_screen *pscreen,
    }
 #endif
 
+   /* TODO: TILE64 modifier support in the KMD */
+   assert(res->surf.tiling != ISL_TILING_64);
+
    switch (whandle->type) {
    case WINSYS_HANDLE_TYPE_SHARED:
       iris_gem_set_tiling(bo, &res->surf);
@@ -2162,130 +2170,6 @@ get_image_offset_el(const struct isl_surf *surf, unsigned level, unsigned z,
                                    out_x0_el, out_y0_el, &z0_el, &a0_el);
    }
    assert(z0_el == 0 && a0_el == 0);
-}
-
-/**
- * Get pointer offset into stencil buffer.
- *
- * The stencil buffer is W tiled. Since the GTT is incapable of W fencing, we
- * must decode the tile's layout in software.
- *
- * See
- *   - PRM, 2011 Sandy Bridge, Volume 1, Part 2, Section 4.5.2.1 W-Major Tile
- *     Format.
- *   - PRM, 2011 Sandy Bridge, Volume 1, Part 2, Section 4.5.3 Tiling Algorithm
- *
- * Even though the returned offset is always positive, the return type is
- * signed due to
- *    commit e8b1c6d6f55f5be3bef25084fdd8b6127517e137
- *    mesa: Fix return type of  _mesa_get_format_bytes() (#37351)
- */
-static intptr_t
-s8_offset(uint32_t stride, uint32_t x, uint32_t y)
-{
-   uint32_t tile_size = 4096;
-   uint32_t tile_width = 64;
-   uint32_t tile_height = 64;
-   uint32_t row_size = 64 * stride / 2; /* Two rows are interleaved. */
-
-   uint32_t tile_x = x / tile_width;
-   uint32_t tile_y = y / tile_height;
-
-   /* The byte's address relative to the tile's base addres. */
-   uint32_t byte_x = x % tile_width;
-   uint32_t byte_y = y % tile_height;
-
-   uintptr_t u = tile_y * row_size
-               + tile_x * tile_size
-               + 512 * (byte_x / 8)
-               +  64 * (byte_y / 8)
-               +  32 * ((byte_y / 4) % 2)
-               +  16 * ((byte_x / 4) % 2)
-               +   8 * ((byte_y / 2) % 2)
-               +   4 * ((byte_x / 2) % 2)
-               +   2 * (byte_y % 2)
-               +   1 * (byte_x % 2);
-
-   return u;
-}
-
-static void
-iris_unmap_s8(struct iris_transfer *map)
-{
-   struct pipe_transfer *xfer = &map->base.b;
-   const struct pipe_box *box = &xfer->box;
-   struct iris_resource *res = (struct iris_resource *) xfer->resource;
-   struct isl_surf *surf = &res->surf;
-
-   if (xfer->usage & PIPE_MAP_WRITE) {
-      uint8_t *untiled_s8_map = map->ptr;
-      uint8_t *tiled_s8_map = res->offset +
-         iris_bo_map(map->dbg, res->bo, (xfer->usage | MAP_RAW) & MAP_FLAGS);
-
-      for (int s = 0; s < box->depth; s++) {
-         unsigned x0_el, y0_el;
-         get_image_offset_el(surf, xfer->level, box->z + s, &x0_el, &y0_el);
-
-         for (uint32_t y = 0; y < box->height; y++) {
-            for (uint32_t x = 0; x < box->width; x++) {
-               ptrdiff_t offset = s8_offset(surf->row_pitch_B,
-                                            x0_el + box->x + x,
-                                            y0_el + box->y + y);
-               tiled_s8_map[offset] =
-                  untiled_s8_map[s * xfer->layer_stride + y * xfer->stride + x];
-            }
-         }
-      }
-   }
-
-   free(map->buffer);
-}
-
-static void
-iris_map_s8(struct iris_transfer *map)
-{
-   struct pipe_transfer *xfer = &map->base.b;
-   const struct pipe_box *box = &xfer->box;
-   struct iris_resource *res = (struct iris_resource *) xfer->resource;
-   struct isl_surf *surf = &res->surf;
-
-   xfer->stride = surf->row_pitch_B;
-   xfer->layer_stride = xfer->stride * box->height;
-
-   /* The tiling and detiling functions require that the linear buffer has
-    * a 16-byte alignment (that is, its `x0` is 16-byte aligned).  Here we
-    * over-allocate the linear buffer to get the proper alignment.
-    */
-   map->buffer = map->ptr = malloc(xfer->layer_stride * box->depth);
-   assert(map->buffer);
-
-   /* One of either READ_BIT or WRITE_BIT or both is set.  READ_BIT implies no
-    * INVALIDATE_RANGE_BIT.  WRITE_BIT needs the original values read in unless
-    * invalidate is set, since we'll be writing the whole rectangle from our
-    * temporary buffer back out.
-    */
-   if (xfer->usage & PIPE_MAP_READ) {
-      uint8_t *untiled_s8_map = map->ptr;
-      uint8_t *tiled_s8_map = res->offset +
-         iris_bo_map(map->dbg, res->bo, (xfer->usage | MAP_RAW) & MAP_FLAGS);
-
-      for (int s = 0; s < box->depth; s++) {
-         unsigned x0_el, y0_el;
-         get_image_offset_el(surf, xfer->level, box->z + s, &x0_el, &y0_el);
-
-         for (uint32_t y = 0; y < box->height; y++) {
-            for (uint32_t x = 0; x < box->width; x++) {
-               ptrdiff_t offset = s8_offset(surf->row_pitch_B,
-                                            x0_el + box->x + x,
-                                            y0_el + box->y + y);
-               untiled_s8_map[s * xfer->layer_stride + y * xfer->stride + x] =
-                  tiled_s8_map[offset];
-            }
-         }
-      }
-   }
-
-   map->unmap = iris_unmap_s8;
 }
 
 /* Compute extent parameters for use with tiled_memcpy functions.
@@ -2632,10 +2516,7 @@ iris_transfer_map(struct pipe_context *ctx,
          }
       }
 
-      if (surf->tiling == ISL_TILING_W) {
-         /* TODO: Teach iris_map_tiled_memcpy about W-tiling... */
-         iris_map_s8(map);
-      } else if (surf->tiling != ISL_TILING_LINEAR) {
+      if (surf->tiling != ISL_TILING_LINEAR) {
          iris_map_tiled_memcpy(map);
       } else {
          iris_map_direct(map);
@@ -2704,7 +2585,7 @@ iris_transfer_unmap(struct pipe_context *ctx, struct pipe_transfer *xfer)
  * The pipe->texture_subdata() driver hook.
  *
  * Mesa's state tracker takes this path whenever possible, even with
- * PIPE_CAP_TEXTURE_TRANSFER_MODES set.
+ * pipe_caps.texture_transfer_modes set.
  */
 static void
 iris_texture_subdata(struct pipe_context *ctx,
@@ -2754,28 +2635,13 @@ iris_texture_subdata(struct pipe_context *ctx,
    for (int s = 0; s < box->depth; s++) {
       const uint8_t *src = data + s * layer_stride;
 
-      if (surf->tiling == ISL_TILING_W) {
-         unsigned x0_el, y0_el;
-         get_image_offset_el(surf, level, box->z + s, &x0_el, &y0_el);
+      unsigned x1, x2, y1, y2;
+      tile_extents(surf, box, level, s, &x1, &x2, &y1, &y2);
 
-         for (unsigned y = 0; y < box->height; y++) {
-            for (unsigned x = 0; x < box->width; x++) {
-               ptrdiff_t offset = s8_offset(surf->row_pitch_B,
-                                            x0_el + box->x + x,
-                                            y0_el + box->y + y);
-               dst[offset] = src[y * stride + x];
-            }
-         }
-      } else {
-         unsigned x1, x2, y1, y2;
-
-         tile_extents(surf, box, level, s, &x1, &x2, &y1, &y2);
-
-         isl_memcpy_linear_to_tiled(x1, x2, y1, y2,
-                                    (void *)dst, (void *)src,
-                                    surf->row_pitch_B, stride,
-                                    false, surf->tiling, ISL_MEMCPY);
-      }
+      isl_memcpy_linear_to_tiled(x1, x2, y1, y2,
+                                 (void *)dst, (void *)src,
+                                 surf->row_pitch_B, stride,
+                                 false, surf->tiling, ISL_MEMCPY);
    }
 }
 

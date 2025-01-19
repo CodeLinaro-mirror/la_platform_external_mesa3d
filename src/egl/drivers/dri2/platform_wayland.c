@@ -45,11 +45,13 @@
 #include "util/u_vector.h"
 #include "util/format/u_formats.h"
 #include "main/glconfig.h"
+#include "pipe/p_screen.h"
 #include "egl_dri2.h"
 #include "eglglobals.h"
 #include "kopper_interface.h"
 #include "loader.h"
 #include "loader_dri_helper.h"
+#include "dri_screen.h"
 #include "dri_util.h"
 #include <loader_wayland_helper.h>
 
@@ -183,7 +185,7 @@ dri2_wl_visual_idx_from_pipe_format(enum pipe_format pipe_format)
 }
 
 static int
-dri2_wl_visual_idx_from_config(const __DRIconfig *config)
+dri2_wl_visual_idx_from_config(const struct dri_config *config)
 {
    struct gl_config *gl_config = (struct gl_config *) config;
 
@@ -664,7 +666,7 @@ dri2_wl_create_window_surface(_EGLDisplay *disp, _EGLConfig *conf,
    struct dri2_egl_surface *dri2_surf;
    struct zwp_linux_dmabuf_v1 *dmabuf_wrapper;
    int visual_idx;
-   const __DRIconfig *config;
+   const struct dri_config *config;
 
    if (!window) {
       _eglError(EGL_BAD_NATIVE_WINDOW, "dri2_create_surface");
@@ -960,7 +962,7 @@ get_surface_specific_modifiers(struct dri2_egl_surface *dri2_surf,
 }
 
 static void
-update_surface(struct dri2_egl_surface *dri2_surf, __DRIimage *dri_img)
+update_surface(struct dri2_egl_surface *dri2_surf, struct dri_image *dri_img)
 {
    int compression_rate;
 
@@ -1008,6 +1010,7 @@ create_dri_image(struct dri2_egl_surface *dri2_surf,
    uint64_t *modifiers;
    unsigned int num_modifiers;
    struct u_vector *modifiers_present;
+   bool implicit_mod_supported;
 
    assert(visual_idx != -1);
 
@@ -1045,6 +1048,26 @@ create_dri_image(struct dri2_egl_surface *dri2_surf,
    } else {
       modifiers = u_vector_tail(modifiers_present);
       num_modifiers = u_vector_length(modifiers_present);
+   }
+
+   if (!dri2_dpy->dri_screen_render_gpu->base.screen->resource_create_with_modifiers &&
+       dri2_dpy->wl_dmabuf) {
+      /* We don't support explicit modifiers, check if the compositor supports
+       * implicit modifiers. */
+      implicit_mod_supported = false;
+      for (unsigned int i = 0; i < num_modifiers; i++) {
+         if (modifiers[i] == DRM_FORMAT_MOD_INVALID) {
+            implicit_mod_supported = true;
+            break;
+         }
+      }
+
+      if (!implicit_mod_supported) {
+         return;
+      }
+
+      num_modifiers = 0;
+      modifiers = NULL;
    }
 
    /* For the purposes of this function, an INVALID modifier on
@@ -1193,14 +1216,25 @@ get_back_bo(struct dri2_egl_surface *dri2_surf)
    if (dri2_dpy->fd_render_gpu != dri2_dpy->fd_display_gpu &&
        dri2_surf->back->linear_copy == NULL) {
       uint64_t linear_mod = DRM_FORMAT_MOD_LINEAR;
-      __DRIimage *linear_copy_display_gpu_image = NULL;
+      const uint64_t *render_modifiers = NULL, *display_modifiers = NULL;
+      unsigned int render_num_modifiers = 0, display_num_modifiers = 0;
+      struct dri_image *linear_copy_display_gpu_image = NULL;
+
+      if (dri2_dpy->dri_screen_render_gpu->base.screen->resource_create_with_modifiers) {
+         render_modifiers = &linear_mod;
+         render_num_modifiers = 1;
+      }
+      if (dri2_dpy->dri_screen_display_gpu->base.screen->resource_create_with_modifiers) {
+         display_modifiers = &linear_mod;
+         display_num_modifiers = 1;
+      }
 
       if (dri2_dpy->dri_screen_display_gpu) {
          linear_copy_display_gpu_image = dri_create_image_with_modifiers(
             dri2_dpy->dri_screen_display_gpu,
             dri2_surf->base.Width, dri2_surf->base.Height,
             linear_pipe_format, use_flags | __DRI_IMAGE_USE_LINEAR,
-            &linear_mod, 1, NULL);
+            display_modifiers, display_num_modifiers, NULL);
 
          if (linear_copy_display_gpu_image) {
             int i, ret = 1;
@@ -1217,7 +1251,7 @@ get_back_bo(struct dri2_egl_surface *dri2_surf)
                num_planes = 1;
 
             for (i = 0; i < num_planes; i++) {
-               __DRIimage *image = dri2_from_planar(
+               struct dri_image *image = dri2_from_planar(
                   linear_copy_display_gpu_image, i, NULL);
 
                if (!image) {
@@ -1285,7 +1319,7 @@ get_back_bo(struct dri2_egl_surface *dri2_surf)
             dri2_dpy->dri_screen_render_gpu,
             dri2_surf->base.Width, dri2_surf->base.Height,
             linear_pipe_format, use_flags | __DRI_IMAGE_USE_LINEAR,
-            &linear_mod, 1, NULL);
+            render_modifiers, render_num_modifiers, NULL);
       }
 
       if (dri2_surf->back->linear_copy == NULL)
@@ -1319,7 +1353,7 @@ get_back_bo(struct dri2_egl_surface *dri2_surf)
 static void
 back_bo_to_dri_buffer(struct dri2_egl_surface *dri2_surf, __DRIbuffer *buffer)
 {
-   __DRIimage *image;
+   struct dri_image *image;
    int name, pitch;
 
    image = dri2_surf->back->dri_image;
@@ -1401,7 +1435,7 @@ update_buffers_if_needed(struct dri2_egl_surface *dri2_surf)
 }
 
 static int
-image_get_buffers(__DRIdrawable *driDrawable, unsigned int format,
+image_get_buffers(struct dri_drawable *driDrawable, unsigned int format,
                   uint32_t *stamp, void *loaderPrivate, uint32_t buffer_mask,
                   struct __DRIimageList *buffers)
 {
@@ -1417,7 +1451,7 @@ image_get_buffers(__DRIdrawable *driDrawable, unsigned int format,
 }
 
 static void
-dri2_wl_flush_front_buffer(__DRIdrawable *driDrawable, void *loaderPrivate)
+dri2_wl_flush_front_buffer(struct dri_drawable *driDrawable, void *loaderPrivate)
 {
    (void)driDrawable;
    (void)loaderPrivate;
@@ -1460,7 +1494,7 @@ static const struct wl_callback_listener throttle_listener = {
 
 static struct wl_buffer *
 create_wl_buffer(struct dri2_egl_display *dri2_dpy,
-                 struct dri2_egl_surface *dri2_surf, __DRIimage *image)
+                 struct dri2_egl_surface *dri2_surf, struct dri_image *image)
 {
    struct wl_buffer *ret = NULL;
    EGLBoolean query;
@@ -1526,7 +1560,7 @@ create_wl_buffer(struct dri2_egl_display *dri2_dpy,
          wl_proxy_set_queue((struct wl_proxy *)params, dri2_surf->wl_queue);
 
       for (i = 0; i < num_planes; i++) {
-         __DRIimage *p_image;
+         struct dri_image *p_image;
          int stride, offset;
          int fd = -1;
 
@@ -1664,7 +1698,7 @@ dri2_wl_swap_buffers_with_damage(_EGLDisplay *disp, _EGLSurface *draw,
    dri2_surf->back = NULL;
 
    if (!dri2_surf->current->wl_buffer) {
-      __DRIimage *image;
+      struct dri_image *image;
 
       if (dri2_dpy->fd_render_gpu != dri2_dpy->fd_display_gpu)
          image = dri2_surf->current->linear_copy;
@@ -1703,7 +1737,7 @@ dri2_wl_swap_buffers_with_damage(_EGLDisplay *disp, _EGLSurface *draw,
    if (dri2_dpy->fd_render_gpu != dri2_dpy->fd_display_gpu) {
       _EGLContext *ctx = _eglGetCurrentContext();
       struct dri2_egl_context *dri2_ctx = dri2_egl_context(ctx);
-      __DRIdrawable *dri_drawable = dri2_dpy->vtbl->get_dri_drawable(draw);
+      struct dri_drawable *dri_drawable = dri2_dpy->vtbl->get_dri_drawable(draw);
       dri2_blit_image(
          dri2_ctx->dri_context, dri2_surf->current->linear_copy,
          dri2_surf->current->dri_image, 0, 0, dri2_surf->base.Width,
@@ -1753,7 +1787,7 @@ dri2_wl_create_wayland_buffer_from_image(_EGLDisplay *disp, _EGLImage *img)
 {
    struct dri2_egl_display *dri2_dpy = dri2_egl_display(disp);
    struct dri2_egl_image *dri2_img = dri2_egl_image(img);
-   __DRIimage *image = dri2_img->dri_image;
+   struct dri_image *image = dri2_img->dri_image;
    struct wl_buffer *buffer;
    int fourcc;
 
@@ -2548,7 +2582,7 @@ dri2_wl_swrast_commit_backbuffer(struct dri2_egl_surface *dri2_surf)
 }
 
 static void
-dri2_wl_kopper_get_drawable_info(__DRIdrawable *draw, int *x, int *y, int *w,
+dri2_wl_kopper_get_drawable_info(struct dri_drawable *draw, int *x, int *y, int *w,
                                  int *h, void *loaderPrivate)
 {
    struct dri2_egl_surface *dri2_surf = loaderPrivate;
@@ -2561,7 +2595,7 @@ dri2_wl_kopper_get_drawable_info(__DRIdrawable *draw, int *x, int *y, int *w,
 }
 
 static void
-dri2_wl_swrast_get_drawable_info(__DRIdrawable *draw, int *x, int *y, int *w,
+dri2_wl_swrast_get_drawable_info(struct dri_drawable *draw, int *x, int *y, int *w,
                                  int *h, void *loaderPrivate)
 {
    struct dri2_egl_surface *dri2_surf = loaderPrivate;
@@ -2574,7 +2608,7 @@ dri2_wl_swrast_get_drawable_info(__DRIdrawable *draw, int *x, int *y, int *w,
 }
 
 static void
-dri2_wl_swrast_get_image(__DRIdrawable *read, int x, int y, int w, int h,
+dri2_wl_swrast_get_image(struct dri_drawable *read, int x, int y, int w, int h,
                          char *data, void *loaderPrivate)
 {
    struct dri2_egl_surface *dri2_surf = loaderPrivate;
@@ -2613,7 +2647,7 @@ dri2_wl_swrast_get_image(__DRIdrawable *read, int x, int y, int w, int h,
 }
 
 static void
-dri2_wl_swrast_put_image2(__DRIdrawable *draw, int op, int x, int y, int w,
+dri2_wl_swrast_put_image2(struct dri_drawable *draw, int op, int x, int y, int w,
                           int h, int stride, char *data, void *loaderPrivate)
 {
    struct dri2_egl_surface *dri2_surf = loaderPrivate;
@@ -2649,7 +2683,7 @@ dri2_wl_swrast_put_image2(__DRIdrawable *draw, int op, int x, int y, int w,
 }
 
 static void
-dri2_wl_swrast_put_image(__DRIdrawable *draw, int op, int x, int y, int w,
+dri2_wl_swrast_put_image(struct dri_drawable *draw, int op, int x, int y, int w,
                          int h, char *data, void *loaderPrivate)
 {
    struct dri2_egl_surface *dri2_surf = loaderPrivate;
@@ -2902,6 +2936,34 @@ kopperSetSurfaceCreateInfo(void *_draw, struct kopper_loader_info *out)
    wlsci->display = dri2_dpy->wl_dpy;
    wlsci->surface = dri2_surf->wl_surface_wrapper;
    out->present_opaque = dri2_surf->base.PresentOpaque;
+   /* convert to vulkan constants */
+   switch (dri2_surf->base.CompressionRate) {
+   case EGL_SURFACE_COMPRESSION_FIXED_RATE_NONE_EXT:
+      out->compression = 0;
+      break;
+   case EGL_SURFACE_COMPRESSION_FIXED_RATE_DEFAULT_EXT:
+      out->compression = UINT32_MAX;
+      break;
+#define EGL_VK_COMP(NUM) \
+   case EGL_SURFACE_COMPRESSION_FIXED_RATE_##NUM##BPC_EXT: \
+      out->compression = VK_IMAGE_COMPRESSION_FIXED_RATE_##NUM##BPC_BIT_EXT; \
+      break
+   EGL_VK_COMP(1);
+   EGL_VK_COMP(2);
+   EGL_VK_COMP(3);
+   EGL_VK_COMP(4);
+   EGL_VK_COMP(5);
+   EGL_VK_COMP(6);
+   EGL_VK_COMP(7);
+   EGL_VK_COMP(8);
+   EGL_VK_COMP(9);
+   EGL_VK_COMP(10);
+   EGL_VK_COMP(11);
+   EGL_VK_COMP(12);
+#undef EGL_VK_COMP
+   default:
+      unreachable("unknown compression rate");
+   }
 }
 
 static const __DRIkopperLoaderExtension kopper_loader_extension = {

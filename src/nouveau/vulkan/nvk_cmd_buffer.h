@@ -53,7 +53,7 @@ struct nvk_root_descriptor_table {
    struct nvk_buffer_address sets[NVK_MAX_SETS];
 
    /* For each descriptor set, the index in dynamic_buffers where that set's
-    * the dynamic buffers start. This is maintained for every set, regardless
+    * dynamic buffers start. This is maintained for every set, regardless
     * of whether or not anything is bound there.
     */
    uint8_t set_dynamic_buffer_start[NVK_MAX_SETS];
@@ -62,7 +62,7 @@ struct nvk_root_descriptor_table {
    union nvk_buffer_descriptor dynamic_buffers[NVK_MAX_DYNAMIC_BUFFERS];
 
    /* enfore alignment to 0x100 as needed pre pascal */
-   uint8_t __padding[0x38];
+   uint8_t __padding[0xb8];
 };
 
 /* helper macro for computing root descriptor byte offsets */
@@ -103,8 +103,9 @@ struct nvk_descriptor_state {
    const struct nvk_root_descriptor_table *root = \
       (const struct nvk_root_descriptor_table *)(desc)->root; \
    unsigned _start = start; \
-   assert(_start + count <= ARRAY_SIZE(root->member)); \
-   for (unsigned i = 0; i < count; i++) \
+   unsigned _count = count; \
+   assert(_start + _count <= ARRAY_SIZE(root->member)); \
+   for (unsigned i = 0; i < _count; i++) \
       (dst)[i] = root->member[i + _start]; \
 } while (0)
 
@@ -125,13 +126,14 @@ struct nvk_descriptor_state {
    struct nvk_root_descriptor_table *root = \
       (struct nvk_root_descriptor_table *)_desc->root; \
    unsigned _start = start; \
-   assert(_start + count <= ARRAY_SIZE(root->member)); \
-   for (unsigned i = 0; i < count; i++) \
+   unsigned _count = count; \
+   assert(_start + _count <= ARRAY_SIZE(root->member)); \
+   for (unsigned i = 0; i < _count; i++) \
       root->member[i + _start] = (src)[i]; \
    if (_desc->flush_root != NULL) { \
       size_t offset = (char *)&root->member[_start] - (char *)root; \
       _desc->flush_root((cmd), _desc, offset, \
-                        count * sizeof(root->member[0])); \
+                        _count * sizeof(root->member[0])); \
    } \
 } while (0)
 
@@ -159,6 +161,7 @@ struct nvk_rendering_state {
    struct nvk_attachment color_att[NVK_MAX_RTS];
    struct nvk_attachment depth_att;
    struct nvk_attachment stencil_att;
+   struct nvk_attachment fsr_att;
 
    bool all_linear;
 };
@@ -167,7 +170,7 @@ struct nvk_graphics_state {
    struct nvk_rendering_state render;
    struct nvk_descriptor_state descriptors;
 
-   uint32_t shaders_dirty;
+   VkShaderStageFlags shaders_dirty;
    struct nvk_shader *shaders[MESA_SHADER_MESH + 1];
 
    struct nvk_cbuf_group {
@@ -198,7 +201,7 @@ struct nvk_cmd_push {
 struct nvk_cmd_buffer {
    struct vk_command_buffer vk;
 
-   struct {
+   struct nvk_cmd_state {
       uint64_t descriptor_buffers[NVK_MAX_SETS];
       struct nvk_graphics_state gfx;
       struct nvk_compute_state cs;
@@ -294,8 +297,7 @@ void nvk_cmd_bind_compute_shader(struct nvk_cmd_buffer *cmd,
 
 void nvk_cmd_dirty_cbufs_for_descriptors(struct nvk_cmd_buffer *cmd,
                                          VkShaderStageFlags stages,
-                                         uint32_t sets_start, uint32_t sets_end,
-                                         uint32_t dyn_start, uint32_t dyn_end);
+                                         uint32_t sets_start, uint32_t sets_end);
 void nvk_cmd_bind_vertex_buffer(struct nvk_cmd_buffer *cmd, uint32_t vb_idx,
                                 struct nvk_addr_range addr_range);
 
@@ -311,7 +313,22 @@ nvk_get_descriptors_state(struct nvk_cmd_buffer *cmd,
    default:
       unreachable("Unhandled bind point");
    }
-};
+}
+
+static inline struct nvk_descriptor_state *
+nvk_get_descriptor_state_for_stages(struct nvk_cmd_buffer *cmd,
+                                    VkShaderStageFlags stages)
+{
+   if (stages & VK_SHADER_STAGE_COMPUTE_BIT) {
+      assert(stages == VK_SHADER_STAGE_COMPUTE_BIT);
+      return &cmd->state.cs.descriptors;
+   } else if (stages & NVK_SHADER_STAGE_GRAPHICS_BITS) {
+      assert(!(stages & ~NVK_SHADER_STAGE_GRAPHICS_BITS));
+      return &cmd->state.gfx.descriptors;
+   } else {
+      unreachable("Unknown shader stage");
+   }
+}
 
 VkResult nvk_cmd_buffer_upload_alloc(struct nvk_cmd_buffer *cmd,
                                      uint32_t size, uint32_t alignment,
@@ -346,6 +363,15 @@ uint64_t
 nvk_cmd_buffer_get_cbuf_descriptor_addr(struct nvk_cmd_buffer *cmd,
                                         const struct nvk_descriptor_state *desc,
                                         const struct nvk_cbuf *cbuf);
+
+VkResult nvk_cmd_flush_cs_qmd(struct nvk_cmd_buffer *cmd,
+                              uint32_t global_size[3],
+                              uint64_t *qmd_addr_out,
+                              uint64_t *root_desc_addr_out);
+
+void nvk_cmd_flush_gfx_dynamic_state(struct nvk_cmd_buffer *cmd);
+void nvk_cmd_flush_gfx_shaders(struct nvk_cmd_buffer *cmd);
+void nvk_cmd_flush_gfx_cbufs(struct nvk_cmd_buffer *cmd);
 
 void nvk_cmd_dispatch_shader(struct nvk_cmd_buffer *cmd,
                              struct nvk_shader *shader,

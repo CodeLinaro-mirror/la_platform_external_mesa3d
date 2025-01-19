@@ -33,13 +33,6 @@
 #include "panvk_priv_bo.h"
 #include "panvk_sampler.h"
 
-static inline const bool
-is_dynamic_buffer(VkDescriptorType type)
-{
-   return type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
-          type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-}
-
 static void *
 get_desc_slot_ptr(struct panvk_descriptor_set *set, uint32_t binding,
                   uint32_t elem, VkDescriptorType type)
@@ -242,11 +235,11 @@ panvk_per_arch(CreateDescriptorPool)(
 
    if (!vk_object_multizalloc(&device->vk, &ma, pAllocator,
                               VK_OBJECT_TYPE_DESCRIPTOR_POOL))
-      return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
+      return panvk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
 
    uint32_t desc_count = 0;
    for (unsigned i = 0; i < pCreateInfo->poolSizeCount; ++i) {
-      if (!is_dynamic_buffer(pCreateInfo->pPoolSizes[i].type))
+      if (!vk_descriptor_type_is_dynamic(pCreateInfo->pPoolSizes[i].type))
          desc_count += panvk_get_desc_stride(pCreateInfo->pPoolSizes[i].type) *
                        pCreateInfo->pPoolSizes[i].descriptorCount;
    }
@@ -262,11 +255,12 @@ panvk_per_arch(CreateDescriptorPool)(
       desc_count += pool->max_sets;
 
       uint64_t pool_size = desc_count * PANVK_DESCRIPTOR_SIZE;
-      pool->desc_bo = panvk_priv_bo_create(device, pool_size, 0,
-                                           VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
-      if (!pool->desc_bo) {
+      VkResult result = panvk_priv_bo_create(device, pool_size, 0,
+                                             VK_SYSTEM_ALLOCATION_SCOPE_OBJECT,
+                                             &pool->desc_bo);
+      if (result != VK_SUCCESS) {
          panvk_destroy_descriptor_pool(device, pAllocator, pool);
-         return vk_error(device, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+         return result;
       }
       uint64_t bo_size = pool->desc_bo->bo->size;
       assert(pool_size <= bo_size);
@@ -328,7 +322,7 @@ panvk_desc_pool_allocate_set(struct panvk_descriptor_pool *pool,
 
       if ((layout->bindings[last_binding].flags &
            VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT) &&
-          !is_dynamic_buffer(layout->bindings[last_binding].type)) {
+          !vk_descriptor_type_is_dynamic(layout->bindings[last_binding].type)) {
          uint32_t desc_stride =
             panvk_get_desc_stride(layout->bindings[last_binding].type);
 
@@ -341,14 +335,14 @@ panvk_desc_pool_allocate_set(struct panvk_descriptor_pool *pool,
    uint32_t first_free_set =
       __bitset_ffs(pool->free_sets, BITSET_WORDS(pool->max_sets));
    if (first_free_set == 0 || pool->desc_heap.free_size < descs_size)
-      return VK_ERROR_OUT_OF_POOL_MEMORY;
+      return panvk_error(pool, VK_ERROR_OUT_OF_POOL_MEMORY);
 
    uint64_t descs_dev_addr = 0;
    if (num_descs) {
       descs_dev_addr = util_vma_heap_alloc(&pool->desc_heap, descs_size,
                                            PANVK_DESCRIPTOR_SIZE);
       if (!descs_dev_addr)
-         return VK_ERROR_FRAGMENTED_POOL;
+         return panvk_error(pool, VK_ERROR_FRAGMENTED_POOL);
    }
    struct panvk_descriptor_set *set = &pool->sets[first_free_set - 1];
 
