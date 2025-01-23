@@ -1606,6 +1606,17 @@ DEFINE_ALIAS_FUNCTION(deepcopy_VkPhysicalDeviceShaderSubgroupExtendedTypesFeatur
                       deepcopy_VkPhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR)
 
 #endif
+#ifdef VK_KHR_global_priority
+DEFINE_ALIAS_FUNCTION(deepcopy_VkDeviceQueueGlobalPriorityCreateInfo,
+                      deepcopy_VkDeviceQueueGlobalPriorityCreateInfoKHR)
+
+DEFINE_ALIAS_FUNCTION(deepcopy_VkPhysicalDeviceGlobalPriorityQueryFeatures,
+                      deepcopy_VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR)
+
+DEFINE_ALIAS_FUNCTION(deepcopy_VkQueueFamilyGlobalPriorityProperties,
+                      deepcopy_VkQueueFamilyGlobalPriorityPropertiesKHR)
+
+#endif
 #ifdef VK_KHR_vulkan_memory_model
 DEFINE_ALIAS_FUNCTION(deepcopy_VkPhysicalDeviceVulkanMemoryModelFeatures,
                       deepcopy_VkPhysicalDeviceVulkanMemoryModelFeaturesKHR)
