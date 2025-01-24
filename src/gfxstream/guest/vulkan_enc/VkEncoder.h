@@ -614,6 +614,63 @@ class VkEncoder {
         uint32_t* pSparseMemoryRequirementCount,
         VkSparseImageMemoryRequirements2* pSparseMemoryRequirements, uint32_t doLock);
 #endif
+#ifdef VK_VERSION_1_4
+    void vkCmdSetLineStipple(VkCommandBuffer commandBuffer, uint32_t lineStippleFactor,
+                             uint16_t lineStipplePattern, uint32_t doLock);
+    VkResult vkMapMemory2(VkDevice device, const VkMemoryMapInfo* pMemoryMapInfo, void** ppData,
+                          uint32_t doLock);
+    VkResult vkUnmapMemory2(VkDevice device, const VkMemoryUnmapInfo* pMemoryUnmapInfo,
+                            uint32_t doLock);
+    void vkCmdBindIndexBuffer2(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                               VkDeviceSize size, VkIndexType indexType, uint32_t doLock);
+    void vkGetRenderingAreaGranularity(VkDevice device,
+                                       const VkRenderingAreaInfo* pRenderingAreaInfo,
+                                       VkExtent2D* pGranularity, uint32_t doLock);
+    void vkGetDeviceImageSubresourceLayout(VkDevice device,
+                                           const VkDeviceImageSubresourceInfo* pInfo,
+                                           VkSubresourceLayout2* pLayout, uint32_t doLock);
+    void vkGetImageSubresourceLayout2(VkDevice device, VkImage image,
+                                      const VkImageSubresource2* pSubresource,
+                                      VkSubresourceLayout2* pLayout, uint32_t doLock);
+    void vkCmdPushDescriptorSet(VkCommandBuffer commandBuffer,
+                                VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout,
+                                uint32_t set, uint32_t descriptorWriteCount,
+                                const VkWriteDescriptorSet* pDescriptorWrites, uint32_t doLock);
+    void vkCmdPushDescriptorSetWithTemplate(VkCommandBuffer commandBuffer,
+                                            VkDescriptorUpdateTemplate descriptorUpdateTemplate,
+                                            VkPipelineLayout layout, uint32_t set,
+                                            const void* pData, uint32_t doLock);
+    void vkCmdSetRenderingAttachmentLocations(
+        VkCommandBuffer commandBuffer, const VkRenderingAttachmentLocationInfo* pLocationInfo,
+        uint32_t doLock);
+    void vkCmdSetRenderingInputAttachmentIndices(
+        VkCommandBuffer commandBuffer,
+        const VkRenderingInputAttachmentIndexInfo* pInputAttachmentIndexInfo, uint32_t doLock);
+    void vkCmdBindDescriptorSets2(VkCommandBuffer commandBuffer,
+                                  const VkBindDescriptorSetsInfo* pBindDescriptorSetsInfo,
+                                  uint32_t doLock);
+    void vkCmdPushConstants2(VkCommandBuffer commandBuffer,
+                             const VkPushConstantsInfo* pPushConstantsInfo, uint32_t doLock);
+    void vkCmdPushDescriptorSet2(VkCommandBuffer commandBuffer,
+                                 const VkPushDescriptorSetInfo* pPushDescriptorSetInfo,
+                                 uint32_t doLock);
+    void vkCmdPushDescriptorSetWithTemplate2(
+        VkCommandBuffer commandBuffer,
+        const VkPushDescriptorSetWithTemplateInfo* pPushDescriptorSetWithTemplateInfo,
+        uint32_t doLock);
+    VkResult vkCopyMemoryToImage(VkDevice device,
+                                 const VkCopyMemoryToImageInfo* pCopyMemoryToImageInfo,
+                                 uint32_t doLock);
+    VkResult vkCopyImageToMemory(VkDevice device,
+                                 const VkCopyImageToMemoryInfo* pCopyImageToMemoryInfo,
+                                 uint32_t doLock);
+    VkResult vkCopyImageToImage(VkDevice device,
+                                const VkCopyImageToImageInfo* pCopyImageToImageInfo,
+                                uint32_t doLock);
+    VkResult vkTransitionImageLayout(VkDevice device, uint32_t transitionCount,
+                                     const VkHostImageLayoutTransitionInfo* pTransitions,
+                                     uint32_t doLock);
+#endif
 #ifdef VK_KHR_dynamic_rendering
     void vkCmdBeginRenderingKHR(VkCommandBuffer commandBuffer,
                                 const VkRenderingInfo* pRenderingInfo, uint32_t doLock);
@@ -776,11 +833,6 @@ class VkEncoder {
                                  VkQueryPool queryPool, uint32_t query, uint32_t doLock);
     VkResult vkQueueSubmit2KHR(VkQueue queue, uint32_t submitCount, const VkSubmitInfo2* pSubmits,
                                VkFence fence, uint32_t doLock);
-    void vkCmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer, VkPipelineStageFlags2 stage,
-                                    VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker,
-                                    uint32_t doLock);
-    void vkGetQueueCheckpointData2NV(VkQueue queue, uint32_t* pCheckpointDataCount,
-                                     VkCheckpointData2NV* pCheckpointData, uint32_t doLock);
 #endif
 #ifdef VK_KHR_copy_commands2
     void vkCmdCopyBuffer2KHR(VkCommandBuffer commandBuffer,
@@ -817,14 +869,14 @@ class VkEncoder {
                                   VkDeviceSize offset, VkDeviceSize size, VkIndexType indexType,
                                   uint32_t doLock);
     void vkGetRenderingAreaGranularityKHR(VkDevice device,
-                                          const VkRenderingAreaInfoKHR* pRenderingAreaInfo,
+                                          const VkRenderingAreaInfo* pRenderingAreaInfo,
                                           VkExtent2D* pGranularity, uint32_t doLock);
     void vkGetDeviceImageSubresourceLayoutKHR(VkDevice device,
-                                              const VkDeviceImageSubresourceInfoKHR* pInfo,
-                                              VkSubresourceLayout2KHR* pLayout, uint32_t doLock);
+                                              const VkDeviceImageSubresourceInfo* pInfo,
+                                              VkSubresourceLayout2* pLayout, uint32_t doLock);
     void vkGetImageSubresourceLayout2KHR(VkDevice device, VkImage image,
-                                         const VkImageSubresource2KHR* pSubresource,
-                                         VkSubresourceLayout2KHR* pLayout, uint32_t doLock);
+                                         const VkImageSubresource2* pSubresource,
+                                         VkSubresourceLayout2* pLayout, uint32_t doLock);
 #endif
 #ifdef VK_KHR_line_rasterization
     void vkCmdSetLineStippleKHR(VkCommandBuffer commandBuffer, uint32_t lineStippleFactor,
@@ -912,20 +964,20 @@ class VkEncoder {
 #endif
 #ifdef VK_EXT_host_image_copy
     VkResult vkCopyMemoryToImageEXT(VkDevice device,
-                                    const VkCopyMemoryToImageInfoEXT* pCopyMemoryToImageInfo,
+                                    const VkCopyMemoryToImageInfo* pCopyMemoryToImageInfo,
                                     uint32_t doLock);
     VkResult vkCopyImageToMemoryEXT(VkDevice device,
-                                    const VkCopyImageToMemoryInfoEXT* pCopyImageToMemoryInfo,
+                                    const VkCopyImageToMemoryInfo* pCopyImageToMemoryInfo,
                                     uint32_t doLock);
     VkResult vkCopyImageToImageEXT(VkDevice device,
-                                   const VkCopyImageToImageInfoEXT* pCopyImageToImageInfo,
+                                   const VkCopyImageToImageInfo* pCopyImageToImageInfo,
                                    uint32_t doLock);
     VkResult vkTransitionImageLayoutEXT(VkDevice device, uint32_t transitionCount,
-                                        const VkHostImageLayoutTransitionInfoEXT* pTransitions,
+                                        const VkHostImageLayoutTransitionInfo* pTransitions,
                                         uint32_t doLock);
     void vkGetImageSubresourceLayout2EXT(VkDevice device, VkImage image,
-                                         const VkImageSubresource2KHR* pSubresource,
-                                         VkSubresourceLayout2KHR* pLayout, uint32_t doLock);
+                                         const VkImageSubresource2* pSubresource,
+                                         VkSubresourceLayout2* pLayout, uint32_t doLock);
 #endif
 #ifdef VK_EXT_private_data
     VkResult vkCreatePrivateDataSlotEXT(VkDevice device,

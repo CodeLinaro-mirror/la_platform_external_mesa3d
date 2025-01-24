@@ -80,12 +80,8 @@ struct agx_encoder
 agx_encoder_allocate(struct agx_batch *batch, struct agx_device *dev)
 {
    struct agx_bo *bo = agx_bo_create(dev, 0x80000, 0, 0, "Encoder");
-
-   return (struct agx_encoder){
-      .bo = bo,
-      .current = bo->map,
-      .end = (uint8_t *)bo->map + bo->size,
-   };
+   uint8_t *map = agx_bo_map(bo);
+   return (struct agx_encoder){.bo = bo, .current = map, .end = map + bo->size};
 }
 
 static void
@@ -94,13 +90,16 @@ agx_batch_init(struct agx_context *ctx,
                struct agx_batch *batch)
 {
    struct agx_device *dev = agx_device(ctx->base.screen);
+   struct agx_screen *screen = agx_screen(ctx->base.screen);
 
    batch->ctx = ctx;
    util_copy_framebuffer_state(&batch->key, key);
    batch->seqnum = ++ctx->batches.seqnum;
 
-   agx_pool_init(&batch->pool, dev, 0, true);
-   agx_pool_init(&batch->pipeline_pool, dev, AGX_BO_LOW_VA, true);
+   agx_bo_reference(screen->rodata);
+   agx_pool_init(&batch->pool, dev, "Batch pool", 0, true);
+   agx_pool_init(&batch->pipeline_pool, dev, "Batch low VA pool", AGX_BO_LOW_VA,
+                 true);
 
    /* These allocations can happen only once and will just be zeroed (not freed)
     * during batch clean up. The memory is owned by the context.
@@ -128,6 +127,7 @@ agx_batch_init(struct agx_context *ctx,
    batch->draw = 0;
    batch->load = 0;
    batch->resolve = 0;
+   batch->feedback = 0;
    memset(batch->uploaded_clear_color, 0, sizeof(batch->uploaded_clear_color));
    batch->clear_depth = 0;
    batch->clear_stencil = 0;
@@ -162,7 +162,7 @@ agx_batch_init(struct agx_context *ctx,
    batch->result_off =
       (2 * sizeof(union agx_batch_result)) * agx_batch_idx(batch);
    batch->result =
-      (void *)(((uint8_t *)ctx->result_buf->map) + batch->result_off);
+      (void *)(((uint8_t *)agx_bo_map(ctx->result_buf)) + batch->result_off);
    memset(batch->result, 0, sizeof(union agx_batch_result) * 2);
 
    agx_batch_mark_active(batch);
@@ -288,14 +288,8 @@ agx_print_result(struct agx_device *dev, struct agx_context *ctx,
       agx_debug_fault(dev, info->address);
    }
 
-   /* Obscurely, we need to tolerate faults to pass the robustness parts of the
-    * CTS, so we can't assert that we don't fault. But it's helpful for any sort
-    * of debugging to crash on fault.
-    */
-   if (dev->debug) {
-      assert(info->status == DRM_ASAHI_STATUS_COMPLETE ||
-             info->status == DRM_ASAHI_STATUS_KILLED);
-   }
+   assert(info->status == DRM_ASAHI_STATUS_COMPLETE ||
+          info->status == DRM_ASAHI_STATUS_KILLED);
 }
 
 static void
@@ -321,6 +315,8 @@ static void
 agx_batch_cleanup(struct agx_context *ctx, struct agx_batch *batch, bool reset)
 {
    struct agx_device *dev = agx_device(ctx->base.screen);
+   struct agx_screen *screen = agx_screen(ctx->base.screen);
+
    assert(batch->ctx == ctx);
    assert(agx_batch_is_submitted(batch));
 
@@ -367,6 +363,7 @@ agx_batch_cleanup(struct agx_context *ctx, struct agx_batch *batch, bool reset)
       }
    }
 
+   agx_bo_unreference(dev, screen->rodata);
    agx_bo_unreference(dev, batch->vdm.bo);
    agx_bo_unreference(dev, batch->cdm.bo);
    agx_pool_cleanup(&batch->pool);
@@ -764,6 +761,10 @@ agx_batch_submit(struct agx_context *ctx, struct agx_batch *batch,
 
    uint64_t wait_seqid = p_atomic_read(&screen->flush_wait_seqid);
 
+   struct agx_submit_virt virt = {
+      .vbo_res_id = ctx->result_buf->vbo_res_id,
+   };
+
    /* Elide syncing against our own queue */
    if (wait_seqid && wait_seqid == ctx->flush_my_seqid) {
       batch_debug(batch,
@@ -859,6 +860,8 @@ agx_batch_submit(struct agx_context *ctx, struct agx_batch *batch,
 
          /* And keep track of the BO for cloning the out_sync */
          shared_bos[shared_bo_count++] = bo;
+         if (dev->is_virtio)
+            virt.extres_count++;
       } else {
          /* Deal with BOs which are not externally shared, but which have been
           * written from another context within the same screen. We also need to
@@ -875,6 +878,20 @@ agx_batch_submit(struct agx_context *ctx, struct agx_batch *batch,
                          agx_bo_writer_syncobj(writer));
             shared_bos[shared_bo_count++] = NULL;
          }
+      }
+   }
+
+   if (dev->is_virtio && virt.extres_count) {
+      struct agx_bo **p = shared_bos;
+      virt.extres =
+         malloc(virt.extres_count * sizeof(struct asahi_ccmd_submit_res));
+
+      for (unsigned i = 0; i < virt.extres_count; i++) {
+         while (!*p)
+            p++; // Skip inter-context slots which are not recorded here
+         virt.extres[i].res_id = (*p)->vbo_res_id;
+         virt.extres[i].flags = ASAHI_EXTRES_READ | ASAHI_EXTRES_WRITE;
+         p++;
       }
    }
 
@@ -910,7 +927,10 @@ agx_batch_submit(struct agx_context *ctx, struct agx_batch *batch,
          .cmd_type = DRM_ASAHI_CMD_COMPUTE,
          .flags = 0,
          .cmd_buffer = (uint64_t)(uintptr_t)compute,
-         .cmd_buffer_size = sizeof(struct drm_asahi_cmd_compute),
+
+         /* Work around for shipping 6.11.8 kernels, remove when we bump uapi
+          */
+         .cmd_buffer_size = sizeof(struct drm_asahi_cmd_compute) - 8,
          .result_offset = feedback ? batch->result_off : 0,
          .result_size = feedback ? sizeof(union agx_batch_result) : 0,
          /* Barrier on previous submission */
@@ -944,7 +964,7 @@ agx_batch_submit(struct agx_context *ctx, struct agx_batch *batch,
       .commands = (uint64_t)(uintptr_t)(&commands[0]),
    };
 
-   int ret = dev->ops.submit(dev, &submit, ctx->result_buf->vbo_res_id);
+   int ret = dev->ops.submit(dev, &submit, &virt);
 
    u_rwlock_rdunlock(&screen->destroy_lock);
 
@@ -1053,6 +1073,9 @@ agx_batch_submit(struct agx_context *ctx, struct agx_batch *batch,
    }
 
    agx_batch_mark_submitted(batch);
+
+   if (virt.extres)
+      free(virt.extres);
 
    /* Record the last syncobj for fence creation */
    ctx->syncobj = batch->syncobj;

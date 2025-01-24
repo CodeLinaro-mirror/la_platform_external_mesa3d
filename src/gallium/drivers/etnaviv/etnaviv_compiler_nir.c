@@ -104,9 +104,15 @@ etna_emit_output(struct etna_compile *c, nir_variable *var, struct etna_inst_src
 
    if (is_fs(c)) {
       switch (var->data.location) {
-      case FRAG_RESULT_COLOR:
-      case FRAG_RESULT_DATA0: /* DATA0 is used by gallium shaders for color */
-         c->variant->ps_color_out_reg = src.reg;
+      case FRAG_RESULT_DATA0:
+      case FRAG_RESULT_DATA1:
+      case FRAG_RESULT_DATA2:
+      case FRAG_RESULT_DATA3:
+      case FRAG_RESULT_DATA4:
+      case FRAG_RESULT_DATA5:
+      case FRAG_RESULT_DATA6:
+      case FRAG_RESULT_DATA7:
+         c->variant->ps_color_out_reg[var->data.location - FRAG_RESULT_DATA0] = src.reg;
          break;
       case FRAG_RESULT_DEPTH:
          c->variant->ps_depth_out_reg = src.reg;
@@ -287,7 +293,7 @@ const_src(struct etna_compile *c, nir_const_value *value, unsigned num_component
 static const uint8_t
 reg_swiz[NUM_REG_TYPES] = {
    [REG_TYPE_VEC4] = INST_SWIZ_IDENTITY,
-   [REG_TYPE_VIRT_SCALAR_X] = INST_SWIZ_IDENTITY,
+   [REG_TYPE_VIRT_SCALAR_X] = SWIZZLE(X, X, X, X),
    [REG_TYPE_VIRT_SCALAR_Y] = SWIZZLE(Y, Y, Y, Y),
    [REG_TYPE_VIRT_VEC2_XY] = INST_SWIZ_IDENTITY,
    [REG_TYPE_VIRT_VEC2T_XY] = INST_SWIZ_IDENTITY,
@@ -369,6 +375,8 @@ get_src(struct etna_compile *c, nir_src *src)
       case nir_intrinsic_load_uniform:
       case nir_intrinsic_load_ubo:
       case nir_intrinsic_load_reg:
+      case nir_intrinsic_ddx:
+      case nir_intrinsic_ddy:
          return ra_src(c, src);
       case nir_intrinsic_load_front_face:
          return (hw_src) { .use = 1, .rgroup = ISA_REG_GROUP_INTERNAL };
@@ -569,6 +577,42 @@ emit_intrinsic(struct etna_compile *c, nir_intrinsic_instr * intr)
    case nir_intrinsic_terminate:
       etna_emit_discard(c, SRC_DISABLE);
       break;
+   case nir_intrinsic_ddx: {
+      unsigned dst_swiz;
+      struct etna_inst_dst dst = ra_def(c, &intr->def, &dst_swiz);
+      struct etna_inst_src src = get_src(c, &intr->src[0]);
+
+      src = src_swizzle(src, dst_swiz);
+
+      struct etna_inst inst = {
+         .dst = dst,
+         .opcode = ISA_OPC_DSX,
+         .cond = ISA_COND_TRUE,
+         .type = ISA_TYPE_F32,
+         .src[0] = src,
+         .src[1] = src,
+      };
+
+      emit_inst(c, &inst);
+   } break;
+   case nir_intrinsic_ddy: {
+      unsigned dst_swiz;
+      struct etna_inst_dst dst = ra_def(c, &intr->def, &dst_swiz);
+      struct etna_inst_src src = get_src(c, &intr->src[0]);
+
+      src = src_swizzle(src, dst_swiz);
+
+      struct etna_inst inst = {
+         .dst = dst,
+         .opcode = ISA_OPC_DSY,
+         .type = ISA_TYPE_F32,
+         .cond = ISA_COND_TRUE,
+         .src[0] = src,
+         .src[1] = src,
+      };
+
+      emit_inst(c, &inst);
+   } break;
    case nir_intrinsic_load_uniform: {
       unsigned dst_swiz;
       struct etna_inst_dst dst = ra_def(c, &intr->def, &dst_swiz);
@@ -1142,8 +1186,10 @@ etna_compile_shader(struct etna_shader_variant *v)
    v->vs_id_in_reg = -1;
    v->vs_pos_out_reg = -1;
    v->vs_pointsize_out_reg = -1;
-   v->ps_color_out_reg = 0; /* 0 for shader that doesn't write fragcolor.. */
    v->ps_depth_out_reg = -1;
+
+   if (s->info.stage == MESA_SHADER_FRAGMENT)
+      NIR_PASS_V(s, nir_lower_fragcolor, specs->num_rts);
 
    /*
     * Lower glTexCoord, fixes e.g. neverball point sprite (exit cylinder stars)
@@ -1166,6 +1212,7 @@ etna_compile_shader(struct etna_shader_variant *v)
          unsigned idx = var->data.driver_location;
          sf->reg[idx].reg = idx;
          sf->reg[idx].slot = var->data.location;
+         sf->reg[idx].interpolation = var->data.interpolation;
          sf->reg[idx].num_components = glsl_get_components(var->type);
          sf->num_reg = MAX2(sf->num_reg, idx+1);
       }
@@ -1175,6 +1222,12 @@ etna_compile_shader(struct etna_shader_variant *v)
          unsigned idx = var->data.driver_location;
          sf->reg[idx].reg = idx + 1;
          sf->reg[idx].slot = var->data.location;
+         if (var->data.interpolation == INTERP_MODE_NONE && v->key.flatshade &&
+             (var->data.location == VARYING_SLOT_COL0 ||
+              var->data.location == VARYING_SLOT_COL1)) {
+            var->data.interpolation = INTERP_MODE_FLAT;
+         }
+         sf->reg[idx].interpolation = var->data.interpolation;
          sf->reg[idx].num_components = glsl_get_components(var->type);
          sf->num_reg = MAX2(sf->num_reg, idx+1);
          count++;
@@ -1336,7 +1389,8 @@ etna_link_shader(struct etna_shader_link_info *info,
       const struct etna_shader_inout *fsio = &fs->infile.reg[idx];
       const struct etna_shader_inout *vsio = etna_shader_vs_lookup(vs, fsio);
       struct etna_varying *varying;
-      bool interpolate_always = true;
+      bool varying_is_color = fsio->slot == VARYING_SLOT_COL0 ||
+                              fsio->slot == VARYING_SLOT_COL1;
 
       assert(fsio->reg > 0 && fsio->reg <= ARRAY_SIZE(info->varyings));
 
@@ -1346,15 +1400,32 @@ etna_link_shader(struct etna_shader_link_info *info,
       varying = &info->varyings[fsio->reg - 1];
       varying->num_components = fsio->num_components;
 
-      if (!interpolate_always) /* colors affected by flat shading */
+      if (varying_is_color) /* colors affected by flat shading */
          varying->pa_attributes = 0x200;
       else /* texture coord or other bypasses flat shading */
          varying->pa_attributes = 0x2f1;
 
-      varying->use[0] = VARYING_COMPONENT_USE_UNUSED;
-      varying->use[1] = VARYING_COMPONENT_USE_UNUSED;
-      varying->use[2] = VARYING_COMPONENT_USE_UNUSED;
-      varying->use[3] = VARYING_COMPONENT_USE_UNUSED;
+      for (int i = 0; i < 4; i++) {
+         if (varying_is_color)
+            varying->use[i] = VARYING_COMPONENT_USE_COLOR;
+         else
+            varying->use[i] = VARYING_COMPONENT_USE_GENERIC;
+      }
+
+      switch (fsio->interpolation) {
+      case INTERP_MODE_NONE:
+      case INTERP_MODE_SMOOTH:
+         varying->semantic = VARYING_INTERPOLATION_MODE_SMOOTH;
+         break;
+      case INTERP_MODE_NOPERSPECTIVE:
+         varying->semantic = VARYING_INTERPOLATION_MODE_NONPERSPECTIVE;
+         break;
+      case INTERP_MODE_FLAT:
+         varying->semantic = VARYING_INTERPOLATION_MODE_FLAT;
+         break;
+      default:
+         unreachable("unsupported varying interpolation mode");
+      }
 
       /* point/tex coord is an input to the PS without matching VS output,
        * so it gets a varying slot without being assigned a VS register.

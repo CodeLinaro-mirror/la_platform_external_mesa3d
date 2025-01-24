@@ -46,8 +46,8 @@ struct etna_shader_key
           * Combined Vertex/Fragment shader parameters:
           */
 
-         /* do we need to swap rb in frag color? */
-         unsigned frag_rb_swap : 1;
+         /* do we need to swap rb in frag colors? */
+         unsigned frag_rb_swap : PIPE_MAX_COLOR_BUFS;
          /* do we need to invert front facing value? */
          unsigned front_ccw : 1;
          /* do we need to replace glTexCoord.xy ? */
@@ -55,6 +55,8 @@ struct etna_shader_key
          unsigned sprite_coord_yinvert : 1;
          /* do we need to lower sample_tex_compare */
          unsigned has_sample_tex_compare : 1;
+         /* color varyings should be flat shaded */
+         unsigned flatshade : 1;
       };
       uint32_t global;
    };

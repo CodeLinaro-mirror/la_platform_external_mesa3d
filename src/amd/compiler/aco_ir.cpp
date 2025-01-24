@@ -346,11 +346,11 @@ convert_to_SDWA(amd_gfx_level gfx_level, aco_ptr<Instruction>& instr)
    sdwa.dst_sel = SubdwordSel(instr->definitions[0].bytes(), 0, false);
 
    if (instr->definitions[0].getTemp().type() == RegType::sgpr && gfx_level == GFX8)
-      instr->definitions[0].setFixed(vcc);
+      instr->definitions[0].setPrecolored(vcc);
    if (instr->definitions.size() >= 2)
-      instr->definitions[1].setFixed(vcc);
+      instr->definitions[1].setPrecolored(vcc);
    if (instr->operands.size() >= 3)
-      instr->operands[2].setFixed(vcc);
+      instr->operands[2].setPrecolored(vcc);
 
    instr->pass_flags = tmp->pass_flags;
 
@@ -474,11 +474,11 @@ convert_to_DPP(amd_gfx_level gfx_level, aco_ptr<Instruction>& instr, bool dpp8)
    instr->valu().opsel_hi = tmp->valu().opsel_hi;
 
    if ((instr->isVOPC() || instr->definitions.size() > 1) && gfx_level < GFX11)
-      instr->definitions.back().setFixed(vcc);
+      instr->definitions.back().setPrecolored(vcc);
 
    if (instr->operands.size() >= 3 && instr->operands[2].isOfType(RegType::sgpr) &&
        gfx_level < GFX11)
-      instr->operands[2].setFixed(vcc);
+      instr->operands[2].setPrecolored(vcc);
 
    instr->pass_flags = tmp->pass_flags;
 
@@ -1328,6 +1328,50 @@ wait_imm::print(FILE* output) const
    }
 }
 
+void
+wait_imm::build_waitcnt(Builder& bld)
+{
+   enum amd_gfx_level gfx_level = bld.program->gfx_level;
+
+   if (gfx_level >= GFX12) {
+      if (vm != wait_imm::unset_counter && lgkm != wait_imm::unset_counter) {
+         bld.sopp(aco_opcode::s_wait_loadcnt_dscnt, (vm << 8) | lgkm);
+         vm = wait_imm::unset_counter;
+         lgkm = wait_imm::unset_counter;
+      }
+
+      if (vs != wait_imm::unset_counter && lgkm != wait_imm::unset_counter) {
+         bld.sopp(aco_opcode::s_wait_storecnt_dscnt, (vs << 8) | lgkm);
+         vs = wait_imm::unset_counter;
+         lgkm = wait_imm::unset_counter;
+      }
+
+      aco_opcode op[wait_type_num];
+      op[wait_type_exp] = aco_opcode::s_wait_expcnt;
+      op[wait_type_lgkm] = aco_opcode::s_wait_dscnt;
+      op[wait_type_vm] = aco_opcode::s_wait_loadcnt;
+      op[wait_type_vs] = aco_opcode::s_wait_storecnt;
+      op[wait_type_sample] = aco_opcode::s_wait_samplecnt;
+      op[wait_type_bvh] = aco_opcode::s_wait_bvhcnt;
+      op[wait_type_km] = aco_opcode::s_wait_kmcnt;
+
+      for (unsigned i = 0; i < wait_type_num; i++) {
+         if ((*this)[i] != wait_imm::unset_counter)
+            bld.sopp(op[i], (*this)[i]);
+      }
+   } else {
+      if (vs != wait_imm::unset_counter) {
+         assert(gfx_level >= GFX10);
+         bld.sopk(aco_opcode::s_waitcnt_vscnt, Operand(sgpr_null, s1), vs);
+         vs = wait_imm::unset_counter;
+      }
+      if (!empty())
+         bld.sopp(aco_opcode::s_waitcnt, pack(gfx_level));
+   }
+
+   *this = wait_imm();
+}
+
 bool
 should_form_clause(const Instruction* a, const Instruction* b)
 {
@@ -1397,28 +1441,99 @@ get_vmem_type(enum amd_gfx_level gfx_level, Instruction* instr)
    return 0;
 }
 
-unsigned
-parse_vdst_wait(Instruction* instr)
+/* Parse implicit data dependency resolution:
+ * Returns the value of each counter that must be reached
+ * before an instruction is issued.
+ *
+ * (Probably incomplete.)
+ */
+depctr_wait
+parse_depctr_wait(const Instruction* instr)
 {
-   if (instr->isVMEM() || instr->isFlatLike() || instr->isDS() || instr->isEXP())
-      return 0;
-   else if (instr->isLDSDIR())
-      return instr->ldsdir().wait_vdst;
-   else if (instr->opcode == aco_opcode::s_waitcnt_depctr)
-      return (instr->salu().imm >> 12) & 0xf;
-   else
-      return 15;
+   depctr_wait res;
+   if (instr->isVMEM() || instr->isFlatLike() || instr->isDS() || instr->isEXP()) {
+      res.va_vdst = 0;
+      res.va_exec = 0;
+      res.sa_exec = 0;
+      if (instr->isVMEM() || instr->isFlatLike()) {
+         res.sa_sdst = 0;
+         res.va_sdst = 0;
+         res.va_vcc = 0;
+      }
+   } else if (instr->isSMEM()) {
+      res.sa_sdst = 0;
+      res.va_sdst = 0;
+      res.va_vcc = 0;
+   } else if (instr->isLDSDIR()) {
+      res.va_vdst = instr->ldsdir().wait_vdst;
+      res.va_exec = 0;
+      res.sa_exec = 0;
+   } else if (instr->opcode == aco_opcode::s_waitcnt_depctr) {
+      unsigned imm = instr->salu().imm;
+      res.va_vdst = (imm >> 12) & 0xf;
+      res.va_sdst = (imm >> 9) & 0x7;
+      res.va_ssrc = (imm >> 8) & 0x1;
+      res.hold_cnt = (imm >> 7) & 0x1;
+      res.vm_vsrc = (imm >> 2) & 0x7;
+      res.va_vcc = (imm >> 1) & 0x1;
+      res.sa_sdst = imm & 0x1;
+   } else if (instr->isVALU()) {
+      res.sa_exec = 0;
+      for (const Definition& def : instr->definitions) {
+         if (def.regClass().type() == RegType::sgpr) {
+            res.sa_sdst = 0;
+            /* Notably, this is the only exception, even VALU that
+             * reads exec doesn't implicitly wait for va_exec.
+             */
+            if (instr->opcode == aco_opcode::v_readfirstlane_b32)
+               res.va_exec = 0;
+            break;
+         }
+      }
+   } else if (instr_info.classes[(int)instr->opcode] == instr_class::branch ||
+              instr_info.classes[(int)instr->opcode] == instr_class::sendmsg) {
+      res.sa_exec = 0;
+      res.va_exec = 0;
+      switch (instr->opcode) {
+      case aco_opcode::s_cbranch_vccz:
+      case aco_opcode::s_cbranch_vccnz:
+         res.va_vcc = 0;
+         res.sa_sdst = 0;
+         break;
+      case aco_opcode::s_cbranch_scc0:
+      case aco_opcode::s_cbranch_scc1:
+         res.sa_sdst = 0;
+         break;
+      default: break;
+      }
+   } else if (instr->isSALU()) {
+      for (const Definition& def : instr->definitions) {
+         if (def.physReg() < vcc) {
+            res.va_sdst = 0;
+         } else if (def.physReg() <= vcc_hi) {
+            res.va_vcc = 0;
+         } else if (def.physReg() == exec || def.physReg() == exec_hi) {
+            res.va_exec = 0;
+         }
+      }
+      for (const Operand& op : instr->operands) {
+         if (op.physReg() < vcc) {
+            res.va_sdst = 0;
+         } else if (op.physReg() <= vcc_hi) {
+            res.va_vcc = 0;
+         } else if (op.physReg() == exec || op.physReg() == exec_hi) {
+            res.va_exec = 0;
+         }
+      }
+   }
+
+   return res;
 }
 
 bool
 dealloc_vgprs(Program* program)
 {
    if (program->gfx_level < GFX11)
-      return false;
-
-   /* sendmsg(dealloc_vgprs) releases scratch, so this isn't safe if there is a in-progress scratch
-    * store. */
-   if (uses_scratch(program))
       return false;
 
    /* If we insert the sendmsg on GFX11.5, the export priority workaround will require us to insert
@@ -1435,8 +1550,6 @@ dealloc_vgprs(Program* program)
    Builder bld(program);
    if (!block.instructions.empty() && block.instructions.back()->opcode == aco_opcode::s_endpgm) {
       bld.reset(&block.instructions, block.instructions.begin() + (block.instructions.size() - 1));
-      /* Due to a hazard, an s_nop is needed before "s_sendmsg sendmsg_dealloc_vgprs". */
-      bld.sopp(aco_opcode::s_nop, 0);
       bld.sopp(aco_opcode::s_sendmsg, sendmsg_dealloc_vgprs);
    }
 

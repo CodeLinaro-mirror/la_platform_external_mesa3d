@@ -46,12 +46,16 @@ extern "C" {
         vpe_priv->init.funcs.log(vpe_priv->init.funcs.log_ctx, __VA_ARGS__);                       \
     } while (0)
 
+#define vpe_event(event_id, ...)                                                                   \
+    do {                                                                                           \
+        vpe_priv->init.funcs.sys_event(event_id, __VA_ARGS__);                                     \
+    } while (0)
+
 #define container_of(ptr, type, member) (type *)(void *)((char *)ptr - offsetof(type, member))
 
 #define VPE_MIN_VIEWPORT_SIZE                                                                      \
     2                      // chroma viewport size is half of it, thus need to be 2 for YUV420
                            // for simplication we just use 2 for all types
-#define MAX_VPE_CMD 256    // TODO Dynamic allocation
 
 #define MAX_LINE_SIZE 1024 // without 16 pixels for the seams
 #define MAX_LINE_CNT  4
@@ -101,7 +105,7 @@ struct vpe_cmd_info {
 
     // input
     uint16_t             num_inputs;
-    struct vpe_cmd_input inputs[MAX_PIPE];
+    struct vpe_cmd_input inputs[MAX_INPUT_PIPE];
 
     // output
     uint16_t              num_outputs;
@@ -117,14 +121,6 @@ struct config_record {
     uint64_t config_size;
 };
 
-#define VPE_3DLUT_CACHE_SIZE 81920
-
-struct vpe_3dlut_cache {
-    uint64_t uid;
-    uint8_t  cache_buf[VPE_3DLUT_CACHE_SIZE];
-    uint64_t buffer_size;
-};
-
 /** represents a stream input, i.e. common to all segments */
 struct stream_ctx {
     struct vpe_priv *vpe_priv;
@@ -136,11 +132,9 @@ struct stream_ctx {
     uint16_t            num_segments;
     struct segment_ctx *segment_ctx;
 
-    uint16_t num_configs;                               // shared among same stream
-    uint16_t num_stream_op_configs[VPE_CMD_TYPE_COUNT]; // shared among same cmd type within the
-                                                        // same stream
-    struct config_record configs[16];
-    struct config_record stream_op_configs[VPE_CMD_TYPE_COUNT][16];
+    // share configs that can be re-used once generated
+    struct vpe_vector *configs[MAX_INPUT_PIPE];
+    struct vpe_vector *stream_op_configs[MAX_INPUT_PIPE][VPE_CMD_TYPE_COUNT];
 
     // cached color properties
     bool                     per_pixel_alpha;
@@ -167,20 +161,18 @@ struct stream_ctx {
     struct colorspace_transform *gamut_remap;
     struct transfer_func        *in_shaper_func; // for shaper lut
     struct vpe_3dlut            *lut3d_func;     // for 3dlut
-    struct vpe_3dlut_cache      *lut3d_cache;    // for 3dlut cache
     struct transfer_func        *blend_tf;       // for 1dlut
     white_point_gain             white_point_gain;
-
-    bool                    flip_horizonal_output;
-    struct vpe_color_adjust color_adjustments; // stores the current color adjustments params
-    struct fixed31_32
-        tf_scaling_factor; // a scaling factor that acts as a gain on the transfer function
+    bool                         flip_horizonal_output;
+    struct vpe_color_adjust      color_adjustments; // stores the current color adjustments params
+    struct fixed31_32            tf_scaling_factor; // a gain applied on a transfer function
 };
 
 struct output_ctx {
     // stores the paramters built for generating vpep configs
     struct vpe_surface_info    surface;
-    struct vpe_color           bg_color;
+    struct vpe_color           mpc_bg_color;
+    struct vpe_color           opp_bg_color;
     struct vpe_rect            target_rect;
     enum vpe_alpha_mode        alpha_mode;
     struct vpe_clamping_params clamping_params;
@@ -189,8 +181,8 @@ struct output_ctx {
     enum color_transfer_func tf;
     enum color_space         cs;
 
-    uint32_t             num_configs;
-    struct config_record configs[8];
+    // store generated per-pipe configs that can be reused
+    struct vpe_vector *configs[MAX_OUTPUT_PIPE];
 
     union {
         struct {
@@ -248,9 +240,7 @@ struct vpe_priv {
     struct calculate_buffer cal_buffer;
     struct vpe_bufs_req     bufs_required; /**< cached required buffer size for the checked ops */
 
-    // number of total vpe cmds
-    uint16_t            num_vpe_cmds;
-    struct vpe_cmd_info vpe_cmd_info[MAX_VPE_CMD];
+    struct vpe_vector  *vpe_cmd_vector;
     bool                ops_support;
 
     // writers
@@ -270,7 +260,7 @@ struct vpe_priv {
     struct output_ctx output_ctx;
 
     uint16_t        num_pipe;
-    struct pipe_ctx pipe_ctx[MAX_PIPE];
+    struct pipe_ctx pipe_ctx[MAX_INPUT_PIPE];
 
     // internal temp structure for creating pure BG filling
     struct vpe_build_param *dummy_input_param;
@@ -278,12 +268,10 @@ struct vpe_priv {
     bool scale_yuv_matrix; // this is a flag that forces scaling the yuv->rgb matrix
                            //  when embedding the color adjustments
 
-#ifdef VPE_BUILD_1_1
     // collaborate sync data counter
     int32_t  collaborate_sync_index;
     uint16_t vpe_num_instance;
     bool     collaboration_mode;
-#endif
     enum vpe_expansion_mode expansion_mode;
 };
 

@@ -22,6 +22,7 @@
 #include "nv_push_cl90b5.h"
 #include "nv_push_cla097.h"
 #include "nv_push_cla0c0.h"
+#include "nv_push_clb1c0.h"
 #include "nv_push_clc597.h"
 
 static void
@@ -378,6 +379,7 @@ enum nvk_barrier {
    NVK_BARRIER_INVALIDATE_TEX_DATA     = 1 << 4,
    NVK_BARRIER_INVALIDATE_CONSTANT     = 1 << 5,
    NVK_BARRIER_INVALIDATE_MME_DATA     = 1 << 6,
+   NVK_BARRIER_INVALIDATE_QMD_DATA     = 1 << 7,
 };
 
 static enum nvk_barrier
@@ -410,6 +412,10 @@ nvk_barrier_flushes_waits(VkPipelineStageFlags2 stages,
                   VK_PIPELINE_STAGE_2_CLEAR_BIT)))
       barriers |= NVK_BARRIER_RENDER_WFI;
 
+   if (access & VK_ACCESS_2_COMMAND_PREPROCESS_WRITE_BIT_EXT)
+      barriers |= NVK_BARRIER_FLUSH_SHADER_DATA |
+                  NVK_BARRIER_COMPUTE_WFI;
+
    return barriers;
 }
 
@@ -427,6 +433,10 @@ nvk_barrier_invalidates(VkPipelineStageFlags2 stages,
                  VK_ACCESS_2_CONDITIONAL_RENDERING_READ_BIT_EXT |
                  VK_ACCESS_2_DESCRIPTOR_BUFFER_READ_BIT_EXT))
       barriers |= NVK_BARRIER_INVALIDATE_MME_DATA;
+
+   if (access & VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT)
+      barriers |= NVK_BARRIER_INVALIDATE_CONSTANT |
+                  NVK_BARRIER_INVALIDATE_QMD_DATA;
 
    if (access & (VK_ACCESS_2_UNIFORM_READ_BIT |
                  VK_ACCESS_2_DESCRIPTOR_BUFFER_READ_BIT_EXT))
@@ -538,7 +548,7 @@ nvk_cmd_invalidate_deps(struct nvk_cmd_buffer *cmd,
    if (!barriers)
       return;
 
-   struct nv_push *p = nvk_cmd_buffer_push(cmd, 8);
+   struct nv_push *p = nvk_cmd_buffer_push(cmd, 10);
 
    if (barriers & NVK_BARRIER_INVALIDATE_TEX_DATA) {
       P_IMMD(p, NVA097, INVALIDATE_TEXTURE_DATA_CACHE_NO_WFI, {
@@ -560,6 +570,10 @@ nvk_cmd_invalidate_deps(struct nvk_cmd_buffer *cmd,
       if (pdev->info.cls_eng3d >= TURING_A)
          P_IMMD(p, NVC597, MME_DMA_SYSMEMBAR, 0);
    }
+
+   if ((barriers & NVK_BARRIER_INVALIDATE_QMD_DATA) &&
+       pdev->info.cls_eng3d >= MAXWELL_COMPUTE_B)
+      P_IMMD(p, NVB1C0, INVALIDATE_SKED_CACHES, 0);
 }
 
 VKAPI_ATTR void VKAPI_CALL
@@ -603,8 +617,7 @@ nvk_cmd_bind_shaders(struct vk_command_buffer *vk_cmd,
 void
 nvk_cmd_dirty_cbufs_for_descriptors(struct nvk_cmd_buffer *cmd,
                                     VkShaderStageFlags stages,
-                                    uint32_t sets_start, uint32_t sets_end,
-                                    uint32_t dyn_start, uint32_t dyn_end)
+                                    uint32_t sets_start, uint32_t sets_end)
 {
    if (!(stages & NVK_VK_GRAPHICS_STAGE_BITS))
       return;
@@ -629,12 +642,8 @@ nvk_cmd_dirty_cbufs_for_descriptors(struct nvk_cmd_buffer *cmd,
 
          case NVK_CBUF_TYPE_DESC_SET:
          case NVK_CBUF_TYPE_UBO_DESC:
-            if (cbuf->desc_set >= sets_start && cbuf->desc_set < sets_end)
-               group->dirty |= BITFIELD_BIT(i);
-            break;
-
          case NVK_CBUF_TYPE_DYNAMIC_UBO:
-            if (cbuf->dynamic_idx >= dyn_start && cbuf->dynamic_idx < dyn_end)
+            if (cbuf->desc_set >= sets_start && cbuf->desc_set < sets_end)
                group->dirty |= BITFIELD_BIT(i);
             break;
 
@@ -664,7 +673,7 @@ nvk_bind_descriptor_sets(struct nvk_cmd_buffer *cmd,
                                        0, NVK_MAX_SETS,
                                        set_dynamic_buffer_start);
 
-   /* Fro the Vulkan 1.3.275 spec:
+   /* From the Vulkan 1.3.275 spec:
     *
     *    "When binding a descriptor set (see Descriptor Set Binding) to
     *    set number N...
@@ -735,7 +744,7 @@ nvk_bind_descriptor_sets(struct nvk_cmd_buffer *cmd,
    assert(next_dyn_offset <= info->dynamicOffsetCount);
 
    nvk_descriptor_state_set_root_array(cmd, desc, dynamic_buffers,
-                                       dyn_buffer_start, dyn_buffer_end,
+                                       dyn_buffer_start, dyn_buffer_end - dyn_buffer_start,
                                        &dynamic_buffers[dyn_buffer_start]);
 
    /* We need to set everything above first_set because later calls to
@@ -755,8 +764,7 @@ nvk_bind_descriptor_sets(struct nvk_cmd_buffer *cmd,
                                        set_dynamic_buffer_start);
 
    nvk_cmd_dirty_cbufs_for_descriptors(cmd, info->stageFlags, info->firstSet,
-                                       info->firstSet + info->descriptorSetCount,
-                                       dyn_buffer_start, dyn_buffer_end);
+                                       info->firstSet + info->descriptorSetCount);
 }
 
 VKAPI_ATTR void VKAPI_CALL
@@ -822,8 +830,7 @@ nvk_set_descriptor_buffer_offsets(struct nvk_cmd_buffer *cmd,
 
    nvk_cmd_dirty_cbufs_for_descriptors(cmd, info->stageFlags,
                                        info->firstSet,
-                                       info->firstSet + info->setCount,
-                                       0, 0);
+                                       info->firstSet + info->setCount);
 }
 
 VKAPI_ATTR void VKAPI_CALL
@@ -944,7 +951,7 @@ nvk_push_descriptor_set(struct nvk_cmd_buffer *cmd,
                                   info->pDescriptorWrites);
 
    nvk_cmd_dirty_cbufs_for_descriptors(cmd, info->stageFlags,
-                                       info->set, info->set + 1, 0, 0);
+                                       info->set, info->set + 1);
 }
 
 VKAPI_ATTR void VKAPI_CALL
@@ -1095,6 +1102,26 @@ nvk_cmd_buffer_dump(struct nvk_cmd_buffer *cmd, FILE *fp)
          const uint64_t addr = p->addr;
          fprintf(fp, "<%u B of INDIRECT DATA at 0x%" PRIx64 ">\n",
                  p->range, addr);
+
+         uint64_t mem_offset = 0;
+         struct nvkmd_mem *mem =
+            nvkmd_dev_lookup_mem_by_va(dev->nvkmd, addr, &mem_offset);
+         if (mem != NULL) {
+            void *map;
+            VkResult map_result = nvkmd_mem_map(mem, &dev->vk.base,
+                                                NVKMD_MEM_MAP_RD, NULL,
+                                                &map);
+            if (map_result == VK_SUCCESS) {
+               struct nv_push push = {
+                  .start = mem->map + mem_offset,
+                  .end = mem->map + mem_offset + p->range,
+               };
+               vk_push_print(fp, &push, &pdev->info);
+               nvkmd_mem_unmap(mem, 0);
+            }
+
+            nvkmd_mem_unref(mem);
+         }
       }
    }
 }
@@ -1128,5 +1155,5 @@ nvk_CmdPushDescriptorSetWithTemplate2KHR(
    /* We don't know the actual set of stages here so assume everything */
    nvk_cmd_dirty_cbufs_for_descriptors(cmd, NVK_VK_GRAPHICS_STAGE_BITS |
                                             VK_SHADER_STAGE_COMPUTE_BIT,
-                                       set, set + 1, 0, 0);
+                                       set, set + 1);
 }

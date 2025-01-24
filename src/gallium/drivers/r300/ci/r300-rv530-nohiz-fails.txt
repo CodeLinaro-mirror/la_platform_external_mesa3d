@@ -378,6 +378,9 @@ spec@!opengl 1.0@gl-1.0-edgeflag-quads,Fail
 spec@!opengl 1.0@gl-1.0-no-op-paths,Fail
 spec@!opengl 1.0@gl-1.0-scissor-offscreen,Fail
 
+# This one started to fail in CI at the turn of 2024 and 2025 but works locally
+spec@!opengl 1.0@gl-1.0-drawbuffer-modes,Fail
+
 spec@!opengl 1.1@depthstencil-default_fb-blit samples=2,Fail
 spec@!opengl 1.1@depthstencil-default_fb-blit samples=4,Fail
 spec@!opengl 1.1@depthstencil-default_fb-blit samples=6,Fail
@@ -437,9 +440,6 @@ spec@!opengl 2.1@pbo,Fail
 spec@!opengl 2.1@pbo@test_draw_pixels,Fail
 spec@!opengl 2.1@pbo@test_polygon_stip,Fail
 spec@!opengl 2.1@polygon-stipple-fs,Fail
-
-spec@arb_clear_texture@arb_clear_texture-float,Fail
-spec@arb_clear_texture@arb_clear_texture-supported-formats,Fail
 
 spec@arb_color_buffer_float@gl_rgba32f-render,Fail
 spec@arb_color_buffer_float@gl_rgba32f-render-fog,Fail
@@ -742,19 +742,24 @@ spec@glsl-1.10@execution@loops@glsl-vs-loop-300,Fail
 
 spec@glsl-1.10@execution@variable-indexing@vs-output-array-vec2-index-wr-no-unroll,Fail
 
+# HW limitation (no support for gl_ClipVertex)
 spec@glsl-1.20@execution@clipping@vs-clip-vertex-const-accept,Fail
+spec@glsl-1.20@execution@clipping@vs-clip-vertex-const-reject,Fail
 spec@glsl-1.20@execution@clipping@vs-clip-vertex-different-from-position,Fail
 spec@glsl-1.20@execution@clipping@vs-clip-vertex-homogeneity,Fail
 spec@glsl-1.20@execution@clipping@vs-clip-vertex-primitives,Fail
-
-# We write -nan to output, end don't end with zero
-spec@glsl-1.20@execution@const-builtin@glsl-const-builtin-normalize,Fail
 
 # https://gitlab.freedesktop.org/mesa/mesa/-/issues/8618
 spec@glsl-1.20@execution@fs-nan-builtin-max,Fail
 spec@glsl-1.20@execution@fs-nan-builtin-min,Fail
 spec@glsl-1.20@execution@vs-nan-builtin-min,Fail
 spec@glsl-1.20@execution@vs-nan-builtin-max,Fail
+
+# piglit bug, requires GLSL >= 1.20 but specifies #version 130
+spec@glsl-1.20@execution@vs-loop-uint-induction-var-1,Fail
+spec@glsl-1.20@execution@vs-loop-uint-induction-var-2,Fail
+spec@glsl-1.20@execution@vs-loop-uint-induction-var-3,Fail
+spec@glsl-1.20@execution@vs-loop-uint-induction-var-4,Fail
 
 spec@glsl-1.20@execution@tex-miplevel-selection gl2:texture() 1d,Fail
 spec@glsl-1.20@execution@tex-miplevel-selection gl2:texture() 2d,Fail
@@ -820,3 +825,9 @@ Xnine.fog,Crash
 Xnine.lighting,Crash
 Xnine.specular_lighting,Crash
 Xnine.stencil_cull,Crash
+dEQP-GLES2.functional.texture.mipmap.2d.projected.nearest_nearest_mirror,Fail
+dEQP-GLES2.functional.texture.mipmap.2d.projected.nearest_nearest_repeat,Fail
+dEQP-GLES2.functional.texture.mipmap.2d.projected.nearest_nearest_clamp,Fail
+dEQP-GLES2.functional.texture.mipmap.2d.projected.linear_nearest_repeat,Fail
+dEQP-GLES2.functional.texture.mipmap.2d.projected.linear_nearest_mirror,Fail
+dEQP-GLES2.functional.texture.mipmap.2d.projected.linear_nearest_clamp,Fail

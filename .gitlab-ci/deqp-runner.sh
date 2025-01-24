@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2086 # we want word splitting
+# shellcheck disable=SC1091 # paths only become valid at runtime
+
+. "${SCRIPTS_DIR}/setup-test-env.sh"
 
 section_start test_setup "deqp: preparing test setup"
 
@@ -35,64 +38,9 @@ findmnt -n tmpfs ${SHADER_CACHE_HOME} || findmnt -n tmpfs ${SHADER_CACHE_DIR} ||
     mount -t tmpfs -o nosuid,nodev,size=2G,mode=1755 tmpfs ${SHADER_CACHE_DIR}
 }
 
-if [ -z "$DEQP_SUITE" ]; then
-    if [ -z "$DEQP_VER" ]; then
-        echo 'DEQP_SUITE must be set to the name of your deqp-gpu_version.toml, or DEQP_VER must be set to something like "gles2", "gles31-khr" or "vk" for the test run'
-        exit 1
-    fi
-
-    DEQP_WIDTH=${DEQP_WIDTH:-256}
-    DEQP_HEIGHT=${DEQP_HEIGHT:-256}
-    DEQP_CONFIG=${DEQP_CONFIG:-rgba8888d24s8ms0}
-
-    DEQP_OPTIONS="$DEQP_OPTIONS --deqp-surface-width=$DEQP_WIDTH --deqp-surface-height=$DEQP_HEIGHT"
-    DEQP_OPTIONS="$DEQP_OPTIONS --deqp-surface-type=${DEQP_SURFACE_TYPE:-pbuffer}"
-    DEQP_OPTIONS="$DEQP_OPTIONS --deqp-gl-config-name=$DEQP_CONFIG"
-    DEQP_OPTIONS="$DEQP_OPTIONS --deqp-visibility=hidden"
-
-    if [ "$DEQP_VER" = "vk" ] && [ -z "$VK_DRIVER" ]; then
-        echo 'VK_DRIVER must be to something like "radeon" or "intel" for the test run'
-        exit 1
-    fi
-
-    # Generate test case list file.
-    if [ "$DEQP_VER" = "vk" ]; then
-       MUSTPASS=/deqp/mustpass/vk-main.txt
-       DEQP=/deqp/external/vulkancts/modules/vulkan/deqp-vk
-    elif [ "$DEQP_VER" = "gles2" ] || [ "$DEQP_VER" = "gles3" ] || [ "$DEQP_VER" = "gles31" ] || [ "$DEQP_VER" = "egl" ]; then
-       MUSTPASS=/deqp/mustpass/$DEQP_VER-main.txt
-       DEQP=/deqp/modules/$DEQP_VER/deqp-$DEQP_VER
-    elif [ "$DEQP_VER" = "gles2-khr" ] || [ "$DEQP_VER" = "gles3-khr" ] || [ "$DEQP_VER" = "gles31-khr" ] || [ "$DEQP_VER" = "gles32-khr" ]; then
-       MUSTPASS=/deqp/mustpass/$DEQP_VER-main.txt
-       DEQP=/deqp/external/openglcts/modules/glcts
-    else
-       MUSTPASS=/deqp/mustpass/$DEQP_VER-main.txt
-       DEQP=/deqp/external/openglcts/modules/glcts
-    fi
-
-    cp $MUSTPASS /tmp/case-list.txt
-
-    # If the caselist is too long to run in a reasonable amount of time, let the job
-    # specify what fraction (1/n) of the caselist we should run.  Note: N~M is a gnu
-    # sed extension to match every nth line (first line is #1).
-    if [ -n "$DEQP_FRACTION" ]; then
-       sed -ni 1~$DEQP_FRACTION"p" /tmp/case-list.txt
-    fi
-
-    # If the job is parallel at the gitab job level, take the corresponding fraction
-    # of the caselist.
-    if [ -n "$CI_NODE_INDEX" ]; then
-       sed -ni $CI_NODE_INDEX~$CI_NODE_TOTAL"p" /tmp/case-list.txt
-    fi
-
-    if [ ! -s /tmp/case-list.txt ]; then
-        echo "Caselist generation failed"
-        exit 1
-    fi
-fi
-
+BASELINE=""
 if [ -e "$INSTALL/$GPU_VERSION-fails.txt" ]; then
-    DEQP_RUNNER_OPTIONS="$DEQP_RUNNER_OPTIONS --baseline $INSTALL/$GPU_VERSION-fails.txt"
+    BASELINE="--baseline $INSTALL/$GPU_VERSION-fails.txt"
 fi
 
 # Default to an empty known flakes file if it doesn't exist.
@@ -115,6 +63,10 @@ if [ -e "$INSTALL/$GPU_VERSION-skips.txt" ]; then
     DEQP_SKIPS="$DEQP_SKIPS $INSTALL/$GPU_VERSION-skips.txt"
 fi
 
+if [ -e "$INSTALL/$GPU_VERSION-slow-skips.txt" ] && [[ $CI_JOB_NAME != *full* ]]; then
+    DEQP_SKIPS="$DEQP_SKIPS $INSTALL/$GPU_VERSION-slow-skips.txt"
+fi
+
 if [ "$PIGLIT_PLATFORM" != "gbm" ] ; then
     DEQP_SKIPS="$DEQP_SKIPS $INSTALL/x11-skips.txt"
 fi
@@ -123,9 +75,8 @@ if [ "$PIGLIT_PLATFORM" = "gbm" ]; then
     DEQP_SKIPS="$DEQP_SKIPS $INSTALL/gbm-skips.txt"
 fi
 
-if [ -n "$VK_DRIVER" ] && [ -z "$DEQP_SUITE" ]; then
-    # Bump the number of tests per group to reduce the startup time of VKCTS.
-    DEQP_RUNNER_OPTIONS="$DEQP_RUNNER_OPTIONS --tests-per-group ${DEQP_RUNNER_TESTS_PER_GROUP:-5000}"
+if [ -n "$USE_ANGLE" ]; then
+    DEQP_SKIPS="$DEQP_SKIPS $INSTALL/angle-skips.txt"
 fi
 
 # Set the path to VK validation layer settings (in case it ends up getting loaded)
@@ -154,69 +105,46 @@ if [ "$GALLIUM_DRIVER" = "virpipe" ]; then
     sleep 1
 fi
 
-if [ -z "$DEQP_SUITE" ]; then
-    if [ -n "$DEQP_EXPECTED_RENDERER" ]; then
-        export DEQP_RUNNER_OPTIONS="$DEQP_RUNNER_OPTIONS --renderer-check $DEQP_EXPECTED_RENDERER"
-    fi
-    if [ $DEQP_VER != vk ] && [ $DEQP_VER != egl ]; then
-        VER=$(sed 's/[() ]/./g' "$INSTALL/VERSION")
-        export DEQP_RUNNER_OPTIONS="$DEQP_RUNNER_OPTIONS --version-check $VER"
-    fi
-fi
-
 uncollapsed_section_switch deqp "deqp: deqp-runner"
 
 # Print the detailed version with the list of backports and local patches
 { set +x; } 2>/dev/null
-for api in vk gl gles; do
-  deqp_version_log=/deqp/version-$api
+for api in vk-main vk gl gles; do
+  deqp_version_log=/deqp-$api/deqp-$api-version
   if [ -r "$deqp_version_log" ]; then
     cat "$deqp_version_log"
   fi
 done
 set -x
 
+# If you change the format of the suite toml filenames or the
+# $GPU_VERSION-{fails,flakes,skips}.txt filenames, look through the rest
+# of the tree for other places that need to be kept in sync (e.g.
+# src/**/ci/gitlab-ci*.yml)
 set +e
-if [ -z "$DEQP_SUITE" ]; then
-    deqp-runner \
-        run \
-        --deqp $DEQP \
-        --output $RESULTS_DIR \
-        --caselist /tmp/case-list.txt \
-        --skips $INSTALL/all-skips.txt $DEQP_SKIPS \
-        --flakes $INSTALL/$GPU_VERSION-flakes.txt \
-        --testlog-to-xml /deqp/executor/testlog-to-xml \
-        --jobs ${FDO_CI_CONCURRENT:-4} \
-        $DEQP_RUNNER_OPTIONS \
-        -- \
-        $DEQP_OPTIONS
-else
-    # If you change the format of the suite toml filenames or the
-    # $GPU_VERSION-{fails,flakes,skips}.txt filenames, look through the rest
-    # of the tree for other places that need to be kept in sync (e.g.
-    # src/**/ci/gitlab-ci*.yml)
-    deqp-runner \
-        suite \
-        --suite $INSTALL/deqp-$DEQP_SUITE.toml \
-        --output $RESULTS_DIR \
-        --skips $INSTALL/all-skips.txt $DEQP_SKIPS \
-        --flakes $INSTALL/$GPU_VERSION-flakes.txt \
-        --testlog-to-xml /deqp/executor/testlog-to-xml \
-        --fraction-start ${CI_NODE_INDEX:-1} \
-        --fraction $((CI_NODE_TOTAL * ${DEQP_FRACTION:-1})) \
-        --jobs ${FDO_CI_CONCURRENT:-4} \
-        $DEQP_RUNNER_OPTIONS
-fi
+deqp-runner -V
+deqp-runner \
+    suite \
+    --suite $INSTALL/deqp-$DEQP_SUITE.toml \
+    --output $RESULTS_DIR \
+    --skips $INSTALL/all-skips.txt $DEQP_SKIPS \
+    --flakes $INSTALL/$GPU_VERSION-flakes.txt \
+    --testlog-to-xml /deqp-tools/testlog-to-xml \
+    --fraction-start ${CI_NODE_INDEX:-1} \
+    --fraction $((CI_NODE_TOTAL * ${DEQP_FRACTION:-1})) \
+    --jobs ${FDO_CI_CONCURRENT:-4} \
+    $BASELINE \
+    ${DEQP_RUNNER_MAX_FAILS:+--max-fails "$DEQP_RUNNER_MAX_FAILS"} \
+    ${DEQP_FORCE_ASAN:+--env LD_PRELOAD=libasan.so.8:/install/lib/libdlclose-skip.so}; DEQP_EXITCODE=$?
 
-DEQP_EXITCODE=$?
+{ set +x; } 2>/dev/null
+
 set -e
-
-set +x
-
-report_load
 
 section_switch test_post_process "deqp: post-processing test results"
 set -x
+
+report_load
 
 # Remove all but the first 50 individual XML files uploaded as artifacts, to
 # save fd.o space when you break everything.
@@ -227,7 +155,7 @@ find $RESULTS_DIR -name \*.xml | \
 
 # If any QPA XMLs are there, then include the XSL/CSS in our artifacts.
 find $RESULTS_DIR -name \*.xml \
-    -exec cp /deqp/testlog.css /deqp/testlog.xsl "$RESULTS_DIR/" ";" \
+    -exec cp /deqp-tools/testlog.css /deqp-tools/testlog.xsl "$RESULTS_DIR/" ";" \
     -quit
 
 deqp-runner junit \
@@ -255,8 +183,9 @@ fi
 # Compress results.csv to save on bandwidth during the upload of artifacts to
 # GitLab. This reduces the size in a VKCTS run from 135 to 7.6MB, and takes
 # 0.17s on a Ryzen 5950X (16 threads, 0.95s when limited to 1 thread).
-zstd --rm -T0 -8q "$RESULTS_DIR/results.csv" -o "$RESULTS_DIR/results.csv.zst"
+zstd --quiet --rm --threads ${FDO_CI_CONCURRENT:-0} -8 "$RESULTS_DIR/results.csv" -o "$RESULTS_DIR/results.csv.zst"
 
+set +x
 section_end test_post_process
 
 exit $DEQP_EXITCODE

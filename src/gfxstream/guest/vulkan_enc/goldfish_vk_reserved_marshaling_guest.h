@@ -1155,6 +1155,205 @@ void reservedmarshal_VkDeviceImageMemoryRequirements(
     const VkDeviceImageMemoryRequirements* forMarshaling, uint8_t** ptr);
 
 #endif
+#ifdef VK_VERSION_1_4
+void reservedmarshal_VkPhysicalDeviceVulkan14Features(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceVulkan14Features* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceVulkan14Properties(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceVulkan14Properties* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkDeviceQueueGlobalPriorityCreateInfo(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkDeviceQueueGlobalPriorityCreateInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceGlobalPriorityQueryFeatures(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceGlobalPriorityQueryFeatures* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkQueueFamilyGlobalPriorityProperties(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkQueueFamilyGlobalPriorityProperties* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceShaderSubgroupRotateFeatures(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceShaderSubgroupRotateFeatures* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceShaderFloatControls2Features(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceShaderFloatControls2Features* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceShaderExpectAssumeFeatures(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceShaderExpectAssumeFeatures* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceLineRasterizationFeatures(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceLineRasterizationFeatures* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceLineRasterizationProperties(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceLineRasterizationProperties* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPipelineRasterizationLineStateCreateInfo(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPipelineRasterizationLineStateCreateInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceVertexAttributeDivisorProperties(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceVertexAttributeDivisorProperties* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkVertexInputBindingDivisorDescription(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkVertexInputBindingDivisorDescription* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPipelineVertexInputDivisorStateCreateInfo(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPipelineVertexInputDivisorStateCreateInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceVertexAttributeDivisorFeatures(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceVertexAttributeDivisorFeatures* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceIndexTypeUint8Features(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceIndexTypeUint8Features* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkMemoryMapInfo(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                     const VkMemoryMapInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkMemoryUnmapInfo(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                       const VkMemoryUnmapInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceMaintenance5Features(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceMaintenance5Features* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceMaintenance5Properties(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceMaintenance5Properties* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkRenderingAreaInfo(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                         const VkRenderingAreaInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkImageSubresource2(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                         const VkImageSubresource2* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkDeviceImageSubresourceInfo(VulkanStreamGuest* vkStream,
+                                                  VkStructureType rootType,
+                                                  const VkDeviceImageSubresourceInfo* forMarshaling,
+                                                  uint8_t** ptr);
+
+void reservedmarshal_VkSubresourceLayout2(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                          const VkSubresourceLayout2* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPipelineCreateFlags2CreateInfo(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPipelineCreateFlags2CreateInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkBufferUsageFlags2CreateInfo(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkBufferUsageFlags2CreateInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDevicePushDescriptorProperties(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDevicePushDescriptorProperties* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceDynamicRenderingLocalReadFeatures(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceDynamicRenderingLocalReadFeatures* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkRenderingAttachmentLocationInfo(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkRenderingAttachmentLocationInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkRenderingInputAttachmentIndexInfo(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkRenderingInputAttachmentIndexInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceMaintenance6Features(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceMaintenance6Features* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceMaintenance6Properties(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceMaintenance6Properties* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkBindMemoryStatus(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                        const VkBindMemoryStatus* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkBindDescriptorSetsInfo(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                              const VkBindDescriptorSetsInfo* forMarshaling,
+                                              uint8_t** ptr);
+
+void reservedmarshal_VkPushConstantsInfo(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                         const VkPushConstantsInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPushDescriptorSetInfo(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                             const VkPushDescriptorSetInfo* forMarshaling,
+                                             uint8_t** ptr);
+
+void reservedmarshal_VkPushDescriptorSetWithTemplateInfo(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPushDescriptorSetWithTemplateInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDevicePipelineProtectedAccessFeatures(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDevicePipelineProtectedAccessFeatures* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDevicePipelineRobustnessFeatures(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDevicePipelineRobustnessFeatures* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDevicePipelineRobustnessProperties(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDevicePipelineRobustnessProperties* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPipelineRobustnessCreateInfo(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPipelineRobustnessCreateInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceHostImageCopyFeatures(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceHostImageCopyFeatures* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkPhysicalDeviceHostImageCopyProperties(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDeviceHostImageCopyProperties* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkMemoryToImageCopy(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                         const VkMemoryToImageCopy* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkImageToMemoryCopy(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                         const VkImageToMemoryCopy* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkCopyMemoryToImageInfo(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                             const VkCopyMemoryToImageInfo* forMarshaling,
+                                             uint8_t** ptr);
+
+void reservedmarshal_VkCopyImageToMemoryInfo(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                             const VkCopyImageToMemoryInfo* forMarshaling,
+                                             uint8_t** ptr);
+
+void reservedmarshal_VkCopyImageToImageInfo(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                            const VkCopyImageToImageInfo* forMarshaling,
+                                            uint8_t** ptr);
+
+void reservedmarshal_VkHostImageLayoutTransitionInfo(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkHostImageLayoutTransitionInfo* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkSubresourceHostMemcpySize(VulkanStreamGuest* vkStream,
+                                                 VkStructureType rootType,
+                                                 const VkSubresourceHostMemcpySize* forMarshaling,
+                                                 uint8_t** ptr);
+
+void reservedmarshal_VkHostImageCopyDevicePerformanceQuery(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkHostImageCopyDevicePerformanceQuery* forMarshaling, uint8_t** ptr);
+
+#endif
 #ifdef VK_KHR_dynamic_rendering
 DEFINE_ALIAS_FUNCTION(reservedmarshal_VkRenderingInfo, reservedmarshal_VkRenderingInfoKHR)
 
@@ -1169,25 +1368,6 @@ DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceDynamicRenderingFeatures,
 
 DEFINE_ALIAS_FUNCTION(reservedmarshal_VkCommandBufferInheritanceRenderingInfo,
                       reservedmarshal_VkCommandBufferInheritanceRenderingInfoKHR)
-
-void reservedmarshal_VkRenderingFragmentShadingRateAttachmentInfoKHR(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkRenderingFragmentShadingRateAttachmentInfoKHR* forMarshaling, uint8_t** ptr);
-
-void reservedmarshal_VkRenderingFragmentDensityMapAttachmentInfoEXT(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkRenderingFragmentDensityMapAttachmentInfoEXT* forMarshaling, uint8_t** ptr);
-
-void reservedmarshal_VkAttachmentSampleCountInfoAMD(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkAttachmentSampleCountInfoAMD* forMarshaling, uint8_t** ptr);
-
-DEFINE_ALIAS_FUNCTION(reservedmarshal_VkAttachmentSampleCountInfoAMD,
-                      reservedmarshal_VkAttachmentSampleCountInfoNV)
-
-void reservedmarshal_VkMultiviewPerViewAttributesInfoNVX(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkMultiviewPerViewAttributesInfoNVX* forMarshaling, uint8_t** ptr);
 
 #endif
 #ifdef VK_KHR_get_physical_device_properties2
@@ -1531,13 +1711,6 @@ DEFINE_ALIAS_FUNCTION(reservedmarshal_VkCommandBufferSubmitInfo,
 DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceSynchronization2Features,
                       reservedmarshal_VkPhysicalDeviceSynchronization2FeaturesKHR)
 
-void reservedmarshal_VkQueueFamilyCheckpointProperties2NV(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkQueueFamilyCheckpointProperties2NV* forMarshaling, uint8_t** ptr);
-
-void reservedmarshal_VkCheckpointData2NV(VulkanStreamGuest* vkStream, VkStructureType rootType,
-                                         const VkCheckpointData2NV* forMarshaling, uint8_t** ptr);
-
 #endif
 #ifdef VK_KHR_zero_initialize_workgroup_memory
 DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures,
@@ -1589,51 +1762,37 @@ DEFINE_ALIAS_FUNCTION(reservedmarshal_VkDeviceImageMemoryRequirements,
 
 #endif
 #ifdef VK_KHR_maintenance5
-void reservedmarshal_VkPhysicalDeviceMaintenance5FeaturesKHR(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkPhysicalDeviceMaintenance5FeaturesKHR* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceMaintenance5Features,
+                      reservedmarshal_VkPhysicalDeviceMaintenance5FeaturesKHR)
 
-void reservedmarshal_VkPhysicalDeviceMaintenance5PropertiesKHR(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkPhysicalDeviceMaintenance5PropertiesKHR* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceMaintenance5Properties,
+                      reservedmarshal_VkPhysicalDeviceMaintenance5PropertiesKHR)
 
-void reservedmarshal_VkRenderingAreaInfoKHR(VulkanStreamGuest* vkStream, VkStructureType rootType,
-                                            const VkRenderingAreaInfoKHR* forMarshaling,
-                                            uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkRenderingAreaInfo, reservedmarshal_VkRenderingAreaInfoKHR)
 
-void reservedmarshal_VkImageSubresource2KHR(VulkanStreamGuest* vkStream, VkStructureType rootType,
-                                            const VkImageSubresource2KHR* forMarshaling,
-                                            uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkDeviceImageSubresourceInfo,
+                      reservedmarshal_VkDeviceImageSubresourceInfoKHR)
 
-void reservedmarshal_VkDeviceImageSubresourceInfoKHR(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkDeviceImageSubresourceInfoKHR* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkImageSubresource2, reservedmarshal_VkImageSubresource2KHR)
 
-void reservedmarshal_VkSubresourceLayout2KHR(VulkanStreamGuest* vkStream, VkStructureType rootType,
-                                             const VkSubresourceLayout2KHR* forMarshaling,
-                                             uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkSubresourceLayout2, reservedmarshal_VkSubresourceLayout2KHR)
 
-void reservedmarshal_VkPipelineCreateFlags2CreateInfoKHR(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkPipelineCreateFlags2CreateInfoKHR* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPipelineCreateFlags2CreateInfo,
+                      reservedmarshal_VkPipelineCreateFlags2CreateInfoKHR)
 
-void reservedmarshal_VkBufferUsageFlags2CreateInfoKHR(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkBufferUsageFlags2CreateInfoKHR* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkBufferUsageFlags2CreateInfo,
+                      reservedmarshal_VkBufferUsageFlags2CreateInfoKHR)
 
 #endif
 #ifdef VK_KHR_line_rasterization
-void reservedmarshal_VkPhysicalDeviceLineRasterizationFeaturesKHR(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkPhysicalDeviceLineRasterizationFeaturesKHR* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceLineRasterizationFeatures,
+                      reservedmarshal_VkPhysicalDeviceLineRasterizationFeaturesKHR)
 
-void reservedmarshal_VkPhysicalDeviceLineRasterizationPropertiesKHR(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkPhysicalDeviceLineRasterizationPropertiesKHR* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceLineRasterizationProperties,
+                      reservedmarshal_VkPhysicalDeviceLineRasterizationPropertiesKHR)
 
-void reservedmarshal_VkPipelineRasterizationLineStateCreateInfoKHR(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkPipelineRasterizationLineStateCreateInfoKHR* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPipelineRasterizationLineStateCreateInfo,
+                      reservedmarshal_VkPipelineRasterizationLineStateCreateInfoKHR)
 
 #endif
 #ifdef VK_ANDROID_native_buffer
@@ -1737,13 +1896,13 @@ void reservedmarshal_VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT(
     VulkanStreamGuest* vkStream, VkStructureType rootType,
     const VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT* forMarshaling, uint8_t** ptr);
 
-DEFINE_ALIAS_FUNCTION(reservedmarshal_VkVertexInputBindingDivisorDescriptionKHR,
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkVertexInputBindingDivisorDescription,
                       reservedmarshal_VkVertexInputBindingDivisorDescriptionEXT)
 
-DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPipelineVertexInputDivisorStateCreateInfoKHR,
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPipelineVertexInputDivisorStateCreateInfo,
                       reservedmarshal_VkPipelineVertexInputDivisorStateCreateInfoEXT)
 
-DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR,
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceVertexAttributeDivisorFeatures,
                       reservedmarshal_VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT)
 
 #endif
@@ -1767,6 +1926,10 @@ void reservedmarshal_VkPhysicalDeviceFragmentDensityMapPropertiesEXT(
 void reservedmarshal_VkRenderPassFragmentDensityMapCreateInfoEXT(
     VulkanStreamGuest* vkStream, VkStructureType rootType,
     const VkRenderPassFragmentDensityMapCreateInfoEXT* forMarshaling, uint8_t** ptr);
+
+void reservedmarshal_VkRenderingFragmentDensityMapAttachmentInfoEXT(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkRenderingFragmentDensityMapAttachmentInfoEXT* forMarshaling, uint8_t** ptr);
 
 #endif
 #ifdef VK_EXT_scalar_block_layout
@@ -1805,18 +1968,18 @@ void reservedmarshal_VkPipelineRasterizationProvokingVertexStateCreateInfoEXT(
 
 #endif
 #ifdef VK_EXT_line_rasterization
-DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceLineRasterizationFeaturesKHR,
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceLineRasterizationFeatures,
                       reservedmarshal_VkPhysicalDeviceLineRasterizationFeaturesEXT)
 
-DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceLineRasterizationPropertiesKHR,
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceLineRasterizationProperties,
                       reservedmarshal_VkPhysicalDeviceLineRasterizationPropertiesEXT)
 
-DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPipelineRasterizationLineStateCreateInfoKHR,
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPipelineRasterizationLineStateCreateInfo,
                       reservedmarshal_VkPipelineRasterizationLineStateCreateInfoEXT)
 
 #endif
 #ifdef VK_EXT_index_type_uint8
-DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceIndexTypeUint8FeaturesKHR,
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceIndexTypeUint8Features,
                       reservedmarshal_VkPhysicalDeviceIndexTypeUint8FeaturesEXT)
 
 #endif
@@ -1827,54 +1990,37 @@ void reservedmarshal_VkPhysicalDeviceExtendedDynamicStateFeaturesEXT(
 
 #endif
 #ifdef VK_EXT_host_image_copy
-void reservedmarshal_VkPhysicalDeviceHostImageCopyFeaturesEXT(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkPhysicalDeviceHostImageCopyFeaturesEXT* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceHostImageCopyFeatures,
+                      reservedmarshal_VkPhysicalDeviceHostImageCopyFeaturesEXT)
 
-void reservedmarshal_VkPhysicalDeviceHostImageCopyPropertiesEXT(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkPhysicalDeviceHostImageCopyPropertiesEXT* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceHostImageCopyProperties,
+                      reservedmarshal_VkPhysicalDeviceHostImageCopyPropertiesEXT)
 
-void reservedmarshal_VkMemoryToImageCopyEXT(VulkanStreamGuest* vkStream, VkStructureType rootType,
-                                            const VkMemoryToImageCopyEXT* forMarshaling,
-                                            uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkMemoryToImageCopy, reservedmarshal_VkMemoryToImageCopyEXT)
 
-void reservedmarshal_VkImageToMemoryCopyEXT(VulkanStreamGuest* vkStream, VkStructureType rootType,
-                                            const VkImageToMemoryCopyEXT* forMarshaling,
-                                            uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkImageToMemoryCopy, reservedmarshal_VkImageToMemoryCopyEXT)
 
-void reservedmarshal_VkCopyMemoryToImageInfoEXT(VulkanStreamGuest* vkStream,
-                                                VkStructureType rootType,
-                                                const VkCopyMemoryToImageInfoEXT* forMarshaling,
-                                                uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkCopyMemoryToImageInfo,
+                      reservedmarshal_VkCopyMemoryToImageInfoEXT)
 
-void reservedmarshal_VkCopyImageToMemoryInfoEXT(VulkanStreamGuest* vkStream,
-                                                VkStructureType rootType,
-                                                const VkCopyImageToMemoryInfoEXT* forMarshaling,
-                                                uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkCopyImageToMemoryInfo,
+                      reservedmarshal_VkCopyImageToMemoryInfoEXT)
 
-void reservedmarshal_VkCopyImageToImageInfoEXT(VulkanStreamGuest* vkStream,
-                                               VkStructureType rootType,
-                                               const VkCopyImageToImageInfoEXT* forMarshaling,
-                                               uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkCopyImageToImageInfo,
+                      reservedmarshal_VkCopyImageToImageInfoEXT)
 
-void reservedmarshal_VkHostImageLayoutTransitionInfoEXT(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkHostImageLayoutTransitionInfoEXT* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkHostImageLayoutTransitionInfo,
+                      reservedmarshal_VkHostImageLayoutTransitionInfoEXT)
 
-void reservedmarshal_VkSubresourceHostMemcpySizeEXT(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkSubresourceHostMemcpySizeEXT* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkSubresourceHostMemcpySize,
+                      reservedmarshal_VkSubresourceHostMemcpySizeEXT)
 
-void reservedmarshal_VkHostImageCopyDevicePerformanceQueryEXT(
-    VulkanStreamGuest* vkStream, VkStructureType rootType,
-    const VkHostImageCopyDevicePerformanceQueryEXT* forMarshaling, uint8_t** ptr);
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkHostImageCopyDevicePerformanceQuery,
+                      reservedmarshal_VkHostImageCopyDevicePerformanceQueryEXT)
 
-DEFINE_ALIAS_FUNCTION(reservedmarshal_VkSubresourceLayout2KHR,
-                      reservedmarshal_VkSubresourceLayout2EXT)
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkSubresourceLayout2, reservedmarshal_VkSubresourceLayout2EXT)
 
-DEFINE_ALIAS_FUNCTION(reservedmarshal_VkImageSubresource2KHR,
-                      reservedmarshal_VkImageSubresource2EXT)
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkImageSubresource2, reservedmarshal_VkImageSubresource2EXT)
 
 #endif
 #ifdef VK_EXT_shader_demote_to_helper_invocation

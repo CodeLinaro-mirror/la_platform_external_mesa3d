@@ -51,7 +51,7 @@ convert_profile12_to_stdprofile(D3D12_VIDEO_ENCODER_PROFILE_HEVC profile)
 void
 d3d12_video_bitstream_builder_hevc::init_profile_tier_level(HEVCProfileTierLevel *ptl,
                         uint8_t HEVCProfileIdc,
-                        uint8_t HEVCLevelIdc,
+                        uint32_t HEVCLevelIdc,
                         bool isHighTier)
 {
    memset(ptl, 0, sizeof(HEVCProfileTierLevel));
@@ -67,7 +67,7 @@ d3d12_video_bitstream_builder_hevc::init_profile_tier_level(HEVCProfileTierLevel
    ptl->general_interlaced_source_flag = 0;  // no
    ptl->general_non_packed_constraint_flag = 1; // no frame packing arrangement SEI messages
    ptl->general_frame_only_constraint_flag = 1;
-   ptl->general_level_idc = HEVCLevelIdc;
+   ptl->general_level_idc = static_cast<uint8_t>(HEVCLevelIdc);
 
    if (ptl->general_profile_idc == 4 /*MAIN444*/)
    {
@@ -389,11 +389,29 @@ d3d12_video_bitstream_builder_hevc::build_sps(const HevcVideoParameterSet& paren
 {
    HevcSeqParameterSet m_latest_sps = {};
 
-   // In case is 420 10 bits
-   if(inputFmt == DXGI_FORMAT_P010)
-   {
-      m_latest_sps.bit_depth_luma_minus8 = 2;
-      m_latest_sps.bit_depth_chroma_minus8 = 2;
+   UINT SubWidthC = 1u;
+   UINT SubHeightC = 1u;
+   if (inputFmt == DXGI_FORMAT_NV12) {
+      // 420 8 bits
+      m_latest_sps.bit_depth_luma_minus8 = 0u;
+      m_latest_sps.bit_depth_chroma_minus8 = 0u;
+      SubWidthC = 2u;
+      SubHeightC = 2u;
+      m_latest_sps.chroma_format_idc = 1u;
+   } else if (inputFmt == DXGI_FORMAT_P010) {
+      // 420 10 bits
+      m_latest_sps.bit_depth_luma_minus8 = 2u;
+      m_latest_sps.bit_depth_chroma_minus8 = 2u;
+      SubWidthC = 2u;
+      SubHeightC = 2u;
+      m_latest_sps.chroma_format_idc = 1u;
+   } else if (inputFmt == DXGI_FORMAT_AYUV) {
+      // 444 8 bits
+      m_latest_sps.bit_depth_luma_minus8 = 0u;
+      m_latest_sps.bit_depth_chroma_minus8 = 0u;
+      SubWidthC = 1u;
+      SubHeightC = 1u;
+      m_latest_sps.chroma_format_idc = 3u;
    }
 
    uint8_t minCuSize = d3d12_video_encoder_convert_12cusize_to_pixel_size_hevc(codecConfig.MinLumaCodingUnitSize);
@@ -411,20 +429,19 @@ d3d12_video_bitstream_builder_hevc::build_sps(const HevcVideoParameterSet& paren
    // inherit PTL from parentVPS fully
    m_latest_sps.ptl = parentVPS.ptl;
 
-   m_latest_sps.chroma_format_idc = 1; // 420
-
    // Codec spec dictates pic_width/height_in_luma_samples must be divisible by minCuSize but HW might have higher req pow 2 multiples
    assert((picDimensionMultipleRequirement % minCuSize) == 0u);
 
    // upper layer passes the viewport, can calculate the difference between it and pic_width_in_luma_samples
    D3D12_VIDEO_ENCODER_PICTURE_RESOLUTION_DESC viewport = { };
-   viewport.Width = crop_window_upper_layer.front /* passes height */ - ((crop_window_upper_layer.left + crop_window_upper_layer.right) << 1);
-   viewport.Height = crop_window_upper_layer.back /* passes width */- ((crop_window_upper_layer.top + crop_window_upper_layer.bottom) << 1);
+   viewport.Width = crop_window_upper_layer.front /* passes width */ - ((crop_window_upper_layer.left + crop_window_upper_layer.right) * SubWidthC);
+   viewport.Height = crop_window_upper_layer.back /* passes height */- ((crop_window_upper_layer.top + crop_window_upper_layer.bottom) * SubHeightC);
 
    m_latest_sps.pic_width_in_luma_samples = ALIGN(encodeResolution.Width, picDimensionMultipleRequirement);
    m_latest_sps.pic_height_in_luma_samples = ALIGN(encodeResolution.Height, picDimensionMultipleRequirement);
-   m_latest_sps.conf_win_right_offset = (m_latest_sps.pic_width_in_luma_samples - viewport.Width) >> 1;
-   m_latest_sps.conf_win_bottom_offset = (m_latest_sps.pic_height_in_luma_samples - viewport.Height) >> 1;
+   m_latest_sps.conf_win_right_offset = (m_latest_sps.pic_width_in_luma_samples - viewport.Width) / SubWidthC;
+   m_latest_sps.conf_win_bottom_offset = (m_latest_sps.pic_height_in_luma_samples - viewport.Height) / SubHeightC;
+
    m_latest_sps.conformance_window_flag = m_latest_sps.conf_win_left_offset || m_latest_sps.conf_win_right_offset || m_latest_sps.conf_win_top_offset || m_latest_sps.conf_win_bottom_offset;
 
    m_latest_sps.log2_max_pic_order_cnt_lsb_minus4 = hevcGOP.log2_max_pic_order_cnt_lsb_minus4;
@@ -459,14 +476,14 @@ d3d12_video_bitstream_builder_hevc::build_sps(const HevcVideoParameterSet& paren
    m_latest_sps.strong_intra_smoothing_enabled_flag = 0;
 
    m_latest_sps.vui_parameters_present_flag = seqData.vui_parameters_present_flag;
-   m_latest_sps.vui.aspect_ratio_idc = seqData.aspect_ratio_idc;
+   m_latest_sps.vui.aspect_ratio_idc = static_cast<uint8_t>(seqData.aspect_ratio_idc);
    m_latest_sps.vui.sar_width = seqData.sar_width;
    m_latest_sps.vui.sar_height = seqData.sar_height;
-   m_latest_sps.vui.video_format = seqData.video_format;
+   m_latest_sps.vui.video_format = static_cast<uint8_t>(seqData.video_format);
    m_latest_sps.vui.video_full_range_flag = seqData.video_full_range_flag;
-   m_latest_sps.vui.colour_primaries = seqData.colour_primaries;
-   m_latest_sps.vui.transfer_characteristics = seqData.transfer_characteristics;
-   m_latest_sps.vui.matrix_coeffs = seqData.matrix_coefficients;
+   m_latest_sps.vui.colour_primaries = static_cast<uint8_t>(seqData.colour_primaries);
+   m_latest_sps.vui.transfer_characteristics = static_cast<uint8_t>(seqData.transfer_characteristics);
+   m_latest_sps.vui.matrix_coeffs = static_cast<uint8_t>(seqData.matrix_coefficients);
    m_latest_sps.vui.chroma_sample_loc_type_top_field = seqData.chroma_sample_loc_type_top_field;
    m_latest_sps.vui.chroma_sample_loc_type_bottom_field = seqData.chroma_sample_loc_type_bottom_field;
    m_latest_sps.vui.def_disp_win_left_offset = seqData.def_disp_win_left_offset;
@@ -499,7 +516,7 @@ d3d12_video_bitstream_builder_hevc::build_sps(const HevcVideoParameterSet& paren
    m_latest_sps.vui.motion_vectors_over_pic_boundaries_flag = seqData.vui_flags.motion_vectors_over_pic_boundaries_flag;
    m_latest_sps.vui.restricted_ref_pic_lists_flag = seqData.vui_flags.restricted_ref_pic_lists_flag;
 
-   m_latest_sps.sps_extension_present_flag = seqData.sps_range_extension.sps_range_extension_flag; // Set sps_extension_present_flag if sps_range_extension_flag present
+   m_latest_sps.sps_extension_present_flag = static_cast<uint8_t>(seqData.sps_range_extension.sps_range_extension_flag); // Set sps_extension_present_flag if sps_range_extension_flag present
    if (m_latest_sps.sps_extension_present_flag)
    {
       m_latest_sps.sps_range_extension.sps_range_extension_flag = seqData.sps_range_extension.sps_range_extension_flag;

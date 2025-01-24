@@ -32,7 +32,7 @@ hk_CreateEvent(VkDevice device, const VkEventCreateInfo *pCreateInfo,
     */
    event->bo =
       agx_bo_create(&dev->dev, HK_EVENT_MEM_SIZE, 0, AGX_BO_WRITEBACK, "Event");
-   event->status = event->bo->map;
+   event->status = agx_bo_map(event->bo);
    event->addr = event->bo->va->addr;
 
    *event->status = VK_EVENT_RESET;
@@ -90,7 +90,11 @@ hk_CmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent _event,
 {
    VK_FROM_HANDLE(hk_cmd_buffer, cmd, commandBuffer);
    VK_FROM_HANDLE(hk_event, event, _event);
+   struct hk_device *dev = hk_cmd_buffer_device(cmd);
 
+   perf_debug(dev, "Set event");
+   hk_cmd_buffer_end_compute(cmd);
+   hk_cmd_buffer_end_graphics(cmd);
    hk_queue_write(cmd, event->bo->va->addr, VK_EVENT_SET, false);
 }
 
@@ -100,7 +104,11 @@ hk_CmdResetEvent2(VkCommandBuffer commandBuffer, VkEvent _event,
 {
    VK_FROM_HANDLE(hk_cmd_buffer, cmd, commandBuffer);
    VK_FROM_HANDLE(hk_event, event, _event);
+   struct hk_device *dev = hk_cmd_buffer_device(cmd);
 
+   perf_debug(dev, "Reset event");
+   hk_cmd_buffer_end_compute(cmd);
+   hk_cmd_buffer_end_graphics(cmd);
    hk_queue_write(cmd, event->bo->va->addr, VK_EVENT_RESET, false);
 }
 
@@ -109,5 +117,15 @@ hk_CmdWaitEvents2(VkCommandBuffer commandBuffer, uint32_t eventCount,
                   const VkEvent *pEvents,
                   const VkDependencyInfo *pDependencyInfos)
 {
-   /* Currently we barrier everything, so this is a no-op. */
+   VK_FROM_HANDLE(hk_cmd_buffer, cmd, commandBuffer);
+   struct hk_device *dev = hk_cmd_buffer_device(cmd);
+
+   perf_debug(dev, "Wait events");
+
+   /* The big hammer. Need to check if this is actually needed.
+    *
+    * XXX: perf.
+    */
+   hk_cmd_buffer_end_compute(cmd);
+   hk_cmd_buffer_end_graphics(cmd);
 }

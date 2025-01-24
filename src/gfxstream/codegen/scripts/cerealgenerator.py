@@ -22,6 +22,7 @@ SUPPORTED_FEATURES = [
     "VK_VERSION_1_1",
     "VK_VERSION_1_2",
     "VK_VERSION_1_3",
+    "VK_VERSION_1_4",
     # Instance extensions
     "VK_KHR_get_physical_device_properties2",
     "VK_KHR_external_semaphore_capabilities",
@@ -348,7 +349,7 @@ class IOStream;
 // required extensions, but the approach will be to
 // implement them completely on the guest side.
 #undef VK_KHR_android_surface
-#if defined(LINUX_GUEST_BUILD) || defined(__Fuchsia__)
+#if defined(LINUX_GUEST_BUILD) || DETECT_OS_FUCHSIA || DETECT_OS_WINDOWS
 #undef VK_ANDROID_native_buffer
 #endif
 """

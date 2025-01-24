@@ -22,8 +22,10 @@ actions:
       minutes: 10
     to: nfs
     nfsrootfs:
-      url: None/lava-rootfs.tar.zst
+      url: None
       compression: zstd
+      format: tar
+      overlays: {}
     namespace: dut
 - deploy:
     timeout:
@@ -86,6 +88,7 @@ actions:
           steps:
           - |-
             echo test FASTBOOT
+            export CURRENT_SECTION=dut_boot
           - export -p > /dut-env-vars.sh
 - test:
     namespace: container
@@ -129,10 +132,7 @@ actions:
           - |-
             lava_ssh_test_case 'artifact_download' 'bash --' << EOF
             source /dut-env-vars.sh
-            set -ex
-            curl -L --retry 4 -f --retry-all-errors --retry-delay 60 None | tar -xz -C /
-            mkdir -p /ci/project/dir
-            curl -L --retry 4 -f --retry-all-errors --retry-delay 60 None | tar --zstd -x -C /ci/project/dir
+            set -e
             echo Could not find jwt file, disabling S3 requests...
             sed -i '/S3_RESULTS_UPLOAD/d' /set-job-env-vars.sh
             EOF

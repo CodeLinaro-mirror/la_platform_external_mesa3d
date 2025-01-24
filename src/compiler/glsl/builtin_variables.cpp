@@ -38,7 +38,6 @@
 
 #include "ir.h"
 #include "ir_builder.h"
-#include "linker.h"
 #include "glsl_parser_extras.h"
 #include "glsl_symbol_table.h"
 #include "main/consts_exts.h"
@@ -1131,6 +1130,10 @@ builtin_variable_generator::generate_special_vars()
       add_system_value(SYSTEM_VALUE_SUBGROUP_LE_MASK, uvec4_t, "gl_SubgroupLeMask");
       add_system_value(SYSTEM_VALUE_SUBGROUP_LT_MASK, uvec4_t, "gl_SubgroupLtMask");
    }
+   if (state->is_version(300, 300) && state->OVR_multiview_enable){
+      add_system_value(SYSTEM_VALUE_VIEW_INDEX, int_t, GLSL_PRECISION_MEDIUM,
+                      "gl_ViewID_OVR");
+   }
 }
 
 
@@ -1143,10 +1146,6 @@ builtin_variable_generator::generate_vs_special_vars()
    if (state->is_version(130, 300) || state->EXT_gpu_shader4_enable) {
       add_system_value(SYSTEM_VALUE_VERTEX_ID, int_t, GLSL_PRECISION_HIGH,
                        "gl_VertexID");
-   }
-   if (state->is_version(300, 300) && state->OVR_multiview_enable){
-      add_system_value(SYSTEM_VALUE_VIEW_INDEX, int_t, GLSL_PRECISION_MEDIUM,
-                      "gl_ViewID_OVR");
    }
    if (state->is_version(460, 0)) {
       add_system_value(SYSTEM_VALUE_BASE_VERTEX, int_t, "gl_BaseVertex");

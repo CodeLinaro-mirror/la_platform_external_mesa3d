@@ -26,12 +26,12 @@
  */
 
 #include "float64_glsl.h"
+#include "glsl_parser_extras.h"
 #include "glsl_to_nir.h"
 #include "ir_visitor.h"
 #include "ir_hierarchical_visitor.h"
 #include "ir.h"
 #include "ir_optimization.h"
-#include "program.h"
 #include "compiler/nir/nir_control_flow.h"
 #include "compiler/nir/nir_builder.h"
 #include "compiler/nir/nir_builtin_builder.h"
@@ -50,12 +50,35 @@
  * pass.
  */
 
+static nir_variable_mode
+get_param_mode(ir_variable *param)
+{
+   switch ((enum ir_variable_mode)(param->data.mode)) {
+   case ir_var_const_in:
+   case ir_var_function_in:
+      return nir_var_function_in;
+
+   case ir_var_function_out:
+      return nir_var_function_out;
+
+   case ir_var_function_inout:
+      return nir_var_function_inout;
+
+   case ir_var_auto:
+   case ir_var_uniform:
+   case ir_var_shader_storage:
+   case ir_var_temporary:
+   default:
+      unreachable("Unsupported function param mode");
+   }
+}
+
 namespace {
 
 class nir_visitor : public ir_visitor
 {
 public:
-   nir_visitor(const struct gl_constants *consts, nir_shader *shader);
+   nir_visitor(nir_shader *shader, const uint8_t *src_blake3);
    nir_visitor(const nir_visitor &) = delete;
    ~nir_visitor();
    nir_visitor & operator=(const nir_visitor &) = delete;
@@ -96,10 +119,9 @@ private:
    nir_alu_instr *emit(nir_op op, unsigned dest_size, nir_def *src1,
                        nir_def *src2, nir_def *src3);
 
-   bool supports_std430;
-
    nir_shader *shader;
    nir_function_impl *impl;
+   nir_function_impl *global_impl;
    nir_builder b;
    nir_def *result; /* result of the expression tree last visited */
 
@@ -126,8 +148,6 @@ private:
 
    void adjust_sparse_variable(nir_deref_instr *var_deref, const glsl_type *type,
                                nir_def *dest);
-
-   const struct gl_constants *consts;
 };
 
 /*
@@ -151,22 +171,23 @@ private:
 } /* end of anonymous namespace */
 
 nir_shader *
-glsl_to_nir(const struct gl_constants *consts,
-            struct exec_list **ir, shader_info *si, gl_shader_stage stage,
-            const nir_shader_compiler_options *options)
+glsl_to_nir(struct gl_shader *gl_shader,
+            const nir_shader_compiler_options *options,
+            const uint8_t *src_blake3)
 {
    MESA_TRACE_FUNC();
 
-   nir_shader *shader = nir_shader_create(NULL, stage, options, si);
+   nir_shader *shader =
+      nir_shader_create(NULL, gl_shader->Stage, options, NULL);
 
-   nir_visitor v1(consts, shader);
+   nir_visitor v1(shader, src_blake3);
    nir_function_visitor v2(&v1);
-   v2.run(*ir);
-   visit_exec_list(*ir, &v1);
+   v2.run(gl_shader->ir);
+   visit_exec_list(gl_shader->ir, &v1);
 
    /* The GLSL IR won't be needed anymore. */
-   ralloc_free(*ir);
-   *ir = NULL;
+   ralloc_free(gl_shader->ir);
+   gl_shader->ir = NULL;
 
    nir_validate_shader(shader, "after glsl to nir, before function inline");
    if (should_print_nir(shader)) {
@@ -177,10 +198,8 @@ glsl_to_nir(const struct gl_constants *consts,
    return shader;
 }
 
-nir_visitor::nir_visitor(const struct gl_constants *consts, nir_shader *shader)
+nir_visitor::nir_visitor(nir_shader *shader, const uint8_t *src_blake3)
 {
-   this->consts = consts;
-   this->supports_std430 = consts->UseSTD430AsDefaultPacking;
    this->shader = shader;
    this->is_global = true;
    this->var_table = _mesa_pointer_hash_table_create(NULL);
@@ -190,7 +209,26 @@ nir_visitor::nir_visitor(const struct gl_constants *consts, nir_shader *shader)
    this->impl = NULL;
    this->deref = NULL;
    this->sig = NULL;
+   this->global_impl = NULL;
    memset(&this->b, 0, sizeof(this->b));
+
+   if (src_blake3) {
+      char blake_as_str[BLAKE3_OUT_LEN * 2 + 1];;
+      _mesa_blake3_format(blake_as_str, src_blake3);
+
+      /* Create unique function name of function to temporarily hold global
+       * instructions.
+       */
+      char gloabl_func_name[45];
+      snprintf(gloabl_func_name, 45, "%s_%s", "gl_mesa_tmp", blake_as_str);
+
+      nir_function *func = nir_function_create(shader, gloabl_func_name);
+      func->is_tmp_globals_wrapper = true;
+      this->global_impl = nir_function_impl_create(func);
+
+      this->impl = this->global_impl;
+      b = nir_builder_at(nir_after_impl(this->impl));
+   }
 }
 
 nir_visitor::~nir_visitor()
@@ -435,11 +473,14 @@ nir_visitor::visit(ir_variable *ir)
 
    switch(ir->data.mode) {
    case ir_var_auto:
-   case ir_var_temporary:
-      if (is_global)
+      if (is_global) {
          var->data.mode = nir_var_shader_temp;
-      else
-         var->data.mode = nir_var_function_temp;
+         break;
+      }
+
+      FALLTHROUGH;
+   case ir_var_temporary:
+      var->data.mode = nir_var_function_temp;
       break;
 
    case ir_var_function_in:
@@ -574,6 +615,16 @@ nir_visitor::visit(ir_variable *ir)
    var->data.explicit_xfb_buffer = ir->data.explicit_xfb_buffer;
    var->data.explicit_xfb_stride = ir->data.explicit_xfb_stride;
 
+   if (ir->is_interface_instance()) {
+      int *max_ifc_array_access = ir->get_max_ifc_array_access();
+      if (max_ifc_array_access) {
+         var->max_ifc_array_access =
+            rzalloc_array(var, int, ir->get_interface_type()->length);
+         memcpy(var->max_ifc_array_access, max_ifc_array_access,
+                ir->get_interface_type()->length * sizeof(unsigned));
+      }
+   }
+
    var->num_state_slots = ir->get_num_state_slots();
    if (var->num_state_slots > 0) {
       var->state_slots = rzalloc_array(var, nir_state_slot,
@@ -625,16 +676,16 @@ nir_visitor::create_function(ir_function_signature *ir)
 
    func->num_params = ir->parameters.length() +
                       (ir->return_type != &glsl_type_builtin_void);
-   func->params = ralloc_array(shader, nir_parameter, func->num_params);
+   func->params = rzalloc_array(shader, nir_parameter, func->num_params);
 
    unsigned np = 0;
-
    if (ir->return_type != &glsl_type_builtin_void) {
       /* The return value is a variable deref (basically an out parameter) */
       func->params[np].num_components = 1;
       func->params[np].bit_size = 32;
       func->params[np].type = ir->return_type;
       func->params[np].is_return = true;
+      func->params[np].mode = nir_var_function_out;
       np++;
    }
 
@@ -644,6 +695,9 @@ nir_visitor::create_function(ir_function_signature *ir)
 
       func->params[np].type = param->type;
       func->params[np].is_return = false;
+      func->params[np].mode = get_param_mode(param);
+      func->params[np].implicit_conversion_prohibited =
+         !!param->data.implicit_conversion_prohibited;
       np++;
    }
    assert(np == func->num_params);
@@ -690,9 +744,11 @@ nir_visitor::visit(ir_function_signature *ir)
 
       visit_exec_list(&ir->body, this);
 
+      this->impl = global_impl;
+      if (this->impl)
+         b = nir_builder_at(nir_after_impl(this->impl));
+
       this->is_global = true;
-   } else {
-      func->impl = NULL;
    }
 }
 
@@ -1956,10 +2012,18 @@ nir_visitor::visit(ir_expression *ir)
       return;
    }
 
+   case ir_unop_implicitly_sized_array_length:
    case ir_unop_ssbo_unsized_array_length: {
-      nir_intrinsic_instr *intrin =
-         nir_intrinsic_instr_create(b.shader,
-                                    nir_intrinsic_deref_buffer_array_length);
+      nir_intrinsic_instr *intrin;
+      if (ir->operation == ir_unop_ssbo_unsized_array_length) {
+         intrin =
+            nir_intrinsic_instr_create(b.shader,
+                                       nir_intrinsic_deref_buffer_array_length);
+      } else {
+         intrin =
+            nir_intrinsic_instr_create(b.shader,
+                                       nir_intrinsic_deref_implicit_array_length);
+      }
 
       ir_dereference *deref = ir->operands[0]->as_dereference();
       intrin->src[0] = nir_src_for_ssa(&evaluate_deref(deref)->def);
@@ -2007,19 +2071,8 @@ nir_visitor::visit(ir_expression *ir)
                                        : nir_isign(&b, srcs[0]);
       break;
    case ir_unop_rcp:  result = nir_frcp(&b, srcs[0]);  break;
-
-   case ir_unop_rsq:
-      if (consts->ForceGLSLAbsSqrt)
-         srcs[0] = nir_fabs(&b, srcs[0]);
-      result = nir_frsq(&b, srcs[0]);
-      break;
-
-   case ir_unop_sqrt:
-      if (consts->ForceGLSLAbsSqrt)
-         srcs[0] = nir_fabs(&b, srcs[0]);
-      result = nir_fsqrt(&b, srcs[0]);
-      break;
-
+   case ir_unop_rsq:  result = nir_frsq(&b, srcs[0]);  break;
+   case ir_unop_sqrt: result = nir_fsqrt(&b, srcs[0]); break;
    case ir_unop_exp:  result = nir_fexp2(&b, nir_fmul_imm(&b, srcs[0], M_LOG2E)); break;
    case ir_unop_log:  result = nir_fmul_imm(&b, nir_flog2(&b, srcs[0]), 1.0 / M_LOG2E); break;
    case ir_unop_exp2: result = nir_fexp2(&b, srcs[0]); break;
@@ -2770,7 +2823,8 @@ glsl_float64_funcs_to_nir(struct gl_context *ctx,
    struct gl_shader *sh = _mesa_new_shader(-1, MESA_SHADER_VERTEX);
    sh->Source = float64_source;
    sh->CompileStatus = COMPILE_FAILURE;
-   _mesa_glsl_compile_shader(ctx, sh, false, false, true);
+   _mesa_glsl_compile_shader(ctx, sh, NULL, false, false, true);
+   nir_shader *nir = nir_shader_clone(NULL, sh->nir);
 
    if (!sh->CompileStatus) {
       if (sh->InfoLog) {
@@ -2780,13 +2834,6 @@ glsl_float64_funcs_to_nir(struct gl_context *ctx,
       }
       return NULL;
    }
-
-   nir_shader *nir = nir_shader_create(NULL, MESA_SHADER_VERTEX, options, NULL);
-
-   nir_visitor v1(&ctx->Const, nir);
-   nir_function_visitor v2(&v1);
-   v2.run(sh->ir);
-   visit_exec_list(sh->ir, &v1);
 
    /* _mesa_delete_shader will try to free sh->Source but it's static const */
    sh->Source = NULL;

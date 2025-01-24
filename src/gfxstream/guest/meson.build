@@ -16,7 +16,11 @@ endif
 gfxstream_guest_args = []
 
 # Our internal guest build
-gfxstream_guest_args += '-DLINUX_GUEST_BUILD'
+if host_machine.system() == 'windows'
+  gfxstream_guest_args += '-DWINDOWS_GUEST_BUILD'
+else
+  gfxstream_guest_args += '-DLINUX_GUEST_BUILD'
+endif
 # Include the gfxstream private VkStructureType definitions
 gfxstream_guest_args += '-DVK_GFXSTREAM_STRUCTURE_TYPE_EXT'
 
@@ -34,7 +38,6 @@ endif
 # Includes      #
 #===============#
 
-inc_include_mesa = include_directories('../../../include')
 inc_vulkan_headers = include_directories('../../../include/vulkan')
 inc_vulkan_enc = include_directories('vulkan_enc')
 

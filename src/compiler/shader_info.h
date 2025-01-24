@@ -91,6 +91,8 @@ typedef struct shader_info {
 
    /* Which I/O is per-view */
    uint64_t per_view_outputs;
+   /* Enabled view mask, for per-view outputs */
+   uint32_t view_mask;
 
    /* Which 16-bit inputs and outputs are used corresponding to
     * VARYING_SLOT_VARn_16BIT.
@@ -182,13 +184,6 @@ typedef struct shader_info {
 
    /* Whether texture size, levels, or samples is queried. */
    bool uses_resource_info_query:1;
-
-   /**
-    * True if this shader uses the fddx/fddy opcodes.
-    *
-    * Note that this does not include the "fine" and "coarse" variants.
-    */
-   bool uses_fddx_fddy:1;
 
    /** Has divergence analysis ever been run? */
    bool divergence_analysis_run:1;
@@ -496,6 +491,14 @@ typedef struct shader_info {
          /** Is the vertex order counterclockwise? */
          bool ccw:1;
          bool point_mode:1;
+
+         /* Bit mask of TCS per-vertex inputs (VS outputs) that are used
+          * with a vertex index that is equal to the invocation id.
+          *
+          * Not mutually exclusive with tcs_cross_invocation_inputs_read, i.e.
+          * both input[0] and input[invocation_id] can be present.
+          */
+         uint64_t tcs_same_invocation_inputs_read;
 
          /* Bit mask of TCS per-vertex inputs (VS outputs) that are used
           * with a vertex index that is NOT the invocation id

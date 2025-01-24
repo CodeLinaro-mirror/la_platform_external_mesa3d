@@ -105,9 +105,9 @@ d3d12_video_encoder_sync_completion(struct pipe_video_codec *codec, ID3D12Fence 
  * Get feedback fence.
  */
 int
-d3d12_video_encoder_get_feedback_fence(struct pipe_video_codec *codec,
-                                       struct pipe_fence_handle *fence,
-                                       uint64_t timeout);
+d3d12_video_encoder_fence_wait(struct pipe_video_codec *codec,
+                               struct pipe_fence_handle *fence,
+                               uint64_t timeout);
 
 struct pipe_video_buffer*
 d3d12_video_create_dpb_buffer(struct pipe_video_codec *codec,
@@ -136,6 +136,8 @@ enum d3d12_video_encoder_config_dirty_flags
    d3d12_video_encoder_config_dirty_flag_video_header           = 0x1000,
    d3d12_video_encoder_config_dirty_flag_picture_header         = 0x2000,
    d3d12_video_encoder_config_dirty_flag_aud_header             = 0x4000,
+   d3d12_video_encoder_config_dirty_flag_sei_header             = 0x8000,
+   d3d12_video_encoder_config_dirty_flag_svcprefix_slice_header = 0x10000,
 };
 DEFINE_ENUM_FLAG_OPERATORS(d3d12_video_encoder_config_dirty_flags);
 
@@ -286,6 +288,8 @@ struct D3D12EncodeConfiguration
    struct pipe_h265_enc_seq_param m_encoderCodecSpecificSequenceStateDescH265;
    struct pipe_h265_enc_vid_param m_encoderCodecSpecificVideoStateDescH265;
    struct pipe_h265_enc_pic_param m_encoderCodecSpecificPictureStateDescH265;
+
+   bool m_bUsedAsReference; // Set if frame will be used as reference frame
 };
 
 struct EncodedBitstreamResolvedMetadata
@@ -407,6 +411,7 @@ struct d3d12_video_encoder
    std::shared_ptr<d3d12_video_dpb_storage_manager_interface>        m_upDPBStorageManager;
    std::unique_ptr<d3d12_video_bitstream_builder_interface>          m_upBitstreamBuilder;
 
+   pipe_resource* m_nalPrefixTmpBuffer = NULL;
    std::vector<uint8_t> m_BitstreamHeadersBuffer;
    std::vector<uint8_t> m_StagingHeadersBuffer;
    std::vector<EncodedBitstreamResolvedMetadata> m_spEncodedFrameMetadata;
@@ -523,8 +528,11 @@ d3d12_video_encoder_query_d3d12_driver_caps(struct d3d12_video_encoder *pD3D12En
 bool
 d3d12_video_encoder_check_subregion_mode_support(struct d3d12_video_encoder *pD3D12Enc,
                                                  D3D12_VIDEO_ENCODER_FRAME_SUBREGION_LAYOUT_MODE requestedSlicesMode);
-uint64_t
+size_t
 d3d12_video_encoder_pool_current_index(struct d3d12_video_encoder *pD3D12Enc);
+
+size_t
+d3d12_video_encoder_metadata_current_index(struct d3d12_video_encoder *pD3D12Enc);
 
 unsigned
 d3d12_video_encoder_build_post_encode_codec_bitstream(struct d3d12_video_encoder * pD3D12Enc,
