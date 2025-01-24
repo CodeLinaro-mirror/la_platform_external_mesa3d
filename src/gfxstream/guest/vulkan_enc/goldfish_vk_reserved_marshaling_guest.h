@@ -1624,6 +1624,17 @@ DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceShaderSubgroupExtendedType
                       reservedmarshal_VkPhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR)
 
 #endif
+#ifdef VK_KHR_global_priority
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkDeviceQueueGlobalPriorityCreateInfo,
+                      reservedmarshal_VkDeviceQueueGlobalPriorityCreateInfoKHR)
+
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceGlobalPriorityQueryFeatures,
+                      reservedmarshal_VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR)
+
+DEFINE_ALIAS_FUNCTION(reservedmarshal_VkQueueFamilyGlobalPriorityProperties,
+                      reservedmarshal_VkQueueFamilyGlobalPriorityPropertiesKHR)
+
+#endif
 #ifdef VK_KHR_vulkan_memory_model
 DEFINE_ALIAS_FUNCTION(reservedmarshal_VkPhysicalDeviceVulkanMemoryModelFeatures,
                       reservedmarshal_VkPhysicalDeviceVulkanMemoryModelFeaturesKHR)

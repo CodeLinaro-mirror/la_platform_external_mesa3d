@@ -1458,6 +1458,17 @@ DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures,
                       count_VkPhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR)
 
 #endif
+#ifdef VK_KHR_global_priority
+DEFINE_ALIAS_FUNCTION(count_VkDeviceQueueGlobalPriorityCreateInfo,
+                      count_VkDeviceQueueGlobalPriorityCreateInfoKHR)
+
+DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceGlobalPriorityQueryFeatures,
+                      count_VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR)
+
+DEFINE_ALIAS_FUNCTION(count_VkQueueFamilyGlobalPriorityProperties,
+                      count_VkQueueFamilyGlobalPriorityPropertiesKHR)
+
+#endif
 #ifdef VK_KHR_vulkan_memory_model
 DEFINE_ALIAS_FUNCTION(count_VkPhysicalDeviceVulkanMemoryModelFeatures,
                       count_VkPhysicalDeviceVulkanMemoryModelFeaturesKHR)
