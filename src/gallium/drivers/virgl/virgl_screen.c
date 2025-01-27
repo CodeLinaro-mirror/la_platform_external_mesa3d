@@ -294,8 +294,9 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_MAX_COMBINED_HW_ATOMIC_COUNTER_BUFFERS:
       return vscreen->caps.caps.v2.max_combined_atomic_counter_buffers;
    case PIPE_CAP_TEXTURE_FLOAT_LINEAR:
-   case PIPE_CAP_TEXTURE_HALF_FLOAT_LINEAR:
       return 1; /* TODO: need to introduce a hw-cap for this */
+   case PIPE_CAP_TEXTURE_HALF_FLOAT_LINEAR:
+      return 0; /* Manually disabled due to GL_LUMINANCE16F_EXT internalFormat handling issue */
    case PIPE_CAP_QUERY_BUFFER_OBJECT:
       return vscreen->caps.caps.v2.capability_bits & VIRGL_CAP_QBO;
    case PIPE_CAP_MAX_VARYINGS:
