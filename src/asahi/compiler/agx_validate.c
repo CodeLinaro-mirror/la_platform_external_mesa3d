@@ -359,6 +359,7 @@ static bool
 agx_validate_width(agx_context *ctx)
 {
    bool succ = true;
+   enum agx_size *sizes = calloc(ctx->alloc, sizeof(*sizes));
 
    agx_foreach_instr_global(ctx, I) {
       agx_foreach_dest(I, d) {
@@ -373,6 +374,9 @@ agx_validate_width(agx_context *ctx)
             agx_print_instr(I, stderr);
             fprintf(stderr, "\n");
          }
+
+         if (I->dest[d].type == AGX_INDEX_NORMAL)
+            sizes[I->dest[d].value] = I->dest[d].size;
       }
 
       agx_foreach_src(I, s) {
@@ -393,6 +397,21 @@ agx_validate_width(agx_context *ctx)
       }
    }
 
+   /* Check sources after all defs processed for proper backedge handling */
+   agx_foreach_instr_global(ctx, I) {
+      agx_foreach_ssa_src(I, s) {
+         if (sizes[I->src[s].value] != I->src[s].size) {
+            succ = false;
+            fprintf(stderr, "source %u, expected el size %u, got el size %u\n",
+                    s, agx_size_align_16(sizes[I->src[s].value]),
+                    agx_size_align_16(I->src[s].size));
+            agx_print_instr(I, stderr);
+            fprintf(stderr, "\n");
+         }
+      }
+   }
+
+   free(sizes);
    return succ;
 }
 
@@ -497,6 +516,20 @@ agx_validate(agx_context *ctx, const char *after)
             fprintf(stderr, "Invalid defs after %s\n", after);
             agx_print_instr(I, stderr);
             fail = true;
+         }
+      }
+
+      /* agx_validate_defs skips phi sources, so validate them now */
+      agx_foreach_block(ctx, block) {
+         agx_foreach_phi_in_block(block, phi) {
+            agx_foreach_ssa_src(phi, s) {
+               if (!BITSET_TEST(defs, phi->src[s].value)) {
+                  fprintf(stderr, "Undefined phi source %u after %s\n",
+                          phi->src[s].value, after);
+                  agx_print_instr(phi, stderr);
+                  fail = true;
+               }
+            }
          }
       }
 

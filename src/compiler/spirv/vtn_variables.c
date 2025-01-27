@@ -1282,10 +1282,6 @@ vtn_get_builtin_location(struct vtn_builder *b,
       *location = SYSTEM_VALUE_SHADER_INDEX;
       set_mode_system_value(b, mode);
       break;
-   case SpvBuiltInCoalescedInputCountAMDX:
-      *location = SYSTEM_VALUE_COALESCED_INPUT_COUNT;
-      set_mode_system_value(b, mode);
-      break;
 
    case SpvBuiltInWarpsPerSMNV:
       *location = SYSTEM_VALUE_WARPS_PER_SM_NV;
@@ -1853,10 +1849,6 @@ vtn_storage_class_to_mode(struct vtn_builder *b,
       mode = vtn_variable_mode_node_payload;
       nir_mode = nir_var_mem_node_payload_in;
       break;
-   case SpvStorageClassNodeOutputPayloadAMDX:
-      mode = vtn_variable_mode_node_payload;
-      nir_mode = nir_var_mem_node_payload;
-      break;
 
    case SpvStorageClassGeneric:
       mode = vtn_variable_mode_generic;
@@ -2162,6 +2154,7 @@ vtn_create_variable(struct vtn_builder *b, struct vtn_value *val,
    var->type = type;
    var->mode = mode;
    var->base_location = -1;
+   var->input_attachment_index = NIR_VARIABLE_NO_INDEX;
 
    val->pointer = vtn_zalloc(b, struct vtn_pointer);
    val->pointer->mode = var->mode;

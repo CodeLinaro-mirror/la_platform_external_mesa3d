@@ -32,6 +32,8 @@
 #include "panvk_cmd_alloc.h"
 #include "panvk_cmd_buffer.h"
 #include "panvk_cmd_desc_state.h"
+#include "panvk_cmd_draw.h"
+#include "panvk_cmd_fb_preload.h"
 #include "panvk_cmd_pool.h"
 #include "panvk_cmd_push_constant.h"
 #include "panvk_device.h"
@@ -40,7 +42,6 @@
 #include "panvk_physical_device.h"
 #include "panvk_priv_bo.h"
 
-#include "pan_blitter.h"
 #include "pan_desc.h"
 #include "pan_encoder.h"
 #include "pan_props.h"
@@ -50,7 +51,7 @@
 #include "vk_format.h"
 
 static VkResult
-panvk_cmd_prepare_fragment_job(struct panvk_cmd_buffer *cmdbuf, mali_ptr fbd)
+panvk_cmd_prepare_fragment_job(struct panvk_cmd_buffer *cmdbuf, uint64_t fbd)
 {
    const struct pan_fb_info *fbinfo = &cmdbuf->state.gfx.render.fb.info;
    struct panvk_batch *batch = cmdbuf->cur_batch;
@@ -140,22 +141,16 @@ panvk_per_arch(cmd_close_batch)(struct panvk_cmd_buffer *cmdbuf)
                                  panfrost_sample_positions_offset(
                                     pan_sample_pattern(fbinfo->nr_samples));
 
+      if (batch->vtc_jc.first_tiler) {
+         VkResult result = panvk_per_arch(cmd_fb_preload)(cmdbuf, fbinfo);
+         if (result != VK_SUCCESS)
+            return;
+      }
+
       for (uint32_t i = 0; i < batch->fb.layer_count; i++) {
          VkResult result;
 
-         mali_ptr fbd = batch->fb.desc.gpu + (batch->fb.desc_stride * i);
-         if (batch->vtc_jc.first_tiler) {
-            cmdbuf->state.gfx.render.fb.info.bifrost.pre_post.dcds.gpu = 0;
-
-            ASSERTED unsigned num_preload_jobs = GENX(pan_preload_fb)(
-               &dev->blitter.cache, &cmdbuf->desc_pool.base,
-               &cmdbuf->state.gfx.render.fb.info, i, batch->tls.gpu, NULL);
-
-            /* Bifrost GPUs use pre frame DCDs to preload the FB content. We
-             * thus expect num_preload_jobs to be zero.
-             */
-            assert(!num_preload_jobs);
-         }
+         uint64_t fbd = batch->fb.desc.gpu + (batch->fb.desc_stride * i);
 
          result = panvk_per_arch(cmd_prepare_tiler_context)(cmdbuf, i);
          if (result != VK_SUCCESS)
@@ -230,8 +225,10 @@ panvk_per_arch(cmd_prepare_tiler_context)(struct panvk_cmd_buffer *cmdbuf,
                                           uint32_t layer_idx)
 {
    struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+   struct panvk_physical_device *phys_dev =
+      to_panvk_physical_device(cmdbuf->vk.base.device->physical);
    struct panvk_batch *batch = cmdbuf->cur_batch;
-   mali_ptr tiler_desc;
+   uint64_t tiler_desc;
 
    if (batch->tiler.ctx_descs.gpu) {
       tiler_desc =
@@ -258,7 +255,8 @@ panvk_per_arch(cmd_prepare_tiler_context)(struct panvk_cmd_buffer *cmdbuf,
    }
 
    pan_pack(&batch->tiler.ctx_templ, TILER_CONTEXT, cfg) {
-      cfg.hierarchy_mask = 0x28;
+      cfg.hierarchy_mask =
+         panvk_select_tiler_hierarchy_mask(phys_dev, &cmdbuf->state.gfx);
       cfg.fb_width = fbinfo->width;
       cfg.fb_height = fbinfo->height;
       cfg.heap = batch->tiler.heap_desc.gpu;
@@ -390,7 +388,7 @@ panvk_create_cmdbuf(struct vk_command_pool *vk_pool, VkCommandBufferLevel level,
    cmdbuf = vk_zalloc(&device->vk.alloc, sizeof(*cmdbuf), 8,
                       VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
    if (!cmdbuf)
-      return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
+      return panvk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
 
    VkResult result = vk_command_buffer_init(
       &pool->vk, &cmdbuf->vk, &panvk_per_arch(cmd_buffer_ops), level);

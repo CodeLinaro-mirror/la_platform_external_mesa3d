@@ -449,9 +449,14 @@ llvmpipe_memobj_create_from_handle(struct pipe_screen *pscreen,
 {
 #ifdef PIPE_MEMORY_FD
    struct llvmpipe_memory_object *memobj = CALLOC_STRUCT(llvmpipe_memory_object);
+   pipe_reference_init(&memobj->reference, 1);
 
    if (handle->type == WINSYS_HANDLE_TYPE_FD &&
-       pscreen->import_memory_fd(pscreen, handle->handle, &memobj->data, &memobj->size, false)) {
+       pscreen->import_memory_fd(pscreen,
+                                 handle->handle,
+                                 (struct pipe_memory_allocation **)&memobj->mem_alloc,
+                                 &memobj->size,
+                                 false)) {
       return &memobj->b;
    }
    free(memobj);
@@ -467,10 +472,13 @@ llvmpipe_memobj_destroy(struct pipe_screen *pscreen,
    if (!memobj)
       return;
    struct llvmpipe_memory_object *lpmo = llvmpipe_memory_object(memobj);
+   if (pipe_reference(&lpmo->reference, NULL))
+   {
 #ifdef PIPE_MEMORY_FD
-   pscreen->free_memory_fd(pscreen, lpmo->data);
+      pscreen->free_memory_fd(pscreen, (struct pipe_memory_allocation *)lpmo->mem_alloc);
 #endif
-   free(lpmo);
+      free(lpmo);
+   }
 }
 
 
@@ -497,7 +505,7 @@ llvmpipe_resource_from_memobj(struct pipe_screen *pscreen,
          goto fail;
       if (lpmo->size < lpr->size_required)
          goto fail;
-      lpr->tex_data = lpmo->data;
+      lpr->tex_data = lpmo->mem_alloc->cpu_addr;
    } else {
       /* other data (vertex buffer, const buffer, etc) */
       const uint bytes = templat->width0;
@@ -523,10 +531,11 @@ llvmpipe_resource_from_memobj(struct pipe_screen *pscreen,
 
       if (lpmo->size < lpr->size_required)
          goto fail;
-      lpr->data = lpmo->data;
+      lpr->data = lpmo->mem_alloc->cpu_addr;
    }
    lpr->id = id_counter++;
-   lpr->imported_memory = true;
+   lpr->imported_memory = &lpmo->b;
+   pipe_reference(NULL, &lpmo->reference);
 
 #if MESA_DEBUG
    simple_mtx_lock(&resource_list_mutex);
@@ -552,17 +561,25 @@ llvmpipe_resource_destroy(struct pipe_screen *pscreen,
       if (lpr->dt) {
          /* display target */
          struct sw_winsys *winsys = screen->winsys;
+         if (lpr->dmabuf)
+            winsys->displaytarget_unmap(winsys, lpr->dt);
          winsys->displaytarget_destroy(winsys, lpr->dt);
       } else if (llvmpipe_resource_is_texture(pt)) {
          /* free linear image data */
          if (lpr->tex_data) {
-            if (!lpr->imported_memory)
+            if (lpr->imported_memory)
+               llvmpipe_memobj_destroy(pscreen, lpr->imported_memory);
+            else
                align_free(lpr->tex_data);
             lpr->tex_data = NULL;
+            lpr->imported_memory = NULL;
          }
       } else if (lpr->data) {
-         if (!lpr->imported_memory)
-            align_free(lpr->data);
+         if (lpr->imported_memory)
+            llvmpipe_memobj_destroy(pscreen, lpr->imported_memory);
+         else
+             align_free(lpr->data);
+         lpr->imported_memory = NULL;
       }
    }
 
@@ -976,6 +993,8 @@ llvmpipe_transfer_map_ms(struct pipe_context *pipe,
 
    if (llvmpipe_resource_is_texture(resource) && (resource->flags & PIPE_RESOURCE_FLAG_SPARSE)) {
       map = llvmpipe_resource_map(resource, 0, 0, tex_usage);
+      if (!map)
+         return NULL;
 
       lpt->block_box = (struct pipe_box) {
          .x = box->x / util_format_get_blockwidth(format),
@@ -1017,7 +1036,8 @@ llvmpipe_transfer_map_ms(struct pipe_context *pipe,
    }
 
    map = llvmpipe_resource_map(resource, level, box->z, tex_usage);
-
+   if (!map)
+      return NULL;
 
    /* May want to do different things here depending on read/write nature
     * of the map:
@@ -1310,7 +1330,7 @@ llvmpipe_allocate_memory(struct pipe_screen *_screen, uint64_t size)
    if (mem->offset + mem->size > screen->mem_file_size) {
       /* expand the anonymous file */
       screen->mem_file_size = mem->offset + mem->size;
-      ftruncate(screen->fd_mem_alloc, screen->mem_file_size);
+      UNUSED int unused = ftruncate(screen->fd_mem_alloc, screen->mem_file_size);
    }
 
    mtx_unlock(&screen->mem_mutex);
@@ -1489,6 +1509,7 @@ llvmpipe_import_memory_fd(struct pipe_screen *screen,
       if (!ret) {
          free(alloc);
          *ptr = NULL;
+         return false;
       } else {
          *ptr = (struct pipe_memory_allocation*)alloc;
       }
@@ -1600,7 +1621,10 @@ llvmpipe_resource_bind_backing(struct pipe_screen *pscreen,
 
       if (lpr->dmabuf) {
          if (lpr->dt)
+         {
+            winsys->displaytarget_unmap(winsys, lpr->dt);
             winsys->displaytarget_destroy(winsys, lpr->dt);
+         }
          if (pmem) {
             /* Round up the surface size to a multiple of the tile size to
              * avoid tile clipping.

@@ -129,7 +129,7 @@ struct __GLXDRIdrawableRec
    unsigned long eventMask;
    int refcount;
 
-   __DRIdrawable *dri_drawable;
+   struct dri_drawable *dri_drawable;
 };
 
 /*
@@ -524,8 +524,8 @@ struct glx_screen
      * Per screen direct rendering interface functions and data.
      */
    __GLXDRIscreen driScreen;
-   __DRIscreen *frontend_screen;
-   const __DRIconfig **driver_configs;
+   struct dri_screen *frontend_screen;
+   const struct dri_config **driver_configs;
 #endif
 
     /**

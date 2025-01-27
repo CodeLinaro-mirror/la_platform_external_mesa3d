@@ -37,6 +37,16 @@ nir_function_can_inline(nir_function *function)
    bool can_inline = true;
    if (!function->should_inline) {
       if (function->impl) {
+         nir_foreach_block(block, function->impl) {
+            nir_foreach_instr(instr, block) {
+               if (instr->type != nir_instr_type_intrinsic)
+                  continue;
+               nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+               if (intr->intrinsic == nir_intrinsic_barrier)
+                  return true;
+            }
+         }
+
          if (function->impl->num_blocks > 2)
             can_inline = false;
          if (function->impl->ssa_alloc > 45)
@@ -62,9 +72,18 @@ static void
 fixup_cast_deref_mode(nir_deref_instr *deref)
 {
    nir_deref_instr *parent = nir_src_as_deref(deref->parent);
-   if (parent && parent->modes & nir_var_uniform &&
-       deref->modes & nir_var_function_temp) {
-      deref->modes |= nir_var_uniform;
+   if (parent && deref->modes & nir_var_function_temp) {
+      if (parent->modes & nir_var_uniform) {
+         deref->modes |= nir_var_uniform;
+      } else if (parent->modes & nir_var_image) {
+         deref->modes |= nir_var_image;
+      } else if (parent->modes & nir_var_mem_ubo) {
+         deref->modes |= nir_var_mem_ubo;
+      } else if (parent->modes & nir_var_mem_ssbo) {
+         deref->modes |= nir_var_mem_ssbo;
+      } else
+         return;
+
       deref->modes ^= nir_var_function_temp;
 
       nir_foreach_use(use, &deref->def) {

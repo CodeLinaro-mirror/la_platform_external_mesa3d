@@ -6,9 +6,9 @@
  */
 #include "hk_physical_device.h"
 
+#include "asahi/compiler/agx_nir_texture.h"
 #include "asahi/lib/agx_device.h"
 #include "asahi/lib/agx_nir_lower_vbo.h"
-#include "asahi/lib/agx_nir_passes.h"
 #include "util/disk_cache.h"
 #include "util/mesa-sha1.h"
 #include "git_sha1.h"
@@ -20,10 +20,10 @@
 #include "hk_shader.h"
 #include "hk_wsi.h"
 
-#include "util/u_debug.h"
+#include "util/simple_mtx.h"
 #include "vulkan/vulkan_core.h"
 #include "vulkan/wsi/wsi_common.h"
-#include "vk_device.h"
+#include "unstable_asahi_drm.h"
 #include "vk_drm_syncobj.h"
 #include "vk_shader_module.h"
 
@@ -41,7 +41,7 @@ hk_get_vk_version()
    if (version_override)
       return version_override;
 
-   return VK_MAKE_VERSION(1, 3, VK_HEADER_VERSION);
+   return VK_MAKE_VERSION(1, 4, VK_HEADER_VERSION);
 }
 
 static void
@@ -63,8 +63,7 @@ hk_get_device_extensions(const struct hk_instance *instance,
       .KHR_draw_indirect_count = true,
       .KHR_driver_properties = true,
       .KHR_dynamic_rendering = true,
-      // TODO
-      .KHR_dynamic_rendering_local_read = false,
+      .KHR_dynamic_rendering_local_read = true,
       .KHR_external_fence = true,
       .KHR_external_fence_fd = true,
       .KHR_external_memory = true,
@@ -139,7 +138,7 @@ hk_get_device_extensions(const struct hk_instance *instance,
       .EXT_conditional_rendering = false,
       .EXT_color_write_enable = true,
       .EXT_custom_border_color = true,
-      .EXT_depth_bias_control = false,
+      .EXT_depth_bias_control = true,
       .EXT_depth_clip_control = false,
       .EXT_depth_clip_enable = true,
       .EXT_descriptor_indexing = true,
@@ -151,14 +150,13 @@ hk_get_device_extensions(const struct hk_instance *instance,
       .EXT_extended_dynamic_state2 = true,
       .EXT_extended_dynamic_state3 = true,
       .EXT_external_memory_dma_buf = true,
-      // TODO
-      .EXT_global_priority = false,
-      // TODO
-      .EXT_global_priority_query = false,
+      .EXT_global_priority = true,
+      .EXT_global_priority_query = true,
       .EXT_graphics_pipeline_library = true,
       .EXT_host_query_reset = true,
       .EXT_host_image_copy = true,
       .EXT_image_2d_view_of_3d = true,
+      .EXT_image_drm_format_modifier = true,
       .EXT_image_robustness = true,
       .EXT_image_sliced_view_of_3d = false,
       .EXT_image_view_min_lod = false,
@@ -353,6 +351,9 @@ hk_get_device_features(
       .shaderIntegerDotProduct = true,
       .maintenance4 = true,
 
+      /* Vulkan 1.4 */
+      .pushDescriptor = true,
+
       /* VK_KHR_dynamic_rendering_local_read */
       .dynamicRenderingLocalRead = true,
 
@@ -441,10 +442,10 @@ hk_get_device_features(
       .customBorderColorWithoutFormat = true,
 
       /* VK_EXT_depth_bias_control */
-      .depthBiasControl = false,
-      .leastRepresentableValueForceUnormRepresentation = false,
+      .depthBiasControl = true,
+      .leastRepresentableValueForceUnormRepresentation = true,
       .floatRepresentation = false,
-      .depthBiasExact = false,
+      .depthBiasExact = true,
 
       /* VK_EXT_depth_clip_control */
       .depthClipControl = false,
@@ -479,7 +480,7 @@ hk_get_device_features(
       .extendedDynamicState3ConservativeRasterizationMode = false,
       .extendedDynamicState3ExtraPrimitiveOverestimationSize = false,
       .extendedDynamicState3DepthClipEnable = true,
-      .extendedDynamicState3SampleLocationsEnable = false,
+      .extendedDynamicState3SampleLocationsEnable = true,
       .extendedDynamicState3ColorBlendAdvanced = false,
       .extendedDynamicState3ProvokingVertexMode = true,
       .extendedDynamicState3LineRasterizationMode = true,
@@ -511,7 +512,7 @@ hk_get_device_features(
 
 #ifdef HK_USE_WSI_PLATFORM
       /* VK_EXT_swapchain_maintenance1 */
-      .swapchainMaintenance1 = false,
+      .swapchainMaintenance1 = true,
 #endif
 
       /* VK_EXT_image_view_min_lod */
@@ -618,7 +619,16 @@ hk_get_device_properties(const struct agx_device *dev,
       .maxImageArrayLayers = 2048,
       .maxTexelBufferElements = AGX_TEXTURE_BUFFER_MAX_SIZE,
       .maxUniformBufferRange = 65536,
-      .maxStorageBufferRange = UINT32_MAX,
+
+      /* From a hardware perspective, storage buffers are lowered to global
+       * address arithmetic so there is no hard limit. However, making efficient
+       * use of the hardware addressing modes depends on no signed wrapping in
+       * any `amul` operations, which are themselves bounded by
+       * maxStorageBufferRange. Therefore, limit storage buffers to INT32_MAX
+       * bytes instead of UINT32_MAX. This is believed to be acceptable for
+       * Direct3D.
+       */
+      .maxStorageBufferRange = INT32_MAX,
       .maxPushConstantsSize = HK_MAX_PUSH_SIZE,
       .maxMemoryAllocationCount = 4096,
       .maxSamplerAllocationCount = 4000,
@@ -644,7 +654,11 @@ hk_get_device_properties(const struct agx_device *dev,
       .maxVertexInputBindings = AGX_MAX_ATTRIBS,
       .maxVertexInputAttributeOffset = 65535,
       .maxVertexInputBindingStride = 2048,
-      .maxVertexOutputComponents = 64,
+
+      /* Hardware limit is 128 but we need to reserve some for internal purposes
+       * (like cull distance emulation). Set 96 to be safe.
+       */
+      .maxVertexOutputComponents = 96,
       .maxGeometryShaderInvocations = 32,
       .maxGeometryInputComponents = 128,
       .maxGeometryOutputComponents = 128,
@@ -658,7 +672,9 @@ hk_get_device_properties(const struct agx_device *dev,
       .maxTessellationControlTotalOutputComponents = 4216,
       .maxTessellationEvaluationInputComponents = 128,
       .maxTessellationEvaluationOutputComponents = 128,
-      .maxFragmentInputComponents = 64,
+
+      /* Set to match maxVertexOutputComponents, hardware limit is higher. */
+      .maxFragmentInputComponents = 96,
       .maxFragmentOutputAttachments = HK_MAX_RTS,
       .maxFragmentDualSrcAttachments = 1,
       .maxFragmentCombinedOutputResources = 16,
@@ -702,8 +718,9 @@ hk_get_device_properties(const struct agx_device *dev,
       .sampledImageStencilSampleCounts = sample_counts,
       .storageImageSampleCounts = sample_counts,
       .maxSampleMaskWords = 1,
-      .timestampComputeAndGraphics = false,
-      .timestampPeriod = 1,
+      .timestampComputeAndGraphics = agx_supports_timestamps(dev),
+      /* FIXME: Is timestamp period actually 1? */
+      .timestampPeriod = 1.0f,
       .maxClipDistances = 8,
       .maxCullDistances = 8,
       .maxCombinedClipAndCullDistances = 8,
@@ -727,9 +744,8 @@ hk_get_device_properties(const struct agx_device *dev,
 
       /* Vulkan 1.1 properties */
       .subgroupSize = 32,
-      .subgroupSupportedStages = VK_SHADER_STAGE_COMPUTE_BIT |
-                                 VK_SHADER_STAGE_FRAGMENT_BIT |
-                                 VK_SHADER_STAGE_VERTEX_BIT,
+      .subgroupSupportedStages =
+         VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_ALL_GRAPHICS,
       .subgroupSupportedOperations =
          VK_SUBGROUP_FEATURE_BASIC_BIT | VK_SUBGROUP_FEATURE_BALLOT_BIT |
          VK_SUBGROUP_FEATURE_VOTE_BIT | VK_SUBGROUP_FEATURE_QUAD_BIT |
@@ -744,7 +760,7 @@ hk_get_device_properties(const struct agx_device *dev,
       .maxMultiviewViewCount = HK_MAX_MULTIVIEW_VIEW_COUNT,
       .maxMultiviewInstanceIndex = UINT32_MAX,
       .maxPerSetDescriptors = UINT32_MAX,
-      .maxMemoryAllocationSize = (1u << 31),
+      .maxMemoryAllocationSize = (1ull << 37),
 
       /* Vulkan 1.2 properties */
       .supportedDepthResolveModes =
@@ -756,7 +772,7 @@ hk_get_device_properties(const struct agx_device *dev,
       .independentResolveNone = true,
       .independentResolve = true,
       .driverID = VK_DRIVER_ID_MESA_HONEYKRISP,
-      .conformanceVersion = (VkConformanceVersion){1, 3, 8, 3},
+      .conformanceVersion = (VkConformanceVersion){1, 4, 0, 0},
       .denormBehaviorIndependence = VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
       .roundingModeIndependence = VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
       .shaderSignedZeroInfNanPreserveFloat16 = true,
@@ -825,6 +841,10 @@ hk_get_device_properties(const struct agx_device *dev,
       .uniformTexelBufferOffsetSingleTexelAlignment = true,
       .maxBufferSize = HK_MAX_BUFFER_SIZE,
 
+      /* Vulkan 1.4 properties */
+      .dynamicRenderingLocalReadDepthStencilAttachments = false,
+      .dynamicRenderingLocalReadMultisampledAttachments = true,
+
       /* VK_KHR_push_descriptor */
       .maxPushDescriptors = HK_MAX_PUSH_DESCRIPTORS,
 
@@ -854,7 +874,7 @@ hk_get_device_properties(const struct agx_device *dev,
       /* VK_KHR_maintenance6 */
       .blockTexelViewCompatibleMultipleLayers = false,
       .maxCombinedImageSamplerDescriptorCount = 3,
-      .fragmentShadingRateClampCombinerInputs = false, /* TODO */
+      .fragmentShadingRateClampCombinerInputs = false,
 
       /* VK_EXT_map_memory_placed */
       .minPlacedMemoryMapAlignment = os_page_size,
@@ -922,14 +942,8 @@ hk_get_device_properties(const struct agx_device *dev,
           vk_shaderModuleIdentifierAlgorithmUUID,
           sizeof(properties->shaderModuleIdentifierAlgorithmUUID));
 
-   const struct {
-      uint16_t vendor_id;
-      uint16_t device_id;
-      uint8_t pad[12];
-   } dev_uuid = {
-      .vendor_id = 0,
-      .device_id = 0,
-   };
+   uint8_t dev_uuid[VK_UUID_SIZE];
+   agx_get_device_uuid(dev, &dev_uuid);
    static_assert(sizeof(dev_uuid) == VK_UUID_SIZE);
    memcpy(properties->deviceUUID, &dev_uuid, VK_UUID_SIZE);
    static_assert(sizeof(instance->driver_build_sha) >= VK_UUID_SIZE);
@@ -1008,7 +1022,10 @@ hk_physical_device_init_pipeline_cache(struct hk_physical_device *pdev)
 
 #ifdef ENABLE_SHADER_CACHE
    char renderer[10];
-   ASSERTED int len = snprintf(renderer, sizeof(renderer), "hk_g13g_");
+   ASSERTED int len =
+      snprintf(renderer, sizeof(renderer), "HK_G%u%c_",
+               pdev->dev.params.gpu_generation, pdev->dev.params.gpu_variant);
+
    assert(len == sizeof(renderer) - 2);
 
    char timestamp[41];
@@ -1032,28 +1049,42 @@ hk_physical_device_free_disk_cache(struct hk_physical_device *pdev)
 #endif
 }
 
+/* Use 1/2 of total size to avoid swapping */
+#define SYSMEM_HEAP_FRACTION(x) (x * 1 / 2)
+
 static uint64_t
-hk_get_sysmem_heap_size(void)
+hk_get_sysmem_heap_size(struct hk_physical_device *pdev)
 {
+   if (pdev->sysmem)
+      return pdev->sysmem;
+
    uint64_t sysmem_size_B = 0;
    if (!os_get_total_physical_memory(&sysmem_size_B))
       return 0;
 
-   /* Use 3/4 of total size to avoid swapping */
-   return ROUND_DOWN_TO(sysmem_size_B * 3 / 4, 1 << 20);
+   return ROUND_DOWN_TO(SYSMEM_HEAP_FRACTION(sysmem_size_B), 1 << 20);
 }
 
 static uint64_t
 hk_get_sysmem_heap_available(struct hk_physical_device *pdev)
 {
+   if (pdev->sysmem) {
+      uint64_t total_used = 0;
+      for (unsigned i = 0; i < pdev->mem_heap_count; i++) {
+         const struct hk_memory_heap *heap = &pdev->mem_heaps[i];
+         uint64_t used = p_atomic_read(&heap->used);
+         total_used += used;
+      }
+      return pdev->sysmem - total_used;
+   }
+
    uint64_t sysmem_size_B = 0;
    if (!os_get_available_system_memory(&sysmem_size_B)) {
       vk_loge(VK_LOG_OBJS(pdev), "Failed to query available system memory");
       return 0;
    }
 
-   /* Use 3/4 of available to avoid swapping */
-   return ROUND_DOWN_TO(sysmem_size_B * 3 / 4, 1 << 20);
+   return ROUND_DOWN_TO(SYSMEM_HEAP_FRACTION(sysmem_size_B), 1 << 20);
 }
 
 VkResult
@@ -1091,9 +1122,8 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
    drmFreeVersion(version);
 
    if (!is_asahi) {
-      result =
-         vk_errorf(instance, VK_ERROR_INCOMPATIBLE_DRIVER,
-                   "device %s does not use the asahi kernel driver", path);
+      /* Fail silently */
+      result = VK_ERROR_INCOMPATIBLE_DRIVER;
       goto fail_fd;
    }
 
@@ -1115,33 +1145,14 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
       goto fail_fd;
    }
 
-   /* TODO: we're render-only, should we be reporting displays anyway in
-    * KHR_display?
-    */
+   /* We're render-only */
    pdev->master_fd = -1;
-
-#if 0
-   if (instance->vk.enabled_extensions.KHR_display) {
-      int master_fd =
-         open(drm_device->nodes[DRM_NODE_PRIMARY], O_RDWR | O_CLOEXEC);
-
-      if (master_fd >= 0) {
-         struct stat st;
-         if (!stat(drm_device->nodes[DRM_NODE_PRIMARY], &st)) {
-            pdev->master_fd = master_fd;
-            properties.drmHasPrimary = true;
-            properties.drmPrimaryMajor = major(st.st_rdev);
-            properties.drmPrimaryMinor = minor(st.st_rdev);
-         }
-      }
-   }
-#endif
-
    pdev->render_dev = render_dev;
    pdev->dev.fd = fd;
 
    if (!agx_open_device(NULL, &pdev->dev)) {
-      result = vk_error(instance, VK_ERROR_UNKNOWN);
+      /* Fail silently, for virtgpu */
+      result = VK_ERROR_INCOMPATIBLE_DRIVER;
       goto fail_pdev_alloc;
    }
 
@@ -1172,7 +1183,15 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
 
    hk_physical_device_init_pipeline_cache(pdev);
 
-   uint64_t sysmem_size_B = hk_get_sysmem_heap_size();
+   const char *hk_sysmem = getenv("HK_SYSMEM");
+   if (hk_sysmem) {
+      uint64_t sysmem = strtoll(hk_sysmem, NULL, 10);
+      if (sysmem != LLONG_MIN && sysmem != LLONG_MAX) {
+         pdev->sysmem = sysmem;
+      }
+   }
+
+   uint64_t sysmem_size_B = hk_get_sysmem_heap_size(pdev);
    if (sysmem_size_B == 0) {
       result = vk_errorf(instance, VK_ERROR_INITIALIZATION_FAILED,
                          "Failed to query total system memory");
@@ -1217,6 +1236,7 @@ hk_create_drm_physical_device(struct vk_instance *_instance,
    if (result != VK_SUCCESS)
       goto fail_disk_cache;
 
+   simple_mtx_init(&pdev->debug_compile_lock, mtx_plain);
    *pdev_out = &pdev->vk;
 
    return VK_SUCCESS;
@@ -1247,6 +1267,7 @@ hk_physical_device_destroy(struct vk_physical_device *vk_pdev)
    if (pdev->master_fd >= 0)
       close(pdev->master_fd);
 
+   simple_mtx_destroy(&pdev->debug_compile_lock);
    hk_physical_device_free_disk_cache(pdev);
    agx_close_device(&pdev->dev);
    vk_physical_device_finish(&pdev->vk);
@@ -1343,6 +1364,13 @@ hk_GetPhysicalDeviceMemoryProperties2(
    }
 }
 
+static const VkQueueGlobalPriorityKHR hk_global_queue_priorities[] = {
+   VK_QUEUE_GLOBAL_PRIORITY_LOW_KHR,
+   VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_KHR,
+   VK_QUEUE_GLOBAL_PRIORITY_HIGH_KHR,
+   VK_QUEUE_GLOBAL_PRIORITY_REALTIME_KHR,
+};
+
 VKAPI_ATTR void VKAPI_CALL
 hk_GetPhysicalDeviceQueueFamilyProperties2(
    VkPhysicalDevice physicalDevice, uint32_t *pQueueFamilyPropertyCount,
@@ -1359,51 +1387,22 @@ hk_GetPhysicalDeviceQueueFamilyProperties2(
       {
          p->queueFamilyProperties.queueFlags = queue_family->queue_flags;
          p->queueFamilyProperties.queueCount = queue_family->queue_count;
-         p->queueFamilyProperties.timestampValidBits = 0; // TODO 64;
+         p->queueFamilyProperties.timestampValidBits =
+            agx_supports_timestamps(&pdev->dev) ? 64 : 0;
          p->queueFamilyProperties.minImageTransferGranularity =
             (VkExtent3D){1, 1, 1};
 
-         vk_foreach_struct(ext, p->pNext) {
-            switch (ext->sType) {
-            case VK_STRUCTURE_TYPE_QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES_KHR: {
-               VkQueueFamilyGlobalPriorityPropertiesKHR *props = (void *)ext;
-
-               /* TODO: support multiple priorities */
-               props->priorityCount = 1;
-               props->priorities[0] = VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT;
-               break;
-            }
-            default:
-               break;
-            }
+         VkQueueFamilyGlobalPriorityPropertiesKHR *prio = vk_find_struct(
+            p->pNext, QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES_KHR);
+         if (prio) {
+            STATIC_ASSERT(ARRAY_SIZE(hk_global_queue_priorities) <=
+                          VK_MAX_GLOBAL_PRIORITY_SIZE_KHR);
+            prio->priorityCount = ARRAY_SIZE(hk_global_queue_priorities);
+            memcpy(&prio->priorities, hk_global_queue_priorities,
+                   sizeof(hk_global_queue_priorities));
          }
       }
    }
-}
-
-static const VkTimeDomainKHR hk_time_domains[] = {
-   VK_TIME_DOMAIN_DEVICE_KHR,
-   VK_TIME_DOMAIN_CLOCK_MONOTONIC_KHR,
-#ifdef CLOCK_MONOTONIC_RAW
-   VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_KHR,
-#endif
-};
-
-VKAPI_ATTR VkResult VKAPI_CALL
-hk_GetPhysicalDeviceCalibrateableTimeDomainsKHR(VkPhysicalDevice physicalDevice,
-                                                uint32_t *pTimeDomainCount,
-                                                VkTimeDomainKHR *pTimeDomains)
-{
-   VK_OUTARRAY_MAKE_TYPED(VkTimeDomainKHR, out, pTimeDomains, pTimeDomainCount);
-
-   for (int d = 0; d < ARRAY_SIZE(hk_time_domains); d++) {
-      vk_outarray_append_typed(VkTimeDomainKHR, &out, i)
-      {
-         *i = hk_time_domains[d];
-      }
-   }
-
-   return vk_outarray_status(&out);
 }
 
 VKAPI_ATTR void VKAPI_CALL

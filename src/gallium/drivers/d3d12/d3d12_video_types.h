@@ -64,14 +64,12 @@ GetDesc(ID3D12VideoDecoderHeap *heap)
 */
 const bool D3D12_VIDEO_ENC_CBR_FORCE_VBV_EQUAL_BITRATE = debug_get_bool_option("D3D12_VIDEO_ENC_CBR_FORCE_VBV_EQUAL_BITRATE", false);
 
-const bool D3D12_VIDEO_ENC_ASYNC = debug_get_bool_option("D3D12_VIDEO_ENC_ASYNC", true);
-
 /**
  * This indicates how many in-flight encode commands can happen before blocking on the next request
  */
-const uint64_t D3D12_VIDEO_ENC_ASYNC_DEPTH = debug_get_num_option("D3D12_VIDEO_ENC_ASYNC_DEPTH", 8);
+const size_t D3D12_VIDEO_ENC_ASYNC_DEPTH = static_cast<size_t>(debug_get_num_option("D3D12_VIDEO_ENC_ASYNC_DEPTH", 8));
 
-const uint64_t D3D12_VIDEO_ENC_METADATA_BUFFERS_COUNT = debug_get_num_option("D3D12_VIDEO_ENC_METADATA_BUFFERS_COUNT", 2 * D3D12_VIDEO_ENC_ASYNC_DEPTH);
+const size_t D3D12_VIDEO_ENC_METADATA_BUFFERS_COUNT = static_cast<size_t>(debug_get_num_option("D3D12_VIDEO_ENC_METADATA_BUFFERS_COUNT", 2 * D3D12_VIDEO_ENC_ASYNC_DEPTH));
 
 constexpr unsigned int D3D12_VIDEO_H264_MB_IN_PIXELS = 16;
 
@@ -171,8 +169,8 @@ DEFINE_ENUM_FLAG_OPERATORS(codec_unit_location_flags);
 DEFINE_ENUM_FLAG_OPERATORS(pipe_video_feedback_encode_result_flags);
 DEFINE_ENUM_FLAG_OPERATORS(pipe_video_feedback_metadata_type);
 
-#define D3D12_VIDEO_ENC_H264_MAX_TEMPORAL_LAYERS 1
-#define D3D12_VIDEO_ENC_HEVC_MAX_TEMPORAL_LAYERS 1
+#define D3D12_VIDEO_ENC_H264_MAX_TEMPORAL_LAYERS 4
+#define D3D12_VIDEO_ENC_HEVC_MAX_TEMPORAL_LAYERS 4
 #define D3D12_VIDEO_ENC_AV1_MAX_TEMPORAL_LAYERS 1
 #define D3D12_VIDEO_ENC_MAX_RATE_CONTROL_TEMPORAL_LAYERS 4
 

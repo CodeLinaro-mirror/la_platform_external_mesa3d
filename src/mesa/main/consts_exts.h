@@ -225,6 +225,7 @@ struct gl_extensions
    GLboolean OES_viewport_array;
    GLboolean OVR_multiview;
    GLboolean OVR_multiview2;
+   GLboolean OVR_multiview_multisampled_render_to_texture;
    /* vendor extensions */
    GLboolean AMD_compressed_ATC_texture;
    GLboolean AMD_framebuffer_multisample_advanced;
@@ -343,8 +344,6 @@ struct gl_shader_compiler_options
     * \name Forms of indirect addressing the driver cannot do.
     */
    /*@{*/
-   GLboolean EmitNoIndirectInput;   /**< No indirect addressing of inputs */
-   GLboolean EmitNoIndirectOutput;  /**< No indirect addressing of outputs */
    GLboolean EmitNoIndirectTemp;    /**< No indirect addressing of temps */
    GLboolean EmitNoIndirectUniform; /**< No indirect addressing of constants */
    /*@}*/
@@ -399,15 +398,6 @@ struct gl_program_constants
    GLuint MaxParameters;
    GLuint MaxLocalParams;
    GLuint MaxEnvParams;
-   /* native/hardware limits */
-   GLuint MaxNativeInstructions;
-   GLuint MaxNativeAluInstructions;
-   GLuint MaxNativeTexInstructions;
-   GLuint MaxNativeTexIndirections;
-   GLuint MaxNativeAttribs;
-   GLuint MaxNativeTemps;
-   GLuint MaxNativeAddressRegs;
-   GLuint MaxNativeParameters;
    /* For shaders */
    GLuint MaxUniformComponents;  /**< Usually == MaxParameters * 4 */
 
@@ -675,11 +665,6 @@ struct gl_constants
     *        function out variables are now initialized.
     */
    GLchar GLSLZeroInit;
-
-   /**
-    * Force GL names reuse. Needed by SPECviewperf13.
-    */
-   GLboolean ForceGLNamesReuse;
 
    /**
     * Treat integer textures using GL_LINEAR filters as GL_NEAREST.
@@ -957,8 +942,6 @@ struct gl_constants
    bool PackedDriverUniformStorage;
 
    bool HasFBFetch;
-
-   bool CombinedClipCullDistanceArrays;
 
    bool PointSizeFixed;
 

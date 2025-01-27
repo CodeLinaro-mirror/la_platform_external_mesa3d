@@ -441,6 +441,12 @@ vk_image_view_init(struct vk_device *device,
          vk_image_expand_aspect_mask(image, range->aspectMask);
 
       assert(!(image_view->aspects & ~image->aspects));
+      const VkImageUsageFlags video = VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR |
+                                      VK_IMAGE_USAGE_VIDEO_DECODE_SRC_BIT_KHR |
+                                      VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR |
+                                      VK_IMAGE_USAGE_VIDEO_ENCODE_DST_BIT_KHR |
+                                      VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR |
+                                      VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR;
 
       /* From the Vulkan 1.2.184 spec:
        *
@@ -456,11 +462,10 @@ vk_image_view_init(struct vk_device *device,
        *    be identical to the image format, and the sampler to be used with the
        *    image view must enable sampler Y′CBCR conversion."
        *
-       * Since no one implements video yet, we can ignore the bits about video
-       * create flags and assume YCbCr formats match.
        */
       if ((image->aspects & VK_IMAGE_ASPECT_PLANE_1_BIT) &&
-          (range->aspectMask == VK_IMAGE_ASPECT_COLOR_BIT))
+          (range->aspectMask == VK_IMAGE_ASPECT_COLOR_BIT) &&
+          !(image->usage & video))
          assert(image_view->format == image->format);
 
       /* From the Vulkan 1.2.184 spec:
@@ -538,7 +543,7 @@ vk_image_view_init(struct vk_device *device,
    if (vk_format_is_compressed(image->format) &&
        !vk_format_is_compressed(image_view->format)) {
       const struct util_format_description *fmt =
-         vk_format_description(image_view->format);
+         vk_format_description(image->format);
 
       /* Non-compressed view of compressed image only works for single MIP
        * views.
@@ -681,6 +686,7 @@ vk_image_layout_is_read_only(VkImageLayout layout,
    case VK_IMAGE_LAYOUT_VIDEO_ENCODE_DST_KHR:
    case VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR:
    case VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR:
+   case VK_IMAGE_LAYOUT_VIDEO_ENCODE_QUANTIZATION_MAP_KHR:
       unreachable("Invalid image layout.");
    }
 
@@ -1067,6 +1073,8 @@ vk_image_layout_to_usage_flags(VkImageLayout layout,
       return VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR;
    case VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR:
       return VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR;
+   case VK_IMAGE_LAYOUT_VIDEO_ENCODE_QUANTIZATION_MAP_KHR:
+      return VK_IMAGE_USAGE_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR;
    case VK_IMAGE_LAYOUT_MAX_ENUM:
       unreachable("Invalid image layout.");
    }

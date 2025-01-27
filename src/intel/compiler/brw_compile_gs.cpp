@@ -6,6 +6,7 @@
 #include "brw_eu.h"
 #include "brw_fs.h"
 #include "brw_fs_builder.h"
+#include "brw_generator.h"
 #include "brw_prim.h"
 #include "brw_nir.h"
 #include "brw_private.h"
@@ -118,16 +119,18 @@ run_gs(fs_visitor &s)
 
    brw_calculate_cfg(s);
 
-   brw_fs_optimize(s);
+   brw_optimize(s);
 
    s.assign_curb_setup();
    brw_assign_gs_urb_setup(s);
 
-   brw_fs_lower_3src_null_dest(s);
-   brw_fs_workaround_memory_fence_before_eot(s);
-   brw_fs_workaround_emit_dummy_mov_instruction(s);
+   brw_lower_3src_null_dest(s);
+   brw_workaround_memory_fence_before_eot(s);
+   brw_workaround_emit_dummy_mov_instruction(s);
 
    brw_allocate_registers(s, true /* allow_spilling */);
+
+   brw_workaround_source_arf_before_eot(s);
 
    return !s.failed;
 }
@@ -356,7 +359,7 @@ brw_compile_gs(const struct brw_compiler *compiler,
       prog_data->base.base.dispatch_grf_start_reg =
          v.payload().num_regs / reg_unit(compiler->devinfo);
 
-      fs_generator g(compiler, &params->base,
+      brw_generator g(compiler, &params->base,
                      &prog_data->base.base, MESA_SHADER_GEOMETRY);
       if (unlikely(debug_enabled)) {
          const char *label =

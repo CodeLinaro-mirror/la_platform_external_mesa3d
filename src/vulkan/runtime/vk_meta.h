@@ -47,7 +47,7 @@ struct vk_meta_rect {
 };
 
 #define VK_PRIMITIVE_TOPOLOGY_META_RECT_LIST_MESA (VkPrimitiveTopology)11
-#define VK_IMAGE_VIEW_CREATE_INTERNAL_MESA (VkImageViewCreateFlagBits)0x40000000
+#define VK_IMAGE_VIEW_CREATE_DRIVER_INTERNAL_BIT_MESA (VkImageViewCreateFlagBits)0x80000000
 
 struct vk_meta_copy_image_properties {
    union {
@@ -102,10 +102,14 @@ struct vk_meta_device {
    struct hash_table *cache;
    simple_mtx_t cache_mtx;
 
+   VkPipelineCache pipeline_cache;
+
    uint32_t max_bind_map_buffer_size_B;
    bool use_layered_rendering;
    bool use_gs_for_layer;
    bool use_stencil_export;
+
+   bool use_rect_list_pipeline;
 
    struct {
       /* Optimal workgroup size for each possible chunk size. This should be
@@ -162,6 +166,9 @@ enum vk_meta_object_key_type {
    VK_META_OBJECT_KEY_COPY_BUFFER_TO_IMAGE_PIPELINE,
    VK_META_OBJECT_KEY_COPY_IMAGE_PIPELINE,
    VK_META_OBJECT_KEY_FILL_BUFFER_PIPELINE,
+
+   /* Should be used as an offset for driver-specific object types. */
+   VK_META_OBJECT_KEY_DRIVER_OFFSET = 0x80000000,
 };
 
 uint64_t vk_meta_lookup_object(struct vk_meta_device *meta,
@@ -271,8 +278,6 @@ VkResult vk_meta_create_buffer_view(struct vk_command_buffer *cmd,
                                     struct vk_meta_device *meta,
                                     const VkBufferViewCreateInfo *info,
                                     VkBufferView *buffer_view_out);
-
-#define VK_IMAGE_VIEW_CREATE_DRIVER_INTERNAL_BIT_MESA 0x80000000
 
 VkResult vk_meta_create_image_view(struct vk_command_buffer *cmd,
                                    struct vk_meta_device *meta,
@@ -389,6 +394,50 @@ void vk_meta_update_buffer(struct vk_command_buffer *cmd,
 void vk_meta_fill_buffer(struct vk_command_buffer *cmd,
                          struct vk_meta_device *meta, VkBuffer buffer,
                          VkDeviceSize offset, VkDeviceSize size, uint32_t data);
+
+static inline enum glsl_sampler_dim
+vk_image_view_type_to_sampler_dim(VkImageViewType view_type)
+{
+   switch (view_type) {
+   case VK_IMAGE_VIEW_TYPE_1D:
+   case VK_IMAGE_VIEW_TYPE_1D_ARRAY:
+      return GLSL_SAMPLER_DIM_1D;
+
+   case VK_IMAGE_VIEW_TYPE_2D:
+   case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
+      return GLSL_SAMPLER_DIM_2D;
+
+   case VK_IMAGE_VIEW_TYPE_CUBE:
+   case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
+      return GLSL_SAMPLER_DIM_CUBE;
+
+   case VK_IMAGE_VIEW_TYPE_3D:
+      return GLSL_SAMPLER_DIM_3D;
+
+   default:
+      unreachable();
+   }
+}
+
+static inline bool
+vk_image_view_type_is_array(VkImageViewType view_type)
+{
+   switch (view_type) {
+   case VK_IMAGE_VIEW_TYPE_1D_ARRAY:
+   case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
+   case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
+      return true;
+
+   case VK_IMAGE_VIEW_TYPE_1D:
+   case VK_IMAGE_VIEW_TYPE_2D:
+   case VK_IMAGE_VIEW_TYPE_3D:
+   case VK_IMAGE_VIEW_TYPE_CUBE:
+      return false;
+
+   default:
+      unreachable();
+   }
+}
 
 #ifdef __cplusplus
 }

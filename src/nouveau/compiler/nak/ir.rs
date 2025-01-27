@@ -12,6 +12,7 @@ use crate::legalize::LegalizeBuilder;
 use crate::sph::{OutputTopology, PixelImap};
 use compiler::as_slice::*;
 use compiler::cfg::CFG;
+use compiler::smallvec::SmallVec;
 use nak_ir_proc::*;
 use std::cmp::{max, min};
 use std::fmt;
@@ -580,6 +581,7 @@ impl SSAValueAllocator {
         SSAValueAllocator { count: 0 }
     }
 
+    #[allow(dead_code)]
     pub fn max_idx(&self) -> u32 {
         self.count
     }
@@ -1487,6 +1489,8 @@ pub trait DstsAsSlice: AsSlice<Dst, Attr = DstType> {
         self.as_mut_slice()
     }
 
+    // Currently only used by test code
+    #[allow(dead_code)]
     fn dst_types(&self) -> DstTypeList {
         self.attrs()
     }
@@ -1651,6 +1655,8 @@ impl OpFoldData<'_> {
 }
 
 pub trait Foldable: SrcsAsSlice + DstsAsSlice {
+    // Currently only used by test code
+    #[allow(dead_code)]
     fn fold(&self, sm: &dyn ShaderModel, f: &mut OpFoldData<'_>);
 }
 
@@ -6783,41 +6789,7 @@ impl<T: Into<Op>> From<T> for Instr {
     }
 }
 
-/// The result of map() done on a Box<Instr>. A Vec is only allocated if the
-/// mapping results in multiple instructions. This helps to reduce the amount of
-/// Vec's allocated in the optimization passes.
-pub enum MappedInstrs {
-    None,
-    One(Box<Instr>),
-    Many(Vec<Box<Instr>>),
-}
-
-impl MappedInstrs {
-    pub fn push(&mut self, i: Box<Instr>) {
-        match self {
-            MappedInstrs::None => {
-                *self = MappedInstrs::One(i);
-            }
-            MappedInstrs::One(_) => {
-                *self = match std::mem::replace(self, MappedInstrs::None) {
-                    MappedInstrs::One(o) => MappedInstrs::Many(vec![o, i]),
-                    _ => panic!("Not a One"),
-                };
-            }
-            MappedInstrs::Many(v) => {
-                v.push(i);
-            }
-        }
-    }
-
-    pub fn last_mut(&mut self) -> Option<&mut Box<Instr>> {
-        match self {
-            MappedInstrs::None => None,
-            MappedInstrs::One(instr) => Some(instr),
-            MappedInstrs::Many(v) => v.last_mut(),
-        }
-    }
-}
+pub type MappedInstrs = SmallVec<Box<Instr>>;
 
 pub struct BasicBlock {
     pub label: Label,
@@ -7279,12 +7251,32 @@ pub struct ShaderInfo {
 pub trait ShaderModel {
     fn sm(&self) -> u8;
     fn num_regs(&self, file: RegFile) -> u32;
+    fn hw_reserved_gprs(&self) -> u32;
     fn crs_size(&self, max_crs_depth: u32) -> u32;
 
     fn op_can_be_uniform(&self, op: &Op) -> bool;
 
     fn legalize_op(&self, b: &mut LegalizeBuilder, op: &mut Op);
     fn encode_shader(&self, s: &Shader<'_>) -> Vec<u32>;
+}
+
+/// For compute shaders, large values of local_size impose an additional limit
+/// on the number of GPRs per thread
+pub fn gpr_limit_from_local_size(local_size: &[u16; 3]) -> u32 {
+    fn prev_multiple_of(x: u32, y: u32) -> u32 {
+        (x / y) * y
+    }
+
+    let local_size = local_size[0] * local_size[1] * local_size[2];
+    // Warps are allocated in multiples of 4
+    // Multiply that by 32 threads/warp
+    let local_size = local_size.next_multiple_of(4 * 32) as u32;
+    let total_regs: u32 = 65536;
+
+    let out = total_regs / local_size;
+    // GPRs are allocated in multiples of 8
+    let out = prev_multiple_of(out, 8);
+    min(out, 255)
 }
 
 pub struct Shader<'a> {

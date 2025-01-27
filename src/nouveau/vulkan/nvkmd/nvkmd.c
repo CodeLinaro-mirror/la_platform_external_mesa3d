@@ -9,6 +9,60 @@
 #include <inttypes.h>
 
 void
+nvkmd_dev_track_mem(struct nvkmd_dev *dev,
+                    struct nvkmd_mem *mem)
+{
+   if (mem->link.next == NULL) {
+      simple_mtx_lock(&dev->mems_mutex);
+      list_addtail(&mem->link, &dev->mems);
+      simple_mtx_unlock(&dev->mems_mutex);
+   }
+}
+
+static void
+nvkmd_dev_untrack_mem(struct nvkmd_dev *dev,
+                      struct nvkmd_mem *mem)
+{
+   if (mem->link.next != NULL) {
+      simple_mtx_lock(&dev->mems_mutex);
+      list_del(&mem->link);
+      simple_mtx_unlock(&dev->mems_mutex);
+   }
+}
+
+static struct nvkmd_mem *
+nvkmd_dev_lookup_mem_by_va_locked(struct nvkmd_dev *dev,
+                                  uint64_t addr,
+                                  uint64_t *offset_out)
+{
+   list_for_each_entry(struct nvkmd_mem, mem, &dev->mems, link) {
+      if (mem->va == NULL || addr < mem->va->addr)
+         continue;
+
+      const uint64_t offset = addr - mem->va->addr;
+      if (offset < mem->va->size_B) {
+         if (offset_out != NULL)
+            *offset_out = offset;
+         return nvkmd_mem_ref(mem);
+      }
+   }
+
+   return NULL;
+}
+
+struct nvkmd_mem *
+nvkmd_dev_lookup_mem_by_va(struct nvkmd_dev *dev,
+                           uint64_t addr,
+                           uint64_t *offset_out)
+{
+   simple_mtx_lock(&dev->mems_mutex);
+   struct nvkmd_mem *mem =
+      nvkmd_dev_lookup_mem_by_va_locked(dev, addr, offset_out);
+   simple_mtx_unlock(&dev->mems_mutex);
+   return mem;
+}
+
+void
 nvkmd_mem_init(struct nvkmd_dev *dev,
                struct nvkmd_mem *mem,
                const struct nvkmd_mem_ops *ops,
@@ -215,6 +269,8 @@ nvkmd_mem_unref(struct nvkmd_mem *mem)
    if (mem->map != NULL)
       mem->ops->unmap(mem, 0, mem->map);
 
+   nvkmd_dev_untrack_mem(mem->dev, mem);
+
    mem->ops->free(mem);
 }
 
@@ -245,7 +301,11 @@ nvkmd_mem_map(struct nvkmd_mem *mem, struct vk_object_base *log_obj,
 
       VkResult result = VK_SUCCESS;
       if (mem->map == NULL) {
-         result = mem->ops->map(mem, log_obj, flags, NULL, &map);
+         /* We always map read/write for internal maps since they're reference
+          * counted and otherwise we don't have a good way to add permissions
+          * after the fact.
+          */
+         result = mem->ops->map(mem, log_obj, NVKMD_MEM_MAP_RDWR, NULL, &map);
          if (result == VK_SUCCESS)
             mem->map = map;
       } else {

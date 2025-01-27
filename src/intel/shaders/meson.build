@@ -26,6 +26,7 @@ intel_shader_files = files(
   'generate_draws_iris.cl',
   'memcpy.cl',
   'query_copy.cl',
+  'util.cl',
 )
 
 prepended_input_args = []
@@ -50,7 +51,8 @@ intel_shaders_gens = [ [ 80,   8],
                        [110,  11],
                        [120,  12],
                        [125, 125],
-                       [200,  20] ]
+                       [200,  20],
+                       [300,  30] ]
 intel_shaders = []
 foreach gen : intel_shaders_gens
   intel_shaders += custom_target(

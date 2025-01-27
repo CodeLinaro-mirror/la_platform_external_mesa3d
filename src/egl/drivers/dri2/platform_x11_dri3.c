@@ -67,7 +67,7 @@ egl_dri3_in_current_context(struct loader_dri3_drawable *draw)
    return ctx->Resource.Display == dri3_surf->surf.base.Resource.Display;
 }
 
-static __DRIcontext *
+static struct dri_context *
 egl_dri3_get_dri_context(struct loader_dri3_drawable *draw)
 {
    _EGLContext *ctx = _eglGetCurrentContext();
@@ -78,7 +78,7 @@ egl_dri3_get_dri_context(struct loader_dri3_drawable *draw)
    return dri2_ctx->dri_context;
 }
 
-static __DRIscreen *
+static struct dri_screen *
 egl_dri3_get_dri_screen(void)
 {
    _EGLContext *ctx = _eglGetCurrentContext();
@@ -158,7 +158,7 @@ dri3_create_surface(_EGLDisplay *disp, EGLint type, _EGLConfig *conf,
    struct dri2_egl_display *dri2_dpy = dri2_egl_display(disp);
    struct dri2_egl_config *dri2_conf = dri2_egl_config(conf);
    struct dri3_egl_surface *dri3_surf;
-   const __DRIconfig *dri_config;
+   const struct dri_config *dri_config;
    xcb_drawable_t drawable;
 
    dri3_surf = calloc(1, sizeof *dri3_surf);
@@ -412,7 +412,7 @@ dri3_create_image_khr(_EGLDisplay *disp, _EGLContext *ctx, EGLenum target,
  * contents of its fake front buffer.
  */
 static void
-dri3_flush_front_buffer(__DRIdrawable *driDrawable, void *loaderPrivate)
+dri3_flush_front_buffer(struct dri_drawable *driDrawable, void *loaderPrivate)
 {
    struct loader_dri3_drawable *draw = loaderPrivate;
    (void)driDrawable;
@@ -492,7 +492,7 @@ dri3_query_surface(_EGLDisplay *disp, _EGLSurface *surf, EGLint attribute,
    return _eglQuerySurface(disp, surf, attribute, value);
 }
 
-static __DRIdrawable *
+static struct dri_drawable *
 dri3_get_dri_drawable(_EGLSurface *surf)
 {
    struct dri3_egl_surface *dri3_surf = dri3_egl_surface(surf);
@@ -535,7 +535,7 @@ dri3_x11_connect(struct dri2_egl_display *dri2_dpy, bool zink, bool swrast)
    if (dri2_dpy->fd_render_gpu < 0) {
       int conn_error = xcb_connection_has_error(dri2_dpy->conn);
       if (!swrast) {
-         _eglLog(_EGL_WARNING, "DRI3: Screen seems not DRI3 capable");
+         _eglLog(_EGL_INFO, "DRI3: Could not get DRI3 device");
 
          if (conn_error)
             _eglLog(_EGL_WARNING, "DRI3: Failed to initialize");

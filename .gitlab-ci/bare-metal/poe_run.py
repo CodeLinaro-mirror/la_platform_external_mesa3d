@@ -35,7 +35,7 @@ class PoERun:
         self.powerup = args.powerup
         self.powerdown = args.powerdown
         self.ser = SerialBuffer(
-            args.dev, "results/serial-output.txt", "")
+            args.dev, "results/serial-output.txt", ": ")
         self.boot_timeout = boot_timeout
         self.test_timeout = test_timeout
         self.logger = logger
@@ -87,14 +87,18 @@ class PoERun:
                 self.print_error("nouveau jetson tk1 network fail, abandoning run.")
                 return 1
 
-            result = re.search("hwci: mesa: (\S*)", line)
+            result = re.search(r"hwci: mesa: (\S*), exit_code: (\d+)", line)
             if result:
-                if result.group(1) == "pass":
+                status = result.group(1)
+                exit_code = int(result.group(2))
+
+                if status == "pass":
                     self.logger.update_dut_job("status", "pass")
-                    return 0
                 else:
                     self.logger.update_status_fail("test fail")
-                    return 1
+
+                self.logger.update_dut_job("exit_code", exit_code)
+                return exit_code
 
         self.print_error(
             "Reached the end of the CPU serial log without finding a result")

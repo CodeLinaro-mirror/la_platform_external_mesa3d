@@ -128,11 +128,11 @@ namespace {
           * messages which require the total size.
           */
          if (inst->opcode == SHADER_OPCODE_SEND) {
-            ss = DIV_ROUND_UP(inst->size_read(2), REG_SIZE) +
-                 DIV_ROUND_UP(inst->size_read(3), REG_SIZE);
+            ss = DIV_ROUND_UP(inst->size_read(devinfo, 2), REG_SIZE) +
+                 DIV_ROUND_UP(inst->size_read(devinfo, 3), REG_SIZE);
          } else {
             for (unsigned i = 0; i < inst->sources; i++)
-               ss = MAX2(ss, DIV_ROUND_UP(inst->size_read(i), REG_SIZE));
+               ss = MAX2(ss, DIV_ROUND_UP(inst->size_read(devinfo, i), REG_SIZE));
          }
 
          /* Convert the execution size to GRF units. */
@@ -878,7 +878,7 @@ namespace {
 
       /* Stall on any source dependencies. */
       for (unsigned i = 0; i < inst->sources; i++) {
-         for (unsigned j = 0; j < regs_read(inst, i); j++)
+         for (unsigned j = 0; j < regs_read(devinfo, inst, i); j++)
             stall_on_dependency(
                st, reg_dependency_id(devinfo, inst->src[i], j));
       }
@@ -935,7 +935,7 @@ namespace {
       if (inst->is_send_from_grf()) {
          for (unsigned i = 0; i < inst->sources; i++) {
             if (inst->is_payload(i)) {
-               for (unsigned j = 0; j < regs_read(inst, i); j++)
+               for (unsigned j = 0; j < regs_read(devinfo, inst, i); j++)
                   mark_read_dependency(
                      st, perf, reg_dependency_id(devinfo, inst->src[i], j));
             }
@@ -1012,13 +1012,15 @@ namespace {
        *       weights used elsewhere in the compiler back-end.
        *
        *       Note that we provide slightly more pessimistic weights on
-       *       Gfx12+ for SIMD32, since the effective warp size on that
+       *       Gfx12.x for SIMD32, since the effective warp size on that
        *       platform is 2x the SIMD width due to EU fusion, which increases
        *       the likelihood of divergent control flow in comparison to
        *       previous generations, giving narrower SIMD modes a performance
        *       advantage in several test-cases with non-uniform discard jumps.
+       *       EU fusion has been removed on Xe2+ so its divergence behavior is
+       *       expected to be closer to pre-Gfx12 platforms.
        */
-      const float discard_weight = (dispatch_width > 16 || s->devinfo->ver < 12 ?
+      const float discard_weight = (dispatch_width > 16 || s->devinfo->ver != 12 ?
                                     1.0 : 0.5);
       const float loop_weight = 10;
       unsigned halt_count = 0;
