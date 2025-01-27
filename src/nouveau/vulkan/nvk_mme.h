@@ -8,6 +8,8 @@
 #include "mme_builder.h"
 #include "nvk_private.h"
 
+#include "nak.h"
+
 struct nv_device_info;
 
 enum nvk_mme {
@@ -19,6 +21,7 @@ enum nvk_mme {
    NVK_MME_SET_VB_ENABLES,
    NVK_MME_SET_VB_STRIDE,
    NVK_MME_SET_TESS_PARAMS,
+   NVK_MME_SET_SHADING_RATE_CONTROL,
    NVK_MME_SET_ANTI_ALIAS,
    NVK_MME_DRAW,
    NVK_MME_DRAW_INDEXED,
@@ -64,7 +67,18 @@ enum nvk_mme_scratch {
    NVK_MME_SCRATCH_TESS_PARAMS,
 
    /* Anti-aliasing state */
+   NVK_MME_SCRATCH_SAMPLE_MASKS_2PASS_0,
+   NVK_MME_SCRATCH_SAMPLE_MASKS_2PASS_1,
+   NVK_MME_SCRATCH_SAMPLE_MASKS_2PASS_2,
+   NVK_MME_SCRATCH_SAMPLE_MASKS_2PASS_3,
+   NVK_MME_SCRATCH_SAMPLE_MASKS_4PASS_0,
+   NVK_MME_SCRATCH_SAMPLE_MASKS_4PASS_1,
+   NVK_MME_SCRATCH_SAMPLE_MASKS_4PASS_2,
+   NVK_MME_SCRATCH_SAMPLE_MASKS_4PASS_3,
    NVK_MME_SCRATCH_ANTI_ALIAS,
+
+   /* Shading rate control */
+   NVK_MME_SCRATCH_SHADING_RATE_CONTROL,
 
    /* Addres of cb0 */
    NVK_MME_SCRATCH_CB0_ADDR_HI,
@@ -108,6 +122,9 @@ _nvk_mme_load_scratch(struct mme_builder *b, enum nvk_mme_scratch scratch)
 }
 #define nvk_mme_load_scratch(b, S) \
    _nvk_mme_load_scratch(b, NVK_MME_SCRATCH_##S)
+
+#define nvk_mme_load_scratch_arr(b, S, i) \
+   _nvk_mme_load_scratch(b, NVK_MME_SCRATCH_##S + i)
 
 static inline void
 _nvk_mme_store_scratch(struct mme_builder *b, enum nvk_mme_scratch scratch,
@@ -198,6 +215,7 @@ void nvk_mme_bind_vb(struct mme_builder *b);
 void nvk_mme_set_vb_enables(struct mme_builder *b);
 void nvk_mme_set_vb_stride(struct mme_builder *b);
 void nvk_mme_set_tess_params(struct mme_builder *b);
+void nvk_mme_set_shading_rate_control(struct mme_builder *b);
 void nvk_mme_set_anti_alias(struct mme_builder *b);
 void nvk_mme_draw(struct mme_builder *b);
 void nvk_mme_draw_indexed(struct mme_builder *b);
@@ -215,6 +233,12 @@ void nvk_mme_set_write_mask(struct mme_builder *b);
 void nvk_mme_set_conservative_raster_state(struct mme_builder *b);
 void nvk_mme_set_viewport_min_max_z(struct mme_builder *b);
 void nvk_mme_set_z_clamp(struct mme_builder *b);
+
+uint32_t nvk_mme_tess_params(enum nak_ts_domain domain,
+                             enum nak_ts_spacing spacing,
+                             enum nak_ts_prims prims);
+uint32_t nvk_mme_anti_alias_min_sample_shading(float mss);
+uint32_t nvk_mme_shading_rate_control_sample_shading(bool sample_shading);
 
 struct nvk_mme_mthd_data {
    uint16_t mthd;
@@ -235,6 +259,7 @@ struct nvk_mme_test_case {
 extern const struct nvk_mme_test_case nvk_mme_clear_tests[];
 extern const struct nvk_mme_test_case nvk_mme_bind_vb_tests[];
 extern const struct nvk_mme_test_case nvk_mme_set_tess_params_tests[];
+extern const struct nvk_mme_test_case nvk_mme_set_shading_rate_control_tests[];
 extern const struct nvk_mme_test_case nvk_mme_set_anti_alias_tests[];
 
 void nvk_test_all_mmes(const struct nv_device_info *devinfo);

@@ -184,7 +184,6 @@ extern "C" {
 
 #define MPC_FIELD_LIST_VPE10_COMMON(post_fix)                                                      \
     SFRB(VPECLK_R_GATE_DISABLE, VPMPC_CLOCK_CONTROL, post_fix),                                    \
-        SFRB(VPMPC_TEST_CLK_SEL, VPMPC_CLOCK_CONTROL, post_fix),                                   \
         SFRB(VPMPCC0_SOFT_RESET, VPMPC_SOFT_RESET, post_fix),                                      \
         SFRB(VPMPC_SFR0_SOFT_RESET, VPMPC_SOFT_RESET, post_fix),                                   \
         SFRB(VPMPC_SFT0_SOFT_RESET, VPMPC_SOFT_RESET, post_fix),                                   \
@@ -579,6 +578,7 @@ extern "C" {
 
 #define MPC_FIELD_LIST_VPE10(post_fix)                                                             \
     MPC_FIELD_LIST_VPE10_COMMON(post_fix),                                                         \
+        SFRB(VPMPC_TEST_CLK_SEL, VPMPC_CLOCK_CONTROL, post_fix),                                   \
         SFRB(VPMPCC_BG_BPC, VPMPCC_CONTROL, post_fix),                                             \
         SFRB(VPMPCC_GLOBAL_ALPHA, VPMPCC_CONTROL, post_fix),                                       \
         SFRB(VPMPCC_GLOBAL_GAIN, VPMPCC_CONTROL, post_fix),                                        \
@@ -795,19 +795,19 @@ extern "C" {
     reg_id_val VPMPC_BYPASS_BG_GB;                                                                 \
     reg_id_val VPMPC_HOST_READ_CONTROL;                                                            \
     reg_id_val VPMPC_PENDING_STATUS_MISC;                                                          \
-    reg_id_val VPMPC_OUT_MUX;                                                                     \
-    reg_id_val VPMPC_OUT_FLOAT_CONTROL;                                                           \
-    reg_id_val VPMPC_OUT_DENORM_CONTROL;                                                          \
-    reg_id_val VPMPC_OUT_DENORM_CLAMP_G_Y;                                                        \
-    reg_id_val VPMPC_OUT_DENORM_CLAMP_B_CB;                                                       \
+    reg_id_val VPMPC_OUT_MUX;                                                                      \
+    reg_id_val VPMPC_OUT_FLOAT_CONTROL;                                                            \
+    reg_id_val VPMPC_OUT_DENORM_CONTROL;                                                           \
+    reg_id_val VPMPC_OUT_DENORM_CLAMP_G_Y;                                                         \
+    reg_id_val VPMPC_OUT_DENORM_CLAMP_B_CB;                                                        \
     reg_id_val VPMPC_OUT_CSC_COEF_FORMAT;                                                          \
-    reg_id_val VPMPC_OUT_CSC_MODE;                                                                \
-    reg_id_val VPMPC_OUT_CSC_C11_C12_A;                                                           \
-    reg_id_val VPMPC_OUT_CSC_C13_C14_A;                                                           \
-    reg_id_val VPMPC_OUT_CSC_C21_C22_A;                                                           \
-    reg_id_val VPMPC_OUT_CSC_C23_C24_A;                                                           \
-    reg_id_val VPMPC_OUT_CSC_C31_C32_A;                                                           \
-    reg_id_val VPMPC_OUT_CSC_C33_C34_A;                                                           \
+    reg_id_val VPMPC_OUT_CSC_MODE;                                                                 \
+    reg_id_val VPMPC_OUT_CSC_C11_C12_A;                                                            \
+    reg_id_val VPMPC_OUT_CSC_C13_C14_A;                                                            \
+    reg_id_val VPMPC_OUT_CSC_C21_C22_A;                                                            \
+    reg_id_val VPMPC_OUT_CSC_C23_C24_A;                                                            \
+    reg_id_val VPMPC_OUT_CSC_C31_C32_A;                                                            \
+    reg_id_val VPMPC_OUT_CSC_C33_C34_A;                                                            \
     reg_id_val VPMPCC_TOP_SEL;                                                                     \
     reg_id_val VPMPCC_BOT_SEL;                                                                     \
     reg_id_val VPMPCC_VPOPP_ID;                                                                    \
@@ -907,6 +907,7 @@ extern "C" {
     reg_id_val VPMPCC_MCM_1DLUT_RAMA_REGION_28_29;                                                 \
     reg_id_val VPMPCC_MCM_1DLUT_RAMA_REGION_30_31;                                                 \
     reg_id_val VPMPCC_MCM_1DLUT_RAMA_REGION_32_33;                                                 \
+    reg_id_val VPMPCC_MCM_MEM_PWR_CTRL;
 
 #define MPC_REG_VARIABLE_LIST_VPE10                                                                \
     MPC_REG_VARIABLE_LIST_VPE10_COMMON                                                             \
@@ -951,7 +952,6 @@ extern "C" {
     reg_id_val VPMPCC_MCM_3DLUT_OUT_OFFSET_R;                                                      \
     reg_id_val VPMPCC_MCM_3DLUT_OUT_OFFSET_G;                                                      \
     reg_id_val VPMPCC_MCM_3DLUT_OUT_OFFSET_B;                                                      \
-    reg_id_val VPMPCC_MCM_MEM_PWR_CTRL;
 
 
 #define MPC_FIELD_VARIABLE_LIST_VPE10_COMMON(type)                                                 \
@@ -1454,12 +1454,12 @@ void vpe10_mpc_program_mpc_out(struct mpc *mpc, enum vpe_surface_pixel_format fo
 void vpe10_mpc_set_output_transfer_func(struct mpc *mpc, struct output_ctx *output_ctx);
 
 void vpe10_mpc_set_mpc_shaper_3dlut(
-    struct mpc *mpc, const struct transfer_func *func_shaper, const struct vpe_3dlut *lut3d_func);
+    struct mpc *mpc, struct transfer_func *func_shaper, struct vpe_3dlut *lut3d_func);
 
-void vpe10_mpc_set_blend_lut(struct mpc *mpc, const struct transfer_func *blend_tf);
+void vpe10_mpc_set_blend_lut(struct mpc *mpc, struct transfer_func *blend_tf);
 
-bool vpe10_mpc_program_movable_cm(struct mpc *mpc, const struct transfer_func *func_shaper,
-    const struct vpe_3dlut *lut3d_func, const struct transfer_func *blend_tf, bool afterblend);
+bool vpe10_mpc_program_movable_cm(struct mpc *mpc, struct transfer_func *func_shaper,
+    struct vpe_3dlut *lut3d_func, struct transfer_func *blend_tf, bool afterblend);
 
 void vpe10_mpc_program_crc(struct mpc *mpc, bool enable);
 #ifdef __cplusplus

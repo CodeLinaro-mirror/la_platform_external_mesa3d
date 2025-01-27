@@ -2,7 +2,7 @@
   stage: layered-backends
   rules:
     - !reference [.test, rules]
-    - if: $FORCE_KERNEL_TAG != null
+    - if: $EXTERNAL_KERNEL_TAG != null
       when: never
     - !reference [.gl-rules, rules]
     - !reference [.llvmpipe-rules, rules]
@@ -38,7 +38,8 @@
   allow_failure: true # see comment in .performance-rules, which we don't inherit this line from.
   variables:
     JOB_PRIORITY: 40
-    S3_ARTIFACT_NAME: "mesa-x86_64-default-release"
+    LAVA_S3_ARTIFACT_NAME: mesa-x86_64-default-release
+    S3_ARTIFACT_NAME: mesa-python-ci-artifacts
   needs:
     - kernel+rootfs_x86_64
     - debian-release
@@ -50,8 +51,10 @@
   variables:
     GALLIVM_PERF: nopt
     FLAKES_CHANNEL: "#virgl-ci"
-  script:
-    - xvfb-run --server-args='-noreset' bash -c ". $SCRIPTS_DIR/setup-test-env.sh && GALLIUM_DRIVER=virpipe install/deqp-runner.sh"
+  script: |
+    export LD_LIBRARY_PATH="$CI_PROJECT_DIR/install/lib"
+    export LIBGL_DRIVERS_PATH="$CI_PROJECT_DIR/install/lib/dri"
+    xvfb-run --server-args='-noreset' bash -c ". $SCRIPTS_DIR/setup-test-env.sh && GALLIUM_DRIVER=virpipe install/deqp-runner.sh"
 
 .virgl-test:
   extends:
@@ -67,7 +70,7 @@
 .virgl-iris-test:
   extends:
     - .lava-piglit-traces:x86_64
-    - .lava-acer-cp514-2h-1160g7-volteer:x86_64
+    - .lava-acer-cp514-2h-1130g7-volteer:x86_64
   variables:
     HWCI_KERNEL_MODULES: vhost_vsock
     HWCI_KVM: "true"

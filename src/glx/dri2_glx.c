@@ -243,7 +243,7 @@ dri2WaitForSBC(__GLXDRIdrawable *pdraw, int64_t target_sbc, int64_t *ust,
    return 1;
 }
 
-static __DRIcontext *
+static struct dri_context *
 dri2GetCurrentContext()
 {
    struct glx_context *gc = __glXGetCurrentContext();
@@ -263,7 +263,7 @@ dri2Throttle(struct dri2_screen *psc,
 	     struct dri2_drawable *draw,
 	     enum __DRI2throttleReason reason)
 {
-   __DRIcontext *ctx = dri2GetCurrentContext();
+   struct dri_context *ctx = dri2GetCurrentContext();
 
    dri_throttle(ctx, draw->base.dri_drawable, reason);
 }
@@ -276,7 +276,7 @@ dri2Throttle(struct dri2_screen *psc,
  */
 static void
 dri2Flush(struct dri2_screen *psc,
-          __DRIcontext *ctx,
+          struct dri_context *ctx,
           struct dri2_drawable *draw,
           unsigned flags,
           enum __DRI2throttleReason throttle_reason)
@@ -302,7 +302,7 @@ __dri2CopySubBuffer(__GLXDRIdrawable *pdraw, int x, int y,
    struct dri2_screen *psc = (struct dri2_screen *) pdraw->psc;
    XRectangle xrect;
    XserverRegion region;
-   __DRIcontext *ctx = dri2GetCurrentContext();
+   struct dri_context *ctx = dri2GetCurrentContext();
    unsigned flags;
 
    /* Check we have the right attachments */
@@ -391,7 +391,7 @@ dri2_wait_gl(struct glx_context *gc)
  * contents of its fake front buffer.
  */
 static void
-dri2FlushFrontBuffer(__DRIdrawable *driDrawable, void *loaderPrivate)
+dri2FlushFrontBuffer(struct dri_drawable *driDrawable, void *loaderPrivate)
 {
    struct glx_display *priv;
    struct glx_context *gc;
@@ -527,7 +527,7 @@ dri2SwapBuffers(__GLXDRIdrawable *pdraw, int64_t target_msc, int64_t divisor,
     if (!priv->have_back)
 	return ret;
 
-    __DRIcontext *ctx = dri2GetCurrentContext();
+    struct dri_context *ctx = dri2GetCurrentContext();
     unsigned flags = __DRI2_FLUSH_DRAWABLE;
     if (flush)
        flags |= __DRI2_FLUSH_CONTEXT;
@@ -540,7 +540,7 @@ dri2SwapBuffers(__GLXDRIdrawable *pdraw, int64_t target_msc, int64_t divisor,
 }
 
 static __DRIbuffer *
-dri2GetBuffers(__DRIdrawable * driDrawable,
+dri2GetBuffers(struct dri_drawable * driDrawable,
                int *width, int *height,
                unsigned int *attachments, int count,
                int *out_count, void *loaderPrivate)
@@ -563,7 +563,7 @@ dri2GetBuffers(__DRIdrawable * driDrawable,
 }
 
 static __DRIbuffer *
-dri2GetBuffersWithFormat(__DRIdrawable * driDrawable,
+dri2GetBuffersWithFormat(struct dri_drawable * driDrawable,
                          int *width, int *height,
                          unsigned int *attachments, int count,
                          int *out_count, void *loaderPrivate)

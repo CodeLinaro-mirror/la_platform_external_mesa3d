@@ -84,7 +84,7 @@ iris_utrace_create_buffer(struct u_trace_context *utctx, uint64_t size_B)
       iris_bo_alloc(screen->bufmgr, "utrace timestamps",
                     size_B, 16 /* alignment */,
                     IRIS_MEMZONE_OTHER,
-                    BO_ALLOC_COHERENT | BO_ALLOC_SMEM);
+                    BO_ALLOC_SMEM);
 
    void *ptr = iris_bo_map(NULL, bo, MAP_READ | MAP_WRITE);
    memset(ptr, 0, size_B);
@@ -112,7 +112,7 @@ iris_utrace_record_ts(struct u_trace *trace, void *cs,
 
    const bool is_end_compute =
       cs == NULL &&
-      (flags & INTEL_DS_TRACEPOINT_FLAG_END_OF_PIPE_CS);
+      (flags & INTEL_DS_TRACEPOINT_FLAG_END_CS);
    if (is_end_compute) {
       assert(ice->utrace.last_compute_walker != NULL);
       batch->screen->vtbl.rewrite_compute_walker_pc(
@@ -237,6 +237,7 @@ iris_utrace_pipe_flush_bit_to_ds_stall_flag(uint32_t flags)
       { .iris = PIPE_CONTROL_DEPTH_CACHE_FLUSH,            .ds = INTEL_DS_DEPTH_CACHE_FLUSH_BIT, },
       { .iris = PIPE_CONTROL_DATA_CACHE_FLUSH,             .ds = INTEL_DS_DATA_CACHE_FLUSH_BIT, },
       { .iris = PIPE_CONTROL_TILE_CACHE_FLUSH,             .ds = INTEL_DS_TILE_CACHE_FLUSH_BIT, },
+      { .iris = PIPE_CONTROL_L3_FABRIC_FLUSH,              .ds = INTEL_DS_L3_FABRIC_FLUSH_BIT, },
       { .iris = PIPE_CONTROL_RENDER_TARGET_FLUSH,          .ds = INTEL_DS_RENDER_TARGET_CACHE_FLUSH_BIT, },
       { .iris = PIPE_CONTROL_STATE_CACHE_INVALIDATE,       .ds = INTEL_DS_STATE_CACHE_INVALIDATE_BIT, },
       { .iris = PIPE_CONTROL_CONST_CACHE_INVALIDATE,       .ds = INTEL_DS_CONST_CACHE_INVALIDATE_BIT, },

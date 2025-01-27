@@ -191,13 +191,12 @@ bool si_alloc_resource(struct si_screen *sscreen, struct si_resource *res)
    }
 
    if (res->b.b.flags & SI_RESOURCE_FLAG_CLEAR) {
-      struct si_context *ctx = si_get_aux_context(&sscreen->aux_context.general);
+      struct si_context *ctx = si_get_aux_context(&sscreen->aux_context.compute_resource_init);
       uint32_t value = 0;
 
       si_clear_buffer(ctx, &res->b.b, 0, res->bo_size, &value, 4, SI_AUTO_SELECT_CLEAR_METHOD,
                       false);
-      si_barrier_after_simple_buffer_op(ctx, 0, &res->b.b, NULL);
-      si_put_aux_context_flush(&sscreen->aux_context.general);
+      si_put_aux_context_flush(&sscreen->aux_context.compute_resource_init);
    }
 
    return true;
@@ -257,7 +256,8 @@ static bool si_invalidate_buffer(struct si_context *sctx, struct si_resource *bu
 
    /* Check if mapping this buffer would cause waiting for the GPU. */
    if (si_cs_is_buffer_referenced(sctx, buf->buf, RADEON_USAGE_READWRITE) ||
-       !sctx->ws->buffer_wait(sctx->ws, buf->buf, 0, RADEON_USAGE_READWRITE)) {
+       !sctx->ws->buffer_wait(sctx->ws, buf->buf, 0,
+                              RADEON_USAGE_READWRITE | RADEON_USAGE_DISALLOW_SLOW_REPLY)) {
       /* Reallocate the buffer in the same pipe_resource. */
       si_alloc_resource(sctx->screen, buf);
       si_rebind_buffer(sctx, &buf->b.b);
@@ -400,7 +400,8 @@ static void *si_buffer_transfer_map(struct pipe_context *ctx, struct pipe_resour
       if (buf->flags & (RADEON_FLAG_SPARSE | RADEON_FLAG_NO_CPU_ACCESS) ||
           force_discard_range ||
           si_cs_is_buffer_referenced(sctx, buf->buf, RADEON_USAGE_READWRITE) ||
-          !sctx->ws->buffer_wait(sctx->ws, buf->buf, 0, RADEON_USAGE_READWRITE)) {
+          !sctx->ws->buffer_wait(sctx->ws, buf->buf, 0,
+                                 RADEON_USAGE_READWRITE | RADEON_USAGE_DISALLOW_SLOW_REPLY)) {
          /* Do a wait-free write-only transfer using a temporary buffer. */
          struct u_upload_mgr *uploader;
          struct si_resource *staging = NULL;
@@ -447,7 +448,9 @@ static void *si_buffer_transfer_map(struct pipe_context *ctx, struct pipe_resour
          si_barrier_before_simple_buffer_op(sctx, 0, &staging->b.b, resource);
          si_copy_buffer(sctx, &staging->b.b, resource, box->x % SI_MAP_BUFFER_ALIGNMENT,
                         box->x, box->width);
-         si_barrier_after_simple_buffer_op(sctx, 0, &staging->b.b, resource);
+         /* Since the CPU will wait for the copy to finish, we don't have to insert any GPU barrier
+          * after the copy because there is no GPU reader.
+          */
 
          data = si_buffer_map(sctx, staging, usage & ~PIPE_MAP_UNSYNCHRONIZED);
          if (!data) {

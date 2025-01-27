@@ -376,18 +376,108 @@ size_t goldfish_vk_extension_struct_size(VkStructureType rootType, const void* s
             return sizeof(VkPhysicalDeviceMaintenance4Properties);
         }
 #endif
-#ifdef VK_KHR_dynamic_rendering
-        case VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_SHADING_RATE_ATTACHMENT_INFO_KHR: {
-            return sizeof(VkRenderingFragmentShadingRateAttachmentInfoKHR);
+#ifdef VK_VERSION_1_4
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES: {
+            return sizeof(VkPhysicalDeviceVulkan14Features);
         }
-        case VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_DENSITY_MAP_ATTACHMENT_INFO_EXT: {
-            return sizeof(VkRenderingFragmentDensityMapAttachmentInfoEXT);
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_PROPERTIES: {
+            return sizeof(VkPhysicalDeviceVulkan14Properties);
         }
-        case VK_STRUCTURE_TYPE_ATTACHMENT_SAMPLE_COUNT_INFO_AMD: {
-            return sizeof(VkAttachmentSampleCountInfoAMD);
+        case VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO: {
+            return sizeof(VkDeviceQueueGlobalPriorityCreateInfo);
         }
-        case VK_STRUCTURE_TYPE_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_NVX: {
-            return sizeof(VkMultiviewPerViewAttributesInfoNVX);
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GLOBAL_PRIORITY_QUERY_FEATURES: {
+            return sizeof(VkPhysicalDeviceGlobalPriorityQueryFeatures);
+        }
+        case VK_STRUCTURE_TYPE_QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES: {
+            return sizeof(VkQueueFamilyGlobalPriorityProperties);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_ROTATE_FEATURES: {
+            return sizeof(VkPhysicalDeviceShaderSubgroupRotateFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT_CONTROLS_2_FEATURES: {
+            return sizeof(VkPhysicalDeviceShaderFloatControls2Features);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_EXPECT_ASSUME_FEATURES: {
+            return sizeof(VkPhysicalDeviceShaderExpectAssumeFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES: {
+            return sizeof(VkPhysicalDeviceLineRasterizationFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_PROPERTIES: {
+            return sizeof(VkPhysicalDeviceLineRasterizationProperties);
+        }
+        case VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_LINE_STATE_CREATE_INFO: {
+            return sizeof(VkPipelineRasterizationLineStateCreateInfo);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_PROPERTIES: {
+            return sizeof(VkPhysicalDeviceVertexAttributeDivisorProperties);
+        }
+        case VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO: {
+            return sizeof(VkPipelineVertexInputDivisorStateCreateInfo);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_FEATURES: {
+            return sizeof(VkPhysicalDeviceVertexAttributeDivisorFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES: {
+            return sizeof(VkPhysicalDeviceIndexTypeUint8Features);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES: {
+            return sizeof(VkPhysicalDeviceMaintenance5Features);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_PROPERTIES: {
+            return sizeof(VkPhysicalDeviceMaintenance5Properties);
+        }
+        case VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO: {
+            return sizeof(VkPipelineCreateFlags2CreateInfo);
+        }
+        case VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO: {
+            return sizeof(VkBufferUsageFlags2CreateInfo);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES: {
+            return sizeof(VkPhysicalDevicePushDescriptorProperties);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_LOCAL_READ_FEATURES: {
+            return sizeof(VkPhysicalDeviceDynamicRenderingLocalReadFeatures);
+        }
+        case VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_LOCATION_INFO: {
+            return sizeof(VkRenderingAttachmentLocationInfo);
+        }
+        case VK_STRUCTURE_TYPE_RENDERING_INPUT_ATTACHMENT_INDEX_INFO: {
+            return sizeof(VkRenderingInputAttachmentIndexInfo);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_6_FEATURES: {
+            return sizeof(VkPhysicalDeviceMaintenance6Features);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_6_PROPERTIES: {
+            return sizeof(VkPhysicalDeviceMaintenance6Properties);
+        }
+        case VK_STRUCTURE_TYPE_BIND_MEMORY_STATUS: {
+            return sizeof(VkBindMemoryStatus);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_PROTECTED_ACCESS_FEATURES: {
+            return sizeof(VkPhysicalDevicePipelineProtectedAccessFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_ROBUSTNESS_FEATURES: {
+            return sizeof(VkPhysicalDevicePipelineRobustnessFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_ROBUSTNESS_PROPERTIES: {
+            return sizeof(VkPhysicalDevicePipelineRobustnessProperties);
+        }
+        case VK_STRUCTURE_TYPE_PIPELINE_ROBUSTNESS_CREATE_INFO: {
+            return sizeof(VkPipelineRobustnessCreateInfo);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_FEATURES: {
+            return sizeof(VkPhysicalDeviceHostImageCopyFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_PROPERTIES: {
+            return sizeof(VkPhysicalDeviceHostImageCopyProperties);
+        }
+        case VK_STRUCTURE_TYPE_SUBRESOURCE_HOST_MEMCPY_SIZE: {
+            return sizeof(VkSubresourceHostMemcpySize);
+        }
+        case VK_STRUCTURE_TYPE_HOST_IMAGE_COPY_DEVICE_PERFORMANCE_QUERY: {
+            return sizeof(VkHostImageCopyDevicePerformanceQuery);
         }
 #endif
 #ifdef VK_KHR_incremental_present
@@ -398,36 +488,6 @@ size_t goldfish_vk_extension_struct_size(VkStructureType rootType, const void* s
 #ifdef VK_KHR_pipeline_executable_properties
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_EXECUTABLE_PROPERTIES_FEATURES_KHR: {
             return sizeof(VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR);
-        }
-#endif
-#ifdef VK_KHR_synchronization2
-        case VK_STRUCTURE_TYPE_QUEUE_FAMILY_CHECKPOINT_PROPERTIES_2_NV: {
-            return sizeof(VkQueueFamilyCheckpointProperties2NV);
-        }
-#endif
-#ifdef VK_KHR_maintenance5
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES_KHR: {
-            return sizeof(VkPhysicalDeviceMaintenance5FeaturesKHR);
-        }
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_PROPERTIES_KHR: {
-            return sizeof(VkPhysicalDeviceMaintenance5PropertiesKHR);
-        }
-        case VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO_KHR: {
-            return sizeof(VkPipelineCreateFlags2CreateInfoKHR);
-        }
-        case VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO_KHR: {
-            return sizeof(VkBufferUsageFlags2CreateInfoKHR);
-        }
-#endif
-#ifdef VK_KHR_line_rasterization
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_KHR: {
-            return sizeof(VkPhysicalDeviceLineRasterizationFeaturesKHR);
-        }
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_PROPERTIES_KHR: {
-            return sizeof(VkPhysicalDeviceLineRasterizationPropertiesKHR);
-        }
-        case VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_LINE_STATE_CREATE_INFO_KHR: {
-            return sizeof(VkPipelineRasterizationLineStateCreateInfoKHR);
         }
 #endif
 #ifdef VK_ANDROID_native_buffer
@@ -533,6 +593,9 @@ size_t goldfish_vk_extension_struct_size(VkStructureType rootType, const void* s
                 }
             }
         }
+        case VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_DENSITY_MAP_ATTACHMENT_INFO_EXT: {
+            return sizeof(VkRenderingFragmentDensityMapAttachmentInfoEXT);
+        }
 #endif
 #ifdef VK_EXT_provoking_vertex
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROVOKING_VERTEX_FEATURES_EXT: {
@@ -548,20 +611,6 @@ size_t goldfish_vk_extension_struct_size(VkStructureType rootType, const void* s
 #ifdef VK_EXT_extended_dynamic_state
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT: {
             return sizeof(VkPhysicalDeviceExtendedDynamicStateFeaturesEXT);
-        }
-#endif
-#ifdef VK_EXT_host_image_copy
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_FEATURES_EXT: {
-            return sizeof(VkPhysicalDeviceHostImageCopyFeaturesEXT);
-        }
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_PROPERTIES_EXT: {
-            return sizeof(VkPhysicalDeviceHostImageCopyPropertiesEXT);
-        }
-        case VK_STRUCTURE_TYPE_SUBRESOURCE_HOST_MEMCPY_SIZE_EXT: {
-            return sizeof(VkSubresourceHostMemcpySizeEXT);
-        }
-        case VK_STRUCTURE_TYPE_HOST_IMAGE_COPY_DEVICE_PERFORMANCE_QUERY_EXT: {
-            return sizeof(VkHostImageCopyDevicePerformanceQueryEXT);
         }
 #endif
 #ifdef VK_EXT_texel_buffer_alignment
@@ -1012,18 +1061,108 @@ size_t goldfish_vk_extension_struct_size_with_stream_features(uint32_t streamFea
             return sizeof(VkPhysicalDeviceMaintenance4Properties);
         }
 #endif
-#ifdef VK_KHR_dynamic_rendering
-        case VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_SHADING_RATE_ATTACHMENT_INFO_KHR: {
-            return sizeof(VkRenderingFragmentShadingRateAttachmentInfoKHR);
+#ifdef VK_VERSION_1_4
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES: {
+            return sizeof(VkPhysicalDeviceVulkan14Features);
         }
-        case VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_DENSITY_MAP_ATTACHMENT_INFO_EXT: {
-            return sizeof(VkRenderingFragmentDensityMapAttachmentInfoEXT);
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_PROPERTIES: {
+            return sizeof(VkPhysicalDeviceVulkan14Properties);
         }
-        case VK_STRUCTURE_TYPE_ATTACHMENT_SAMPLE_COUNT_INFO_AMD: {
-            return sizeof(VkAttachmentSampleCountInfoAMD);
+        case VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO: {
+            return sizeof(VkDeviceQueueGlobalPriorityCreateInfo);
         }
-        case VK_STRUCTURE_TYPE_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_NVX: {
-            return sizeof(VkMultiviewPerViewAttributesInfoNVX);
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GLOBAL_PRIORITY_QUERY_FEATURES: {
+            return sizeof(VkPhysicalDeviceGlobalPriorityQueryFeatures);
+        }
+        case VK_STRUCTURE_TYPE_QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES: {
+            return sizeof(VkQueueFamilyGlobalPriorityProperties);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_ROTATE_FEATURES: {
+            return sizeof(VkPhysicalDeviceShaderSubgroupRotateFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT_CONTROLS_2_FEATURES: {
+            return sizeof(VkPhysicalDeviceShaderFloatControls2Features);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_EXPECT_ASSUME_FEATURES: {
+            return sizeof(VkPhysicalDeviceShaderExpectAssumeFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES: {
+            return sizeof(VkPhysicalDeviceLineRasterizationFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_PROPERTIES: {
+            return sizeof(VkPhysicalDeviceLineRasterizationProperties);
+        }
+        case VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_LINE_STATE_CREATE_INFO: {
+            return sizeof(VkPipelineRasterizationLineStateCreateInfo);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_PROPERTIES: {
+            return sizeof(VkPhysicalDeviceVertexAttributeDivisorProperties);
+        }
+        case VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO: {
+            return sizeof(VkPipelineVertexInputDivisorStateCreateInfo);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_FEATURES: {
+            return sizeof(VkPhysicalDeviceVertexAttributeDivisorFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES: {
+            return sizeof(VkPhysicalDeviceIndexTypeUint8Features);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES: {
+            return sizeof(VkPhysicalDeviceMaintenance5Features);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_PROPERTIES: {
+            return sizeof(VkPhysicalDeviceMaintenance5Properties);
+        }
+        case VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO: {
+            return sizeof(VkPipelineCreateFlags2CreateInfo);
+        }
+        case VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO: {
+            return sizeof(VkBufferUsageFlags2CreateInfo);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES: {
+            return sizeof(VkPhysicalDevicePushDescriptorProperties);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_LOCAL_READ_FEATURES: {
+            return sizeof(VkPhysicalDeviceDynamicRenderingLocalReadFeatures);
+        }
+        case VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_LOCATION_INFO: {
+            return sizeof(VkRenderingAttachmentLocationInfo);
+        }
+        case VK_STRUCTURE_TYPE_RENDERING_INPUT_ATTACHMENT_INDEX_INFO: {
+            return sizeof(VkRenderingInputAttachmentIndexInfo);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_6_FEATURES: {
+            return sizeof(VkPhysicalDeviceMaintenance6Features);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_6_PROPERTIES: {
+            return sizeof(VkPhysicalDeviceMaintenance6Properties);
+        }
+        case VK_STRUCTURE_TYPE_BIND_MEMORY_STATUS: {
+            return sizeof(VkBindMemoryStatus);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_PROTECTED_ACCESS_FEATURES: {
+            return sizeof(VkPhysicalDevicePipelineProtectedAccessFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_ROBUSTNESS_FEATURES: {
+            return sizeof(VkPhysicalDevicePipelineRobustnessFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_ROBUSTNESS_PROPERTIES: {
+            return sizeof(VkPhysicalDevicePipelineRobustnessProperties);
+        }
+        case VK_STRUCTURE_TYPE_PIPELINE_ROBUSTNESS_CREATE_INFO: {
+            return sizeof(VkPipelineRobustnessCreateInfo);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_FEATURES: {
+            return sizeof(VkPhysicalDeviceHostImageCopyFeatures);
+        }
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_PROPERTIES: {
+            return sizeof(VkPhysicalDeviceHostImageCopyProperties);
+        }
+        case VK_STRUCTURE_TYPE_SUBRESOURCE_HOST_MEMCPY_SIZE: {
+            return sizeof(VkSubresourceHostMemcpySize);
+        }
+        case VK_STRUCTURE_TYPE_HOST_IMAGE_COPY_DEVICE_PERFORMANCE_QUERY: {
+            return sizeof(VkHostImageCopyDevicePerformanceQuery);
         }
 #endif
 #ifdef VK_KHR_incremental_present
@@ -1034,36 +1173,6 @@ size_t goldfish_vk_extension_struct_size_with_stream_features(uint32_t streamFea
 #ifdef VK_KHR_pipeline_executable_properties
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_EXECUTABLE_PROPERTIES_FEATURES_KHR: {
             return sizeof(VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR);
-        }
-#endif
-#ifdef VK_KHR_synchronization2
-        case VK_STRUCTURE_TYPE_QUEUE_FAMILY_CHECKPOINT_PROPERTIES_2_NV: {
-            return sizeof(VkQueueFamilyCheckpointProperties2NV);
-        }
-#endif
-#ifdef VK_KHR_maintenance5
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES_KHR: {
-            return sizeof(VkPhysicalDeviceMaintenance5FeaturesKHR);
-        }
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_PROPERTIES_KHR: {
-            return sizeof(VkPhysicalDeviceMaintenance5PropertiesKHR);
-        }
-        case VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO_KHR: {
-            return sizeof(VkPipelineCreateFlags2CreateInfoKHR);
-        }
-        case VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO_KHR: {
-            return sizeof(VkBufferUsageFlags2CreateInfoKHR);
-        }
-#endif
-#ifdef VK_KHR_line_rasterization
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_KHR: {
-            return sizeof(VkPhysicalDeviceLineRasterizationFeaturesKHR);
-        }
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_PROPERTIES_KHR: {
-            return sizeof(VkPhysicalDeviceLineRasterizationPropertiesKHR);
-        }
-        case VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_LINE_STATE_CREATE_INFO_KHR: {
-            return sizeof(VkPipelineRasterizationLineStateCreateInfoKHR);
         }
 #endif
 #ifdef VK_ANDROID_native_buffer
@@ -1169,6 +1278,9 @@ size_t goldfish_vk_extension_struct_size_with_stream_features(uint32_t streamFea
                 }
             }
         }
+        case VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_DENSITY_MAP_ATTACHMENT_INFO_EXT: {
+            return sizeof(VkRenderingFragmentDensityMapAttachmentInfoEXT);
+        }
 #endif
 #ifdef VK_EXT_provoking_vertex
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROVOKING_VERTEX_FEATURES_EXT: {
@@ -1184,20 +1296,6 @@ size_t goldfish_vk_extension_struct_size_with_stream_features(uint32_t streamFea
 #ifdef VK_EXT_extended_dynamic_state
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT: {
             return sizeof(VkPhysicalDeviceExtendedDynamicStateFeaturesEXT);
-        }
-#endif
-#ifdef VK_EXT_host_image_copy
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_FEATURES_EXT: {
-            return sizeof(VkPhysicalDeviceHostImageCopyFeaturesEXT);
-        }
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_PROPERTIES_EXT: {
-            return sizeof(VkPhysicalDeviceHostImageCopyPropertiesEXT);
-        }
-        case VK_STRUCTURE_TYPE_SUBRESOURCE_HOST_MEMCPY_SIZE_EXT: {
-            return sizeof(VkSubresourceHostMemcpySizeEXT);
-        }
-        case VK_STRUCTURE_TYPE_HOST_IMAGE_COPY_DEVICE_PERFORMANCE_QUERY_EXT: {
-            return sizeof(VkHostImageCopyDevicePerformanceQueryEXT);
         }
 #endif
 #ifdef VK_EXT_texel_buffer_alignment

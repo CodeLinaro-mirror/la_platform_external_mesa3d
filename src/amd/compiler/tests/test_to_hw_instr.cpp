@@ -209,7 +209,6 @@ BEGIN_TEST(to_hw_instr.swap_subdword)
       bld.pseudo(aco_opcode::p_parallelcopy, Definition(v128_hi, v2b), Definition(v129_lo, v2b),
                  Operand(v129_lo, v2b), Operand(v128_hi, v2b));
 
-      //~gfx11! s_nop
       //~gfx11! s_sendmsg sendmsg(dealloc_vgprs)
       //~gfx(8|9|11)! s_endpgm
 
@@ -361,7 +360,6 @@ BEGIN_TEST(to_hw_instr.subdword_constant)
       bld.pseudo(aco_opcode::p_unit_test, Operand::c32(17u));
       bld.pseudo(aco_opcode::p_parallelcopy, Definition(v0_lo, v1b), Operand::zero(1));
 
-      //~gfx11! s_nop
       //~gfx11! s_sendmsg sendmsg(dealloc_vgprs)
       //! s_endpgm
 
@@ -493,7 +491,6 @@ BEGIN_TEST(to_hw_instr.extract)
 
          finish_to_hw_instr_test();
 
-         //~gfx11_.*! s_nop
          //~gfx11_.*! s_sendmsg sendmsg(dealloc_vgprs)
          //! s_endpgm
       }
@@ -612,7 +609,6 @@ BEGIN_TEST(to_hw_instr.insert)
 
       finish_to_hw_instr_test();
 
-      //~gfx11! s_nop
       //~gfx11! s_sendmsg sendmsg(dealloc_vgprs)
       //! s_endpgm
    }
@@ -641,7 +637,7 @@ BEGIN_TEST(to_hw_instr.copy_linear_vgpr_scc)
    Instruction* instr = bld.pseudo(aco_opcode::p_parallelcopy, Definition(v0_lo, v1.as_linear()),
                                    Operand(v1_lo, v1.as_linear()));
    instr->pseudo().scratch_sgpr = m0;
-   instr->pseudo().tmp_in_scc = true;
+   instr->pseudo().needs_scratch_reg = true;
 
    finish_to_hw_instr_test();
 END_TEST
@@ -664,7 +660,8 @@ BEGIN_TEST(to_hw_instr.swap_linear_vgpr)
    Instruction* instr = bld.pseudo(aco_opcode::p_parallelcopy, Definition(reg_v0, v1_linear),
                                    Definition(reg_v1, v1_linear), Operand(reg_v1, v1_linear),
                                    Operand(reg_v0, v1_linear));
-   instr->pseudo().scratch_sgpr = m0;
+   instr->pseudo().scratch_sgpr = scc;
+   instr->pseudo().needs_scratch_reg = true;
 
    finish_to_hw_instr_test();
 END_TEST
@@ -688,7 +685,8 @@ BEGIN_TEST(to_hw_instr.copy_linear_vgpr_v3)
    //! s2: %0:exec,  s1: %0:scc = s_not_b64 %0:exec
    Instruction* instr = bld.pseudo(aco_opcode::p_parallelcopy, Definition(reg_v0, v3_linear),
                                    Operand(reg_v4, v3_linear));
-   instr->pseudo().scratch_sgpr = m0;
+   instr->pseudo().scratch_sgpr = scc;
+   instr->pseudo().needs_scratch_reg = true;
 
    finish_to_hw_instr_test();
 END_TEST
@@ -713,7 +711,8 @@ BEGIN_TEST(to_hw_instr.copy_linear_vgpr_coalesce)
    Instruction* instr = bld.pseudo(aco_opcode::p_parallelcopy, Definition(reg_v0, v1_linear),
                                    Definition(reg_v1, v1_linear), Operand(reg_v4, v1_linear),
                                    Operand(reg_v5, v1_linear));
-   instr->pseudo().scratch_sgpr = m0;
+   instr->pseudo().scratch_sgpr = scc;
+   instr->pseudo().needs_scratch_reg = true;
 
    finish_to_hw_instr_test();
 END_TEST
@@ -764,10 +763,32 @@ BEGIN_TEST(to_hw_instr.pack2x16_constant)
       bld.pseudo(aco_opcode::p_parallelcopy, Definition(v0_lo, v2b), Definition(v0_hi, v2b),
                  Operand::zero(2), Operand(v1_lo, v2b));
 
-      //~gfx11! s_nop
       //~gfx11! s_sendmsg sendmsg(dealloc_vgprs)
       //! s_endpgm
 
       finish_to_hw_instr_test();
+   }
+END_TEST
+
+BEGIN_TEST(to_hw_instr.mov_b16_sgpr_src)
+   if (!setup_cs(NULL, GFX11))
+      return;
+
+   //>> p_unit_test 0
+   //! v2b: %0:v[0][0:16] = v_mov_b16 hi(%0:s[0][16:32])
+   bld.pseudo(aco_opcode::p_unit_test, Operand::zero());
+   bld.pseudo(aco_opcode::p_extract_vector, Definition(PhysReg(256), v2b), Operand(PhysReg(0), s1),
+              Operand::c32(1));
+
+   //! s_sendmsg sendmsg(dealloc_vgprs)
+   //! s_endpgm
+
+   finish_to_hw_instr_test();
+
+   for (aco_ptr<Instruction>& instr : program->blocks[0].instructions) {
+      if (instr->opcode == aco_opcode::v_mov_b16 && instr->format != asVOP3(Format::VOP1)) {
+         fail_test("v_mov_b16 must be be VOP3");
+         return;
+      }
    }
 END_TEST

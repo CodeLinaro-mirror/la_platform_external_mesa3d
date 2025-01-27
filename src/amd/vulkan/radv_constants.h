@@ -12,6 +12,9 @@
 #define RADV_CONSTANTS_H
 
 #define ATI_VENDOR_ID 0x1002
+#ifdef HAVE_AMDGPU_VIRTIO
+#define VIRTGPU_PCI_VENDOR_ID 0x1af4
+#endif
 
 #define MAX_VBS                        32
 #define MAX_VERTEX_ATTRIBS             32
@@ -27,7 +30,6 @@
 #define MAX_DYNAMIC_BUFFERS            (MAX_DYNAMIC_UNIFORM_BUFFERS + MAX_DYNAMIC_STORAGE_BUFFERS)
 #define MAX_SAMPLES_LOG2               4
 #define NUM_META_FS_KEYS               12
-#define RADV_MAX_DRM_DEVICES           8
 #define MAX_VIEWS                      8
 #define MAX_SO_STREAMS                 4
 #define MAX_SO_BUFFERS                 4

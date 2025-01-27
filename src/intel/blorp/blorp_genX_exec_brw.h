@@ -285,12 +285,23 @@ emit_urb_config(struct blorp_batch *batch,
    blorp_pre_emit_urb_config(batch, &urb_cfg);
 
    for (int i = 0; i <= MESA_SHADER_GEOMETRY; i++) {
+#if GFX_VER >= 12
+      blorp_emit(batch, GENX(3DSTATE_URB_ALLOC_VS), urb) {
+         urb._3DCommandSubOpcode            += i;
+         urb.VSURBEntryAllocationSize        = urb_cfg.size[i] - 1;
+         urb.VSURBStartingAddressSlice0      = urb_cfg.start[i];
+         urb.VSURBStartingAddressSliceN      = urb_cfg.start[i];
+         urb.VSNumberofURBEntriesSlice0      = urb_cfg.entries[i];
+         urb.VSNumberofURBEntriesSliceN      = urb_cfg.entries[i];
+      }
+#else
       blorp_emit(batch, GENX(3DSTATE_URB_VS), urb) {
          urb._3DCommandSubOpcode      += i;
          urb.VSURBStartingAddress      = urb_cfg.start[i];
          urb.VSURBEntryAllocationSize  = urb_cfg.size[i] - 1;
          urb.VSNumberofURBEntries      = urb_cfg.entries[i];
       }
+#endif
    }
 
    if (batch->blorp->config.use_mesh_shading) {
@@ -793,30 +804,31 @@ blorp_emit_ps_config(struct blorp_batch *batch,
          ps.RenderTargetResolveType = RESOLVE_PARTIAL;
          break;
       case ISL_AUX_OP_FULL_RESOLVE:
-         /* WA 1406738321:
-          * In-place full resolve of a 3D/Volume surface is not supported.
-          * In order to fully resolve 3D/volume surface, copy operation must be
-          * performed to a new destination (declared as uncompressed) using the
-          * compressed 3D surface as a source.
-          */
-#if GFX_VERx10 == 120
-         assert(params->src.surf.dim != ISL_SURF_DIM_3D);
-#endif
          ps.RenderTargetResolveType = RESOLVE_FULL;
          break;
 #endif /* GFX_VER < 20 */
       case ISL_AUX_OP_FAST_CLEAR:
-         /* WA 1406738321:
-          * 3D/Volumetric surfaces do not support Fast Clear operation.
-          */
-#if GFX_VERx10 == 120
-         assert(params->dst.surf.dim != ISL_SURF_DIM_3D);
-#endif
          ps.RenderTargetFastClearEnable = true;
          break;
       default:
          unreachable("Invalid fast clear op");
       }
+
+#if GFX_VERx10 == 120
+      /* The 3DSTATE_PS_BODY page for TGL says:
+       *
+       *   3D/Volumetric surfaces do not support Fast Clear operation.
+       *
+       *   [...]
+       *
+       *   3D/Volumetric surfaces do not support in-place resolve pass
+       *   operation.
+       *
+       * HSD 1406738321 suggests a more limited scope of restrictions, but
+       * there should be no harm in complying with the Bspec restrictions.
+       */
+      if (params->dst.surf.dim == ISL_SURF_DIM_3D)
+         assert(params->fast_clear_op == ISL_AUX_OP_NONE);
 
       /* The RENDER_SURFACE_STATE page for TGL says:
        *
@@ -829,11 +841,6 @@ blorp_emit_ps_config(struct blorp_batch *batch,
        * Due to the surface layout parameters, if LOD0's width isn't a
        * multiple of 64px, LOD1 and LOD2+ will share CCS elements. Assert that
        * these operations aren't occurring on these LODs.
-       *
-       * We don't explicitly check for TGL+ because the restriction is
-       * technically applicable to all hardware. Platforms prior to TGL don't
-       * support CCS on 8 bpp surfaces. So, these unaligned fast clear
-       * operations shouldn't be occurring prior to TGL as well.
        */
       if (isl_format_get_layout(params->dst.surf.format)->bpb == 8 &&
           params->dst.surf.logical_level0_px.width % 64 != 0 &&
@@ -842,6 +849,24 @@ blorp_emit_ps_config(struct blorp_batch *batch,
          assert(params->num_samples == 1);
          assert(!ps.RenderTargetFastClearEnable);
       }
+
+      /* From the TGL BSpec 44930 (r47128):
+       *
+       *   Compression of 3D Ys surfaces with 64 or 128 bpp is not supported
+       *   in Gen12. Moreover, "Render Target Fast-clear Enable" command is
+       *   not supported for any 3D Ys surfaces. except when Surface is a
+       *   Procdural Texture.
+       *
+       * It's not clear where the exception applies, but either way, we don't
+       * support Procedural Textures.
+       */
+      if (params->dst.surf.dim == ISL_SURF_DIM_3D &&
+          params->dst.surf.tiling == ISL_TILING_ICL_Ys &&
+          isl_format_get_layout(params->dst.surf.format)->bpb >= 64) {
+         assert(params->dst.aux_usage != ISL_AUX_USAGE_CCS_D);
+         assert(!ps.RenderTargetFastClearEnable);
+      }
+#endif
 
       if (prog_data) {
          intel_set_ps_dispatch_state(&ps, devinfo, prog_data,
@@ -1653,43 +1678,42 @@ blorp_exec_compute(struct blorp_batch *batch, const struct blorp_params *params)
    assert(cs_prog_data->local_size[2] == 1);
 
 #if GFX_VERx10 >= 125
-   assert(cs_prog_data->push.per_thread.regs == 0);
-   blorp_emit(batch, GENX(COMPUTE_WALKER), cw) {
-      cw.SIMDSize                       = dispatch.simd_size / 16;
-      cw.MessageSIMD                    = dispatch.simd_size / 16,
-      cw.LocalXMaximum                  = cs_prog_data->local_size[0] - 1;
-      cw.LocalYMaximum                  = cs_prog_data->local_size[1] - 1;
-      cw.LocalZMaximum                  = cs_prog_data->local_size[2] - 1;
-      cw.ThreadGroupIDStartingX         = group_x0;
-      cw.ThreadGroupIDStartingY         = group_y0;
-      cw.ThreadGroupIDStartingZ         = group_z0;
-      cw.ThreadGroupIDXDimension        = group_x1;
-      cw.ThreadGroupIDYDimension        = group_y1;
-      cw.ThreadGroupIDZDimension        = group_z1;
-      cw.ExecutionMask                  = 0xffffffff;
-      cw.PostSync.MOCS                  = isl_mocs(batch->blorp->isl_dev, 0, false);
+   uint32_t surfaces_offset = blorp_setup_binding_table(batch, params);
 
-      uint32_t surfaces_offset = blorp_setup_binding_table(batch, params);
+   uint32_t samplers_offset =
+      params->src.enabled ? blorp_emit_sampler_state(batch) : 0;
 
-      uint32_t samplers_offset =
-         params->src.enabled ? blorp_emit_sampler_state(batch) : 0;
+   uint32_t push_const_offset;
+   unsigned push_const_size;
+   blorp_get_compute_push_const(batch, params, dispatch.threads,
+                                &push_const_offset, &push_const_size);
+   struct GENX(COMPUTE_WALKER_BODY) body = {
+      .SIMDSize                       = dispatch.simd_size / 16,
+      .MessageSIMD                    = dispatch.simd_size / 16,
+      .LocalXMaximum                  = cs_prog_data->local_size[0] - 1,
+      .LocalYMaximum                  = cs_prog_data->local_size[1] - 1,
+      .LocalZMaximum                  = cs_prog_data->local_size[2] - 1,
+      .ThreadGroupIDStartingX         = group_x0,
+      .ThreadGroupIDStartingY         = group_y0,
+      .ThreadGroupIDStartingZ         = group_z0,
+      .ThreadGroupIDXDimension        = group_x1,
+      .ThreadGroupIDYDimension        = group_y1,
+      .ThreadGroupIDZDimension        = group_z1,
+      .ExecutionMask                  = dispatch.right_mask,
+      .PostSync.MOCS                  = isl_mocs(batch->blorp->isl_dev, 0, false),
 
-      uint32_t push_const_offset;
-      unsigned push_const_size;
-      blorp_get_compute_push_const(batch, params, dispatch.threads,
-                                   &push_const_offset, &push_const_size);
-      cw.IndirectDataStartAddress       = push_const_offset;
-      cw.IndirectDataLength             = push_const_size;
+      .IndirectDataStartAddress       = push_const_offset,
+      .IndirectDataLength             = push_const_size,
 
 #if GFX_VERx10 >= 125
-      cw.GenerateLocalID                = cs_prog_data->generate_local_id != 0;
-      cw.EmitLocal                      = cs_prog_data->generate_local_id;
-      cw.WalkOrder                      = cs_prog_data->walk_order;
-      cw.TileLayout = cs_prog_data->walk_order == INTEL_WALK_ORDER_YXZ ?
-                      TileY32bpe : Linear;
+      .GenerateLocalID                = cs_prog_data->generate_local_id != 0,
+      .EmitLocal                      = cs_prog_data->generate_local_id,
+      .WalkOrder                      = cs_prog_data->walk_order,
+      .TileLayout = cs_prog_data->walk_order == INTEL_WALK_ORDER_YXZ ?
+                    TileY32bpe : Linear,
 #endif
 
-      cw.InterfaceDescriptor = (struct GENX(INTERFACE_DESCRIPTOR_DATA)) {
+      .InterfaceDescriptor = (struct GENX(INTERFACE_DESCRIPTOR_DATA)) {
          .KernelStartPointer = params->cs_prog_kernel,
          .SamplerStatePointer = samplers_offset,
          .SamplerCount = params->src.enabled ? 1 : 0,
@@ -1704,7 +1728,12 @@ blorp_exec_compute(struct blorp_batch *batch, const struct blorp_params *params)
                                                          dispatch.group_size,
                                                          dispatch.simd_size),
          .NumberOfBarriers = cs_prog_data->uses_barrier,
-      };
+      },
+   };
+
+   assert(cs_prog_data->push.per_thread.regs == 0);
+   blorp_emit(batch, GENX(COMPUTE_WALKER), cw) {
+      cw.body = body;
    }
 
 #else
@@ -1856,7 +1885,11 @@ xy_bcb_surf_dim(const struct isl_surf *surf)
 {
    switch (surf->dim) {
    case ISL_SURF_DIM_1D:
-      return XY_SURFTYPE_1D;
+      /* An undocumented assertion in simulation is that 1D surfaces must use
+       * LINEAR tiling. But that doesn't work, so instead consider 1D tiled
+       * surfaces as 2D with a Height=1.
+       */
+      return surf->tiling != ISL_TILING_LINEAR ? XY_SURFTYPE_2D: XY_SURFTYPE_1D;
    case ISL_SURF_DIM_2D:
       return XY_SURFTYPE_2D;
    case ISL_SURF_DIM_3D:

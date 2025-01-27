@@ -107,6 +107,7 @@ typedef enum {
    OPC_READ_COND_MACRO = _OPC(1, 54),
    OPC_READ_FIRST_MACRO = _OPC(1, 55),
    OPC_SHPS_MACRO       = _OPC(1, 56),
+   OPC_READ_GETLAST_MACRO = _OPC(1, 57),
 
    /* Macros that expand to a loop */
    OPC_SCAN_MACRO      = _OPC(1, 58),
@@ -287,6 +288,7 @@ typedef enum {
    OPC_GETSPID         = _OPC(6, 36), /* SP ID */
    OPC_GETWID          = _OPC(6, 37), /* wavefront ID */
    OPC_GETFIBERID      = _OPC(6, 38), /* fiber ID */
+   OPC_SHFL            = _OPC(6, 39),
 
    /* Logical opcodes for things that differ in a6xx+ */
    OPC_STC             = _OPC(6, 40),
@@ -409,6 +411,7 @@ typedef enum {
    TYPE_U32 = 3,
    TYPE_S16 = 4,
    TYPE_S32 = 5,
+   TYPE_ATOMIC_U64 = 6, /* Only valid for a7xx atomics */
    TYPE_U8 = 6,
    TYPE_U8_32 = 7,
 } type_t;
@@ -442,6 +445,8 @@ type_uint_size(unsigned bit_size)
    case 1:  /* 1b bools are treated as normal half-regs */
    case 16: return TYPE_U16;
    case 32: return TYPE_U32;
+   case 64:
+      return TYPE_U32;
    default:
       ir3_assert(0); /* invalid size */
       return (type_t)0;
@@ -637,6 +642,18 @@ is_madsh(opc_t opc)
 }
 
 static inline bool
+is_sad(opc_t opc)
+{
+   switch (opc) {
+   case OPC_SAD_S16:
+   case OPC_SAD_S32:
+      return true;
+   default:
+      return false;
+   }
+}
+
+static inline bool
 is_local_atomic(opc_t opc)
 {
    switch (opc) {
@@ -787,6 +804,21 @@ is_cat3_float(opc_t opc)
    case OPC_MAD_F32:
    case OPC_SEL_F16:
    case OPC_SEL_F32:
+      return true;
+   default:
+      return false;
+   }
+}
+
+static inline bool
+is_cat3_alt(opc_t opc)
+{
+   switch (opc) {
+   case OPC_SHLM:
+   case OPC_SHRM:
+   case OPC_SHLG:
+   case OPC_SHRG:
+   case OPC_ANDG:
       return true;
    default:
       return false;

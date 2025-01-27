@@ -23,8 +23,6 @@
 #include "amd_family.h"
 
 struct radeon_info;
-struct ac_surf_info;
-struct radeon_surf;
 struct vk_sync_type;
 struct vk_sync_wait;
 struct vk_sync_signal;
@@ -292,6 +290,9 @@ struct radeon_winsys {
    void (*cs_execute_ib)(struct radeon_cmdbuf *cs, struct radeon_winsys_bo *bo, const uint64_t va, const uint32_t cdw,
                          const bool predicate);
 
+   void (*cs_chain_dgc_ib)(struct radeon_cmdbuf *cs, uint64_t va, uint32_t cdw, uint64_t trailer_va,
+                           const bool predicate);
+
    void (*cs_dump)(struct radeon_cmdbuf *cs, FILE *file, const int *trace_ids, int trace_id_count,
                    enum radv_cs_dump_type type);
 
@@ -303,11 +304,7 @@ struct radeon_winsys {
 
    void (*dump_bo_log)(struct radeon_winsys *ws, FILE *file);
 
-   int (*surface_init)(struct radeon_winsys *ws, const struct ac_surf_info *surf_info, struct radeon_surf *surf);
-
    int (*get_fd)(struct radeon_winsys *ws);
-
-   struct ac_addrlib *(*get_addrlib)(struct radeon_winsys *ws);
 
    const struct vk_sync_type *const *(*get_sync_types)(struct radeon_winsys *ws);
 };
