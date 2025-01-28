@@ -29,13 +29,21 @@ pub enum ImageDim {
 #[derive(Clone, Debug, Copy, PartialEq, Default)]
 #[repr(u8)]
 pub enum SampleLayout {
-    _1x1 = 0,
-    _2x1 = 1,
-    _2x2 = 2,
-    _4x2 = 3,
-    _4x4 = 4,
+    _1x1,
+    _2x1,
+    _2x1D3d,
+    _2x2,
+    _4x2,
+    _4x2D3d,
+    _4x4,
     #[default]
-    Invalid = 5,
+    Invalid,
+}
+
+#[repr(C)]
+pub struct SampleOffset {
+    pub x: u8,
+    pub y: u8,
 }
 
 impl SampleLayout {
@@ -47,20 +55,40 @@ impl SampleLayout {
     pub fn choose_sample_layout(samples: u32) -> SampleLayout {
         match samples {
             1 => SampleLayout::_1x1,
-            2 => SampleLayout::_2x1,
+            2 => SampleLayout::_2x1D3d,
             4 => SampleLayout::_2x2,
-            8 => SampleLayout::_4x2,
+            8 => SampleLayout::_4x2D3d,
             16 => SampleLayout::_4x4,
             _ => SampleLayout::Invalid,
         }
+    }
+
+    pub fn samples(&self) -> u32 {
+        match self {
+            SampleLayout::_1x1 => 1,
+            SampleLayout::_2x1 => 2,
+            SampleLayout::_2x1D3d => 2,
+            SampleLayout::_2x2 => 4,
+            SampleLayout::_4x2 => 8,
+            SampleLayout::_4x2D3d => 8,
+            SampleLayout::_4x4 => 16,
+            SampleLayout::Invalid => panic!("Invalid sample layout"),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn nil_sample_layout_samples(self) -> u32 {
+        self.samples()
     }
 
     pub fn px_extent_sa(&self) -> Extent4D<units::Samples> {
         match self {
             SampleLayout::_1x1 => Extent4D::new(1, 1, 1, 1),
             SampleLayout::_2x1 => Extent4D::new(2, 1, 1, 1),
+            SampleLayout::_2x1D3d => Extent4D::new(2, 1, 1, 1),
             SampleLayout::_2x2 => Extent4D::new(2, 2, 1, 1),
             SampleLayout::_4x2 => Extent4D::new(4, 2, 1, 1),
+            SampleLayout::_4x2D3d => Extent4D::new(4, 2, 1, 1),
             SampleLayout::_4x4 => Extent4D::new(4, 4, 1, 1),
             SampleLayout::Invalid => panic!("Invalid sample layout"),
         }
@@ -69,6 +97,48 @@ impl SampleLayout {
     #[no_mangle]
     pub extern "C" fn nil_px_extent_sa(self) -> Extent4D<units::Samples> {
         self.px_extent_sa()
+    }
+
+    pub fn sa_offset(&self, s: u8) -> SampleOffset {
+        let (x, y) = match self {
+            SampleLayout::_1x1 => (0, 0),
+            SampleLayout::_2x1 => {
+                debug_assert!(s < 2);
+                (s, 0)
+            }
+            SampleLayout::_2x1D3d => {
+                debug_assert!(s < 2);
+                (1 - s, 0)
+            }
+            SampleLayout::_2x2 => {
+                debug_assert!(s < 4);
+                (s & 1, s >> 1)
+            }
+            SampleLayout::_4x2 => {
+                debug_assert!(s < 8);
+                (s & 3, s >> 2)
+            }
+            SampleLayout::_4x2D3d => match s {
+                0 => (2, 0),
+                1 => (1, 1),
+                2 => (3, 1),
+                3 => (1, 0),
+                4 => (0, 1),
+                5 => (0, 0),
+                6 => (2, 1),
+                7 => (3, 0),
+                _ => panic!("Invalid sample"),
+            },
+            SampleLayout::_4x4 => todo!("Figure out the layout of 4x4"),
+            SampleLayout::Invalid => panic!("Invalid sample layout"),
+        };
+
+        SampleOffset { x, y }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn nil_sample_offset(self, s: u8) -> SampleOffset {
+        self.sa_offset(s)
     }
 }
 
@@ -199,7 +269,7 @@ impl Image {
             // the size of a miplevel, we don't care about arrays.
             lvl_ext_B.array_len = 1;
 
-            if tiling.is_tiled {
+            if tiling.is_tiled() {
                 let lvl_tiling = tiling.clamp(lvl_ext_B);
 
                 if tiling != lvl_tiling {
@@ -275,7 +345,7 @@ impl Image {
             image.align_B = std::cmp::max(image.align_B, 1 << 16);
         }
 
-        if image.levels[0].tiling.is_tiled {
+        if image.levels[0].tiling.is_tiled() {
             image.pte_kind = Self::choose_pte_kind(
                 dev,
                 info.format,
@@ -290,7 +360,7 @@ impl Image {
             }
         }
 
-        if image.levels[0].tiling.is_tiled {
+        if image.levels[0].tiling.is_tiled() {
             image.tile_mode = u16::from(image.levels[0].tiling.y_log2) << 4
                 | u16::from(image.levels[0].tiling.z_log2) << 8;
 
@@ -377,28 +447,43 @@ impl Image {
     }
 
     #[no_mangle]
-    pub extern "C" fn nil_image_level_size_B(&self, level: u32) -> u64 {
-        self.level_size_B(level)
+    pub extern "C" fn nil_image_level_layer_size_B(&self, level: u32) -> u64 {
+        self.level_layer_size_B(level)
     }
 
-    pub fn level_size_B(&self, level: u32) -> u64 {
+    pub fn level_layer_size_B(&self, level: u32) -> u64 {
         assert!(level < self.num_levels);
-        let lvl_ext_B = self.level_extent_B(level);
+        let mut lvl_ext_B = self.level_extent_B(level);
+        // We only care about a single array layer here
+        lvl_ext_B.array_len = 1;
         let level = &self.levels[level as usize];
 
-        if level.tiling.is_tiled {
-            let lvl_tiling_ext_B = level.tiling.extent_B();
-            let mut lvl_ext_B = lvl_ext_B.align(&lvl_tiling_ext_B);
-
-            let array_len = lvl_ext_B.array_len;
-            lvl_ext_B.array_len = 1;
-
-            self.array_stride_B * u64::from(array_len - 1) + lvl_ext_B.size_B()
+        if level.tiling.is_tiled() {
+            lvl_ext_B.align(&level.tiling.extent_B()).size_B()
         } else {
             assert!(lvl_ext_B.depth == 1);
             assert!(lvl_ext_B.array_len == 1);
             u64::from(level.row_stride_B) * u64::from(lvl_ext_B.height - 1)
                 + u64::from(lvl_ext_B.width)
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn nil_image_level_size_B(&self, level: u32) -> u64 {
+        self.level_size_B(level)
+    }
+
+    pub fn level_size_B(&self, level: u32) -> u64 {
+        let lvl_ext_B = self.level_extent_B(level);
+        let lvl = &self.levels[level as usize];
+
+        if lvl.tiling.is_tiled() {
+            let lvl_layer_size_B = self.level_layer_size_B(level);
+            self.array_stride_B * u64::from(lvl_ext_B.array_len - 1)
+                + lvl_layer_size_B
+        } else {
+            assert!(self.extent_px.array_len == 1);
+            self.level_layer_size_B(level)
         }
     }
 
@@ -527,7 +612,7 @@ impl Image {
         let lvl0 = &image_2d_out.levels[0];
 
         assert!(image_2d_out.num_levels == 1);
-        assert!(!lvl0.tiling.is_tiled || lvl0.tiling.z_log2 == 0);
+        assert!(!lvl0.tiling.is_tiled() || lvl0.tiling.z_log2 == 0);
 
         let lvl_tiling_ext_B = lvl0.tiling.extent_B();
         let lvl_ext_B = image_2d_out.level_extent_B(0);

@@ -9,12 +9,14 @@ libasahi_agx_files = files(
   'agx_insert_waits.c',
   'agx_nir_lower_address.c',
   'agx_nir_lower_cull_distance.c',
+  'agx_nir_lower_fminmax.c',
   'agx_nir_lower_frag_sidefx.c',
   'agx_nir_lower_sample_mask.c',
   'agx_nir_lower_discard_zs_emit.c',
   'agx_nir_lower_interpolation.c',
   'agx_nir_lower_shared_bitsize.c',
   'agx_nir_lower_subgroups.c',
+  'agx_nir_lower_texture.c',
   'agx_nir_opt_preamble.c',
   'agx_lower_64bit.c',
   'agx_lower_divergent_shuffle.c',
@@ -39,6 +41,7 @@ libasahi_agx_files = files(
   'agx_spill.c',
   'agx_register_allocate.c',
   'agx_validate.c',
+  'agx_validate_ra.c',
 )
 
 agx_nir_algebraic_c = custom_target(
@@ -92,8 +95,8 @@ idep_agx_builder_h = declare_dependency(
 libasahi_compiler = static_library(
   'asahi_compiler',
   [libasahi_agx_files, agx_opcodes_c, agx_nir_algebraic_c],
-  dependencies: [idep_nir, idep_agx_opcodes_h, idep_agx_builder_h, idep_mesautil],
-  c_args : [no_override_init_args],
+  dependencies: [idep_nir, idep_agx_opcodes_h, idep_agx_builder_h, idep_mesautil, idep_libagx],
+  c_args : [no_override_init_args, '-Wno-c2x-extensions'],
   gnu_symbol_visibility : 'hidden',
   build_by_default : false,
 )

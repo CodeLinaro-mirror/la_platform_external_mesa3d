@@ -23,7 +23,6 @@
 
 #include "vk_util.h"
 
-#include "v3dv_debug.h"
 #include "v3dv_private.h"
 
 #include "common/v3d_debug.h"
@@ -34,6 +33,7 @@
 
 #include "util/u_atomic.h"
 #include "util/os_time.h"
+#include "util/perf/cpu_trace.h"
 
 #include "vk_format.h"
 #include "vk_nir_convert_ycbcr.h"
@@ -41,24 +41,6 @@
 
 static VkResult
 compute_vpm_config(struct v3dv_pipeline *pipeline);
-
-void
-v3dv_print_v3d_key(struct v3d_key *key,
-                   uint32_t v3d_key_size)
-{
-   struct mesa_sha1 ctx;
-   unsigned char sha1[20];
-   char sha1buf[41];
-
-   _mesa_sha1_init(&ctx);
-
-   _mesa_sha1_update(&ctx, key, v3d_key_size);
-
-   _mesa_sha1_final(&ctx, sha1);
-   _mesa_sha1_format(sha1buf, sha1);
-
-   fprintf(stderr, "key %p: %s\n", key, sha1buf);
-}
 
 static void
 pipeline_compute_sha1_from_nir(struct v3dv_pipeline_stage *p_stage)
@@ -230,7 +212,6 @@ v3dv_pipeline_get_nir_options(const struct v3d_device_info *devinfo)
       .divergence_analysis_options =
          nir_divergence_multiple_workgroup_per_compute_subgroup,
       .discard_is_demote = true,
-      .has_ddx_intrinsics = true,
       .scalarize_ddx = true,
    };
 
@@ -659,13 +640,6 @@ lower_tex_src(nir_builder *b,
    struct v3dv_descriptor_set_binding_layout *binding_layout =
       &set_layout->binding[binding];
 
-   /* For input attachments, the shader includes the attachment_idx. As we are
-    * treating them as a texture, we only want the base_index
-    */
-   uint32_t array_index = binding_layout->type != VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT ?
-      deref->var->data.index + base_index :
-      base_index;
-
    uint8_t return_size;
    if (V3D_DBG(TMU_16BIT))
       return_size = 16;
@@ -681,7 +655,7 @@ lower_tex_src(nir_builder *b,
       descriptor_map_add(map,
                          deref->var->data.descriptor_set,
                          deref->var->data.binding,
-                         array_index,
+                         base_index,
                          binding_layout->array_size,
                          0,
                          return_size,
@@ -769,15 +743,13 @@ lower_image_deref(nir_builder *b,
    }
 
    if (index)
-      index = nir_umin(b, index, nir_imm_int(b, array_elements - 1));
+      nir_umin(b, index, nir_imm_int(b, array_elements - 1));
 
    uint32_t set = deref->var->data.descriptor_set;
    uint32_t binding = deref->var->data.binding;
    struct v3dv_descriptor_set_layout *set_layout = state->layout->set[set].layout;
    struct v3dv_descriptor_set_binding_layout *binding_layout =
       &set_layout->binding[binding];
-
-   uint32_t array_index = deref->var->data.index + base_index;
 
    assert(binding_layout->type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ||
           binding_layout->type == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER);
@@ -790,7 +762,7 @@ lower_image_deref(nir_builder *b,
       descriptor_map_add(map,
                          deref->var->data.descriptor_set,
                          deref->var->data.binding,
-                         array_index,
+                         base_index,
                          binding_layout->array_size,
                          0,
                          32 /* return_size: doesn't apply for textures */,
@@ -1464,13 +1436,13 @@ upload_assembly(struct v3dv_pipeline *pipeline)
    struct v3dv_bo *bo = v3dv_bo_alloc(pipeline->device, total_size,
                                       "pipeline shader assembly", true);
    if (!bo) {
-      fprintf(stderr, "failed to allocate memory for shader\n");
+      mesa_loge("failed to allocate memory for shader\n");
       return false;
    }
 
    bool ok = v3dv_bo_map(pipeline->device, bo, total_size);
    if (!ok) {
-      fprintf(stderr, "failed to map source shader buffer\n");
+      mesa_loge("failed to map source shader buffer\n");
       return false;
    }
 
@@ -1688,9 +1660,9 @@ pipeline_compile_shader_variant(struct v3dv_pipeline_stage *p_stage,
    struct v3dv_shader_variant *variant = NULL;
 
    if (!qpu_insts) {
-      fprintf(stderr, "Failed to compile %s prog %d NIR to VIR\n",
-              broadcom_shader_stage_name(p_stage->stage),
-              p_stage->program_id);
+      mesa_loge("Failed to compile %s prog %d NIR to VIR\n",
+                broadcom_shader_stage_name(p_stage->stage),
+                p_stage->program_id);
       *out_vk_result = VK_ERROR_UNKNOWN;
    } else {
       variant =
@@ -2845,7 +2817,7 @@ pipeline_init_dynamic_state(struct v3dv_device *device,
       /* FIXME: right now we don't support multiViewport so viewporst[0] would
        * work now, but would need to change if we allow multiple viewports.
        */
-      v3dv_X(device, viewport_compute_xform)(&dyn->vp.viewports[0],
+      v3d_X((&device->devinfo), viewport_compute_xform)(&dyn->vp.viewports[0],
                                              v3dv_dyn->viewport.scale[0],
                                              v3dv_dyn->viewport.translate[0]);
 
@@ -2949,7 +2921,7 @@ pipeline_init(struct v3dv_pipeline *pipeline,
    if (depth_clip_control)
       pipeline->negative_one_to_one = depth_clip_control->negativeOneToOne;
 
-   v3dv_X(device, pipeline_pack_state)(pipeline, cb_info, ds_info,
+   v3d_X((&device->devinfo), pipeline_pack_state)(pipeline, cb_info, ds_info,
                                        rs_info, pv_info, ls_info,
                                        ms_info,
                                        &pipeline_state);
@@ -2974,11 +2946,11 @@ pipeline_init(struct v3dv_pipeline *pipeline,
       vk_find_struct_const(vi_info->pNext,
                            PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT);
 
-   v3dv_X(device, pipeline_pack_compile_state)(pipeline, vi_info, vd_info);
+   v3d_X((&device->devinfo), pipeline_pack_compile_state)(pipeline, vi_info, vd_info);
 
-   if (v3dv_X(device, pipeline_needs_default_attribute_values)(pipeline)) {
+   if (v3d_X((&device->devinfo), pipeline_needs_default_attribute_values)(pipeline)) {
       pipeline->default_attribute_values =
-         v3dv_X(pipeline->device, create_default_attribute_values)(pipeline->device, pipeline);
+         v3d_X((&pipeline->device->devinfo), create_default_attribute_values)(pipeline->device, pipeline);
 
       if (!pipeline->default_attribute_values)
          return VK_ERROR_OUT_OF_DEVICE_MEMORY;
@@ -3056,6 +3028,7 @@ v3dv_CreateGraphicsPipelines(VkDevice _device,
                              const VkAllocationCallbacks *pAllocator,
                              VkPipeline *pPipelines)
 {
+   MESA_TRACE_FUNC();
    V3DV_FROM_HANDLE(v3dv_device, device, _device);
    VkResult result = VK_SUCCESS;
 
@@ -3320,6 +3293,7 @@ v3dv_CreateComputePipelines(VkDevice _device,
                             const VkAllocationCallbacks *pAllocator,
                             VkPipeline *pPipelines)
 {
+   MESA_TRACE_FUNC();
    V3DV_FROM_HANDLE(v3dv_device, device, _device);
    VkResult result = VK_SUCCESS;
 

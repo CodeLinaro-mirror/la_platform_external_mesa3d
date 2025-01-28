@@ -73,7 +73,7 @@ dri_validate_egl_image(void *image, void *data)
    return dri->validate_image(image, dri->lookup_user_data);
 }
 
-static __DRIimage *
+static struct dri_image *
 dri_lookup_egl_image_validated(void *image, void *data)
 {
    struct gbm_dri_device *dri = data;
@@ -85,7 +85,7 @@ dri_lookup_egl_image_validated(void *image, void *data)
 }
 
 static void
-dri_flush_front_buffer(__DRIdrawable * driDrawable, void *data)
+dri_flush_front_buffer(struct dri_drawable * driDrawable, void *data)
 {
    struct gbm_dri_surface *surf = data;
    struct gbm_dri_device *dri = gbm_dri_device(surf->base.gbm);
@@ -109,7 +109,7 @@ dri_get_capability(void *loaderPrivate, enum dri_loader_cap cap)
 }
 
 static int
-image_get_buffers(__DRIdrawable *driDrawable,
+image_get_buffers(struct dri_drawable *driDrawable,
                   unsigned int format,
                   uint32_t *stamp,
                   void *loaderPrivate,
@@ -127,7 +127,7 @@ image_get_buffers(__DRIdrawable *driDrawable,
 }
 
 static void
-swrast_get_drawable_info(__DRIdrawable *driDrawable,
+swrast_get_drawable_info(struct dri_drawable *driDrawable,
                          int           *x,
                          int           *y,
                          int           *width,
@@ -143,7 +143,7 @@ swrast_get_drawable_info(__DRIdrawable *driDrawable,
 }
 
 static void
-swrast_put_image2(__DRIdrawable *driDrawable,
+swrast_put_image2(struct dri_drawable *driDrawable,
                   int            op,
                   int            x,
                   int            y,
@@ -163,7 +163,7 @@ swrast_put_image2(__DRIdrawable *driDrawable,
 }
 
 static void
-swrast_put_image(__DRIdrawable *driDrawable,
+swrast_put_image(struct dri_drawable *driDrawable,
                  int            op,
                  int            x,
                  int            y,
@@ -177,7 +177,7 @@ swrast_put_image(__DRIdrawable *driDrawable,
 }
 
 static void
-swrast_get_image(__DRIdrawable *driDrawable,
+swrast_get_image(struct dri_drawable *driDrawable,
                  int            x,
                  int            y,
                  int            width,
@@ -305,33 +305,37 @@ dri_screen_create_sw(struct gbm_dri_device *dri, bool driver_name_is_inferred)
 }
 
 static const struct gbm_dri_visual gbm_dri_visuals_table[] = {
-   { GBM_FORMAT_R8, __DRI_IMAGE_FORMAT_R8 },
-   { GBM_FORMAT_R16, __DRI_IMAGE_FORMAT_R16 },
-   { GBM_FORMAT_GR88, __DRI_IMAGE_FORMAT_GR88 },
-   { GBM_FORMAT_GR1616, __DRI_IMAGE_FORMAT_GR1616 },
-   { GBM_FORMAT_ARGB1555, __DRI_IMAGE_FORMAT_ARGB1555 },
-   { GBM_FORMAT_RGB565, __DRI_IMAGE_FORMAT_RGB565 },
-   { GBM_FORMAT_XRGB8888, __DRI_IMAGE_FORMAT_XRGB8888 },
-   { GBM_FORMAT_ARGB8888, __DRI_IMAGE_FORMAT_ARGB8888 },
-   { GBM_FORMAT_XBGR8888, __DRI_IMAGE_FORMAT_XBGR8888 },
-   { GBM_FORMAT_ABGR8888, __DRI_IMAGE_FORMAT_ABGR8888 },
-   { GBM_FORMAT_XRGB2101010, __DRI_IMAGE_FORMAT_XRGB2101010 },
-   { GBM_FORMAT_ARGB2101010, __DRI_IMAGE_FORMAT_ARGB2101010 },
-   { GBM_FORMAT_XBGR2101010, __DRI_IMAGE_FORMAT_XBGR2101010 },
-   { GBM_FORMAT_ABGR2101010, __DRI_IMAGE_FORMAT_ABGR2101010 },
-   { GBM_FORMAT_XBGR16161616, __DRI_IMAGE_FORMAT_XBGR16161616 },
-   { GBM_FORMAT_ABGR16161616, __DRI_IMAGE_FORMAT_ABGR16161616 },
-   { GBM_FORMAT_XBGR16161616F, __DRI_IMAGE_FORMAT_XBGR16161616F },
-   { GBM_FORMAT_ABGR16161616F, __DRI_IMAGE_FORMAT_ABGR16161616F },
+   { GBM_FORMAT_R8, PIPE_FORMAT_R8_UNORM },
+   { GBM_FORMAT_R16, PIPE_FORMAT_R16_UNORM },
+   { GBM_FORMAT_GR88, PIPE_FORMAT_R8G8_UNORM },
+   { GBM_FORMAT_GR1616, PIPE_FORMAT_R16G16_UNORM },
+   { GBM_FORMAT_ARGB1555, PIPE_FORMAT_B5G5R5A1_UNORM },
+   { GBM_FORMAT_RGB565, PIPE_FORMAT_B5G6R5_UNORM },
+   { GBM_FORMAT_BGRX8888, PIPE_FORMAT_X8R8G8B8_UNORM },
+   { GBM_FORMAT_BGRA8888, PIPE_FORMAT_A8R8G8B8_UNORM },
+   { GBM_FORMAT_RGBX8888, PIPE_FORMAT_X8B8G8R8_UNORM },
+   { GBM_FORMAT_RGBA8888, PIPE_FORMAT_A8B8G8R8_UNORM },
+   { GBM_FORMAT_XRGB8888, PIPE_FORMAT_B8G8R8X8_UNORM },
+   { GBM_FORMAT_ARGB8888, PIPE_FORMAT_B8G8R8A8_UNORM },
+   { GBM_FORMAT_XBGR8888, PIPE_FORMAT_R8G8B8X8_UNORM },
+   { GBM_FORMAT_ABGR8888, PIPE_FORMAT_R8G8B8A8_UNORM },
+   { GBM_FORMAT_XRGB2101010, PIPE_FORMAT_B10G10R10X2_UNORM },
+   { GBM_FORMAT_ARGB2101010, PIPE_FORMAT_B10G10R10A2_UNORM },
+   { GBM_FORMAT_XBGR2101010, PIPE_FORMAT_R10G10B10X2_UNORM },
+   { GBM_FORMAT_ABGR2101010, PIPE_FORMAT_R10G10B10A2_UNORM },
+   { GBM_FORMAT_XBGR16161616, PIPE_FORMAT_R16G16B16X16_UNORM },
+   { GBM_FORMAT_ABGR16161616, PIPE_FORMAT_R16G16B16A16_UNORM },
+   { GBM_FORMAT_XBGR16161616F, PIPE_FORMAT_R16G16B16X16_FLOAT },
+   { GBM_FORMAT_ABGR16161616F, PIPE_FORMAT_R16G16B16A16_FLOAT },
 };
 
 static int
-gbm_format_to_dri_format(uint32_t gbm_format)
+gbm_format_to_pipe_format(uint32_t gbm_format)
 {
    gbm_format = core->v0.format_canonicalize(gbm_format);
    for (size_t i = 0; i < ARRAY_SIZE(gbm_dri_visuals_table); i++) {
       if (gbm_dri_visuals_table[i].gbm_format == gbm_format)
-         return gbm_dri_visuals_table[i].dri_image_format;
+         return gbm_dri_visuals_table[i].pipe_format;
    }
 
    return 0;
@@ -349,7 +353,7 @@ gbm_dri_is_format_supported(struct gbm_device *gbm,
       return 0;
 
    format = core->v0.format_canonicalize(format);
-   if (gbm_format_to_dri_format(format) == 0)
+   if (gbm_format_to_pipe_format(format) == 0)
       return 0;
 
    /* If there is no query, fall back to the small table which was originally
@@ -385,7 +389,7 @@ gbm_dri_get_format_modifier_plane_count(struct gbm_device *gbm,
       return -1;
 
    format = core->v0.format_canonicalize(format);
-   if (gbm_format_to_dri_format(format) == 0)
+   if (gbm_format_to_pipe_format(format) == 0)
       return -1;
 
    if (!dri2_query_dma_buf_format_modifier_attribs(dri->screen, format, modifier,
@@ -426,7 +430,7 @@ gbm_dri_bo_get_fd(struct gbm_bo *_bo)
 }
 
 static int
-get_number_planes(struct gbm_dri_device *dri, __DRIimage *image)
+get_number_planes(struct gbm_dri_device *dri, struct dri_image *image)
 {
    int num_planes = 0;
 
@@ -471,7 +475,7 @@ gbm_dri_bo_get_handle_for_plane(struct gbm_bo *_bo, int plane)
       return ret;
    }
 
-   __DRIimage *image = dri2_from_planar(bo->image, plane, NULL);
+   struct dri_image *image = dri2_from_planar(bo->image, plane, NULL);
    if (image) {
       dri2_query_image(image, __DRI_IMAGE_ATTRIB_HANDLE, &ret.s32);
       dri2_destroy_image(image);
@@ -510,7 +514,7 @@ gbm_dri_bo_get_plane_fd(struct gbm_bo *_bo, int plane)
       return -1;
    }
 
-   __DRIimage *image = dri2_from_planar(bo->image, plane, NULL);
+   struct dri_image *image = dri2_from_planar(bo->image, plane, NULL);
    if (image) {
       dri2_query_image(image, __DRI_IMAGE_ATTRIB_FD, &fd);
       dri2_destroy_image(image);
@@ -527,7 +531,7 @@ gbm_dri_bo_get_stride(struct gbm_bo *_bo, int plane)
 {
    struct gbm_dri_device *dri = gbm_dri_device(_bo->gbm);
    struct gbm_dri_bo *bo = gbm_dri_bo(_bo);
-   __DRIimage *image;
+   struct dri_image *image;
    int stride = 0;
 
    if (!dri->has_dmabuf_import) {
@@ -577,7 +581,7 @@ gbm_dri_bo_get_offset(struct gbm_bo *_bo, int plane)
       return 0;
    }
 
-   __DRIimage *image = dri2_from_planar(bo->image, plane, NULL);
+   struct dri_image *image = dri2_from_planar(bo->image, plane, NULL);
    if (image) {
       dri2_query_image(image, __DRI_IMAGE_ATTRIB_OFFSET, &offset);
       dri2_destroy_image(image);
@@ -640,7 +644,7 @@ gbm_dri_bo_import(struct gbm_device *gbm,
 {
    struct gbm_dri_device *dri = gbm_dri_device(gbm);
    struct gbm_dri_bo *bo;
-   __DRIimage *image;
+   struct dri_image *image;
    unsigned dri_use = 0;
    int gbm_format;
 
@@ -861,7 +865,7 @@ gbm_dri_bo_create(struct gbm_device *gbm,
 {
    struct gbm_dri_device *dri = gbm_dri_device(gbm);
    struct gbm_dri_bo *bo;
-   int dri_format;
+   int pipe_format;
    unsigned dri_use = 0;
    uint64_t *mods_comp = NULL;
    uint64_t *mods_filtered = NULL;
@@ -881,8 +885,8 @@ gbm_dri_bo_create(struct gbm_device *gbm,
    bo->base.v0.height = height;
    bo->base.v0.format = format;
 
-   dri_format = gbm_format_to_dri_format(format);
-   if (dri_format == 0) {
+   pipe_format = gbm_format_to_pipe_format(format);
+   if (pipe_format == 0) {
       errno = EINVAL;
       goto failed;
    }
@@ -983,7 +987,7 @@ gbm_dri_bo_create(struct gbm_device *gbm,
    }
 
    bo->image = dri_create_image_with_modifiers(dri->screen, width, height,
-                                       dri_format, dri_use,
+                                       pipe_format, dri_use,
                                        mods_filtered ? mods_filtered : modifiers,
                                        mods_filtered ? count_filtered : count,
                                        bo);
@@ -1143,7 +1147,7 @@ dri_destroy(struct gbm_device *gbm)
 
    driDestroyScreen(dri->screen);
    for (i = 0; dri->driver_configs[i]; i++)
-      free((__DRIconfig *) dri->driver_configs[i]);
+      free((struct dri_config *) dri->driver_configs[i]);
    free(dri->driver_configs);
    free(dri->driver_name);
 
@@ -1202,12 +1206,12 @@ dri_device_create(int fd, uint32_t gbm_backend_version)
    if (ret)
       goto err_dri;
 
-   struct dri_screen *screen = dri_screen(dri->screen);
+   struct dri_screen *screen = dri->screen;
    struct pipe_screen *pscreen = screen->base.screen;
 #ifdef HAVE_LIBDRM
-   if (pscreen->get_param(pscreen, PIPE_CAP_DMABUF) & DRM_PRIME_CAP_IMPORT)
+   if (pscreen->caps.dmabuf & DRM_PRIME_CAP_IMPORT)
       dri->has_dmabuf_import = true;
-   if (pscreen->get_param(pscreen, PIPE_CAP_DMABUF) & DRM_PRIME_CAP_EXPORT)
+   if (pscreen->caps.dmabuf & DRM_PRIME_CAP_EXPORT)
       dri->has_dmabuf_export = true;
 #endif
    dri->has_compression_modifiers = pscreen->query_compression_rates &&

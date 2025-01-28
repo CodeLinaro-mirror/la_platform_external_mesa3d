@@ -72,6 +72,7 @@ fs_inst::init(enum opcode opcode, uint8_t exec_size, const brw_reg &dst,
    /* This will be the case for almost all instructions. */
    switch (dst.file) {
    case VGRF:
+   case ADDRESS:
    case ARF:
    case FIXED_GRF:
    case ATTR:
@@ -188,7 +189,7 @@ fs_inst::resize_sources(uint8_t num_sources)
 
       } else {
          new_src = new brw_reg[num_sources];
-         for (unsigned i = 0; i < num_sources; i++)
+         for (unsigned i = 0; i < this->sources; i++)
             new_src[i] = old_src[i];
       }
 
@@ -249,6 +250,14 @@ fs_inst::is_control_source(unsigned arg) const
              arg != MEMORY_LOGICAL_DATA0 &&
              arg != MEMORY_LOGICAL_DATA1;
 
+   case SHADER_OPCODE_QUAD_SWAP:
+   case SHADER_OPCODE_INCLUSIVE_SCAN:
+   case SHADER_OPCODE_EXCLUSIVE_SCAN:
+   case SHADER_OPCODE_VOTE_ANY:
+   case SHADER_OPCODE_VOTE_ALL:
+   case SHADER_OPCODE_REDUCE:
+      return arg != 0;
+
    default:
       return false;
    }
@@ -270,120 +279,6 @@ fs_inst::is_payload(unsigned arg) const
       return arg == 2 || arg == 3;
 
    default:
-      return false;
-   }
-}
-
-/**
- * Returns true if this instruction's sources and destinations cannot
- * safely be the same register.
- *
- * In most cases, a register can be written over safely by the same
- * instruction that is its last use.  For a single instruction, the
- * sources are dereferenced before writing of the destination starts
- * (naturally).
- *
- * However, there are a few cases where this can be problematic:
- *
- * - Virtual opcodes that translate to multiple instructions in the
- *   code generator: if src == dst and one instruction writes the
- *   destination before a later instruction reads the source, then
- *   src will have been clobbered.
- *
- * - SIMD16 compressed instructions with certain regioning (see below).
- *
- * The register allocator uses this information to set up conflicts between
- * GRF sources and the destination.
- */
-bool
-fs_inst::has_source_and_destination_hazard() const
-{
-   switch (opcode) {
-   case FS_OPCODE_PACK_HALF_2x16_SPLIT:
-      /* Multiple partial writes to the destination */
-      return true;
-   case SHADER_OPCODE_SHUFFLE:
-      /* This instruction returns an arbitrary channel from the source and
-       * gets split into smaller instructions in the generator.  It's possible
-       * that one of the instructions will read from a channel corresponding
-       * to an earlier instruction.
-       */
-   case SHADER_OPCODE_SEL_EXEC:
-      /* This is implemented as
-       *
-       * mov(16)      g4<1>D      0D            { align1 WE_all 1H };
-       * mov(16)      g4<1>D      g5<8,8,1>D    { align1 1H }
-       *
-       * Because the source is only read in the second instruction, the first
-       * may stomp all over it.
-       */
-      return true;
-   case SHADER_OPCODE_QUAD_SWIZZLE:
-      switch (src[1].ud) {
-      case BRW_SWIZZLE_XXXX:
-      case BRW_SWIZZLE_YYYY:
-      case BRW_SWIZZLE_ZZZZ:
-      case BRW_SWIZZLE_WWWW:
-      case BRW_SWIZZLE_XXZZ:
-      case BRW_SWIZZLE_YYWW:
-      case BRW_SWIZZLE_XYXY:
-      case BRW_SWIZZLE_ZWZW:
-         /* These can be implemented as a single Align1 region on all
-          * platforms, so there's never a hazard between source and
-          * destination.  C.f. fs_generator::generate_quad_swizzle().
-          */
-         return false;
-      default:
-         return !is_uniform(src[0]);
-      }
-   case BRW_OPCODE_DPAS:
-      /* This is overly conservative. The actual hazard is more complicated to
-       * describe. When the repeat count is N, the single instruction behaves
-       * like N instructions with a repeat count of one, but the destination
-       * and source registers are incremented (in somewhat complex ways) for
-       * each instruction.
-       *
-       * This means the source and destination register is actually a range of
-       * registers. The hazard exists of an earlier iteration would write a
-       * register that should be read by a later iteration.
-       *
-       * There may be some advantage to properly modeling this, but for now,
-       * be overly conservative.
-       */
-      return rcount > 1;
-   default:
-      /* The SIMD16 compressed instruction
-       *
-       * add(16)      g4<1>F      g4<8,8,1>F   g6<8,8,1>F
-       *
-       * is actually decoded in hardware as:
-       *
-       * add(8)       g4<1>F      g4<8,8,1>F   g6<8,8,1>F
-       * add(8)       g5<1>F      g5<8,8,1>F   g7<8,8,1>F
-       *
-       * Which is safe.  However, if we have uniform accesses
-       * happening, we get into trouble:
-       *
-       * add(8)       g4<1>F      g4<0,1,0>F   g6<8,8,1>F
-       * add(8)       g5<1>F      g4<0,1,0>F   g7<8,8,1>F
-       *
-       * Now our destination for the first instruction overwrote the
-       * second instruction's src0, and we get garbage for those 8
-       * pixels.  There's a similar issue for the pre-gfx6
-       * pixel_x/pixel_y, which are registers of 16-bit values and thus
-       * would get stomped by the first decode as well.
-       */
-      if (exec_size == 16) {
-         for (int i = 0; i < sources; i++) {
-            if (src[i].file == VGRF && (src[i].stride == 0 ||
-                                        src[i].type == BRW_TYPE_UW ||
-                                        src[i].type == BRW_TYPE_W ||
-                                        src[i].type == BRW_TYPE_UB ||
-                                        src[i].type == BRW_TYPE_B)) {
-               return true;
-            }
-         }
-      }
       return false;
    }
 }
@@ -432,6 +327,16 @@ fs_inst::can_do_source_mods(const struct intel_device_info *devinfo) const
    case SHADER_OPCODE_SHUFFLE:
    case SHADER_OPCODE_INT_QUOTIENT:
    case SHADER_OPCODE_INT_REMAINDER:
+   case SHADER_OPCODE_REDUCE:
+   case SHADER_OPCODE_INCLUSIVE_SCAN:
+   case SHADER_OPCODE_EXCLUSIVE_SCAN:
+   case SHADER_OPCODE_VOTE_ANY:
+   case SHADER_OPCODE_VOTE_ALL:
+   case SHADER_OPCODE_VOTE_EQUAL:
+   case SHADER_OPCODE_BALLOT:
+   case SHADER_OPCODE_QUAD_SWAP:
+   case SHADER_OPCODE_READ_FROM_LIVE_CHANNEL:
+   case SHADER_OPCODE_READ_FROM_CHANNEL:
       return false;
    default:
       return true;
@@ -489,6 +394,9 @@ fs_inst::can_do_cmod() const
          return false;
    }
 
+   if (dst.file == ARF && dst.nr == BRW_ARF_SCALAR && src[0].file == IMM)
+      return false;
+
    return true;
 }
 
@@ -503,56 +411,6 @@ fs_inst::can_change_types() const
             dst.type == src[1].type &&
             predicate != BRW_PREDICATE_NONE &&
             !src[1].abs && !src[1].negate && src[1].file != ATTR));
-}
-
-bool
-brw_reg::equals(const brw_reg &r) const
-{
-   return brw_regs_equal(this, &r);
-}
-
-bool
-brw_reg::negative_equals(const brw_reg &r) const
-{
-   return brw_regs_negative_equal(this, &r);
-}
-
-bool
-brw_reg::is_contiguous() const
-{
-   switch (file) {
-   case ARF:
-   case FIXED_GRF:
-      return hstride == BRW_HORIZONTAL_STRIDE_1 &&
-             vstride == width + hstride;
-   case VGRF:
-   case ATTR:
-      return stride == 1;
-   case UNIFORM:
-   case IMM:
-   case BAD_FILE:
-      return true;
-   }
-
-   unreachable("Invalid register file");
-}
-
-unsigned
-brw_reg::component_size(unsigned width) const
-{
-   if (file == ARF || file == FIXED_GRF) {
-      const unsigned w = MIN2(width, 1u << this->width);
-      const unsigned h = width >> this->width;
-      const unsigned vs = vstride ? 1 << (vstride - 1) : 0;
-      const unsigned hs = hstride ? 1 << (hstride - 1) : 0;
-      assert(w > 0);
-      /* Note this rounds up to next horizontal stride to be consistent with
-       * the VGRF case below.
-       */
-      return ((MAX2(1, h) - 1) * vs + MAX2(w * hs, 1)) * brw_type_size_bytes(type);
-   } else {
-      return MAX2(width * stride, 1) * brw_type_size_bytes(type);
-   }
 }
 
 void
@@ -740,7 +598,7 @@ fs_inst::components_read(unsigned i) const
 }
 
 unsigned
-fs_inst::size_read(int arg) const
+fs_inst::size_read(const struct intel_device_info *devinfo, int arg) const
 {
    switch (opcode) {
    case SHADER_OPCODE_SEND:
@@ -818,11 +676,14 @@ fs_inst::size_read(int arg) const
    case IMM:
       return components_read(arg) * brw_type_size_bytes(src[arg].type);
    case BAD_FILE:
+   case ADDRESS:
    case ARF:
    case FIXED_GRF:
    case VGRF:
    case ATTR:
-      return components_read(arg) * src[arg].component_size(exec_size);
+      /* Regardless of exec_size, values marked as scalar are SIMD8. */
+      return components_read(arg) *
+             src[arg].component_size(src[arg].is_scalar ? 8 * reg_unit(devinfo) : exec_size);
    }
    return 0;
 }
@@ -868,7 +729,7 @@ fs_inst::flags_read(const intel_device_info *devinfo) const
    } else {
       unsigned mask = 0;
       for (int i = 0; i < sources; i++) {
-         mask |= brw_fs_flag_mask(src[i], size_read(i));
+         mask |= brw_fs_flag_mask(src[i], size_read(devinfo, i));
       }
       return mask;
    }
@@ -938,17 +799,29 @@ fs_inst::is_raw_move() const
            brw_type_size_bits(src[0].type) == brw_type_size_bits(dst.type));
 }
 
+bool
+fs_inst::uses_address_register_implicitly() const
+{
+   switch (opcode) {
+   case SHADER_OPCODE_BROADCAST:
+   case SHADER_OPCODE_SHUFFLE:
+   case SHADER_OPCODE_MOV_INDIRECT:
+      return true;
+   default:
+      return false;
+   }
+}
+
 /* For SIMD16, we need to follow from the uniform setup of SIMD8 dispatch.
  * This brings in those uniform definitions
  */
 void
 fs_visitor::import_uniforms(fs_visitor *v)
 {
-   this->push_constant_loc = v->push_constant_loc;
    this->uniforms = v->uniforms;
 }
 
-enum brw_barycentric_mode
+enum intel_barycentric_mode
 brw_barycentric_mode(const struct brw_wm_prog_key *key,
                      nir_intrinsic_instr *intr)
 {
@@ -966,16 +839,16 @@ brw_barycentric_mode(const struct brw_wm_prog_key *key,
        * interpolation. We'll dynamically remap things so that the FS thread
        * payload is not affected.
        */
-      bary = key->persample_interp == BRW_SOMETIMES ?
-             BRW_BARYCENTRIC_PERSPECTIVE_SAMPLE :
-             BRW_BARYCENTRIC_PERSPECTIVE_PIXEL;
+      bary = key->persample_interp == INTEL_SOMETIMES ?
+             INTEL_BARYCENTRIC_PERSPECTIVE_SAMPLE :
+             INTEL_BARYCENTRIC_PERSPECTIVE_PIXEL;
       break;
    case nir_intrinsic_load_barycentric_centroid:
-      bary = BRW_BARYCENTRIC_PERSPECTIVE_CENTROID;
+      bary = INTEL_BARYCENTRIC_PERSPECTIVE_CENTROID;
       break;
    case nir_intrinsic_load_barycentric_sample:
    case nir_intrinsic_load_barycentric_at_sample:
-      bary = BRW_BARYCENTRIC_PERSPECTIVE_SAMPLE;
+      bary = INTEL_BARYCENTRIC_PERSPECTIVE_SAMPLE;
       break;
    default:
       unreachable("invalid intrinsic");
@@ -984,7 +857,7 @@ brw_barycentric_mode(const struct brw_wm_prog_key *key,
    if (mode == INTERP_MODE_NOPERSPECTIVE)
       bary += 3;
 
-   return (enum brw_barycentric_mode) bary;
+   return (enum intel_barycentric_mode) bary;
 }
 
 /**
@@ -1046,15 +919,7 @@ fs_visitor::assign_curb_setup()
    uint64_t used = 0;
    bool is_compute = gl_shader_stage_is_compute(stage);
 
-   if (is_compute && brw_cs_prog_data(prog_data)->uses_inline_data) {
-      /* With COMPUTE_WALKER, we can push up to one register worth of data via
-       * the inline data parameter in the COMPUTE_WALKER command itself.
-       *
-       * TODO: Support inline data and push at the same time.
-       */
-      assert(devinfo->verx10 >= 125);
-      assert(uniform_push_length <= reg_unit(devinfo));
-   } else if (is_compute && devinfo->verx10 >= 125 && uniform_push_length > 0) {
+   if (is_compute && devinfo->verx10 >= 125 && uniform_push_length > 0) {
       assert(devinfo->has_lsc);
       fs_builder ubld = fs_builder(this, 1).exec_all().at(
          cfg->first_block(), cfg->first_block()->start());
@@ -1093,18 +958,24 @@ fs_visitor::assign_curb_setup()
          fs_inst *send = ubld.emit(SHADER_OPCODE_SEND, dest, srcs, 4);
 
          send->sfid = GFX12_SFID_UGM;
-         send->desc = lsc_msg_desc(devinfo, LSC_OP_LOAD,
-                                   LSC_ADDR_SURFTYPE_FLAT,
-                                   LSC_ADDR_SIZE_A32,
-                                   LSC_DATA_SIZE_D32,
-                                   num_regs * 8 /* num_channels */,
-                                   true /* transpose */,
-                                   LSC_CACHE(devinfo, LOAD, L1STATE_L3MOCS));
+         uint32_t desc = lsc_msg_desc(devinfo, LSC_OP_LOAD,
+                                      LSC_ADDR_SURFTYPE_FLAT,
+                                      LSC_ADDR_SIZE_A32,
+                                      LSC_DATA_SIZE_D32,
+                                      num_regs * 8 /* num_channels */,
+                                      true /* transpose */,
+                                      LSC_CACHE(devinfo, LOAD, L1STATE_L3MOCS));
          send->header_size = 0;
          send->mlen = lsc_msg_addr_len(devinfo, LSC_ADDR_SIZE_A32, 1);
          send->size_written =
             lsc_msg_dest_len(devinfo, LSC_DATA_SIZE_D32, num_regs * 8) * REG_SIZE;
          send->send_is_volatile = true;
+
+         send->src[0] = brw_imm_ud(desc |
+                                   brw_message_desc(devinfo,
+                                                    send->mlen,
+                                                    send->size_written / REG_SIZE,
+                                                    send->header_size));
 
          i += num_regs;
       }
@@ -1123,7 +994,7 @@ fs_visitor::assign_curb_setup()
                constant_nr = ubo_push_start[inst->src[i].nr - UBO_START] +
                              inst->src[i].offset / 4;
             } else if (uniform_nr >= 0 && uniform_nr < (int) uniforms) {
-               constant_nr = push_constant_loc[uniform_nr];
+               constant_nr = uniform_nr;
             } else {
                /* Section 5.11 of the OpenGL 4.1 spec says:
                 * "Out-of-bounds reads return undefined values, which include
@@ -1142,7 +1013,11 @@ fs_visitor::assign_curb_setup()
             brw_reg.abs = inst->src[i].abs;
             brw_reg.negate = inst->src[i].negate;
 
-            assert(inst->src[i].stride == 0);
+            /* The combination of is_scalar for load_uniform, copy prop, and
+             * lower_btd_logical_send can generate a MOV from a UNIFORM with
+             * exec size 2 and stride of 1.
+             */
+            assert(inst->src[i].stride == 0 || inst->exec_size == 2);
             inst->src[i] = byte_offset(
                retype(brw_reg, inst->src[i].type),
                inst->src[i].offset % 4);
@@ -1271,74 +1146,6 @@ brw_get_subgroup_id_param_index(const intel_device_info *devinfo,
       return prog_data->nr_params - 1;
 
    return -1;
-}
-
-/**
- * Assign UNIFORM file registers to either push constants or pull constants.
- *
- * We allow a fragment shader to have more than the specified minimum
- * maximum number of fragment shader uniform components (64).  If
- * there are too many of these, they'd fill up all of register space.
- * So, this will push some of them out to the pull constant buffer and
- * update the program to load them.
- */
-void
-fs_visitor::assign_constant_locations()
-{
-   /* Only the first compile gets to decide on locations. */
-   if (push_constant_loc)
-      return;
-
-   push_constant_loc = ralloc_array(mem_ctx, int, uniforms);
-   for (unsigned u = 0; u < uniforms; u++)
-      push_constant_loc[u] = u;
-
-   /* Now that we know how many regular uniforms we'll push, reduce the
-    * UBO push ranges so we don't exceed the 3DSTATE_CONSTANT limits.
-    *
-    * If changing this value, note the limitation about total_regs in
-    * brw_curbe.c/crocus_state.c
-    */
-   const unsigned max_push_length = 64;
-   unsigned push_length =
-      round_components_to_whole_registers(devinfo, prog_data->nr_params);
-   for (int i = 0; i < 4; i++) {
-      struct brw_ubo_range *range = &prog_data->ubo_ranges[i];
-
-      if (push_length + range->length > max_push_length)
-         range->length = max_push_length - push_length;
-
-      push_length += range->length;
-
-      assert(push_length % (1 * reg_unit(devinfo)) == 0);
-
-   }
-   assert(push_length <= max_push_length);
-}
-
-bool
-fs_visitor::get_pull_locs(const brw_reg &src,
-                          unsigned *out_surf_index,
-                          unsigned *out_pull_index)
-{
-   assert(src.file == UNIFORM);
-
-   if (src.nr < UBO_START)
-      return false;
-
-   const struct brw_ubo_range *range =
-      &prog_data->ubo_ranges[src.nr - UBO_START];
-
-   /* If this access is in our (reduced) range, use the push data. */
-   if (src.offset / 32 < range->length)
-      return false;
-
-   *out_surf_index = range->block;
-   *out_pull_index = (32 * range->start + src.offset) / 4;
-
-   prog_data->has_ubo_pull = true;
-
-   return true;
 }
 
 /**
@@ -1472,6 +1279,7 @@ fs_visitor::invalidate_analysis(brw::analysis_dependency_class c)
 {
    live_analysis.invalidate(c);
    regpressure_analysis.invalidate(c);
+   performance_analysis.invalidate(c);
    idom_analysis.invalidate(c);
    def_analysis.invalidate(c);
 }
@@ -1491,7 +1299,19 @@ fs_visitor::debug_optimizer(const nir_shader *nir,
                       iteration, pass_num, pass_name);
    if (ret == -1)
       return;
-   brw_print_instructions(*this, filename);
+
+   FILE *file = stderr;
+   if (__normal_user()) {
+      file = fopen(filename, "w");
+      if (!file)
+         file = stderr;
+   }
+
+   brw_print_instructions(*this, file);
+
+   if (file != stderr)
+      fclose(file);
+
    free(filename);
 }
 
@@ -1575,7 +1395,7 @@ brw_allocate_registers(fs_visitor &s, bool allow_spilling)
    uint32_t best_register_pressure = UINT32_MAX;
    enum instruction_scheduler_mode best_sched = SCHEDULE_NONE;
 
-   brw_fs_opt_compact_virtual_grfs(s);
+   brw_opt_compact_virtual_grfs(s);
 
    if (s.needs_register_pressure)
       s.shader_stats.max_register_pressure = brw_compute_max_register_pressure(s);
@@ -1669,15 +1489,17 @@ brw_allocate_registers(fs_visitor &s, bool allow_spilling)
    if (s.failed)
       return;
 
-   s.debug_optimizer(nir, "post_ra_alloc", 96, 0);
+   int pass_num = 0;
 
-   brw_fs_opt_bank_conflicts(s);
+   s.debug_optimizer(nir, "post_ra_alloc", 96, pass_num++);
 
-   s.debug_optimizer(nir, "bank_conflict", 96, 1);
+   brw_opt_bank_conflicts(s);
+
+   s.debug_optimizer(nir, "bank_conflict", 96, pass_num++);
 
    brw_schedule_instructions_post_ra(s);
 
-   s.debug_optimizer(nir, "post_ra_alloc_scheduling", 96, 2);
+   s.debug_optimizer(nir, "post_ra_alloc_scheduling", 96, pass_num++);
 
    /* Lowering VGRF to FIXED_GRF is currently done as a separate pass instead
     * of part of assign_regs since both bank conflicts optimization and post
@@ -1687,9 +1509,11 @@ brw_allocate_registers(fs_visitor &s, bool allow_spilling)
     * TODO: Change the passes above, then move this lowering to be part of
     * assign_regs.
     */
-   brw_fs_lower_vgrfs_to_fixed_grfs(s);
+   brw_lower_vgrfs_to_fixed_grfs(s);
 
-   s.debug_optimizer(nir, "lowered_vgrfs_to_fixed_grfs", 96, 3);
+   s.debug_optimizer(nir, "lowered_vgrfs_to_fixed_grfs", 96, pass_num++);
+
+   brw_shader_phase_update(s, BRW_SHADER_PHASE_AFTER_REGALLOC);
 
    if (s.last_scratch > 0) {
       /* We currently only support up to 2MB of scratch space.  If we
@@ -1717,76 +1541,9 @@ brw_allocate_registers(fs_visitor &s, bool allow_spilling)
    if (s.failed)
       return;
 
-   brw_fs_lower_scoreboard(s);
-}
+   brw_lower_scoreboard(s);
 
-/**
- * Move load_interpolated_input with simple (payload-based) barycentric modes
- * to the top of the program so we don't emit multiple PLNs for the same input.
- *
- * This works around CSE not being able to handle non-dominating cases
- * such as:
- *
- *    if (...) {
- *       interpolate input
- *    } else {
- *       interpolate the same exact input
- *    }
- *
- * This should be replaced by global value numbering someday.
- */
-bool
-brw_nir_move_interpolation_to_top(nir_shader *nir)
-{
-   bool progress = false;
-
-   nir_foreach_function_impl(impl, nir) {
-      nir_block *top = nir_start_block(impl);
-      nir_cursor cursor = nir_before_instr(nir_block_first_instr(top));
-      bool impl_progress = false;
-
-      for (nir_block *block = nir_block_cf_tree_next(top);
-           block != NULL;
-           block = nir_block_cf_tree_next(block)) {
-
-         nir_foreach_instr_safe(instr, block) {
-            if (instr->type != nir_instr_type_intrinsic)
-               continue;
-
-            nir_intrinsic_instr *intrin = nir_instr_as_intrinsic(instr);
-            if (intrin->intrinsic != nir_intrinsic_load_interpolated_input)
-               continue;
-            nir_intrinsic_instr *bary_intrinsic =
-               nir_instr_as_intrinsic(intrin->src[0].ssa->parent_instr);
-            nir_intrinsic_op op = bary_intrinsic->intrinsic;
-
-            /* Leave interpolateAtSample/Offset() where they are. */
-            if (op == nir_intrinsic_load_barycentric_at_sample ||
-                op == nir_intrinsic_load_barycentric_at_offset)
-               continue;
-
-            nir_instr *move[3] = {
-               &bary_intrinsic->instr,
-               intrin->src[1].ssa->parent_instr,
-               instr
-            };
-
-            for (unsigned i = 0; i < ARRAY_SIZE(move); i++) {
-               if (move[i]->block != top) {
-                  nir_instr_move(cursor, move[i]);
-                  impl_progress = true;
-               }
-            }
-         }
-      }
-
-      progress = progress || impl_progress;
-
-      nir_metadata_preserve(impl, impl_progress ? nir_metadata_control_flow
-                                                : nir_metadata_all);
-   }
-
-   return progress;
+   s.debug_optimizer(nir, "scoreboard", 96, pass_num++);
 }
 
 unsigned
@@ -1797,56 +1554,6 @@ brw_cs_push_const_total_size(const struct brw_cs_prog_data *cs_prog_data,
    assert(cs_prog_data->push.cross_thread.size % REG_SIZE == 0);
    return cs_prog_data->push.per_thread.size * threads +
           cs_prog_data->push.cross_thread.size;
-}
-
-static bool
-filter_simd(const nir_instr *instr, const void * /* options */)
-{
-   if (instr->type != nir_instr_type_intrinsic)
-      return false;
-
-   switch (nir_instr_as_intrinsic(instr)->intrinsic) {
-   case nir_intrinsic_load_simd_width_intel:
-   case nir_intrinsic_load_subgroup_id:
-      return true;
-
-   default:
-      return false;
-   }
-}
-
-static nir_def *
-lower_simd(nir_builder *b, nir_instr *instr, void *options)
-{
-   uintptr_t simd_width = (uintptr_t)options;
-
-   switch (nir_instr_as_intrinsic(instr)->intrinsic) {
-   case nir_intrinsic_load_simd_width_intel:
-      return nir_imm_int(b, simd_width);
-
-   case nir_intrinsic_load_subgroup_id:
-      /* If the whole workgroup fits in one thread, we can lower subgroup_id
-       * to a constant zero.
-       */
-      if (!b->shader->info.workgroup_size_variable) {
-         unsigned local_workgroup_size = b->shader->info.workgroup_size[0] *
-                                         b->shader->info.workgroup_size[1] *
-                                         b->shader->info.workgroup_size[2];
-         if (local_workgroup_size <= simd_width)
-            return nir_imm_int(b, 0);
-      }
-      return NULL;
-
-   default:
-      return NULL;
-   }
-}
-
-bool
-brw_nir_lower_simd(nir_shader *nir, unsigned dispatch_width)
-{
-   return nir_shader_lower_instructions(nir, filter_simd, lower_simd,
-                                 (void *)(uintptr_t)dispatch_width);
 }
 
 struct intel_cs_dispatch_info
@@ -1874,6 +1581,14 @@ brw_cs_get_dispatch_info(const struct intel_device_info *devinfo,
       info.right_mask = ~0u >> (32 - info.simd_size);
 
    return info;
+}
+
+void
+brw_shader_phase_update(fs_visitor &s, enum brw_shader_phase phase)
+{
+   assert(phase == s.phase + 1);
+   s.phase = phase;
+   brw_validate(s);
 }
 
 bool brw_should_print_shader(const nir_shader *shader, uint64_t debug_flag)
@@ -1947,4 +1662,3 @@ namespace brw {
       inst->conditional_mod = BRW_CONDITIONAL_NZ;
    }
 }
-

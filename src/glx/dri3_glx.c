@@ -111,7 +111,7 @@ glx_dri3_in_current_context(struct loader_dri3_drawable *draw)
    return (pcp != &dummyContext) && pcp->psc == &psc->base;
 }
 
-static __DRIcontext *
+static struct dri_context *
 glx_dri3_get_dri_context(struct loader_dri3_drawable *draw)
 {
    struct glx_context *gc = __glXGetCurrentContext();
@@ -119,7 +119,7 @@ glx_dri3_get_dri_context(struct loader_dri3_drawable *draw)
    return (gc != &dummyContext) ? gc->driContext : NULL;
 }
 
-static __DRIscreen *
+static struct dri_screen *
 glx_dri3_get_dri_screen(void)
 {
    struct glx_context *gc = __glXGetCurrentContext();
@@ -294,7 +294,7 @@ dri3_wait_gl(struct glx_context *gc)
  * contents of its fake front buffer.
  */
 static void
-dri3_flush_front_buffer(__DRIdrawable *driDrawable, void *loaderPrivate)
+dri3_flush_front_buffer(struct dri_drawable *driDrawable, void *loaderPrivate)
 {
    struct loader_dri3_drawable *draw = loaderPrivate;
    struct dri3_drawable *pdraw = loader_drawable_to_dri3_drawable(draw);
@@ -325,7 +325,7 @@ dri3_flush_front_buffer(__DRIdrawable *driDrawable, void *loaderPrivate)
  * loader_dri_drawable.
  */
 static void
-dri3_flush_swap_buffers(__DRIdrawable *driDrawable, void *loaderPrivate)
+dri3_flush_swap_buffers(struct dri_drawable *driDrawable, void *loaderPrivate)
 {
    struct loader_dri3_drawable *draw = loaderPrivate;
    struct dri3_drawable *pdraw = loader_drawable_to_dri3_drawable(draw);
@@ -491,7 +491,7 @@ struct glx_screen *
 dri3_create_screen(int screen, struct glx_display * priv, bool driver_name_is_inferred, bool *return_zink)
 {
    xcb_connection_t *c = XGetXCBConnection(priv->dpy);
-   const __DRIconfig **driver_configs;
+   const struct dri_config **driver_configs;
    struct dri3_screen *psc;
    __GLXDRIscreen *psp;
    char *driverName, *driverNameDisplayGPU;

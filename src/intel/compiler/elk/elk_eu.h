@@ -29,9 +29,7 @@
   *   Keith Whitwell <keithw@vmware.com>
   */
 
-
-#ifndef ELK_EU_H
-#define ELK_EU_H
+#pragma once
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -175,6 +173,7 @@ void elk_init_codegen(const struct elk_isa_info *isa,
                       struct elk_codegen *p, void *mem_ctx);
 bool elk_has_jip(const struct intel_device_info *devinfo, enum elk_opcode opcode);
 bool elk_has_uip(const struct intel_device_info *devinfo, enum elk_opcode opcode);
+bool elk_has_branch_ctrl(const struct intel_device_info *devinfo, enum elk_opcode opcode);
 const struct elk_shader_reloc *elk_get_shader_relocs(struct elk_codegen *p,
                                                      unsigned *num_relocs);
 const unsigned *elk_get_program( struct elk_codegen *p, unsigned *sz );
@@ -1937,6 +1936,4 @@ next_offset(const struct intel_device_info *devinfo, void *store, int offset)
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

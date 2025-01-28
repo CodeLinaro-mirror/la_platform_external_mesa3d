@@ -233,7 +233,6 @@ cc_library_static {
     srcs: [
         "rmv/vk_rmv_common.c",
         "rmv/vk_rmv_exporter.c",
-        "vk_acceleration_structure.c",
         "vk_blend.c",
         "vk_buffer.c",
         "vk_buffer_view.c",

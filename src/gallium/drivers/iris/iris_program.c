@@ -150,6 +150,7 @@ iris_apply_brw_cs_prog_data(struct iris_compiled_shader *shader,
    iris->generate_local_id = brw->generate_local_id;
    iris->walk_order        = brw->walk_order;
    iris->uses_barrier      = brw->uses_barrier;
+   iris->uses_sampler      = brw->uses_sampler;
    iris->prog_mask         = brw->prog_mask;
 
    iris->first_param_is_builtin_subgroup_id =
@@ -563,10 +564,10 @@ iris_to_brw_fs_key(const struct iris_screen *screen,
       .nr_color_regions = key->nr_color_regions,
       .flat_shade = key->flat_shade,
       .alpha_test_replicate_alpha = key->alpha_test_replicate_alpha,
-      .alpha_to_coverage = key->alpha_to_coverage ? BRW_ALWAYS : BRW_NEVER,
+      .alpha_to_coverage = key->alpha_to_coverage ? INTEL_ALWAYS : INTEL_NEVER,
       .clamp_fragment_color = key->clamp_fragment_color,
-      .persample_interp = key->persample_interp ? BRW_ALWAYS : BRW_NEVER,
-      .multisample_fbo = key->multisample_fbo ? BRW_ALWAYS : BRW_NEVER,
+      .persample_interp = key->persample_interp ? INTEL_ALWAYS : INTEL_NEVER,
+      .multisample_fbo = key->multisample_fbo ? INTEL_ALWAYS : INTEL_NEVER,
       .force_dual_color_blend = key->force_dual_color_blend,
       .coherent_fb_fetch = key->coherent_fb_fetch,
       .color_outputs_valid = key->color_outputs_valid,
@@ -1381,7 +1382,8 @@ iris_setup_binding_table(const struct intel_device_info *devinfo,
                          struct iris_binding_table *bt,
                          unsigned num_render_targets,
                          unsigned num_system_values,
-                         unsigned num_cbufs)
+                         unsigned num_cbufs,
+                         bool use_null_rt)
 {
    const struct shader_info *info = &nir->info;
 
@@ -1404,6 +1406,8 @@ iris_setup_binding_table(const struct intel_device_info *devinfo,
          bt->used_mask[IRIS_SURFACE_GROUP_RENDER_TARGET_READ] =
             BITFIELD64_MASK(num_render_targets);
       }
+
+      bt->use_null_rt = use_null_rt;
    } else if (info->stage == MESA_SHADER_COMPUTE) {
       bt->sizes[IRIS_SURFACE_GROUP_CS_WORK_GROUPS] = 1;
    }
@@ -1858,7 +1862,7 @@ iris_compile_vs(struct iris_screen *screen,
 
    struct iris_binding_table bt;
    iris_setup_binding_table(devinfo, nir, &bt, /* num_render_targets */ 0,
-                            num_system_values, num_cbufs);
+                            num_system_values, num_cbufs, false);
 
    const char *error;
    const unsigned *program;
@@ -2086,7 +2090,7 @@ iris_compile_tcs(struct iris_screen *screen,
    iris_setup_uniforms(devinfo, mem_ctx, nir, 0, &system_values,
                        &num_system_values, &num_cbufs);
    iris_setup_binding_table(devinfo, nir, &bt, /* num_render_targets */ 0,
-                            num_system_values, num_cbufs);
+                            num_system_values, num_cbufs, false);
 
    const char *error = NULL;
    const unsigned *program;
@@ -2276,7 +2280,7 @@ iris_compile_tes(struct iris_screen *screen,
 
    struct iris_binding_table bt;
    iris_setup_binding_table(devinfo, nir, &bt, /* num_render_targets */ 0,
-                            num_system_values, num_cbufs);
+                            num_system_values, num_cbufs, false);
 
    const char *error;
    const unsigned *program;
@@ -2458,7 +2462,7 @@ iris_compile_gs(struct iris_screen *screen,
 
    struct iris_binding_table bt;
    iris_setup_binding_table(devinfo, nir, &bt, /* num_render_targets */ 0,
-                            num_system_values, num_cbufs);
+                            num_system_values, num_cbufs, false);
 
    const char *error;
    const unsigned *program;
@@ -2627,16 +2631,14 @@ iris_compile_fs(struct iris_screen *screen,
     */
    brw_nir_lower_fs_outputs(nir);
 
-   /* On Gfx11+, shader RT write messages have a "Null Render Target" bit
-    * and do not need a binding table entry with a null surface.  Earlier
-    * generations need an entry for a null surface.
-    */
-   int null_rts = devinfo->ver < 11 ? 1 : 0;
+   int null_rts = brw_nir_fs_needs_null_rt(devinfo, nir,
+                                           key->multisample_fbo,
+                                           key->alpha_to_coverage) ? 1 : 0;
 
    struct iris_binding_table bt;
    iris_setup_binding_table(devinfo, nir, &bt,
                             MAX2(key->nr_color_regions, null_rts),
-                            num_system_values, num_cbufs);
+                            num_system_values, num_cbufs, null_rts != 0);
 
    const char *error;
    const unsigned *program;
@@ -2966,7 +2968,7 @@ iris_compile_cs(struct iris_screen *screen,
 
    struct iris_binding_table bt;
    iris_setup_binding_table(devinfo, nir, &bt, /* num_render_targets */ 0,
-                            num_system_values, num_cbufs);
+                            num_system_values, num_cbufs, false);
 
    const char *error;
    const unsigned *program;
@@ -3234,23 +3236,12 @@ iris_create_compute_state(struct pipe_context *ctx,
    struct iris_context *ice = (void *) ctx;
    struct iris_screen *screen = (void *) ctx->screen;
    struct u_upload_mgr *uploader = ice->shaders.uploader_unsync;
-   const nir_shader_compiler_options *options =
-      screen->brw ? screen->brw->nir_options[MESA_SHADER_COMPUTE]
-                  : screen->elk->nir_options[MESA_SHADER_COMPUTE];
 
    nir_shader *nir;
    switch (state->ir_type) {
    case PIPE_SHADER_IR_NIR:
       nir = (void *)state->prog;
       break;
-
-   case PIPE_SHADER_IR_NIR_SERIALIZED: {
-      struct blob_reader reader;
-      const struct pipe_binary_program_header *hdr = state->prog;
-      blob_reader_init(&reader, hdr->blob, hdr->num_bytes);
-      nir = nir_deserialize(NULL, options, &reader);
-      break;
-   }
 
    default:
       unreachable("Unsupported IR");
@@ -3710,10 +3701,9 @@ iris_bind_cs_state(struct pipe_context *ctx, void *state)
 }
 
 static char *
-iris_finalize_nir(struct pipe_screen *_screen, void *nirptr)
+iris_finalize_nir(struct pipe_screen *_screen, struct nir_shader *nir)
 {
    struct iris_screen *screen = (struct iris_screen *)_screen;
-   struct nir_shader *nir = (struct nir_shader *) nirptr;
    const struct intel_device_info *devinfo = screen->devinfo;
 
    NIR_PASS_V(nir, iris_fix_edge_flags);

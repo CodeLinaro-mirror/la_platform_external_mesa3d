@@ -29,8 +29,7 @@
   *   Keith Whitwell <keithw@vmware.com>
   */
 
-#ifndef BRW_EU_DEFINES_H
-#define BRW_EU_DEFINES_H
+#pragma once
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -403,12 +402,75 @@ enum opcode {
     */
    SHADER_OPCODE_SHUFFLE,
 
+   /* Combine all values in each subset (cluster) of channels using an operation,
+    * and broadcast the result to all channels in the subset.
+    *
+    * Source 0: Value.
+    * Source 1: Immediate with brw_reduce_op.
+    * Source 2: Immediate with cluster size.
+    */
+   SHADER_OPCODE_REDUCE,
+
+   /* Combine values of previous channels using an operation.  Inclusive scan
+    * will include the value of the channel itself in the channel result.
+    *
+    * Source 0: Value.
+    * Source 1: Immediate with brw_reduce_op.
+    */
+   SHADER_OPCODE_INCLUSIVE_SCAN,
+   SHADER_OPCODE_EXCLUSIVE_SCAN,
+
+   /* Check if any or all values in each subset (cluster) of channels are set,
+    * and broadcast the result to all channels in the subset.
+    *
+    * Source 0: Boolean value.
+    * Source 1: Immediate with cluster size.
+    */
+   SHADER_OPCODE_VOTE_ANY,
+   SHADER_OPCODE_VOTE_ALL,
+
+   /* Check if the values of all channels are equal, and broadcast the result
+    * to all channels.
+    *
+    * Source 0: Value.
+    */
+   SHADER_OPCODE_VOTE_EQUAL,
+
+   /* Produces a mask from the boolean value from all channels, and broadcast
+    * the result to all channels.
+    *
+    * Source 0: Boolean value.
+    */
+   SHADER_OPCODE_BALLOT,
+
    /* Select between src0 and src1 based on channel enables.
     *
     * This instruction copies src0 into the enabled channels of the
     * destination and copies src1 into the disabled channels.
     */
    SHADER_OPCODE_SEL_EXEC,
+
+   /* Swap values inside a quad based on the direction.
+    *
+    * Source 0: Value.
+    * Source 1: Immediate with brw_swap_direction.
+    */
+   SHADER_OPCODE_QUAD_SWAP,
+
+   /* Read value from the first live channel and broadcast the result
+    * to all channels.
+    *
+    * Source 0: Value.
+    */
+   SHADER_OPCODE_READ_FROM_LIVE_CHANNEL,
+
+   /* Read value from a specified channel and broadcast the result
+    * to all channels.
+    *
+    * Source 0: Value.
+    * Source 1: Index of the channel to pick value from.
+    */
+   SHADER_OPCODE_READ_FROM_CHANNEL,
 
    /* This turns into an align16 mov from src0 to dst with a swizzle
     * provided as an immediate in src1.
@@ -500,6 +562,7 @@ enum fb_write_logical_srcs {
    FB_WRITE_LOGICAL_SRC_SRC_STENCIL, /* gl_FragStencilRefARB */
    FB_WRITE_LOGICAL_SRC_OMASK,       /* Sample Mask (gl_SampleMask) */
    FB_WRITE_LOGICAL_SRC_COMPONENTS,  /* REQUIRED */
+   FB_WRITE_LOGICAL_SRC_NULL_RT,     /* Null RT write */
    FB_WRITE_LOGICAL_NUM_SRCS
 };
 
@@ -580,6 +643,7 @@ enum memory_logical_mode {
    MEMORY_MODE_UNTYPED,
    MEMORY_MODE_SHARED_LOCAL,
    MEMORY_MODE_SCRATCH,
+   MEMORY_MODE_CONSTANT,
 };
 
 enum memory_logical_srcs {
@@ -671,6 +735,22 @@ enum interpolator_logical_srcs {
    INTERP_NUM_SRCS
 };
 
+enum brw_reduce_op {
+   BRW_REDUCE_OP_ADD,
+   BRW_REDUCE_OP_MUL,
+   BRW_REDUCE_OP_MIN,
+   BRW_REDUCE_OP_MAX,
+   BRW_REDUCE_OP_AND,
+   BRW_REDUCE_OP_OR,
+   BRW_REDUCE_OP_XOR,
+};
+
+enum brw_swap_direction {
+   BRW_SWAP_HORIZONTAL,
+   BRW_SWAP_VERTICAL,
+   BRW_SWAP_DIAGONAL,
+};
+
 enum ENUM_PACKED brw_predicate {
    BRW_PREDICATE_NONE                =  0,
    BRW_PREDICATE_NORMAL              =  1,
@@ -703,6 +783,7 @@ enum ENUM_PACKED brw_reg_file {
    FIXED_GRF,
    IMM,
 
+   ADDRESS,
    VGRF,
    ATTR,
    UNIFORM, /* prog_data->params[reg] */
@@ -723,6 +804,7 @@ enum ENUM_PACKED gfx10_align1_3src_exec_type {
 #define BRW_ARF_ACCUMULATOR           0x20
 #define BRW_ARF_FLAG                  0x30
 #define BRW_ARF_MASK                  0x40
+#define BRW_ARF_SCALAR                0x60
 #define BRW_ARF_STATE                 0x70
 #define BRW_ARF_CONTROL               0x80
 #define BRW_ARF_NOTIFICATION_COUNT    0x90
@@ -733,6 +815,13 @@ enum ENUM_PACKED gfx10_align1_3src_exec_type {
 #define BRW_THREAD_NORMAL     0
 #define BRW_THREAD_ATOMIC     1
 #define BRW_THREAD_SWITCH     2
+
+/* Subregister of the address register used for particular purposes */
+enum brw_address_subreg {
+   BRW_ADDRESS_SUBREG_INDIRECT_DESC = 0,
+   BRW_ADDRESS_SUBREG_INDIRECT_EX_DESC = 2,
+   BRW_ADDRESS_SUBREG_INDIRECT_SPILL_DESC = 4,
+};
 
 enum ENUM_PACKED brw_vertical_stride {
    BRW_VERTICAL_STRIDE_0               = 0,
@@ -831,6 +920,9 @@ operator|=(tgl_sbid_mode &x, tgl_sbid_mode y)
  * the hardware to infer the pipeline based on the source types of the
  * instruction.  TGL_PIPE_ALL can be used when synchronization with all ALU
  * pipelines is intended.
+ *
+ * Xe3 adds TGL_PIPE_SCALAR for a very specific use case (writing immediates
+ * to scalar register).
  */
 enum tgl_pipe {
    TGL_PIPE_NONE = 0,
@@ -838,6 +930,7 @@ enum tgl_pipe {
    TGL_PIPE_INT,
    TGL_PIPE_LONG,
    TGL_PIPE_MATH,
+   TGL_PIPE_SCALAR,
    TGL_PIPE_ALL
 };
 
@@ -925,6 +1018,7 @@ tgl_swsb_encode(const struct intel_device_info *devinfo,
          swsb.pipe == TGL_PIPE_INT ? 0x18 :
          swsb.pipe == TGL_PIPE_LONG ? 0x20 :
          swsb.pipe == TGL_PIPE_MATH ? 0x28 :
+         swsb.pipe == TGL_PIPE_SCALAR ? 0x30 :
          swsb.pipe == TGL_PIPE_ALL ? 0x8 : 0;
       return pipe | swsb.regdist;
 
@@ -1787,5 +1881,3 @@ enum ENUM_PACKED lsc_vect_size {
 };
 
 #define LSC_ONE_ADDR_REG   1
-
-#endif /* BRW_EU_DEFINES_H */

@@ -5,6 +5,7 @@
 
 #include "brw_fs.h"
 #include "brw_fs_live_variables.h"
+#include "brw_generator.h"
 #include "brw_nir.h"
 #include "brw_cfg.h"
 #include "brw_private.h"
@@ -45,15 +46,17 @@ run_bs(fs_visitor &s, bool allow_spilling)
 
    brw_calculate_cfg(s);
 
-   brw_fs_optimize(s);
+   brw_optimize(s);
 
    s.assign_curb_setup();
 
-   brw_fs_lower_3src_null_dest(s);
-   brw_fs_workaround_memory_fence_before_eot(s);
-   brw_fs_workaround_emit_dummy_mov_instruction(s);
+   brw_lower_3src_null_dest(s);
+   brw_workaround_memory_fence_before_eot(s);
+   brw_workaround_emit_dummy_mov_instruction(s);
 
    brw_allocate_registers(s, allow_spilling);
+
+   brw_workaround_source_arf_before_eot(s);
 
    return !s.failed;
 }
@@ -64,7 +67,7 @@ compile_single_bs(const struct brw_compiler *compiler,
                   const struct brw_bs_prog_key *key,
                   struct brw_bs_prog_data *prog_data,
                   nir_shader *shader,
-                  fs_generator *g,
+                  brw_generator *g,
                   struct brw_compile_stats *stats,
                   int *prog_offset)
 {
@@ -164,7 +167,7 @@ brw_compile_bs(const struct brw_compiler *compiler,
    prog_data->max_stack_size = 0;
    prog_data->num_resume_shaders = num_resume_shaders;
 
-   fs_generator g(compiler, &params->base, &prog_data->base,
+   brw_generator g(compiler, &params->base, &prog_data->base,
                   shader->info.stage);
    if (unlikely(debug_enabled)) {
       char *name = ralloc_asprintf(params->base.mem_ctx,

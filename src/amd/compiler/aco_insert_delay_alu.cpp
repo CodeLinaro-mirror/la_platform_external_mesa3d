@@ -49,6 +49,9 @@ struct alu_delay_info {
    /* Cycles until the writing SALU instruction is finished*/
    int8_t salu_cycles = 0;
 
+   /* VALU wrote this as lane mask. */
+   bool lane_mask_forwarding = true;
+
    bool combine(const alu_delay_info& other)
    {
       bool changed = other.valu_instrs < valu_instrs || other.trans_instrs < trans_instrs ||
@@ -59,6 +62,7 @@ struct alu_delay_info {
       salu_cycles = std::max(salu_cycles, other.salu_cycles);
       valu_cycles = std::max(valu_cycles, other.valu_cycles);
       trans_cycles = std::max(trans_cycles, other.trans_cycles);
+      lane_mask_forwarding &= other.lane_mask_forwarding;
       return changed;
    }
 
@@ -108,21 +112,6 @@ struct delay_ctx {
    delay_ctx() {}
    delay_ctx(Program* program_) : program(program_) {}
 
-   bool join(const delay_ctx* other)
-   {
-      bool changed = false;
-      for (const auto& entry : other->gpr_map) {
-         using iterator = std::map<PhysReg, alu_delay_info>::iterator;
-         const std::pair<iterator, bool> insert_pair = gpr_map.insert(entry);
-         if (insert_pair.second)
-            changed = true;
-         else
-            changed |= insert_pair.first->second.combine(entry.second);
-      }
-
-      return changed;
-   }
-
    UNUSED void print(FILE* output) const
    {
       for (const auto& entry : gpr_map) {
@@ -137,7 +126,9 @@ struct delay_ctx {
 void
 check_alu(delay_ctx& ctx, alu_delay_info& delay, Instruction* instr)
 {
-   for (const Operand op : instr->operands) {
+   for (unsigned i = 0; i < instr->operands.size(); i++) {
+      const Operand op = instr->operands[i];
+      alu_delay_info op_delay;
       if (op.isConstant() || op.isUndefined())
          continue;
 
@@ -146,32 +137,18 @@ check_alu(delay_ctx& ctx, alu_delay_info& delay, Instruction* instr)
          std::map<PhysReg, alu_delay_info>::iterator it =
             ctx.gpr_map.find(PhysReg{op.physReg() + j});
          if (it != ctx.gpr_map.end())
-            delay.combine(it->second);
+            op_delay.combine(it->second);
       }
+
+      bool fast_forward = (instr->opcode == aco_opcode::v_cndmask_b32 ||
+                           instr->opcode == aco_opcode::v_cndmask_b16 ||
+                           instr->opcode == aco_opcode::v_dual_cndmask_b32) &&
+                          i == 2;
+      fast_forward |= instr->isVOPD() && instr->vopd().opy == aco_opcode::v_dual_cndmask_b32 &&
+                      i + 1 == instr->operands.size();
+      if (!op_delay.lane_mask_forwarding || !fast_forward)
+         delay.combine(op_delay);
    }
-}
-
-bool
-parse_delay_alu(delay_ctx& ctx, alu_delay_info& delay, Instruction* instr)
-{
-   if (instr->opcode != aco_opcode::s_delay_alu)
-      return false;
-
-   unsigned imm[2] = {instr->salu().imm & 0xf, (instr->salu().imm >> 7) & 0xf};
-   for (unsigned i = 0; i < 2; ++i) {
-      alu_delay_wait wait = (alu_delay_wait)imm[i];
-      if (wait >= alu_delay_wait::VALU_DEP_1 && wait <= alu_delay_wait::VALU_DEP_4)
-         delay.valu_instrs = imm[i] - (uint32_t)alu_delay_wait::VALU_DEP_1 + 1;
-      else if (wait >= alu_delay_wait::TRANS32_DEP_1 && wait <= alu_delay_wait::TRANS32_DEP_3)
-         delay.trans_instrs = imm[i] - (uint32_t)alu_delay_wait::TRANS32_DEP_1 + 1;
-      else if (wait >= alu_delay_wait::SALU_CYCLE_1)
-         delay.salu_cycles = imm[i] - (uint32_t)alu_delay_wait::SALU_CYCLE_1 + 1;
-   }
-
-   delay.valu_cycles = instr->pass_flags & 0xffff;
-   delay.trans_cycles = instr->pass_flags >> 16;
-
-   return true;
 }
 
 void
@@ -192,15 +169,40 @@ update_alu(delay_ctx& ctx, bool is_valu, bool is_trans, int cycles)
 void
 kill_alu(alu_delay_info& delay, Instruction* instr, delay_ctx& ctx)
 {
-   if (parse_vdst_wait(instr) == 0) {
+   /* Consider frontend waits first. These are automatically done by the hardware,
+    * so we don't need to insert s_delay_alu.
+    * They are also lower granularity, waiting for accesses of a counter instead
+    * of only the real per register dependencies.
+    */
+   depctr_wait wait = parse_depctr_wait(instr);
+
+   int8_t implict_cycles = 0;
+   if (!wait.va_vdst || !wait.va_sdst || !wait.va_vcc || !wait.sa_sdst || !wait.sa_exec ||
+       !wait.va_exec) {
       std::map<PhysReg, alu_delay_info>::iterator it = ctx.gpr_map.begin();
       while (it != ctx.gpr_map.end()) {
          alu_delay_info& entry = it->second;
-         entry.valu_instrs = alu_delay_info::valu_nop;
-         entry.trans_instrs = alu_delay_info::trans_nop;
+         bool wait_valu = !wait.va_vdst || (it->first < vcc && !wait.va_sdst) ||
+                          (it->first >= vcc && it->first <= vcc_hi && !wait.va_vcc) ||
+                          (it->first >= exec && it->first <= exec_hi && !wait.va_exec);
+         if (wait_valu) {
+            implict_cycles = MAX3(implict_cycles, entry.valu_cycles, entry.trans_cycles);
+            entry.valu_cycles = 0;
+            entry.trans_cycles = 0;
+         }
+         bool wait_salu = ((it->first <= vcc_hi || it->first == scc) && !wait.sa_sdst) ||
+                          (it->first >= exec && it->first <= exec_hi && !wait.sa_exec);
+         if (wait_salu) {
+            implict_cycles = MAX2(implict_cycles, entry.salu_cycles);
+            entry.salu_cycles = 0;
+         }
          it = it->second.fixup() ? ctx.gpr_map.erase(it) : std::next(it);
       }
    }
+
+   /* Previous alu progresses as usual while the frontend waits. */
+   if (implict_cycles != 0)
+      update_alu(ctx, false, false, implict_cycles);
 
    if (instr->isVALU() || instr->isSALU())
       check_alu(ctx, delay, instr);
@@ -229,6 +231,7 @@ gen_alu(Instruction* instr, delay_ctx& ctx)
 
    if (is_trans || is_valu || instr->isSALU()) {
       alu_delay_info delay;
+      delay.lane_mask_forwarding = false;
       if (is_trans) {
          delay.trans_instrs = 0;
          delay.trans_cycles = cycle_info.latency;
@@ -239,9 +242,14 @@ gen_alu(Instruction* instr, delay_ctx& ctx)
          delay.salu_cycles = cycle_info.latency;
       }
 
-      for (const Definition& def : instr->definitions) {
-         for (unsigned i = 0; i < def.size(); i++) {
-            auto it = ctx.gpr_map.emplace(PhysReg{def.physReg().reg() + i}, delay);
+      for (Definition& def : instr->definitions) {
+         if (is_valu && def.regClass() == ctx.program->lane_mask) {
+            delay.lane_mask_forwarding = instr->opcode != aco_opcode::v_readlane_b32_e64 &&
+                                         instr->opcode != aco_opcode::v_readfirstlane_b32;
+         }
+
+         for (unsigned j = 0; j < def.size(); j++) {
+            auto it = ctx.gpr_map.emplace(PhysReg{def.physReg().reg() + j}, delay);
             if (!it.second)
                it.first->second.combine(delay);
          }
@@ -275,7 +283,6 @@ emit_delay_alu(delay_ctx& ctx, std::vector<aco_ptr<Instruction>>& instructions,
 
    Instruction* inst = create_instruction(aco_opcode::s_delay_alu, Format::SOPP, 0, 0);
    inst->salu().imm = imm;
-   inst->pass_flags = (delay.valu_cycles | (delay.trans_cycles << 16));
    instructions.emplace_back(inst);
    delay = alu_delay_info();
 }
@@ -288,20 +295,16 @@ handle_block(Program* program, Block& block, delay_ctx& ctx)
 
    for (size_t i = 0; i < block.instructions.size(); i++) {
       aco_ptr<Instruction>& instr = block.instructions[i];
-      bool is_delay_alu = parse_delay_alu(ctx, queued_delay, instr.get());
+      assert(instr->opcode != aco_opcode::s_delay_alu);
 
       kill_alu(queued_delay, instr.get(), ctx);
       gen_alu(instr.get(), ctx);
 
-      if (!is_delay_alu) {
-         if (!queued_delay.empty())
-            emit_delay_alu(ctx, new_instructions, queued_delay);
-         new_instructions.emplace_back(std::move(instr));
-      }
+      if (!queued_delay.empty())
+         emit_delay_alu(ctx, new_instructions, queued_delay);
+      new_instructions.emplace_back(std::move(instr));
    }
 
-   if (!queued_delay.empty())
-      emit_delay_alu(ctx, new_instructions, queued_delay);
    block.instructions.swap(new_instructions);
 }
 
@@ -311,56 +314,23 @@ void
 insert_delay_alu(Program* program)
 {
    /* per BB ctx */
-   std::vector<bool> done(program->blocks.size());
-   std::vector<delay_ctx> in_ctx(program->blocks.size(), delay_ctx(program));
-   std::vector<delay_ctx> out_ctx(program->blocks.size(), delay_ctx(program));
+   delay_ctx ctx(program);
 
-   std::stack<unsigned, std::vector<unsigned>> loop_header_indices;
-   unsigned loop_progress = 0;
+   for (unsigned i = 0; i < program->blocks.size(); i++) {
+      Block& current = program->blocks[i];
 
-   for (unsigned i = 0; i < program->blocks.size();) {
-      Block& current = program->blocks[i++];
-
-      if (current.kind & block_kind_discard_early_exit) {
-         /* Because the jump to the discard early exit block may happen anywhere in a block, it's
-          * not possible to join it with its predecessors this way.
-          */
+      if (current.instructions.empty())
          continue;
-      }
-
-      delay_ctx ctx = in_ctx[current.index];
-
-      if (current.kind & block_kind_loop_header) {
-         loop_header_indices.push(current.index);
-      } else if (current.kind & block_kind_loop_exit) {
-         bool repeat = false;
-         if (loop_progress == loop_header_indices.size()) {
-            i = loop_header_indices.top();
-            repeat = true;
-         }
-         loop_header_indices.pop();
-         loop_progress = std::min<unsigned>(loop_progress, loop_header_indices.size());
-         if (repeat)
-            continue;
-      }
-
-      bool changed = false;
-      for (unsigned b : current.linear_preds)
-         changed |= ctx.join(&out_ctx[b]);
-
-      if (done[current.index] && !changed) {
-         in_ctx[current.index] = std::move(ctx);
-         continue;
-      } else {
-         in_ctx[current.index] = ctx;
-      }
-
-      loop_progress = std::max<unsigned>(loop_progress, current.loop_nest_depth);
-      done[current.index] = true;
 
       handle_block(program, current, ctx);
 
-      out_ctx[current.index] = std::move(ctx);
+      /* Reset ctx if there is a jump, assuming ALU will be done
+       * because branch latency is pretty high.
+       */
+      if (current.linear_succs.empty() ||
+          current.instructions.back()->opcode == aco_opcode::s_branch) {
+         ctx = delay_ctx(program);
+      }
    }
 }
 

@@ -40,7 +40,7 @@
 #include "loader_dri_helper.h"
 #include "dri_util.h"
 
-static __DRIimage *
+static struct dri_image *
 surfaceless_alloc_image(struct dri2_egl_display *dri2_dpy,
                         struct dri2_egl_surface *dri2_surf)
 {
@@ -62,7 +62,7 @@ surfaceless_free_images(struct dri2_egl_surface *dri2_surf)
 }
 
 static int
-surfaceless_image_get_buffers(__DRIdrawable *driDrawable, unsigned int format,
+surfaceless_image_get_buffers(struct dri_drawable *driDrawable, unsigned int format,
                               uint32_t *stamp, void *loaderPrivate,
                               uint32_t buffer_mask,
                               struct __DRIimageList *buffers)
@@ -111,7 +111,7 @@ dri2_surfaceless_create_surface(_EGLDisplay *disp, EGLint type,
    struct dri2_egl_display *dri2_dpy = dri2_egl_display(disp);
    struct dri2_egl_config *dri2_conf = dri2_egl_config(conf);
    struct dri2_egl_surface *dri2_surf;
-   const __DRIconfig *config;
+   const struct dri_config *config;
 
    /* Make sure to calloc so all pointers
     * are originally NULL.
@@ -179,7 +179,7 @@ static const struct dri2_egl_display_vtbl dri2_surfaceless_display_vtbl = {
 };
 
 static void
-surfaceless_flush_front_buffer(__DRIdrawable *driDrawable, void *loaderPrivate)
+surfaceless_flush_front_buffer(struct dri_drawable *driDrawable, void *loaderPrivate)
 {
 }
 
