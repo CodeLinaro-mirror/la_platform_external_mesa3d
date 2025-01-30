@@ -1178,7 +1178,7 @@ get_query_object(struct gl_context *ctx, const char *func,
       break;
    case GL_QUERY_RESULT_AVAILABLE:
       if (!q->Ready)
-         _mesa_check_query(ctx, q);
+         _mesa_wait_query(ctx, q);
       value = q->Ready;
       break;
    case GL_QUERY_TARGET:
