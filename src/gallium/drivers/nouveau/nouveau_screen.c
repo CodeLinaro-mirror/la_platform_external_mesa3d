@@ -309,7 +309,6 @@ nouveau_screen_init(struct nouveau_screen *screen, struct nouveau_device *dev)
    if (nv_dbg)
       nouveau_mesa_debug = atoi(nv_dbg);
 
-   screen->force_enable_cl = debug_get_bool_option("NOUVEAU_ENABLE_CL", false);
    screen->disable_fences = debug_get_bool_option("NOUVEAU_DISABLE_FENCES", false);
 
    /* These must be set before any failure is possible, as the cleanup
@@ -317,12 +316,7 @@ nouveau_screen_init(struct nouveau_screen *screen, struct nouveau_device *dev)
     */
    screen->drm = nouveau_drm(&dev->object);
    screen->device = dev;
-
-   /*
-    * this is initialized to 1 in nouveau_drm_screen_create after screen
-    * is fully constructed and added to the global screen list.
-    */
-   screen->refcount = -1;
+   screen->initialized = false;
 
    if (dev->chipset < 0xc0) {
       data = &nv04_data;

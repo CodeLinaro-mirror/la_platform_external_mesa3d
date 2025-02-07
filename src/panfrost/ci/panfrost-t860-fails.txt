@@ -55,16 +55,30 @@ dEQP-GLES31.functional.texture.gather.basic.cube.rgba8ui.base_level.level_1,Fail
 dEQP-GLES31.functional.texture.gather.basic.cube.rgba8ui.no_corners.size_pot.clamp_to_edge_repeat,Fail
 dEQP-GLES31.functional.texture.gather.basic.cube.rgba8ui.no_corners.size_pot.mirrored_repeat_clamp_to_edge,Fail
 dEQP-GLES31.functional.texture.gather.basic.cube.rgba8ui.no_corners.size_pot.repeat_mirrored_repeat,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_min_reverse_dst_x,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_mag,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_mag_reverse_src_y,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_min_reverse_src_x,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_min_reverse_src_y,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_mag_reverse_dst_y,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_min_reverse_src_dst_x,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_mag_reverse_src_dst_x,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_min_reverse_dst_y,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_mag_reverse_dst_x,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_min_reverse_src_dst_y,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_mag_reverse_src_dst_y,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_mag_reverse_src_x,Fail
+dEQP-GLES3.functional.fbo.blit.rect.nearest_consistency_out_of_bounds_min,Fail
 
 
 # OpenCL below
 api@clbuildprogram,Fail
 api@clcompileprogram,Fail
+api@clgetcommandqueueinfo,Fail
 api@clgetextensionfunctionaddressforplatform,Fail
 api@clgetkernelarginfo,Fail
 api@cllinkprogram,Fail
 program@bitcoin: phatk kernel,Crash
-program@build@include-directories,Fail
 program@build@vector-data-types,Fail
 program@execute@amdgcn-f32-inline-immediates,Fail
 program@execute@amdgcn-f32-inline-immediates@add integer 64,Fail
@@ -81,9 +95,8 @@ program@execute@atomic_cmpxchg-local@simple uint,Fail
 program@execute@atomic_int32_cmpxchg-local,Fail
 program@execute@atomic_int32_cmpxchg-local@simple int,Fail
 program@execute@atomic_int32_cmpxchg-local@simple uint,Fail
-program@execute@bswap,Fail
-program@execute@bswap@s_bswap_u64,Fail
-program@execute@bswap@v_bswap_u64,Fail
+program@execute@atomic_int32_xchg-global-return,Crash
+program@execute@atomic_xchg-global-return,Crash
 program@execute@builtin@builtin-char-abs-1.0.generated,Crash
 program@execute@builtin@builtin-char-abs_diff-1.0.generated,Crash
 program@execute@builtin@builtin-char-add_sat-1.0.generated,Crash
@@ -602,3 +615,4 @@ program@execute@vstore@vstorea_half-float-private@vector storea_half private off
 program@execute@vstore@vstorea_half-float-private@vector storea_half private offset float3,Fail
 program@execute@vstore@vstorea_half-float-private@vector storea_half private offset float4,Fail
 program@execute@vstore@vstorea_half-float-private@vector storea_half private offset float8,Fail
+program@run kernel with max work item sizes,Fail

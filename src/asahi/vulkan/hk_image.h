@@ -12,6 +12,7 @@
 
 #include "hk_private.h"
 
+#include "vk_format.h"
 #include "vk_image.h"
 
 /* Because small images can end up with an array_stride_B that is less than
@@ -87,6 +88,21 @@ hk_image_base_address(const struct hk_image *image, uint8_t plane)
    return hk_image_plane_base_address(&image->planes[plane]);
 }
 
+static inline enum pipe_format
+hk_format_to_pipe_format(VkFormat vkformat)
+{
+   switch (vkformat) {
+   case VK_FORMAT_R10X6_UNORM_PACK16:
+   case VK_FORMAT_R12X4_UNORM_PACK16:
+      return PIPE_FORMAT_R16_UNORM;
+   case VK_FORMAT_R10X6G10X6_UNORM_2PACK16:
+   case VK_FORMAT_R12X4G12X4_UNORM_2PACK16:
+      return PIPE_FORMAT_R16G16_UNORM;
+   default:
+      return vk_format_to_pipe_format(vkformat);
+   }
+}
+
 static inline uint8_t
 hk_image_aspects_to_plane(const struct hk_image *image,
                           VkImageAspectFlags aspectMask)
@@ -113,3 +129,6 @@ hk_image_aspects_to_plane(const struct hk_image *image,
       return 2;
    }
 }
+
+struct agx_device;
+bool hk_can_compress_format(const struct agx_device *dev, VkFormat format);

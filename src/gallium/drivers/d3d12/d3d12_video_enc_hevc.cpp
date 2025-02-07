@@ -354,7 +354,8 @@ d3d12_video_encoder_update_current_frame_pic_params_info_hevc(struct d3d12_video
       static_cast<d3d12_video_bitstream_builder_hevc *>(pD3D12Enc->m_upBitstreamBuilder.get());
    assert(pHEVCBitstreamBuilder != nullptr);
 
-   bUsedAsReference = !hevcPic->not_referenced;
+   pD3D12Enc->m_currentEncodeConfig.m_bUsedAsReference = !hevcPic->not_referenced;
+   bUsedAsReference = pD3D12Enc->m_currentEncodeConfig.m_bUsedAsReference;
 
    if (pD3D12Enc->m_currentEncodeCapabilities.m_encoderCodecSpecificConfigCaps.m_HEVCCodecCaps.SupportFlags &
        D3D12_VIDEO_ENCODER_CODEC_CONFIGURATION_SUPPORT_HEVC_FLAG_NUM_REF_IDX_ACTIVE_OVERRIDE_FLAG_SLICE_SUPPORT)
@@ -370,16 +371,16 @@ d3d12_video_encoder_update_current_frame_pic_params_info_hevc(struct d3d12_video
       // Copy from pipe params
       //
       {
-         picParams.pHEVCPicData1->diff_cu_chroma_qp_offset_depth = hevcPic->pic.pps_range_extension.diff_cu_chroma_qp_offset_depth;
-         picParams.pHEVCPicData1->log2_sao_offset_scale_luma = hevcPic->pic.pps_range_extension.log2_sao_offset_scale_luma;
-         picParams.pHEVCPicData1->log2_sao_offset_scale_chroma = hevcPic->pic.pps_range_extension.log2_sao_offset_scale_chroma;
-         picParams.pHEVCPicData1->log2_max_transform_skip_block_size_minus2 = hevcPic->pic.pps_range_extension.log2_max_transform_skip_block_size_minus2;
-         picParams.pHEVCPicData1->chroma_qp_offset_list_len_minus1 = hevcPic->pic.pps_range_extension.chroma_qp_offset_list_len_minus1;
+         picParams.pHEVCPicData1->diff_cu_chroma_qp_offset_depth = static_cast<UCHAR>(hevcPic->pic.pps_range_extension.diff_cu_chroma_qp_offset_depth);
+         picParams.pHEVCPicData1->log2_sao_offset_scale_luma = static_cast<UCHAR>(hevcPic->pic.pps_range_extension.log2_sao_offset_scale_luma);
+         picParams.pHEVCPicData1->log2_sao_offset_scale_chroma = static_cast<UCHAR>(hevcPic->pic.pps_range_extension.log2_sao_offset_scale_chroma);
+         picParams.pHEVCPicData1->log2_max_transform_skip_block_size_minus2 = static_cast<CHAR>(hevcPic->pic.pps_range_extension.log2_max_transform_skip_block_size_minus2);
+         picParams.pHEVCPicData1->chroma_qp_offset_list_len_minus1 = static_cast<CHAR>(hevcPic->pic.pps_range_extension.chroma_qp_offset_list_len_minus1);
 
          for (uint32_t i = 0; i < ARRAY_SIZE(picParams.pHEVCPicData1->cb_qp_offset_list) ; i++)
          {
-            picParams.pHEVCPicData1->cb_qp_offset_list[i] = hevcPic->pic.pps_range_extension.cb_qp_offset_list[i];
-            picParams.pHEVCPicData1->cr_qp_offset_list[i] = hevcPic->pic.pps_range_extension.cr_qp_offset_list[i];
+            picParams.pHEVCPicData1->cb_qp_offset_list[i] = static_cast<CHAR>(hevcPic->pic.pps_range_extension.cb_qp_offset_list[i]);
+            picParams.pHEVCPicData1->cr_qp_offset_list[i] = static_cast<CHAR>(hevcPic->pic.pps_range_extension.cr_qp_offset_list[i]);
          }
 
          if (hevcPic->pic.pps_range_extension.cross_component_prediction_enabled_flag)
@@ -466,6 +467,7 @@ d3d12_video_encoder_update_current_frame_pic_params_info_hevc(struct d3d12_video
    //
    // These need to be set here so they're available for SPS/PPS header building (reference manager updates after that, for slice header params)
    //
+   picParams.pHEVCPicData->TemporalLayerIndex = hevcPic->pic.temporal_id;
    picParams.pHEVCPicData->List0ReferenceFramesCount = 0;
    picParams.pHEVCPicData->List1ReferenceFramesCount = 0;
    if ((hevcPic->picture_type == PIPE_H2645_ENC_PICTURE_TYPE_P) ||
@@ -490,8 +492,18 @@ d3d12_video_encoder_update_current_frame_pic_params_info_hevc(struct d3d12_video
          hevc_max_delta_qp,
          pD3D12Enc->m_currentEncodeConfig.m_encoderRateControlDesc[hevcPic->pic.temporal_id].m_pRateControlQPMap8Bit);
       picParams.pHEVCPicData->pRateControlQPMap = pD3D12Enc->m_currentEncodeConfig.m_encoderRateControlDesc[hevcPic->pic.temporal_id].m_pRateControlQPMap8Bit.data();
-      picParams.pHEVCPicData->QPMapValuesCount = pD3D12Enc->m_currentEncodeConfig.m_encoderRateControlDesc[hevcPic->pic.temporal_id].m_pRateControlQPMap8Bit.size();
+      picParams.pHEVCPicData->QPMapValuesCount = static_cast<UINT>(pD3D12Enc->m_currentEncodeConfig.m_encoderRateControlDesc[hevcPic->pic.temporal_id].m_pRateControlQPMap8Bit.size());
    }
+
+   pD3D12Enc->m_upDPBManager->begin_frame(picParams, bUsedAsReference, picture);
+   pD3D12Enc->m_upDPBManager->get_current_frame_picture_control_data(picParams);
+
+   // Save state snapshot from record time to resolve headers at get_feedback time
+   size_t current_metadata_slot = static_cast<size_t>(pD3D12Enc->m_fenceValue % D3D12_VIDEO_ENC_METADATA_BUFFERS_COUNT);
+   pD3D12Enc->m_spEncodedFrameMetadata[current_metadata_slot].m_associatedEncodeCapabilities =
+      pD3D12Enc->m_currentEncodeCapabilities;
+   pD3D12Enc->m_spEncodedFrameMetadata[current_metadata_slot].m_associatedEncodeConfig =
+      pD3D12Enc->m_currentEncodeConfig;
 }
 
 ///
@@ -1413,8 +1425,8 @@ d3d12_video_encoder_build_codec_headers_hevc(struct d3d12_video_encoder *pD3D12E
       pWrittenCodecUnitsSizes.push_back(writtenAUDBytesCount);
    }
 
-   uint32_t active_seq_parameter_set_id = pHEVCBitstreamBuilder->get_active_sps().sps_seq_parameter_set_id;
-   uint32_t active_video_parameter_set_id = pHEVCBitstreamBuilder->get_active_vps().vps_video_parameter_set_id;
+   uint8_t active_seq_parameter_set_id = pHEVCBitstreamBuilder->get_active_sps().sps_seq_parameter_set_id;
+   uint8_t active_video_parameter_set_id = pHEVCBitstreamBuilder->get_active_vps().vps_video_parameter_set_id;
    
    bool writeNewVPS = isFirstFrame || (pD3D12Enc->m_currentEncodeConfig.m_ConfigDirtyFlags & d3d12_video_encoder_config_dirty_flag_video_header);
 
@@ -1461,7 +1473,7 @@ d3d12_video_encoder_build_codec_headers_hevc(struct d3d12_video_encoder *pD3D12E
    size_t writtenPPSBytesCount = 0;
    HevcPicParameterSet tentative_pps = pHEVCBitstreamBuilder->build_pps(pD3D12Enc->m_currentEncodeConfig.m_encoderCodecSpecificPictureStateDescH265,
                                                                         pHEVCBitstreamBuilder->get_active_sps(),
-                                                                        currentPicParams.pHEVCPicData->slice_pic_parameter_set_id,
+                                                                        static_cast<uint8_t>(currentPicParams.pHEVCPicData->slice_pic_parameter_set_id),
                                                                         *codecConfigDesc.pHEVCConfig,
                                                                         *currentPicParams.pHEVCPicData1,
                                                                         pD3D12Enc->m_StagingHeadersBuffer,
@@ -1485,7 +1497,7 @@ d3d12_video_encoder_build_codec_headers_hevc(struct d3d12_video_encoder *pD3D12E
       pD3D12Enc->m_BitstreamHeadersBuffer.resize(writtenAUDBytesCount + writtenVPSBytesCount + writtenSPSBytesCount + writtenPPSBytesCount);
    }
 
-   assert(std::accumulate(pWrittenCodecUnitsSizes.begin(), pWrittenCodecUnitsSizes.end(), 0u) ==
-      static_cast<uint64_t>(pD3D12Enc->m_BitstreamHeadersBuffer.size()));
-   return pD3D12Enc->m_BitstreamHeadersBuffer.size();
+   assert(std::accumulate(pWrittenCodecUnitsSizes.begin(), pWrittenCodecUnitsSizes.end(), 0ull) ==
+      pD3D12Enc->m_BitstreamHeadersBuffer.size());
+   return static_cast<uint32_t>(pD3D12Enc->m_BitstreamHeadersBuffer.size());
 }

@@ -172,7 +172,7 @@ struct dri2_egl_display_vtbl {
                               EGLint *numerator, EGLint *denominator);
 
    /* mandatory */
-   __DRIdrawable *(*get_dri_drawable)(_EGLSurface *surf);
+   struct dri_drawable *(*get_dri_drawable)(_EGLSurface *surf);
 
    /* optional */
    void (*close_screen_notify)(_EGLDisplay *disp);
@@ -232,16 +232,16 @@ struct dri2_egl_display {
 
    int dri2_major;
    int dri2_minor;
-   __DRIscreen *dri_screen_render_gpu;
+   struct dri_screen *dri_screen_render_gpu;
    /* dri_screen_display_gpu holds display GPU in case of prime gpu offloading
     * else dri_screen_render_gpu and dri_screen_display_gpu is same. In case of
     * prime gpu offloading, if display and render driver names are different
     * (potentially not compatible), dri_screen_display_gpu will be NULL but
     * fd_display_gpu will still hold fd for display driver.
     */
-   __DRIscreen *dri_screen_display_gpu;
+   struct dri_screen *dri_screen_display_gpu;
    bool own_dri_screen;
-   const __DRIconfig **driver_configs;
+   const struct dri_config **driver_configs;
    /* fd of the GPU used for rendering. */
    int fd_render_gpu;
    /* fd of the GPU used for display. If the same GPU is used for display
@@ -315,12 +315,12 @@ struct dri2_egl_display {
 
 struct dri2_egl_context {
    _EGLContext base;
-   __DRIcontext *dri_context;
+   struct dri_context *dri_context;
 };
 
 struct dri2_egl_surface {
    _EGLSurface base;
-   __DRIdrawable *dri_drawable;
+   struct dri_drawable *dri_drawable;
    __DRIbuffer buffers[5];
    bool have_fake_front;
 
@@ -359,9 +359,9 @@ struct dri2_egl_surface {
 #ifdef HAVE_WAYLAND_PLATFORM
       struct wl_buffer *wl_buffer;
       bool wl_release;
-      __DRIimage *dri_image;
+      struct dri_image *dri_image;
       /* for is_different_gpu case. NULL else */
-      __DRIimage *linear_copy;
+      struct dri_image *linear_copy;
       /* for swrast */
       void *data;
       int data_size;
@@ -381,8 +381,8 @@ struct dri2_egl_surface {
    /* in-fence associated with buffer, -1 once passed down to dri layer: */
    int in_fence_fd;
 
-   __DRIimage *dri_image_back;
-   __DRIimage *dri_image_front;
+   struct dri_image *dri_image_back;
+   struct dri_image *dri_image_front;
 
    /* Used to record all the buffers created by ANativeWindow and their ages.
     * Allocate number of color_buffers based on query to android bufferqueue
@@ -397,7 +397,7 @@ struct dri2_egl_surface {
 #endif
 
    /* surfaceless and device */
-   __DRIimage *front;
+   struct dri_image *front;
    enum pipe_format visual;
 
    int out_fence_fd;
@@ -409,12 +409,12 @@ struct dri2_egl_surface {
 
 struct dri2_egl_config {
    _EGLConfig base;
-   const __DRIconfig *dri_config[2][2];
+   const struct dri_config *dri_config[2][2];
 };
 
 struct dri2_egl_image {
    _EGLImage base;
-   __DRIimage *dri_image;
+   struct dri_image *dri_image;
 };
 
 struct dri2_egl_sync {
@@ -470,25 +470,25 @@ dri2_create_screen(_EGLDisplay *disp);
 EGLBoolean
 dri2_setup_device(_EGLDisplay *disp, EGLBoolean software);
 
-__DRIdrawable *
+struct dri_drawable *
 dri2_surface_get_dri_drawable(_EGLSurface *surf);
 
 GLboolean
 dri2_validate_egl_image(void *image, void *data);
 
-__DRIimage *
+struct dri_image *
 dri2_lookup_egl_image_validated(void *image, void *data);
 
 void
-dri2_get_shifts_and_sizes(const __DRIconfig *config, int *shifts,
+dri2_get_shifts_and_sizes(const struct dri_config *config, int *shifts,
                           unsigned int *sizes);
 
 enum pipe_format
 dri2_image_format_for_pbuffer_config(struct dri2_egl_display *dri2_dpy,
-                                     const __DRIconfig *config);
+                                     const struct dri_config *config);
 
 struct dri2_egl_config *
-dri2_add_config(_EGLDisplay *disp, const __DRIconfig *dri_config,
+dri2_add_config(_EGLDisplay *disp, const struct dri_config *dri_config,
                 EGLint surface_type, const EGLint *attr_list);
 
 void
@@ -509,7 +509,7 @@ dri2_create_image_dma_buf(_EGLDisplay *disp, _EGLContext *ctx,
                           EGLClientBuffer buffer, const EGLint *attr_list);
 
 _EGLImage *
-dri2_create_image_from_dri(_EGLDisplay *disp, __DRIimage *dri_image);
+dri2_create_image_from_dri(_EGLDisplay *disp, struct dri_image *dri_image);
 
 #ifdef HAVE_X11_PLATFORM
 EGLBoolean
@@ -599,7 +599,7 @@ dri2_flush_drawable_for_swapbuffers_flags(
 void
 dri2_flush_drawable_for_swapbuffers(_EGLDisplay *disp, _EGLSurface *draw);
 
-const __DRIconfig *
+const struct dri_config *
 dri2_get_dri_config(struct dri2_egl_config *conf, EGLint surface_type,
                     EGLenum colorspace);
 #include "dri_util.h"
@@ -634,7 +634,7 @@ dri2_fini_surface(_EGLSurface *surf);
 
 EGLBoolean
 dri2_create_drawable(struct dri2_egl_display *dri2_dpy,
-                     const __DRIconfig *config,
+                     const struct dri_config *config,
                      struct dri2_egl_surface *dri2_surf, void *loaderPrivate);
 
 static inline uint64_t

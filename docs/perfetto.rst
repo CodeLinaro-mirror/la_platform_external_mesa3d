@@ -43,6 +43,9 @@ The exact supported features vary per driver:
    * - Panfrost
      - ``gpu.counters.panfrost``
      -
+   * - V3D
+     - ``gpu.counters.v3d``
+     -
 
 Run
 ---
@@ -110,7 +113,11 @@ CPU Tracing
 Mesa's CPU tracepoints (``MESA_TRACE_*``) use Perfetto track events when
 Perfetto is enabled.  They use ``mesa.default`` and ``mesa.slow`` categories.
 
-Currently, only EGL and Freedreno have CPU tracepoints.
+Currently, only EGL and the following drivers have have CPU tracepoints.
+
+- Freedreno
+- V3D
+- VC4
 
 Vulkan data sources
 ~~~~~~~~~~~~~~~~~~~

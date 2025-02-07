@@ -37,6 +37,7 @@
 #include "ast.h"
 #include "glsl_parser_extras.h"
 #include "glsl_parser.h"
+#include "glsl_to_nir.h"
 #include "ir_optimization.h"
 #include "builtin_functions.h"
 
@@ -1030,57 +1031,10 @@ _mesa_glsl_process_extension(const char *name, YYLTYPE *name_locp,
       }
    }
 
+   if (state->OVR_multiview2_enable)
+      state->OVR_multiview_enable = true;
+
    return true;
-}
-
-bool
-_mesa_glsl_can_implicitly_convert(const glsl_type *from, const glsl_type *desired,
-                                  bool has_implicit_conversions,
-                                  bool has_implicit_int_to_uint_conversion)
-{
-   if (from == desired)
-      return true;
-
-   /* GLSL 1.10 and ESSL do not allow implicit conversions. */
-   if (!has_implicit_conversions)
-      return false;
-
-   /* There is no conversion among matrix types. */
-   if (from->matrix_columns > 1 || desired->matrix_columns > 1)
-      return false;
-
-   /* Vector size must match. */
-   if (from->vector_elements != desired->vector_elements)
-      return false;
-
-   /* int and uint can be converted to float. */
-   if (glsl_type_is_float(desired) && (glsl_type_is_integer_32(from) ||
-       glsl_type_is_float_16(from)))
-      return true;
-
-   /* With GLSL 4.0, ARB_gpu_shader5, or MESA_shader_integer_functions, int
-    * can be converted to uint.  Note that state may be NULL here, when
-    * resolving function calls in the linker. By this time, all the
-    * state-dependent checks have already happened though, so allow anything
-    * that's allowed in any shader version.
-    */
-   if (has_implicit_int_to_uint_conversion &&
-       desired->base_type == GLSL_TYPE_UINT && from->base_type == GLSL_TYPE_INT)
-      return true;
-
-   /* No implicit conversions from double. */
-   if (glsl_type_is_double(from))
-      return false;
-
-   /* Conversions from different types to double. */
-   if (glsl_type_is_double(desired)) {
-      if (glsl_type_is_float_16_32(from))
-         return true;
-      if (glsl_type_is_integer_32(from))
-         return true;
-   }
-
-   return false;
 }
 
 /**
@@ -2149,49 +2103,6 @@ set_shader_inout_layout(struct gl_shader *shader,
    shader->layer_viewport_relative = state->layer_viewport_relative;
 }
 
-/* src can be NULL if only the symbols found in the exec_list should be
- * copied
- */
-void
-_mesa_glsl_copy_symbols_from_table(struct exec_list *shader_ir,
-                                   struct glsl_symbol_table *src,
-                                   struct glsl_symbol_table *dest)
-{
-   foreach_in_list (ir_instruction, ir, shader_ir) {
-      switch (ir->ir_type) {
-      case ir_type_function:
-         dest->add_function((ir_function *) ir);
-         break;
-      case ir_type_variable: {
-         ir_variable *const var = (ir_variable *) ir;
-
-         if (var->data.mode != ir_var_temporary)
-            dest->add_variable(var);
-         break;
-      }
-      default:
-         break;
-      }
-   }
-
-   if (src != NULL) {
-      /* Explicitly copy the gl_PerVertex interface definitions because these
-       * are needed to check they are the same during the interstage link.
-       * They can’t necessarily be found via the exec_list because the members
-       * might not be referenced. The GL spec still requires that they match
-       * in that case.
-       */
-      const glsl_type *iface =
-         src->get_interface("gl_PerVertex", ir_var_shader_in);
-      if (iface)
-         dest->add_interface(glsl_get_type_name(iface), iface, ir_var_shader_in);
-
-      iface = src->get_interface("gl_PerVertex", ir_var_shader_out);
-      if (iface)
-         dest->add_interface(glsl_get_type_name(iface), iface, ir_var_shader_out);
-   }
-}
-
 extern "C" {
 
 static void
@@ -2264,10 +2175,9 @@ do_late_parsing_checks(struct _mesa_glsl_parse_state *state)
 }
 
 static void
-opt_shader_and_create_symbol_table(const struct gl_constants *consts,
-                                   const struct gl_extensions *exts,
-                                   struct glsl_symbol_table *source_symbols,
-                                   struct gl_shader *shader)
+opt_shader(const struct gl_constants *consts,
+           const struct gl_extensions *exts,
+           struct gl_shader *shader)
 {
    assert(shader->CompileStatus != COMPILE_FAILURE &&
           !shader->ir->is_empty());
@@ -2309,7 +2219,8 @@ opt_shader_and_create_symbol_table(const struct gl_constants *consts,
                           consts->GLSLHasHalfFloatPacking);
    do_mat_op_to_vec(shader->ir);
 
-   lower_instructions(shader->ir, exts->ARB_gpu_shader5);
+   lower_instructions(shader->ir, consts->ForceGLSLAbsSqrt,
+                      exts->ARB_gpu_shader5);
 
    do_vec_index_to_cond_assign(shader->ir);
 
@@ -2317,19 +2228,6 @@ opt_shader_and_create_symbol_table(const struct gl_constants *consts,
 
    /* Retain any live IR, but trash the rest. */
    reparent_ir(shader->ir, shader->ir);
-
-   /* Destroy the symbol table.  Create a new symbol table that contains only
-    * the variables and functions that still exist in the IR.  The symbol
-    * table will be used later during linking.
-    *
-    * There must NOT be any freed objects still referenced by the symbol
-    * table.  That could cause the linker to dereference freed memory.
-    *
-    * We don't have to worry about types or interface-types here because those
-    * are fly-weights that are looked up by glsl_type.
-    */
-   _mesa_glsl_copy_symbols_from_table(shader->ir, source_symbols,
-                                      shader->symbols);
 }
 
 static bool
@@ -2380,9 +2278,19 @@ can_skip_compile(struct gl_context *ctx, struct gl_shader *shader,
    return false;
 }
 
+static void
+log_compile_skip(struct gl_context *ctx, struct gl_shader *shader)
+{
+   if (ctx->_Shader->Flags & GLSL_DUMP) {
+      _mesa_log("No GLSL IR for shader %d (shader may be from cache)\n",
+                shader->Name);
+   }
+}
+
 void
 _mesa_glsl_compile_shader(struct gl_context *ctx, struct gl_shader *shader,
-                          bool dump_ast, bool dump_hir, bool force_recompile)
+                          FILE *dump_ir_file, bool dump_ast, bool dump_hir,
+                          bool force_recompile)
 {
    const char *source;
    const uint8_t *source_blake3;
@@ -2408,8 +2316,10 @@ _mesa_glsl_compile_shader(struct gl_context *ctx, struct gl_shader *shader,
     */
    if (!source_has_shader_include &&
        can_skip_compile(ctx, shader, source, source_blake3, force_recompile,
-                        false))
+                        false)) {
+      log_compile_skip(ctx, shader);
       return;
+   }
 
     struct _mesa_glsl_parse_state *state =
       new(shader) _mesa_glsl_parse_state(ctx, shader->Stage, shader);
@@ -2429,8 +2339,10 @@ _mesa_glsl_compile_shader(struct gl_context *ctx, struct gl_shader *shader,
     */
    if (source_has_shader_include &&
        can_skip_compile(ctx, shader, source, source_blake3, force_recompile,
-                        true))
+                        true)) {
+      log_compile_skip(ctx, shader);
       return;
+   }
 
    if (!state->error) {
      _mesa_glsl_lexer_ctor(state, source);
@@ -2447,6 +2359,8 @@ _mesa_glsl_compile_shader(struct gl_context *ctx, struct gl_shader *shader,
    }
 
    ralloc_free(shader->ir);
+   ralloc_free(shader->nir);
+   shader->nir = NULL;
    shader->ir = new(shader) exec_list;
    if (!state->error && !state->translation_unit.is_empty())
       _mesa_ast_to_hir(shader->ir, state);
@@ -2466,7 +2380,6 @@ _mesa_glsl_compile_shader(struct gl_context *ctx, struct gl_shader *shader,
    if (!state->error)
       set_shader_inout_layout(shader, state);
 
-   shader->symbols = new(shader->ir) glsl_symbol_table;
    shader->CompileStatus = state->error ? COMPILE_FAILURE : COMPILE_SUCCESS;
    shader->InfoLog = state->info_log;
    shader->Version = state->language_version;
@@ -2486,8 +2399,7 @@ _mesa_glsl_compile_shader(struct gl_context *ctx, struct gl_shader *shader,
       lower_builtins(shader->ir);
       assign_subroutine_indexes(state);
       lower_subroutine(shader->ir, state);
-      opt_shader_and_create_symbol_table(&ctx->Const, &ctx->Extensions,
-                                         state->symbols, shader);
+      opt_shader(&ctx->Const, &ctx->Extensions, shader);
    }
 
    if (!force_recompile) {
@@ -2507,8 +2419,33 @@ _mesa_glsl_compile_shader(struct gl_context *ctx, struct gl_shader *shader,
    delete state->symbols;
    ralloc_free(state);
 
-   if (shader->CompileStatus == COMPILE_SUCCESS)
+   if (ctx->_Shader && ctx->_Shader->Flags & GLSL_DUMP) {
+      if (shader->CompileStatus) {
+         assert(shader->ir);
+         _mesa_log("GLSL IR for shader %d:\n", shader->Name);
+         _mesa_print_ir(mesa_log_get_file(), shader->ir, NULL);
+         _mesa_log("\n\n");
+      } else {
+         _mesa_log("GLSL shader %d failed to compile.\n", shader->Name);
+      }
+      if (shader->InfoLog && shader->InfoLog[0] != 0) {
+         _mesa_log("GLSL shader %d info log:\n", shader->Name);
+         _mesa_log("%s\n", shader->InfoLog);
+      }
+   }
+
+   if (dump_ir_file) {
+      if (shader->CompileStatus) {
+         assert(shader->ir);
+         _mesa_print_ir(dump_ir_file, shader->ir, NULL);
+      }
+   }
+
+   if (shader->CompileStatus == COMPILE_SUCCESS) {
       memcpy(shader->compiled_source_blake3, source_blake3, BLAKE3_OUT_LEN);
+
+      shader->nir = glsl_to_nir(shader, options->NirOptions, source_blake3);
+   }
 
    if (ctx->Cache && shader->CompileStatus == COMPILE_SUCCESS) {
       char sha1_buf[41];
@@ -2570,13 +2507,11 @@ do_common_optimization(exec_list *ir, bool linked,
       OPT(opt_flip_matrices, ir);
 
    OPT(do_dead_code_unlinked, ir);
-   OPT(do_dead_code_local, ir);
    OPT(do_tree_grafting, ir);
    OPT(do_minmax_prune, ir);
    OPT(do_rebalance_tree, ir);
    OPT(do_algebraic, ir, native_integers, options);
-   OPT(do_lower_jumps, ir, true, true, options->EmitNoMainReturn,
-       options->EmitNoCont);
+   OPT(do_lower_jumps, ir, true, options->EmitNoCont);
 
    /* If an optimization pass fails to preserve the invariant flag, calling
     * the pass only once earlier may result in incorrect code generation. Always call

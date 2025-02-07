@@ -36,10 +36,6 @@ dEQP-GLES3.functional.fbo.color.repeated_clear.sample.tex2d.rgba8,Fail
 dEQP-GLES3.functional.fbo.color.repeated_clear.sample.tex2d.rgba8i,Fail
 dEQP-GLES3.functional.fbo.color.repeated_clear.sample.tex2d.rgba8ui,Fail
 dEQP-GLES3.functional.fbo.color.repeated_clear.sample.tex2d.srgb8_alpha8,Fail
-dEQP-GLES3.functional.fbo.depth.depth_test_clamp.depth32f_stencil8,Fail
-dEQP-GLES3.functional.fbo.depth.depth_test_clamp.depth_component32f,Fail
-dEQP-GLES3.functional.fbo.depth.depth_write_clamp.depth32f_stencil8,Fail
-dEQP-GLES3.functional.fbo.depth.depth_write_clamp.depth_component32f,Fail
 dEQP-GLES31.functional.shaders.multisample_interpolation.interpolate_at_sample.non_multisample_buffer.sample_n_default_framebuffer,Fail
 dEQP-GLES31.functional.shaders.multisample_interpolation.interpolate_at_sample.non_multisample_buffer.sample_n_singlesample_rbo,Fail
 dEQP-GLES31.functional.shaders.multisample_interpolation.interpolate_at_sample.non_multisample_buffer.sample_n_singlesample_texture,Fail
@@ -427,13 +423,12 @@ spec@arb_texture_buffer_object@formats (vs- arb)@GL_LUMINANCE_ALPHA8I_EXT,Fail
 spec@arb_texture_buffer_object@formats (vs- arb)@GL_LUMINANCE_ALPHA8UI_EXT,Fail
 spec@arb_texture_cube_map_array@texsubimage cube_map_array,Fail
 spec@arb_viewport_array@display-list,Fail
-spec@egl 1.4@egl-ext_egl_image_storage,Crash
+spec@egl 1.4@egl-ext_egl_image_storage,Fail
 spec@egl 1.4@eglterminate then unbind context,Fail
 spec@egl_khr_gl_image@egl_khr_gl_renderbuffer_image-clear-shared-image gl_depth_component24,Fail
 spec@egl_khr_surfaceless_context@viewport,Fail
 spec@ext_external_objects@vk-image-overwrite,Crash
 spec@ext_external_objects@vk-image-overwrite@RGBA 4 UNORM linear,Fail
-spec@ext_framebuffer_multisample@blit-mismatched-formats,Fail
 spec@ext_framebuffer_multisample@enable-flag,Fail
 spec@ext_framebuffer_multisample@interpolation 2 centroid-deriv-disabled,Fail
 spec@ext_framebuffer_multisample@interpolation 2 centroid-disabled,Fail
@@ -465,8 +460,6 @@ spec@ext_transform_feedback@immediate-reuse-uniform-buffer,Fail
 spec@ext_transform_feedback@tessellation quad_strip wireframe,Fail
 spec@ext_transform_feedback@tessellation quads wireframe,Fail
 spec@glsl-1.10@execution@samplers@glsl-fs-lots-of-tex,Fail
-spec@glsl-1.50@execution@primitive-id-no-gs-quad-strip,Fail
-spec@glsl-1.50@execution@primitive-id-no-gs-quads,Fail
 spec@glsl-es-3.00@execution@built-in-functions@fs-packhalf2x16,Fail
 spec@glsl-es-3.00@execution@built-in-functions@vs-packhalf2x16,Fail
 spec@khr_texture_compression_astc@miptree-gl srgb-fp,Fail

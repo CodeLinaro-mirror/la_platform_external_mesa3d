@@ -322,6 +322,9 @@ compute_topology_builtins(struct intel_perf_config *perf)
 
    perf->sys_vars.slice_mask = devinfo->slice_masks;
    perf->sys_vars.n_eu_slices = devinfo->num_slices;
+   perf->sys_vars.n_l3_banks = devinfo->l3_banks;
+   perf->sys_vars.n_l3_nodes = devinfo->l3_banks / 4;
+   perf->sys_vars.n_sq_idis =  devinfo->num_slices;
 
    perf->sys_vars.n_eu_slice0123 = 0;
    for (int s = 0; s < MIN2(4, devinfo->max_slices); s++) {
@@ -469,8 +472,17 @@ get_register_queries_function(const struct intel_device_info *devinfo)
       if (intel_device_info_eu_total(devinfo) <= 128)
          return intel_oa_register_queries_mtlgt3;
       return NULL;
+   case INTEL_PLATFORM_ARL_U:
+   case INTEL_PLATFORM_ARL_H:
+      if (intel_device_info_eu_total(devinfo) <= 64)
+         return intel_oa_register_queries_arlgt1;
+      if (intel_device_info_eu_total(devinfo) <= 128)
+         return intel_oa_register_queries_arlgt2;
+      return NULL;
    case INTEL_PLATFORM_LNL:
       return intel_oa_register_queries_lnl;
+   case INTEL_PLATFORM_BMG:
+      return intel_oa_register_queries_bmg;
    default:
       return NULL;
    }
@@ -1527,8 +1539,10 @@ intel_perf_init_metrics(struct intel_perf_config *perf_cfg,
       load_oa_metrics(perf_cfg, drm_fd, devinfo);
 
    /* sort query groups by name */
-   qsort(perf_cfg->queries, perf_cfg->n_queries,
-         sizeof(perf_cfg->queries[0]), intel_perf_compare_query_names);
+   if (perf_cfg->queries != NULL) {
+      qsort(perf_cfg->queries, perf_cfg->n_queries,
+            sizeof(perf_cfg->queries[0]), intel_perf_compare_query_names);
+   }
 
    build_unique_counter_list(perf_cfg);
 
@@ -1560,7 +1574,7 @@ int
 intel_perf_stream_open(struct intel_perf_config *perf_config, int drm_fd,
                        uint32_t ctx_id, uint64_t metrics_set_id,
                        uint64_t period_exponent, bool hold_preemption,
-                       bool enable)
+                       bool enable, struct intel_bind_timeline *timeline)
 {
    uint64_t report_format = intel_perf_get_oa_format(perf_config);
 
@@ -1572,7 +1586,7 @@ intel_perf_stream_open(struct intel_perf_config *perf_config, int drm_fd,
    case INTEL_KMD_TYPE_XE:
       return xe_perf_stream_open(perf_config, drm_fd, ctx_id, metrics_set_id,
                                  report_format, period_exponent,
-                                 hold_preemption, enable);
+                                 hold_preemption, enable, timeline);
    default:
          unreachable("missing");
          return 0;
@@ -1620,13 +1634,18 @@ intel_perf_stream_set_state(struct intel_perf_config *perf_config,
 
 int
 intel_perf_stream_set_metrics_id(struct intel_perf_config *perf_config,
-                                 int perf_stream_fd, uint64_t metrics_set_id)
+                                 int drm_fd, int perf_stream_fd,
+                                 uint32_t exec_queue,
+                                 uint64_t metrics_set_id,
+                                 struct intel_bind_timeline *timeline)
 {
    switch (perf_config->devinfo->kmd_type) {
    case INTEL_KMD_TYPE_I915:
       return i915_perf_stream_set_metrics_id(perf_stream_fd, metrics_set_id);
    case INTEL_KMD_TYPE_XE:
-      return xe_perf_stream_set_metrics_id(perf_stream_fd, metrics_set_id);
+      return xe_perf_stream_set_metrics_id(perf_stream_fd, drm_fd,
+                                           exec_queue, metrics_set_id,
+                                           timeline);
    default:
          unreachable("missing");
          return -1;

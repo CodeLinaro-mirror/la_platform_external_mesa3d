@@ -70,35 +70,31 @@ can_sink_instr(nir_instr *instr, nir_move_options options, bool *can_mov_out_of_
    case nir_instr_type_alu: {
       nir_alu_instr *alu = nir_instr_as_alu(instr);
 
-      /* Derivatives cannot be moved into non-uniform control flow, including
-       * past a discard_if in the same block. Even if they could, sinking
-       * derivatives extends the lifetime of helper invocations which may be
-       * worse than the register pressure decrease. Bail on derivatives.
-       */
-      if (nir_op_is_derivative(alu->op))
-         return false;
-
       if (nir_op_is_vec_or_mov(alu->op) || alu->op == nir_op_b2i32)
          return options & nir_move_copies;
       if (nir_alu_instr_is_comparison(alu))
          return options & nir_move_comparisons;
 
       /* Assuming that constants do not contribute to register pressure, it is
-       * beneficial to sink ALU instructions where all but one source is
-       * constant. Detect that case last.
+       * beneficial to sink ALU instructions where all non constant sources
+       * are the same.
        */
       if (!(options & nir_move_alu))
          return false;
 
       unsigned inputs = nir_op_infos[alu->op].num_inputs;
-      unsigned constant_inputs = 0;
+      int non_const = -1;
 
       for (unsigned i = 0; i < inputs; ++i) {
          if (is_constant_like(&alu->src[i].src))
-            constant_inputs++;
+            continue;
+         else if (non_const < 0)
+            non_const = i;
+         else if (!nir_alu_srcs_equal(alu, alu, non_const, i))
+            return false;
       }
 
-      return (constant_inputs + 1 >= inputs);
+      return true;
    }
    case nir_instr_type_intrinsic: {
       nir_intrinsic_instr *intrin = nir_instr_as_intrinsic(instr);
@@ -116,12 +112,15 @@ can_sink_instr(nir_instr *instr, nir_move_options options, bool *can_mov_out_of_
       case nir_intrinsic_load_per_vertex_input:
       case nir_intrinsic_load_frag_coord:
       case nir_intrinsic_load_frag_coord_zw:
+      case nir_intrinsic_load_frag_coord_zw_pan:
       case nir_intrinsic_load_pixel_coord:
+      case nir_intrinsic_load_attribute_pan:
          return options & nir_move_load_input;
       case nir_intrinsic_load_uniform:
       case nir_intrinsic_load_kernel_input:
          return options & nir_move_load_uniform;
       case nir_intrinsic_inverse_ballot:
+      case nir_intrinsic_is_subgroup_invocation_lt_amd:
          *can_mov_out_of_loop = false;
          return options & nir_move_copies;
       case nir_intrinsic_load_constant_agx:

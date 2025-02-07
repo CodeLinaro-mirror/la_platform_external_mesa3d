@@ -40,6 +40,11 @@
 #include <stdlib.h>
 #include <time.h>
 
+static void dummy_sys_event(enum vpe_event_id eventId, ...)
+{
+    // Do nothing, if no callback is provided for sys event
+}
+
 static void override_debug_option(
     struct vpe_debug_options *debug, const struct vpe_debug_options *user_debug)
 {
@@ -124,25 +129,62 @@ static void override_debug_option(
     if (user_debug->flags.bypass_blndgam)
         debug->bypass_blndgam = user_debug->bypass_blndgam;
 
-    if (user_debug->flags.disable_3dlut_cache)
-        debug->disable_3dlut_cache = user_debug->disable_3dlut_cache;
+    if (user_debug->flags.disable_lut_caching)
+        debug->disable_lut_caching = user_debug->disable_lut_caching;
 }
 
-#ifdef VPE_BUILD_1_1
 static void verify_collaboration_mode(struct vpe_priv *vpe_priv)
 {
     if (vpe_priv->pub.level == VPE_IP_LEVEL_1_1) {
         if (vpe_priv->collaboration_mode == true && vpe_priv->collaborate_sync_index == 0) {
             srand((unsigned int)time(NULL)); // Initialization, should only be called once.
-            uint32_t randnum                 = (uint32_t)rand();
-            randnum                          = randnum & 0x0000f000;
+            // coverity[dont_call]
+            uint32_t randnum                 = (uint32_t)rand() % 15;
+            randnum                          = randnum << 12;
             vpe_priv->collaborate_sync_index = (int32_t)randnum;
         }
     } else if (vpe_priv->pub.level == VPE_IP_LEVEL_1_0) {
         vpe_priv->collaboration_mode = false;
     }
 }
-#endif
+
+static enum vpe_status create_output_config_vector(struct vpe_priv *vpe_priv)
+{
+    uint32_t i;
+
+    // output config vector stores all share-able configs that can be re-used later
+    for (i = 0; i < vpe_priv->pub.caps->resource_caps.num_cdc_be; i++) {
+        vpe_priv->output_ctx.configs[i] =
+            vpe_vector_create(vpe_priv, sizeof(struct config_record), MIN_NUM_CONFIG);
+        if (!vpe_priv->output_ctx.configs[i]) {
+            return VPE_STATUS_NO_MEMORY;
+        }
+    }
+    return VPE_STATUS_OK;
+}
+
+static void destroy_output_config_vector(struct vpe_priv *vpe_priv)
+{
+    uint32_t i;
+
+    for (i = 0; i < vpe_priv->pub.caps->resource_caps.num_cdc_be; i++) {
+        if (vpe_priv->output_ctx.configs[i]) {
+            vpe_vector_free(vpe_priv->output_ctx.configs[i]);
+            vpe_priv->output_ctx.configs[i] = NULL;
+        }
+    }
+}
+
+static void free_output_ctx(struct vpe_priv *vpe_priv)
+{
+    if (vpe_priv->output_ctx.gamut_remap)
+        vpe_free(vpe_priv->output_ctx.gamut_remap);
+
+    if (vpe_priv->output_ctx.output_tf)
+        vpe_free(vpe_priv->output_ctx.output_tf);
+
+    destroy_output_config_vector(vpe_priv);
+}
 
 struct vpe *vpe_create(const struct vpe_init_data *params)
 {
@@ -160,6 +202,11 @@ struct vpe *vpe_create(const struct vpe_init_data *params)
 
     vpe_priv->init = *params;
 
+    // Make sys event an optional feature but hooking up to dummy function if no callback is
+    // provided
+    if (vpe_priv->init.funcs.sys_event == NULL)
+        vpe_priv->init.funcs.sys_event = dummy_sys_event;
+
     vpe_priv->pub.level =
         vpe_resource_parse_ip_version(params->ver_major, params->ver_minor, params->ver_rev);
 
@@ -172,6 +219,20 @@ struct vpe *vpe_create(const struct vpe_init_data *params)
         return NULL;
     }
 
+    vpe_priv->vpe_cmd_vector =
+        vpe_vector_create(vpe_priv, sizeof(struct vpe_cmd_info), MIN_VPE_CMD);
+    if (!vpe_priv->vpe_cmd_vector) {
+        vpe_free(vpe_priv);
+        return NULL;
+    }
+
+    status = create_output_config_vector(vpe_priv);
+    if (status != VPE_STATUS_OK) {
+        destroy_output_config_vector(vpe_priv);
+        vpe_free(vpe_priv);
+        return NULL;
+    }
+
     override_debug_option(&vpe_priv->init.debug, &params->debug);
 
     vpe_color_setup_x_points_distribution();
@@ -180,10 +241,7 @@ struct vpe *vpe_create(const struct vpe_init_data *params)
     vpe_priv->ops_support      = false;
     vpe_priv->scale_yuv_matrix = true;
 
-#ifdef VPE_BUILD_1_1
     vpe_priv->collaborate_sync_index = 0;
-#endif
-
     return &vpe_priv->pub;
 }
 
@@ -198,9 +256,12 @@ void vpe_destroy(struct vpe **vpe)
 
     vpe_destroy_resource(vpe_priv, &vpe_priv->resource);
 
-    vpe_free_output_ctx(vpe_priv);
+    free_output_ctx(vpe_priv);
 
     vpe_free_stream_ctx(vpe_priv);
+
+    if (vpe_priv->vpe_cmd_vector)
+        vpe_vector_free(vpe_priv->vpe_cmd_vector);
 
     if (vpe_priv->dummy_input_param)
         vpe_free(vpe_priv->dummy_input_param);
@@ -212,7 +273,6 @@ void vpe_destroy(struct vpe **vpe)
 
     *vpe = NULL;
 }
-
 
 /*****************************************************************************************
  * populate_bg_stream
@@ -254,26 +314,26 @@ static enum vpe_status populate_bg_stream(struct vpe_priv *vpe_priv, const struc
     surface_info                      = &stream->surface_info;
     scaling_info                      = &stream->scaling_info;
     polyphaseCoeffs                   = &stream->polyphase_scaling_coeffs;
-    surface_info->address.type        = VPE_PLN_ADDR_TYPE_GRAPHICS;
+    surface_info->address.type        = param->dst_surface.address.type;
     surface_info->address.tmz_surface = param->dst_surface.address.tmz_surface;
     surface_info->address.grph.addr.quad_part =
         param->dst_surface.address.grph.addr.quad_part;
 
-    surface_info->swizzle                   = VPE_SW_LINEAR; // treat it as linear for simple
+    surface_info->swizzle                   = param->dst_surface.swizzle; // treat it as linear for simple
     surface_info->plane_size.surface_size.x = 0;
     surface_info->plane_size.surface_size.y = 0;
-    surface_info->plane_size.surface_size.width = VPE_MIN_VIEWPORT_SIZE; // min width in pixels
-    surface_info->plane_size.surface_size.height =
-        VPE_MIN_VIEWPORT_SIZE;                                           // min height in pixels
-    surface_info->plane_size.surface_pitch          = 256 / 4;           // pitch in pixels
-    surface_info->plane_size.surface_aligned_height = VPE_MIN_VIEWPORT_SIZE;
+    // min width & height in pixels
+    surface_info->plane_size.surface_size.width     = VPE_MIN_VIEWPORT_SIZE;
+    surface_info->plane_size.surface_size.height    = VPE_MIN_VIEWPORT_SIZE;
+    surface_info->plane_size.surface_pitch          = param->dst_surface.plane_size.surface_pitch;
+    surface_info->plane_size.surface_aligned_height = param->dst_surface.plane_size.surface_aligned_height;
     surface_info->dcc.enable                        = false;
-    surface_info->format                            = VPE_SURFACE_PIXEL_FORMAT_GRPH_RGBA8888;
-    surface_info->cs.encoding                       = VPE_PIXEL_ENCODING_RGB;
-    surface_info->cs.range                          = VPE_COLOR_RANGE_FULL;
-    surface_info->cs.tf                             = VPE_TF_G22;
-    surface_info->cs.cositing                       = VPE_CHROMA_COSITING_NONE;
-    surface_info->cs.primaries                      = VPE_PRIMARIES_BT709;
+    surface_info->format                            = param->dst_surface.format;
+    surface_info->cs.encoding                       = param->dst_surface.cs.encoding;
+    surface_info->cs.range                          = param->dst_surface.cs.range;
+    surface_info->cs.tf                             = param->dst_surface.cs.tf;
+    surface_info->cs.cositing                       = param->dst_surface.cs.cositing;
+    surface_info->cs.primaries                      = param->dst_surface.cs.primaries;
     scaling_info->src_rect.x                        = 0;
     scaling_info->src_rect.y                        = 0;
     scaling_info->src_rect.width                    = VPE_MIN_VIEWPORT_SIZE;
@@ -337,10 +397,14 @@ static enum vpe_status populate_input_streams(struct vpe_priv *vpe_priv, const s
         stream_ctx = &stream_ctx_base[i];
         stream_ctx->stream_type = VPE_STREAM_TYPE_INPUT;
         stream_ctx->stream_idx = (int32_t)i;
+
         stream_ctx->per_pixel_alpha =
             vpe_has_per_pixel_alpha(param->streams[i].surface_info.format);
+
         if (vpe_priv->init.debug.bypass_per_pixel_alpha) {
             stream_ctx->per_pixel_alpha = false;
+        } else if (param->streams[i].enable_luma_key) {
+            stream_ctx->per_pixel_alpha = true;
         }
         if (param->streams[i].horizontal_mirror && !input_h_mirror && output_h_mirror)
             stream_ctx->flip_horizonal_output = true;
@@ -372,18 +436,19 @@ static enum vpe_status populate_virtual_streams(struct vpe_priv* vpe_priv, const
 
     vpe_priv->resource.check_h_mirror_support(&input_h_mirror, &output_h_mirror);
 
+    // Background generation stream
     if (param->num_streams == 0 || vpe_priv->init.debug.bg_color_fill_only) {
         if (num_virtual_streams != 1)
             result = VPE_STATUS_ERROR;
         else
-            result = populate_bg_stream(vpe_priv, param, &vpe_priv->stream_ctx[virtual_stream_idx++]);
+            result = populate_bg_stream(vpe_priv, param, &stream_ctx_base[virtual_stream_idx++]);
     }
 
     if (result != VPE_STATUS_OK)
         return result;
 
     for (virtual_stream_idx = 0; virtual_stream_idx < num_virtual_streams; virtual_stream_idx++) {
-        stream_ctx = &stream_ctx_base[virtual_stream_idx];
+        stream_ctx             = &stream_ctx_base[virtual_stream_idx];
         stream_ctx->stream_idx = virtual_stream_idx + vpe_priv->num_input_streams;
         stream_ctx->per_pixel_alpha =
             vpe_has_per_pixel_alpha(stream_ctx->stream.surface_info.format);
@@ -414,11 +479,9 @@ enum vpe_status vpe_check_support(
     dpp             = vpe_priv->resource.dpp[0];
     status          = VPE_STATUS_OK;
 
-#ifdef VPE_BUILD_1_1
     vpe_priv->collaboration_mode = param->collaboration_mode;
     vpe_priv->vpe_num_instance   = param->num_instances;
     verify_collaboration_mode(vpe_priv);
-#endif
 
     required_virtual_streams = get_required_virtual_stream_count(vpe_priv, param);
 
@@ -440,11 +503,15 @@ enum vpe_status vpe_check_support(
     }
 
     if (param->num_streams == 0 || vpe_priv->init.debug.bg_color_fill_only) {
-        vpe_free_stream_ctx(vpe_priv);
-        vpe_priv->stream_ctx = vpe_alloc_stream_ctx(vpe_priv, 1);
-        vpe_priv->num_streams = required_virtual_streams;
-        vpe_priv->num_virtual_streams = required_virtual_streams;
-        vpe_priv->num_input_streams = 0;
+        if (!((vpe_priv->num_streams == 1) &&
+            (vpe_priv->num_virtual_streams == 1) &&
+            (vpe_priv->num_input_streams == 0))) {
+            vpe_free_stream_ctx(vpe_priv);
+            vpe_priv->stream_ctx = vpe_alloc_stream_ctx(vpe_priv, 1);
+            vpe_priv->num_streams = required_virtual_streams;
+            vpe_priv->num_virtual_streams = required_virtual_streams;
+            vpe_priv->num_input_streams = 0;
+        }
 
         if (!vpe_priv->stream_ctx)
             status = VPE_STATUS_NO_MEMORY;
@@ -485,13 +552,14 @@ enum vpe_status vpe_check_support(
         // output resource preparation for further checking (cache the result)
         output_ctx                     = &vpe_priv->output_ctx;
         output_ctx->surface            = param->dst_surface;
-        output_ctx->bg_color           = param->bg_color;
+        output_ctx->mpc_bg_color       = param->bg_color;
+        output_ctx->opp_bg_color       = param->bg_color;
         output_ctx->target_rect        = param->target_rect;
         output_ctx->alpha_mode         = param->alpha_mode;
         output_ctx->flags.hdr_metadata = param->flags.hdr_metadata;
         output_ctx->hdr_metadata       = param->hdr_metadata;
 
-        vpe_priv->num_vpe_cmds      = 0;
+        vpe_vector_clear(vpe_priv->vpe_cmd_vector);
         output_ctx->clamping_params = vpe_priv->init.debug.clamping_params;
     }
 
@@ -519,7 +587,7 @@ enum vpe_status vpe_check_support(
         // if the bg_color support is false, there is a flag to verify if the bg_color falls in the
         // output gamut
         if (!vpe_priv->pub.caps->bg_color_check_support) {
-            status = vpe_priv->resource.check_bg_color_support(vpe_priv, &output_ctx->bg_color);
+            status = vpe_priv->resource.check_bg_color_support(vpe_priv, &output_ctx->mpc_bg_color);
             if (status != VPE_STATUS_OK) {
                 vpe_log(
                     "failed in checking the background color versus the output color space %d\n",
@@ -541,6 +609,9 @@ enum vpe_status vpe_check_support(
 
     if (vpe_priv->init.debug.assert_when_not_support)
         VPE_ASSERT(status == VPE_STATUS_OK);
+
+    vpe_event(VPE_EVENT_CHECK_SUPPORT, vpe_priv->num_streams, param->target_rect.width,
+        param->target_rect.height, status);
 
     return status;
 }
@@ -572,13 +643,11 @@ static bool validate_cached_param(struct vpe_priv *vpe_priv, const struct vpe_bu
        !(vpe_priv->init.debug.bg_color_fill_only == true && vpe_priv->num_streams == 1))
         return false;
 
-#ifdef VPE_BUILD_1_1
     if (vpe_priv->collaboration_mode != param->collaboration_mode)
         return false;
 
     if (param->num_instances > 0 && vpe_priv->vpe_num_instance != param->num_instances)
         return false;
-#endif
 
     for (i = 0; i < vpe_priv->num_input_streams; i++) {
         struct vpe_stream stream = param->streams[i];
@@ -594,7 +663,10 @@ static bool validate_cached_param(struct vpe_priv *vpe_priv, const struct vpe_bu
     if (output_ctx->alpha_mode != param->alpha_mode)
         return false;
 
-    if (memcmp(&output_ctx->bg_color, &param->bg_color, sizeof(struct vpe_color)))
+    if (memcmp(&output_ctx->mpc_bg_color, &param->bg_color, sizeof(struct vpe_color)))
+        return false;
+
+    if (memcmp(&output_ctx->opp_bg_color, &param->bg_color, sizeof(struct vpe_color)))
         return false;
 
     if (memcmp(&output_ctx->target_rect, &param->target_rect, sizeof(struct vpe_rect)))
@@ -612,12 +684,14 @@ enum vpe_status vpe_build_commands(
     struct vpe_priv      *vpe_priv;
     struct cmd_builder   *builder;
     enum vpe_status       status = VPE_STATUS_OK;
-    uint32_t              cmd_idx, i, j;
+    uint32_t              cmd_idx, pipe_idx, stream_idx, cmd_type_idx;
     struct vpe_build_bufs curr_bufs;
     int64_t               cmd_buf_size;
     int64_t               emb_buf_size;
     uint64_t              cmd_buf_gpu_a, cmd_buf_cpu_a;
     uint64_t              emb_buf_gpu_a, emb_buf_cpu_a;
+    struct vpe_vector    *config_vector;
+    struct vpe_cmd_info  *cmd_info;
 
     if (!vpe || !param || !bufs)
         return VPE_STATUS_ERROR;
@@ -636,9 +710,7 @@ enum vpe_status vpe_build_commands(
     }
 
     if (status == VPE_STATUS_OK) {
-        if (param->streams->flags.geometric_scaling) {
-            vpe_geometric_scaling_feature_skip(vpe_priv, param);
-        }
+        vpe_geometric_scaling_feature_skip(vpe_priv, param);
 
         if (bufs->cmd_buf.size == 0 || bufs->emb_buf.size == 0) {
             /* Here we directly return without setting ops_support to false
@@ -670,12 +742,27 @@ enum vpe_status vpe_build_commands(
     curr_bufs = *bufs;
 
     // copy the param, reset saved configs
-    for (i = 0; i < param->num_streams; i++) {
-        vpe_priv->stream_ctx[i].num_configs = 0;
-        for (j = 0; j < VPE_CMD_TYPE_COUNT; j++)
-            vpe_priv->stream_ctx[i].num_stream_op_configs[j] = 0;
+    for (stream_idx = 0; stream_idx < vpe_priv->num_streams; stream_idx++) {
+        struct stream_ctx *stream_ctx = &vpe_priv->stream_ctx[stream_idx];
+
+        for (pipe_idx = 0; pipe_idx < MAX_INPUT_PIPE; pipe_idx++) {
+            config_vector = stream_ctx->configs[pipe_idx];
+            if (config_vector)
+                vpe_vector_clear(config_vector);
+
+            for (cmd_type_idx = 0; cmd_type_idx < VPE_CMD_TYPE_COUNT; cmd_type_idx++) {
+                config_vector = stream_ctx->stream_op_configs[pipe_idx][cmd_type_idx];
+                if (config_vector)
+                    vpe_vector_clear(config_vector);
+            }
+        }
     }
-    vpe_priv->output_ctx.num_configs = 0;
+
+    for (pipe_idx = 0; pipe_idx < vpe_priv->pub.caps->resource_caps.num_cdc_be; pipe_idx++) {
+        config_vector = vpe_priv->output_ctx.configs[pipe_idx];
+        if (config_vector)
+            vpe_vector_clear(config_vector);
+    }
 
     // Reset pipes
     vpe_pipe_reset(vpe_priv);
@@ -707,48 +794,51 @@ enum vpe_status vpe_build_commands(
          * is used based on the information of the first stream.
          */
         vpe_bg_color_convert(vpe_priv->output_ctx.cs, vpe_priv->output_ctx.output_tf,
-            &vpe_priv->output_ctx.bg_color, vpe_priv->stream_ctx[0].enable_3dlut);
+            vpe_priv->output_ctx.surface.format, &vpe_priv->output_ctx.mpc_bg_color,
+            &vpe_priv->output_ctx.opp_bg_color, vpe_priv->stream_ctx[0].enable_3dlut);
 
-#ifdef VPE_BUILD_1_1
         if (vpe_priv->collaboration_mode == true) {
             status = builder->build_collaborate_sync_cmd(vpe_priv, &curr_bufs);
             if (status != VPE_STATUS_OK) {
                 vpe_log("failed in building collaborate sync cmd %d\n", (int)status);
             }
         }
-#endif
-        for (cmd_idx = 0; cmd_idx < vpe_priv->num_vpe_cmds; cmd_idx++) {
+        for (cmd_idx = 0; cmd_idx < vpe_priv->vpe_cmd_vector->num_elements; cmd_idx++) {
             status = builder->build_vpe_cmd(vpe_priv, &curr_bufs, cmd_idx);
             if (status != VPE_STATUS_OK) {
                 vpe_log("failed in building vpe cmd %d\n", (int)status);
+                break;
             }
 
-#ifdef VPE_BUILD_1_1
-            if ((vpe_priv->collaboration_mode == true) &&
-                (vpe_priv->vpe_cmd_info[cmd_idx].insert_end_csync == true)) {
+            cmd_info = vpe_vector_get(vpe_priv->vpe_cmd_vector, cmd_idx);
+            if (cmd_info == NULL) {
+                status = VPE_STATUS_ERROR;
+                break;
+            }
+
+            if ((vpe_priv->collaboration_mode == true) && (cmd_info->insert_end_csync == true)) {
                 status = builder->build_collaborate_sync_cmd(vpe_priv, &curr_bufs);
                 if (status != VPE_STATUS_OK) {
                     vpe_log("failed in building collaborate sync cmd %d\n", (int)status);
+                    break;
                 }
 
                 // Add next collaborate sync start command when this vpe_cmd isn't the final one.
-                if (cmd_idx < (uint32_t)(vpe_priv->num_vpe_cmds - 1)) {
+                if (cmd_idx < (uint32_t)(vpe_priv->vpe_cmd_vector->num_elements - 1)) {
                     status = builder->build_collaborate_sync_cmd(vpe_priv, &curr_bufs);
                     if (status != VPE_STATUS_OK) {
                         vpe_log("failed in building collaborate sync cmd %d\n", (int)status);
+                        break;
                     }
                 }
             }
-#endif
         }
-#ifdef VPE_BUILD_1_1
-        if (vpe_priv->collaboration_mode == true) {
+        if ((status == VPE_STATUS_OK) && (vpe_priv->collaboration_mode == true)) {
             status = builder->build_collaborate_sync_cmd(vpe_priv, &curr_bufs);
             if (status != VPE_STATUS_OK) {
                 vpe_log("failed in building collaborate sync cmd %d\n", (int)status);
             }
         }
-#endif
     }
 
     if (status == VPE_STATUS_OK) {

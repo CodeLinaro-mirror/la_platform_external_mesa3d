@@ -97,6 +97,21 @@ enum pan_kmod_bo_flags {
    PAN_KMOD_BO_FLAG_GPU_UNCACHED = BITFIELD_BIT(5),
 };
 
+/* Allowed group priority flags. */
+enum pan_kmod_group_allow_priority_flags {
+   /* Allow low priority group. */
+   PAN_KMOD_GROUP_ALLOW_PRIORITY_LOW = BITFIELD_BIT(0),
+
+   /* Allow medium priority group. */
+   PAN_KMOD_GROUP_ALLOW_PRIORITY_MEDIUM = BITFIELD_BIT(1),
+
+   /* Allow high priority group. */
+   PAN_KMOD_GROUP_ALLOW_PRIORITY_HIGH = BITFIELD_BIT(2),
+
+   /* Allow realtime priority group. */
+   PAN_KMOD_GROUP_ALLOW_PRIORITY_REALTIME = BITFIELD_BIT(3),
+};
+
 /* Buffer object. */
 struct pan_kmod_bo {
    /* Atomic reference count. The only reason we need to refcnt BOs at this
@@ -161,6 +176,9 @@ struct pan_kmod_dev_props {
    /* Maximum number of threads per core. */
    uint32_t max_threads_per_core;
 
+   /* Maximum number of compute tasks per core. */
+   uint8_t max_tasks_per_core;
+
    /* Maximum number of threads per workgroup. */
    uint32_t max_threads_per_wg;
 
@@ -185,6 +203,9 @@ struct pan_kmod_dev_props {
 
    /* GPU Timestamp frequency */
    uint64_t timestamp_frequency;
+
+   /* A mask of flags containing the allowed group priorities. */
+   enum pan_kmod_group_allow_priority_flags allowed_group_priorities_mask;
 };
 
 /* Memory allocator for kmod internal allocations. */
@@ -596,8 +617,11 @@ pan_kmod_bo_mmap(struct pan_kmod_bo *bo, off_t bo_offset, size_t size, int prot,
 
    host_addr = os_mmap(host_addr, size, prot, flags, bo->dev->fd,
                        mmap_offset + bo_offset);
-   if (host_addr == MAP_FAILED)
-      mesa_loge("mmap() failed (err=%d)", errno);
+   if (host_addr == MAP_FAILED) {
+      mesa_loge("mmap(..., size=%zu, prot=%d, flags=0x%x) failed: %s",
+                size, prot, flags, strerror(errno));
+      return NULL;
+   }
 
    return host_addr;
 }

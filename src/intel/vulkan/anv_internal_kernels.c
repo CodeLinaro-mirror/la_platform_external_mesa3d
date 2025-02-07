@@ -87,14 +87,6 @@ compile_shader(struct anv_device *device,
 
    link_libanv(nir, libanv);
 
-   if (INTEL_DEBUG(DEBUG_SHADER_PRINT)) {
-      nir_lower_printf_options printf_opts = {
-         .ptr_bit_size               = 64,
-         .use_printf_base_identifier = true,
-      };
-      NIR_PASS_V(nir, nir_lower_printf, &printf_opts);
-   }
-
    NIR_PASS_V(nir, nir_lower_vars_to_ssa);
    NIR_PASS_V(nir, nir_opt_cse);
    NIR_PASS_V(nir, nir_opt_gcm, true);
@@ -293,7 +285,11 @@ anv_device_get_internal_shader(struct anv_device *device,
                           * 2 * (2 loads + 3 stores) +
                           * 3 stores
                           */
-                         14),
+                         14) +
+         /* 3 loads + 3 stores */
+         (intel_needs_workaround(device->info, 16011107343) ? 6 : 0) +
+         /* 3 loads + 3 stores */
+         (intel_needs_workaround(device->info, 22018402687) ? 6 : 0),
       },
       [ANV_INTERNAL_KERNEL_COPY_QUERY_RESULTS_COMPUTE] = {
          .key        = {

@@ -15,6 +15,7 @@
 #include "vk_device_memory.h"
 
 #include "tu_autotune.h"
+#include "tu_cs.h"
 #include "tu_pass.h"
 #include "tu_perfetto.h"
 #include "tu_suballoc.h"
@@ -123,6 +124,10 @@ struct tu_physical_device
    bool has_cached_non_coherent_memory;
    uintptr_t level1_dcache_size;
 
+   struct fdl_ubwc_config ubwc_config;
+
+   bool has_preemption;
+
    struct {
       uint32_t type_count;
       VkMemoryPropertyFlags types[VK_MAX_MEMORY_TYPES];
@@ -199,19 +204,6 @@ struct tu_instance
 VK_DEFINE_HANDLE_CASTS(tu_instance, vk.base, VkInstance,
                        VK_OBJECT_TYPE_INSTANCE)
 
-struct tu_queue
-{
-   struct vk_queue vk;
-
-   struct tu_device *device;
-
-   uint32_t msm_queue_id;
-   uint32_t priority;
-
-   int fence;           /* timestamp/fence of the last queue submission */
-};
-VK_DEFINE_HANDLE_CASTS(tu_queue, vk.base, VkQueue, VK_OBJECT_TYPE_QUEUE)
-
 /* This struct defines the layout of the global_bo */
 struct tu6_global
 {
@@ -233,6 +225,8 @@ struct tu6_global
    } flush_base[4];
 
    alignas(16) uint32_t cs_indirect_xyz[12];
+
+   uint32_t vsc_state[32];
 
    volatile uint32_t vtx_stats_query_not_running;
 
@@ -273,6 +267,7 @@ struct tu_pvtmem_bo {
 };
 
 struct tu_virtio_device;
+struct tu_queue;
 
 struct tu_device
 {
@@ -349,9 +344,11 @@ struct tu_device
    struct util_vma_heap vma;
 
    /* bo list for submits: */
-   struct drm_msm_gem_submit_bo *bo_list;
+   struct drm_msm_gem_submit_bo *submit_bo_list;
    /* map bo handles to bo list index: */
-   uint32_t bo_count, bo_list_size;
+   uint32_t submit_bo_count, submit_bo_list_size;
+   /* bo list for dumping: */
+   struct util_dynarray dump_bo_list;
    mtx_t bo_mutex;
    /* protects imported BOs creation/freeing */
    struct u_rwlock dma_bo_lock;
@@ -383,12 +380,14 @@ struct tu_device
     */
    struct u_vector zombie_vmas;
 
+   struct tu_cs sub_cs;
+
    /* Command streams to set pass index to a scratch reg */
-   struct tu_cs *perfcntrs_pass_cs;
    struct tu_cs_entry *perfcntrs_pass_cs_entries;
 
-   struct tu_cs *cmdbuf_start_a725_quirk_cs;
-   struct tu_cs_entry *cmdbuf_start_a725_quirk_entry;
+   struct tu_cs_entry cmdbuf_start_a725_quirk_entry;
+
+   struct tu_cs_entry bin_preamble_entry;
 
    struct util_dynarray dynamic_rendering_pending;
    VkCommandPool dynamic_rendering_pool;
@@ -493,6 +492,10 @@ VkResult
 tu_physical_device_init(struct tu_physical_device *device,
                         struct tu_instance *instance);
 
+void
+tu_physical_device_get_global_priority_properties(const struct tu_physical_device *pdevice,
+                                                  VkQueueFamilyGlobalPriorityPropertiesKHR *props);
+
 uint64_t
 tu_device_ticks_to_ns(struct tu_device *dev, uint64_t ts);
 
@@ -541,10 +544,12 @@ struct tu_u_trace_cmd_data
 struct tu_u_trace_submission_data
 {
    uint32_t submission_id;
+
    /* We have to know when timestamps are available,
-    * this sync object indicates it.
+    * this queue and fence indicates it.
     */
-   struct tu_u_trace_syncobj *syncobj;
+   struct tu_queue *queue;
+   uint32_t fence;
 
    uint32_t cmd_buffer_count;
    uint32_t last_buffer_with_tracepoints;
@@ -577,5 +582,11 @@ void
 tu_debug_bos_del(struct tu_device *dev, struct tu_bo *bo);
 void
 tu_debug_bos_print_stats(struct tu_device *dev);
+
+void
+tu_dump_bo_init(struct tu_device *dev, struct tu_bo *bo);
+void
+tu_dump_bo_del(struct tu_device *dev, struct tu_bo *bo);
+
 
 #endif /* TU_DEVICE_H */

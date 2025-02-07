@@ -12,21 +12,20 @@
 #include "util/format/u_formats.h"
 
 #include "agx_helpers.h"
-#include "agx_nir_passes.h"
+#include "agx_nir_texture.h"
 #include "agx_pack.h"
 #include "hk_buffer.h"
 #include "hk_device.h"
 #include "hk_entrypoints.h"
+#include "hk_image.h"
 #include "hk_physical_device.h"
-
-#include "vk_format.h"
 
 VkFormatFeatureFlags2
 hk_get_buffer_format_features(struct hk_physical_device *pdev,
                               VkFormat vk_format)
 {
    VkFormatFeatureFlags2 features = 0;
-   enum pipe_format p_format = vk_format_to_pipe_format(vk_format);
+   enum pipe_format p_format = hk_format_to_pipe_format(vk_format);
 
    if (p_format == PIPE_FORMAT_NONE)
       return 0;
@@ -67,7 +66,7 @@ hk_CreateBufferView(VkDevice _device, const VkBufferViewCreateInfo *pCreateInfo,
    if (!view)
       return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
 
-   enum pipe_format format = vk_format_to_pipe_format(view->vk.format);
+   enum pipe_format format = hk_format_to_pipe_format(view->vk.format);
    const struct util_format_description *desc = util_format_description(format);
 
    uint8_t format_swizzle[4] = {
