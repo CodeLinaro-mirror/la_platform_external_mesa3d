@@ -1228,6 +1228,10 @@ fail:
    return VK_ERROR_INVALID_EXTERNAL_HANDLE;
 }
 
+#include <errno.h>
+#include <time.h>
+#define RETRY_DELAY 30
+
 static VkResult
 virtgpu_bo_create_from_device_memory(
    struct vn_renderer *renderer,
@@ -1243,8 +1247,26 @@ virtgpu_bo_create_from_device_memory(
    uint32_t res_id;
    uint32_t gem_handle = virtgpu_ioctl_resource_create_blob(
       gpu, gpu->bo_blob_mem, blob_flags, size, mem_id, &res_id);
-   if (!gem_handle)
-      return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+   if (!gem_handle) {
+      if (errno == ENOSPC) {
+         struct timespec ts;
+         int res;
+
+         ts.tv_sec = RETRY_DELAY / 1000;
+         ts.tv_nsec = (RETRY_DELAY % 1000) * 1000000;
+
+         do {
+            res = nanosleep(&ts, &ts);
+         } while (res && errno == EINTR);
+
+         gem_handle = virtgpu_ioctl_resource_create_blob(
+            gpu, gpu->bo_blob_mem, blob_flags, size, mem_id, &res_id);
+         if (!gem_handle)
+            return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+      } else {
+         return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+      }
+   }
 
    struct virtgpu_bo *bo = util_sparse_array_get(&gpu->bo_array, gem_handle);
    *bo = (struct virtgpu_bo){
