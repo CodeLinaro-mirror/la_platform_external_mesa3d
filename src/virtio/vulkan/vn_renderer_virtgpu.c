@@ -1230,7 +1230,7 @@ fail:
 
 #include <errno.h>
 #include <time.h>
-#define RETRY_DELAY 30
+#define RETRY_DELAY 200
 
 static VkResult
 virtgpu_bo_create_from_device_memory(
