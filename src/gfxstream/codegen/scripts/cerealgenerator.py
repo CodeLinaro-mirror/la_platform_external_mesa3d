@@ -381,11 +381,6 @@ class IOStream;
 #undef VK_ANDROID_external_memory_android_hardware_buffer
 """ % VULKAN_STREAM_TYPE_GUEST
 
-        reservedMarshalingHostIncludes = """
-#include "VulkanBoxedHandles.h"
-
-"""
-
         reservedmarshalImplIncludeGuest = """
 #include "Resources.h"
 """
@@ -501,7 +496,6 @@ using DlSymFunc = void* (void*, const char*);
         decoderSnapshotImplIncludes = f"""
 #include <mutex>
 
-#include "VulkanBoxedHandles.h"
 #include "VulkanHandleMapping.h"
 #include "VkDecoderGlobalState.h"
 #include "VkReconstruction.h"
@@ -541,7 +535,6 @@ class BumpPool;
 #include "VkDecoderGlobalState.h"
 #include "VkDecoderSnapshot.h"
 
-#include "VulkanBoxedHandles.h"
 #include "VulkanDispatch.h"
 #include "%s.h"
 
@@ -629,7 +622,7 @@ class BumpPool;
                            extraImpl=commonCerealImplIncludes)
             self.addCppModule("common", "goldfish_vk_reserved_marshaling",
                            extraHeader=vulkanStreamIncludeHost,
-                           extraImpl=commonCerealImplIncludes + reservedMarshalingHostIncludes)
+                           extraImpl=commonCerealImplIncludes)
             self.addCppModule("common", "goldfish_vk_deepcopy",
                            extraHeader=poolInclude,
                            extraImpl=commonCerealImplIncludes + deepcopyInclude)

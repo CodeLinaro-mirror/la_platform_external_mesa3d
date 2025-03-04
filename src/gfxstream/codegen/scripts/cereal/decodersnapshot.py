@@ -33,8 +33,8 @@ class VkDecoderSnapshot {
 
     void clear();
 
-    void saveReplayBuffers(android::base::Stream* stream);
-    static void loadReplayBuffers(android::base::Stream* stream, std::vector<uint64_t>* outHandleBuffer, std::vector<uint8_t>* outDecoderBuffer);
+    void saveDecoderReplayBuffer(android::base::Stream* stream);
+    static void loadDecoderReplayBuffer(android::base::Stream* stream, std::vector<uint8_t>* outBuffer);
 
     VkSnapshotApiCallInfo* createApiCallInfo();
     void destroyApiCallInfoIfUnused(VkSnapshotApiCallInfo* info);
@@ -68,13 +68,13 @@ class VkDecoderSnapshot::Impl {
         mReconstruction.clear();
     }
 
-    void saveReplayBuffers(android::base::Stream* stream) {
+    void saveDecoderReplayBuffer(android::base::Stream* stream) {
         std::lock_guard<std::mutex> lock(mReconstructionMutex);
-        mReconstruction.saveReplayBuffers(stream);
+        mReconstruction.saveDecoderReplayBuffer(stream);
     }
 
-    static void loadReplayBuffers(android::base::Stream* stream, std::vector<uint64_t>* outHandleBuffer, std::vector<uint8_t>* outDecoderBuffer) {
-        VkReconstruction::loadReplayBuffers(stream, outHandleBuffer, outDecoderBuffer);
+    static void loadDecoderReplayBuffer(android::base::Stream* stream, std::vector<uint8_t>* outBuffer) {
+        VkReconstruction::loadDecoderReplayBuffer(stream, outBuffer);
     }
 
     VkSnapshotApiCallInfo* createApiCallInfo() {
@@ -101,13 +101,13 @@ void VkDecoderSnapshot::clear() {
     mImpl->clear();
 }
 
-void VkDecoderSnapshot::saveReplayBuffers(android::base::Stream* stream) {
-    mImpl->saveReplayBuffers(stream);
+void VkDecoderSnapshot::saveDecoderReplayBuffer(android::base::Stream* stream) {
+    mImpl->saveDecoderReplayBuffer(stream);
 }
 
 /*static*/
-void VkDecoderSnapshot::loadReplayBuffers(android::base::Stream* stream, std::vector<uint64_t>* outHandleBuffer, std::vector<uint8_t>* outDecoderBuffer) {
-    VkDecoderSnapshot::Impl::loadReplayBuffers(stream, outHandleBuffer, outDecoderBuffer);
+void VkDecoderSnapshot::loadDecoderReplayBuffer(android::base::Stream* stream, std::vector<uint8_t>* outBuffer) {
+    VkDecoderSnapshot::Impl::loadDecoderReplayBuffer(stream, outBuffer);
 }
 
 VkSnapshotApiCallInfo* VkDecoderSnapshot::createApiCallInfo() {

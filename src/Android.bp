@@ -27,21 +27,3 @@ cc_library_headers {
         ".",
     ],
 }
-
-cc_library_headers {
-    name: "mesa_gallium_headers",
-    vendor: true,
-    host_supported: true,
-    export_include_dirs: [
-        "gallium/include",
-    ],
-}
-
-cc_library_headers {
-    name: "mesa_llvmpipe_headers",
-    vendor: true,
-    host_supported: true,
-    export_include_dirs: [
-        "gallium/drivers/llvmpipe",
-    ],
-}
