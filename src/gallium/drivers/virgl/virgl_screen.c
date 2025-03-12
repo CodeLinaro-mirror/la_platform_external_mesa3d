@@ -1232,6 +1232,10 @@ virgl_create_screen(struct virgl_winsys *vws, const struct pipe_screen_config *c
    screen->compiler_options.lower_image_offset_to_range_base = true;
    screen->compiler_options.lower_atomic_offset_to_range_base = true;
 
+   /* Fix for dEQP-GLES3.functional.shaders.builtin_functions.precision* regression */
+   screen->compiler_options.lower_ffloor = false;
+   screen->compiler_options.lower_fpow = false;
+
    slab_create_parent(&screen->transfer_pool, sizeof(struct virgl_transfer), 16);
 
    virgl_disk_cache_create(screen);
