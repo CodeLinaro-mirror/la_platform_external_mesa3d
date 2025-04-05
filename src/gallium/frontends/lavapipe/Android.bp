@@ -1,0 +1,78 @@
+/*
+ * Copyright (C) 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+genrule {
+    name: "mesa_lvp_vk_entrypoints_header",
+    srcs: [":mesa_vulkan_xml"],
+    out: ["lvp_entrypoints.h"],
+    tools: ["vk_entrypoints_gen"],
+    cmd: "python3 $(location vk_entrypoints_gen) --xml " +
+        "$(location :mesa_vulkan_xml) --proto --weak --out-h " +
+        "$(location lvp_entrypoints.h) --out-c " +
+        "$(genDir)/placeholder.c --prefix lvp --beta false",
+}
+
+genrule {
+    name: "mesa_lvp_vk_entrypoints_impl",
+    srcs: [":mesa_vulkan_xml"],
+    out: ["lvp_entrypoints.c"],
+    tools: ["vk_entrypoints_gen"],
+    cmd: "python3 $(location vk_entrypoints_gen) --xml " +
+        "$(location :mesa_vulkan_xml) --proto --weak --out-h " +
+        "$(genDir)/lvp_entrypoints.h --out-c " +
+        "$(location lvp_entrypoints.c) --prefix lvp " +
+        "--beta false",
+}
+
+filegroup {
+    name: "mesa_lavapipe_files",
+    srcs: [
+        "lvp_inline_uniforms.c",
+        "lvp_lower_exec_graph.c",
+        "lvp_cmd_buffer.c",
+        "lvp_formats.c",
+        "lvp_pipeline.c",
+        "lvp_device.c",
+        "lvp_nir_lower_sparse_residency.c",
+        "lvp_image.c",
+        "lvp_lower_vulkan_resource.c",
+        "lvp_ray_tracing_pipeline.c",
+        "lvp_nir_ray_tracing.c",
+        "lvp_pipeline_cache.c",
+        "lvp_util.c",
+        "lvp_nir_lower_ray_queries.c",
+        "lvp_pipe_sync.c",
+        "lvp_device_generated_commands.c",
+        "lvp_query.c",
+        "lvp_wsi.c",
+        "lvp_execute.c",
+        "lvp_acceleration_structure.c",
+        "lvp_lower_input_attachments.c",
+        "lvp_descriptor_set.c",
+    ],
+}
+
+filegroup {
+    name: "mesa_lvp_android_files",
+    srcs: [
+        "lvp_android.c",
+    ],
+}
