@@ -1795,14 +1795,65 @@ VkResult ResourceTracker::on_vkEnumerateDeviceExtensionProperties(
         "VK_EXT_device_memory_report",
 #endif
 #if DETECT_OS_LINUX && !defined(VK_USE_PLATFORM_ANDROID_KHR)
-        "VK_KHR_imageless_framebuffer",
+        "VK_KHR_external_memory_fd",
 #endif
         "VK_KHR_multiview",
         "VK_EXT_color_write_enable",
+
+        // Vulkan 1.1
+        // "VK_KHR_16bit_storage",
+        "VK_KHR_device_group",
+        "VK_KHR_device_group_creation",
+        "VK_KHR_external_fence_capabilities",
+        "VK_KHR_external_memory_capabilities",
+        "VK_KHR_external_semaphore_capabilities",
+        "VK_KHR_get_physical_device_properties2",
+        "VK_KHR_relaxed_block_layout",
+        "VK_KHR_shader_draw_parameters",
+        "VK_KHR_storage_buffer_storage_class",
+        "VK_KHR_variable_pointers",
+
+        // Vulkan 1.2
+        "VK_KHR_8bit_storage",
+        "VK_KHR_depth_stencil_resolve",
+        "VK_KHR_draw_indirect_count",
+        "VK_KHR_driver_properties",
+        "VK_KHR_imageless_framebuffer",
+        "VK_KHR_sampler_mirror_clamp_to_edge",
+        "VK_KHR_separate_depth_stencil_layouts",
+        "VK_KHR_shader_atomic_int64",
+        "VK_KHR_shader_float16_int8",
+        "VK_KHR_shader_float_controls",
+        "VK_KHR_spirv_1_4",
+        "VK_KHR_uniform_buffer_standard_layout",
+        "VK_EXT_descriptor_indexing",
+        "VK_EXT_sampler_filter_minmax",
+        "VK_EXT_scalar_block_layout",
+        "VK_EXT_separate_stencil_usage",
+        "VK_EXT_shader_viewport_index_layer",
+
+
         // Vulkan 1.3
         "VK_KHR_synchronization2",
         "VK_EXT_private_data",
         "VK_KHR_dynamic_rendering",
+        "VK_KHR_copy_commands2",
+        "VK_KHR_format_feature_flags2",
+        "VK_KHR_maintenance4",
+        "VK_KHR_shader_integer_dot_product",
+        "VK_KHR_shader_non_semantic_info",
+        "VK_KHR_zero_initialize_workgroup_memory",
+        "VK_EXT_4444_formats",
+        "VK_EXT_extended_dynamic_state",
+        "VK_EXT_extended_dynamic_state2",
+        "VK_EXT_inline_uniform_block",
+        "VK_EXT_pipeline_creation_cache_control",
+        "VK_EXT_pipeline_creation_feedback",
+        "VK_EXT_shader_demote_to_helper_invocation",
+        "VK_EXT_texel_buffer_alignment",
+        "VK_EXT_texture_compression_astc_hdr",
+        "VK_EXT_tooling_info",
+        "VK_EXT_ycbcr_2plane_444_formats",
     };
 
     VkEncoder* enc = (VkEncoder*)context;
@@ -4605,8 +4656,8 @@ VkResult ResourceTracker::on_vkCreateSampler(void* context, VkResult, VkDevice d
                                              VkSampler* pSampler) {
     VkSamplerCreateInfo localCreateInfo = vk_make_orphan_copy(*pCreateInfo);
 
-#if defined(VK_USE_PLATFORM_ANDROID_KHR) || defined(VK_USE_PLATFORM_FUCHSIA)
     vk_struct_chain_iterator structChainIter = vk_make_chain_iterator(&localCreateInfo);
+#if defined(VK_USE_PLATFORM_ANDROID_KHR) || defined(VK_USE_PLATFORM_FUCHSIA)
     VkSamplerYcbcrConversionInfo localVkSamplerYcbcrConversionInfo;
     const VkSamplerYcbcrConversionInfo* samplerYcbcrConversionInfo =
         vk_find_struct_const(pCreateInfo, SAMPLER_YCBCR_CONVERSION_INFO);
@@ -4626,6 +4677,15 @@ VkResult ResourceTracker::on_vkCreateSampler(void* context, VkResult, VkDevice d
         vk_append_struct(&structChainIter, &localVkSamplerCustomBorderColorCreateInfo);
     }
 #endif
+
+    VkSamplerReductionModeCreateInfo localVkSamplerReductionModeCreateInfo;
+    const VkSamplerReductionModeCreateInfo* samplerReductionModeCreateInfo =
+        vk_find_struct_const(pCreateInfo, SAMPLER_REDUCTION_MODE_CREATE_INFO);
+    if (samplerReductionModeCreateInfo) {
+        localVkSamplerReductionModeCreateInfo =
+            vk_make_orphan_copy(*samplerReductionModeCreateInfo);
+        vk_append_struct(&structChainIter, &localVkSamplerReductionModeCreateInfo);
+    }
 
     VkEncoder* enc = (VkEncoder*)context;
     return enc->vkCreateSampler(device, &localCreateInfo, pAllocator, pSampler, true /* do lock */);
