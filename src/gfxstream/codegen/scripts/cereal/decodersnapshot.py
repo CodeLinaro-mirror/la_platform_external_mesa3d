@@ -226,10 +226,12 @@ def extract_deps_vkCreateGraphicsPipelines(param, access, lenExpr, api, cgen):
 def extract_deps_vkCreateFramebuffer(param, access, lenExpr, api, cgen):
     cgen.stmt("mReconstruction.addHandleDependency((const uint64_t*)%s, %s, (uint64_t)(uintptr_t)%s)" % \
               (access, lenExpr, "unboxed_to_boxed_non_dispatchable_VkRenderPass(pCreateInfo->renderPass)"))
+    cgen.beginIf("(pCreateInfo->flags & VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT) == 0")
     cgen.beginFor("uint32_t i = 0", "i < pCreateInfo->attachmentCount" , "++i")
     cgen.stmt("mReconstruction.addHandleDependency((const uint64_t*)%s, %s, (uint64_t)(uintptr_t)%s)" % \
               (access, lenExpr, "unboxed_to_boxed_non_dispatchable_VkImageView(pCreateInfo->pAttachments[i])"))
     cgen.endFor()
+    cgen.endIf();
 
 def extract_deps_vkBindImageMemory(param, access, lenExpr, api, cgen):
     cgen.stmt("mReconstruction.addHandleDependency((const uint64_t*)%s, %s, (uint64_t)(uintptr_t)%s, VkReconstruction::BOUND_MEMORY)" % \
@@ -321,6 +323,11 @@ def api_special_implementation_vkCmdCopyBufferToImage(api, cgen):
     cgen.stmt("mReconstruction.addApiCallDependencyOnVkObject(apiCallHandle, (uint64_t)(uintptr_t)unboxed_to_boxed_non_dispatchable_VkBuffer(srcBuffer))")
     cgen.stmt("mReconstruction.addApiCallDependencyOnVkObject(apiCallHandle, (uint64_t)(uintptr_t)unboxed_to_boxed_non_dispatchable_VkImage(dstImage))")
 
+def api_special_implementation_vkCmdCopyImageToBuffer(api, cgen):
+    cgen.stmt("std::lock_guard<std::mutex> lock(mReconstructionMutex)")
+    cgen.stmt("mReconstruction.addApiCallDependencyOnVkObject(apiCallHandle, (uint64_t)(uintptr_t)unboxed_to_boxed_non_dispatchable_VkImage(srcImage))")
+    cgen.stmt("mReconstruction.addApiCallDependencyOnVkObject(apiCallHandle, (uint64_t)(uintptr_t)unboxed_to_boxed_non_dispatchable_VkBuffer(dstBuffer))")
+
 def api_special_implementation_vkCmdCopyBuffer(api, cgen):
     cgen.stmt("std::lock_guard<std::mutex> lock(mReconstructionMutex)")
     cgen.stmt("mReconstruction.addApiCallDependencyOnVkObject(apiCallHandle, (uint64_t)(uintptr_t)unboxed_to_boxed_non_dispatchable_VkBuffer(srcBuffer))")
@@ -348,6 +355,7 @@ def api_special_implementation_vkResetCommandBuffer(api, cgen):
 
 def api_special_implementation_vkQueueFlushCommandsGOOGLE(api, cgen):
     api_special_implementation_common(api, cgen, "Tag_VkCmdOp")
+    cgen.stmt("mReconstruction.removeDescendantsOfHandle((uint64_t)(uintptr_t)commandBuffer)")
     cgen.stmt("mReconstruction.addHandleDependency((const uint64_t*)(&handle), 1, (uint64_t)(uintptr_t)commandBuffer)")
 
     cgen.line("// Track that `handle` depends on previously tracked dependencies (e.g. the handle for this `vkQueueFlushCommandsGOOGLE()` call depends on the `VkPipeline` handle from `vkCmdBindPipeline()`).")
@@ -384,6 +392,7 @@ apiSpecialImplementation = {
     "vkCmdBindVertexBuffers": api_special_implementation_vkCmdBindVertexBuffers,
     "vkCmdBindPipeline": api_special_implementation_vkCmdBindPipeline,
     "vkCmdCopyBufferToImage": api_special_implementation_vkCmdCopyBufferToImage,
+    "vkCmdCopyImageToBuffer": api_special_implementation_vkCmdCopyImageToBuffer,
     "vkCmdCopyBuffer": api_special_implementation_vkCmdCopyBuffer,
     "vkCmdPipelineBarrier": api_special_implementation_vkCmdPipelineBarrier,
     "vkCmdBeginRenderPass": api_special_implementation_vkCmdBeginRenderPass,
