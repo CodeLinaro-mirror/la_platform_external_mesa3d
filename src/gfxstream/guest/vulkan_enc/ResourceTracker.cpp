@@ -1503,7 +1503,7 @@ void ResourceTracker::setupFeatures(const struct GfxStreamVkFeatureInfo* feature
 void ResourceTracker::setupPlatformHelpers() {
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
     VirtGpuDevice* instance = VirtGpuDevice::getInstance(kCapsetGfxStreamVulkan);
-    auto deviceHandle = (instance) ? instance->getDeviceHandle() : INVALID_DESCRIPTOR;
+    auto deviceHandle = instance ? instance->getDeviceHandle() : INVALID_DESCRIPTOR;
     if (mGralloc == nullptr) {
         mGralloc.reset(gfxstream::createPlatformGralloc(deviceHandle));
     }
@@ -1805,6 +1805,7 @@ VkResult ResourceTracker::on_vkEnumerateDeviceExtensionProperties(
         "VK_KHR_storage_buffer_storage_class",
         "VK_KHR_variable_pointers",
         "VK_EXT_color_write_enable",
+        "VK_EXT_memory_budget",
         "VK_KHR_multiview",
 
         // Vulkan 1.2
