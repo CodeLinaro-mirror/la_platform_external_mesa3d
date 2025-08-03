@@ -67,73 +67,6 @@ vk_android_get_ugralloc(void)
    return _gralloc;
 }
 
-static int vk_android_hal_open(const struct hw_module_t *mod, const char *id,
-                               struct hw_device_t **dev);
-
-static_assert(HWVULKAN_DISPATCH_MAGIC == ICD_LOADER_MAGIC, "");
-
-PUBLIC struct hwvulkan_module_t HAL_MODULE_INFO_SYM = {
-   .common =
-      {
-         .tag = HARDWARE_MODULE_TAG,
-         .module_api_version = HWVULKAN_MODULE_API_VERSION_0_1,
-         .hal_api_version = HARDWARE_MAKE_API_VERSION(1, 0),
-         .id = HWVULKAN_HARDWARE_MODULE_ID,
-         .name = "Mesa 3D Vulkan HAL",
-         .author = "Mesa 3D",
-         .methods =
-            &(hw_module_methods_t){
-               .open = vk_android_hal_open,
-            },
-      },
-};
-
-static int
-vk_android_hal_close(struct hw_device_t *dev)
-{
-   /* the hw_device_t::close() function is called upon driver unloading */
-   assert(dev->version == HWVULKAN_DEVICE_API_VERSION_0_1);
-   assert(dev->module == &HAL_MODULE_INFO_SYM.common);
-
-   hwvulkan_device_t *hal_dev = container_of(dev, hwvulkan_device_t, common);
-   free(hal_dev);
-   return 0;
-}
-
-static int
-vk_android_hal_open(const struct hw_module_t *mod, const char *id,
-                    struct hw_device_t **dev)
-{
-   assert(mod == &HAL_MODULE_INFO_SYM.common);
-   assert(strcmp(id, HWVULKAN_DEVICE_0) == 0);
-
-   hwvulkan_device_t *hal_dev = malloc(sizeof(*hal_dev));
-   if (!hal_dev)
-      return -1;
-
-   *hal_dev = (hwvulkan_device_t){
-      .common =
-         {
-            .tag = HARDWARE_DEVICE_TAG,
-            .version = HWVULKAN_DEVICE_API_VERSION_0_1,
-            .module = &HAL_MODULE_INFO_SYM.common,
-            .close = vk_android_hal_close,
-         },
-      .EnumerateInstanceExtensionProperties =
-         (PFN_vkEnumerateInstanceExtensionProperties)vk_icdGetInstanceProcAddr(
-            NULL, "vkEnumerateInstanceExtensionProperties"),
-      .CreateInstance =
-         (PFN_vkCreateInstance)vk_icdGetInstanceProcAddr(
-            NULL, "vkCreateInstance"),
-      .GetInstanceProcAddr =
-         (PFN_vkGetInstanceProcAddr)vk_icdGetInstanceProcAddr(
-            NULL, "vkGetInstanceProcAddr"),
-   };
-
-   *dev = &hal_dev->common;
-   return 0;
-}
-
 static VkResult
 vk_gralloc_to_drm_explicit_layout(
    struct u_gralloc_buffer_handle *in_hnd,
@@ -635,21 +568,20 @@ vk_image_usage_to_ahb_usage(const VkImageCreateFlags vk_create,
    return ahb_usage;
 }
 
-/* Probe gralloc implementation to test whether it can allocate a buffer
- * for the given format and usage.  Vk drivers must not advertise support
- * for AHB backed VkImage's if the gralloc implementation is not able to
- * perform the allocation.
- */
-bool
+static bool
 vk_ahb_probe_format(VkFormat vk_format,
                     VkImageCreateFlags vk_create,
                     VkImageUsageFlags vk_usage)
 {
+   const uint32_t ahb_format = vk_image_format_to_ahb_format(vk_format);
+   if (!ahb_format)
+      return false;
+
    AHardwareBuffer_Desc desc = {
       .width = 16,
       .height = 16,
       .layers = 1,
-      .format = vk_image_format_to_ahb_format(vk_format),
+      .format = ahb_format,
       .usage = vk_image_usage_to_ahb_usage(vk_create, vk_usage),
    };
 #if ANDROID_API_LEVEL >= 29
@@ -907,6 +839,98 @@ vk_common_GetAndroidHardwareBufferPropertiesANDROID(
    pProperties->memoryTypeBits = (1u << mem_props.memoryTypeCount) - 1;
 
    return VK_SUCCESS;
+}
+
+/* AHB image support per spec:
+ *
+ * - Any Android hardware buffer successfully allocated outside Vulkan with
+ *   usage that includes AHARDWAREBUFFER_USAGE_GPU_* must be supported when
+ *   using equivalent Vulkan image parameters.
+ *
+ * - If a given choice of image parameters are supported for import, they can
+ *   also be used to create an image and memory that will be exported to an
+ *   Android hardware buffer.
+ *
+ * An additional constraint derived from above is:
+ *
+ * - If that AHB cannot get allocated out, then the Vulkan driver must not
+ *   advertise support for the AHB backed image.
+ *
+ * Based on all above, this helper implements the AHB validation as well as
+ * the AHB external and usage props filling.
+ */
+VkResult
+vk_android_get_ahb_image_properties(
+   VkPhysicalDevice pdev_handle,
+   const VkPhysicalDeviceImageFormatInfo2 *info,
+   VkImageFormatProperties2 *props)
+{
+   VK_FROM_HANDLE(vk_physical_device, pdevice, pdev_handle);
+   VkExternalImageFormatProperties *external_props;
+   VkAndroidHardwareBufferUsageANDROID *ahb_usage;
+
+   ASSERTED const VkPhysicalDeviceExternalImageFormatInfo *external_info =
+      vk_find_struct_const(info->pNext,
+                           PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO);
+   assert(
+      external_info &&
+      external_info->handleType ==
+         VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID);
+
+   if (info->type != VK_IMAGE_TYPE_2D) {
+      return vk_errorf(pdevice, VK_ERROR_FORMAT_NOT_SUPPORTED,
+                       "type (%u) unsupported for AHB", info->type);
+   }
+
+   if (!vk_ahb_probe_format(info->format, info->flags, info->usage)) {
+      return vk_errorf(
+         pdevice, VK_ERROR_FORMAT_NOT_SUPPORTED,
+         "format (%u) flags (0x%x) usage (0x%x) unsupported for AHB",
+         info->format, info->flags, info->usage);
+   }
+
+   external_props =
+      vk_find_struct(props->pNext, EXTERNAL_IMAGE_FORMAT_PROPERTIES);
+   if (external_props) {
+      external_props->externalMemoryProperties = (VkExternalMemoryProperties){
+         .externalMemoryFeatures =
+            VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT |
+            VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT |
+            VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT,
+         .exportFromImportedHandleTypes =
+            VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
+         .compatibleHandleTypes =
+            VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
+      };
+   }
+
+   ahb_usage =
+      vk_find_struct(props->pNext, ANDROID_HARDWARE_BUFFER_USAGE_ANDROID);
+   if (ahb_usage) {
+      ahb_usage->androidHardwareBufferUsage =
+         vk_image_usage_to_ahb_usage(info->flags, info->usage);
+   }
+
+   return VK_SUCCESS;
+}
+
+void
+vk_android_get_ahb_buffer_properties(
+   VkPhysicalDevice pdev_handle,
+   const VkPhysicalDeviceExternalBufferInfo *info,
+   VkExternalBufferProperties *props)
+{
+   assert(info->handleType ==
+          VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID);
+   props->externalMemoryProperties = (VkExternalMemoryProperties){
+      .externalMemoryFeatures =
+         VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT |
+         VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT,
+      .exportFromImportedHandleTypes =
+         VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
+      .compatibleHandleTypes =
+         VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
+   };
 }
 
 #endif /* ANDROID_API_LEVEL >= 26 */
