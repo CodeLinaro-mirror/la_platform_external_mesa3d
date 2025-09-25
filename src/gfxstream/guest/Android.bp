@@ -28,6 +28,7 @@ cc_defaults {
         "-DGFXSTREAM_ENABLE_GUEST_GOLDFISH=1",
         "-Wno-missing-field-initializers",
         "-Wno-unused-parameter",
+        "-DHAVE_ENDIAN_H",
     ],
     product_variables: {
         platform_sdk_version: {
