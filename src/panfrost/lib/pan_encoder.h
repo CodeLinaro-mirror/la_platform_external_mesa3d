@@ -195,7 +195,7 @@ pan_flip_compare_func(enum mali_func f)
    }
 }
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
 /* Compute shaders are invoked with a gl_NumWorkGroups X/Y/Z triplet. Vertex
  * shaders are invoked as (1, vertex_count, instance_count). Compute shaders
  * also have a gl_WorkGroupSize X/Y/Z triplet. These 6 values are packed
@@ -274,7 +274,7 @@ pan_get_z_internal_format(enum pipe_format fmt)
    case PIPE_FORMAT_Z32_FLOAT_S8X24_UINT:
       return MALI_Z_INTERNAL_FORMAT_D32;
    default:
-      unreachable("Unsupported depth/stencil format.");
+      UNREACHABLE("Unsupported depth/stencil format.");
    }
 }
 #endif

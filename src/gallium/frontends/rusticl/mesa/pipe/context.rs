@@ -235,6 +235,35 @@ impl PipeContext {
         self.resource_copy_region(src, dst, dst_offset, bx)
     }
 
+    pub fn has_buffer_texture_copies(&self) -> bool {
+        unsafe { self.pipe.as_ref() }.image_copy_buffer.is_some()
+    }
+
+    /// Copies between a buffer and a texture if supported by the context
+    /// ([Self::has_buffer_texture_copies]).
+    pub fn resource_copy_buffer_texture(
+        &self,
+        src: &PipeResource,
+        dst: &PipeResource,
+        buffer_offset: u32,
+        bx: &pipe_box,
+    ) {
+        debug_assert_ne!(src.is_buffer(), dst.is_buffer());
+
+        unsafe {
+            self.pipe.as_ref().image_copy_buffer.unwrap()(
+                self.pipe.as_ptr(),
+                dst.pipe(),
+                src.pipe(),
+                buffer_offset,
+                0,
+                0,
+                0,
+                bx,
+            );
+        }
+    }
+
     fn resource_map(
         &self,
         res: &PipeResource,
@@ -512,14 +541,14 @@ impl PipeContext {
         }
     }
 
-    pub fn set_sampler_views(&self, mut views: Vec<PipeSamplerView>) {
+    pub fn set_sampler_views(&self, mut views: Vec<PipeSamplerView>, unbind_trailing: u32) {
         unsafe {
             self.pipe.as_ref().set_sampler_views.unwrap()(
                 self.pipe.as_ptr(),
                 pipe_shader_type::PIPE_SHADER_COMPUTE,
                 0,
                 views.len() as u32,
-                0,
+                unbind_trailing,
                 PipeSamplerView::as_pipe(views.as_mut_slice()),
             );
         }
@@ -539,7 +568,7 @@ impl PipeContext {
         }
     }
 
-    pub fn set_shader_images(&self, images: &[PipeImageView]) {
+    pub fn set_shader_images(&self, images: &[PipeImageView], unbind_trailing: u32) {
         let images = PipeImageView::slice_to_pipe(images);
         unsafe {
             self.pipe.as_ref().set_shader_images.unwrap()(
@@ -547,7 +576,7 @@ impl PipeContext {
                 pipe_shader_type::PIPE_SHADER_COMPUTE,
                 0,
                 images.len() as u32,
-                0,
+                unbind_trailing,
                 images.as_ptr(),
             )
         }

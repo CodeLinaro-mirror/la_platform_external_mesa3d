@@ -17,10 +17,12 @@ radv_encode_triangle_gfx10_3(VOID_REF dst_addr, vk_ir_triangle_node src)
 {
    REF(radv_bvh_triangle_node) dst = REF(radv_bvh_triangle_node)(dst_addr);
 
+   bool opaque = (src.geometry_id_and_flags & VK_GEOMETRY_OPAQUE) != 0;
+
    DEREF(dst).coords = src.coords;
    DEREF(dst).triangle_id = src.triangle_id;
    DEREF(dst).geometry_id_and_flags = src.geometry_id_and_flags;
-   DEREF(dst).id = 9;
+   DEREF(dst).id = 9 | (opaque ? 128 : 0);
 }
 
 void
@@ -39,7 +41,11 @@ radv_encode_instance_gfx10_3(VOID_REF dst_addr, vk_ir_instance_node src)
 
    radv_accel_struct_header blas_header = DEREF(REF(radv_accel_struct_header)(src.base_ptr));
 
-   DEREF(dst).bvh_ptr = addr_to_node(src.base_ptr + blas_header.bvh_offset);
+   uint64_t ptr = addr_to_node(src.base_ptr + blas_header.bvh_offset);
+   if (VK_BUILD_FLAG(VK_BUILD_FLAG_PROPAGATE_CULL_FLAGS))
+      ptr |= radv_encode_blas_pointer_flags(src.sbt_offset_and_flags >> 24, blas_header.geometry_type);
+
+   DEREF(dst).bvh_ptr = ptr;
    DEREF(dst).bvh_offset = blas_header.bvh_offset;
 
    mat4 transform = mat4(src.otw_matrix);
@@ -103,6 +109,7 @@ bit_writer_skip_to(inout bit_writer writer, uint32_t target)
    if (writer.count > 0) {
       REF(uint32_t) dst = REF(uint32_t)(writer.addr + writer.offset);
       DEREF(dst) = writer.temp;
+      writer.temp = 0;
    }
 
    writer.count = target % 32;
@@ -124,6 +131,8 @@ bit_writer_finish(inout bit_writer writer)
    writer.total_count = 0;
 }
 
+#define RADV_GFX12_UPDATABLE_PRIMITIVE_NODE_INDICES_OFFSET (align(RADV_GFX12_PRIMITIVE_NODE_HEADER_SIZE, 32) / 8 + 9 * 4)
+
 void
 radv_encode_triangle_gfx12(VOID_REF dst, vk_ir_triangle_node src)
 {
@@ -140,8 +149,7 @@ radv_encode_triangle_gfx12(VOID_REF dst, vk_ir_triangle_node src)
    bit_writer_write(child_writer, 0, 1);  /* vertex_type */
    bit_writer_write(child_writer, 28, 5); /* primitive_index_base_bits */
    bit_writer_write(child_writer, 28, 5); /* primitive_index_bits */
-   /* header + 9 floats + geometry_id */
-   bit_writer_write(child_writer, RADV_GFX12_PRIMITIVE_NODE_HEADER_SIZE + 9 * 32 + 28, 10);
+   bit_writer_write(child_writer, RADV_GFX12_UPDATABLE_PRIMITIVE_NODE_INDICES_OFFSET * 8 + 32, 10);
 
    bit_writer_write(child_writer, floatBitsToUint(src.coords[0][0]), 32);
    bit_writer_write(child_writer, floatBitsToUint(src.coords[0][1]), 32);
@@ -152,6 +160,8 @@ radv_encode_triangle_gfx12(VOID_REF dst, vk_ir_triangle_node src)
    bit_writer_write(child_writer, floatBitsToUint(src.coords[2][0]), 32);
    bit_writer_write(child_writer, floatBitsToUint(src.coords[2][1]), 32);
    bit_writer_write(child_writer, floatBitsToUint(src.coords[2][2]), 32);
+
+   bit_writer_write(child_writer, 0, 64 - RADV_GFX12_PRIMITIVE_NODE_HEADER_SIZE + 4);
 
    bit_writer_write(child_writer, src.geometry_id_and_flags & 0xfffffff, 28);
    bit_writer_write(child_writer, src.triangle_id, 28);
@@ -191,8 +201,7 @@ radv_encode_aabb_gfx12(VOID_REF dst, vk_ir_aabb_node src)
    bit_writer_write(child_writer, 0, 1);  /* vertex_type */
    bit_writer_write(child_writer, 28, 5); /* primitive_index_base_bits */
    bit_writer_write(child_writer, 28, 5); /* primitive_index_bits */
-   /* header + 6 floats + geometry_id */
-   bit_writer_write(child_writer, RADV_GFX12_PRIMITIVE_NODE_HEADER_SIZE + 6 * 32 + 28, 10);
+   bit_writer_write(child_writer, RADV_GFX12_UPDATABLE_PRIMITIVE_NODE_INDICES_OFFSET * 8 + 32, 10);
 
    bit_writer_write(child_writer, floatBitsToUint(src.base.aabb.min.x), 32);
    bit_writer_write(child_writer, floatBitsToUint(src.base.aabb.min.y), 32);
@@ -200,6 +209,8 @@ radv_encode_aabb_gfx12(VOID_REF dst, vk_ir_aabb_node src)
    bit_writer_write(child_writer, floatBitsToUint(src.base.aabb.max.x), 32);
    bit_writer_write(child_writer, floatBitsToUint(src.base.aabb.max.y), 32);
    bit_writer_write(child_writer, floatBitsToUint(src.base.aabb.max.z), 32);
+
+   bit_writer_skip_to(child_writer, RADV_GFX12_UPDATABLE_PRIMITIVE_NODE_INDICES_OFFSET * 8 + 4);
 
    bit_writer_write(child_writer, src.geometry_id_and_flags & 0xfffffff, 28);
    bit_writer_write(child_writer, src.primitive_id, 28);
@@ -250,24 +261,11 @@ radv_encode_instance_gfx12(VOID_REF dst, vk_ir_instance_node src)
 
    uint32_t flags = src.sbt_offset_and_flags >> 24;
    uint32_t instance_pointer_flags = 0;
-   if ((flags & VK_GEOMETRY_INSTANCE_FORCE_OPAQUE_BIT_KHR) != 0)
-      instance_pointer_flags |= 1;
-   if ((flags & VK_GEOMETRY_INSTANCE_FORCE_NO_OPAQUE_BIT_KHR) != 0)
-      instance_pointer_flags |= 2;
-   if ((flags & VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR) != 0 ||
-       blas_header.geometry_type == VK_GEOMETRY_TYPE_AABBS_KHR)
-      instance_pointer_flags |= 4;
-   if ((flags & VK_GEOMETRY_INSTANCE_TRIANGLE_FLIP_FACING_BIT_KHR) != 0)
-      instance_pointer_flags |= 8;
-
-   if (blas_header.geometry_type == VK_GEOMETRY_TYPE_TRIANGLES_KHR)
-      instance_pointer_flags |= 512;
-   else
-      instance_pointer_flags |= 256;
 
    uint64_t bvh_addr = addr_to_node(src.base_ptr + blas_header.bvh_offset);
+   bvh_addr |= radv_encode_blas_pointer_flags(flags, blas_header.geometry_type);
    bit_writer_write(child_writer, uint32_t(bvh_addr & 0xffffffff), 32);
-   bit_writer_write(child_writer, uint32_t(bvh_addr >> 32) | (instance_pointer_flags << (54 - 32)), 32);
+   bit_writer_write(child_writer, uint32_t(bvh_addr >> 32), 32);
    bit_writer_write(child_writer, src.custom_instance_and_mask & 0xffffff, 32);
    bit_writer_write(child_writer, src.sbt_offset_and_flags & 0xffffff, 24);
    bit_writer_write(child_writer, src.custom_instance_and_mask >> 24, 8);
@@ -316,8 +314,6 @@ radv_encode_instance_gfx12(VOID_REF dst, vk_ir_instance_node src)
    DEREF(user_data).custom_instance = src.custom_instance_and_mask & 0xffffff;
    DEREF(user_data).instance_index = src.instance_id;
    DEREF(user_data).bvh_offset = blas_header.bvh_offset;
-   DEREF(user_data).blas_addr = src.base_ptr;
-   DEREF(user_data).primitive_base_indices_offset = blas_header.primitive_base_indices_offset;
    DEREF(user_data).leaf_node_offsets_offset = blas_header.leaf_node_offsets_offset;
 }
 

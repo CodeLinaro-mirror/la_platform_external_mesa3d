@@ -316,7 +316,6 @@ get_device_extensions(const struct tu_physical_device *device,
       .EXT_physical_device_drm = !is_kgsl(device->instance),
       .EXT_pipeline_creation_cache_control = true,
       .EXT_pipeline_creation_feedback = true,
-      .EXT_post_depth_coverage = true,
       .EXT_primitive_topology_list_restart = true,
       .EXT_primitives_generated_query = true,
       .EXT_private_data = true,
@@ -352,6 +351,7 @@ get_device_extensions(const struct tu_physical_device *device,
       .IMG_filter_cubic = device->info->a6xx.has_tex_filter_cubic,
       .NV_compute_shader_derivatives = device->info->chip >= 7,
       .QCOM_fragment_density_map_offset = true,
+      .VALVE_fragment_density_map_layered = true,
       .VALVE_mutable_descriptor_type = true,
    } };
 
@@ -778,6 +778,9 @@ tu_get_features(struct tu_physical_device *pdevice,
    /* VK_KHR_unified_layouts */
    features->unifiedImageLayouts = true;
    features->unifiedImageLayoutsVideo = false;
+
+   /* VK_VALVE_fragment_density_map_layered */
+   features->fragmentDensityMapLayered = true;
 }
 
 static void
@@ -1173,8 +1176,7 @@ tu_get_properties(struct tu_physical_device *pdevice,
    props->maxFragmentShadingRateRasterizationSamples = VK_SAMPLE_COUNT_4_BIT;
    props->fragmentShadingRateWithShaderDepthStencilWrites = true;
    props->fragmentShadingRateWithSampleMask = true;
-   /* Has wrong gl_SampleMaskIn[0] values with VK_EXT_post_depth_coverage used. */
-   props->fragmentShadingRateWithShaderSampleMask = false;
+   props->fragmentShadingRateWithShaderSampleMask = true;
    props->fragmentShadingRateWithConservativeRasterization = true;
    props->fragmentShadingRateWithFragmentShaderInterlock = false;
    props->fragmentShadingRateWithCustomSampleLocations = true;
@@ -1436,6 +1438,9 @@ tu_get_properties(struct tu_physical_device *pdevice,
    props->fragmentDensityOffsetGranularity = (VkExtent2D) { 
       TU_FDM_OFFSET_GRANULARITY, TU_FDM_OFFSET_GRANULARITY
    };
+
+   /* VK_VALVE_fragment_density_map_layered */
+   props->maxFragmentDensityMapLayers = MAX_VIEWS;
 }
 
 static const struct vk_pipeline_cache_object_ops *const cache_import_ops[] = {
@@ -1818,7 +1823,7 @@ tu_physical_device_get_global_priority_properties(const struct tu_physical_devic
       props->priorities[2] = VK_QUEUE_GLOBAL_PRIORITY_HIGH_KHR;
       break;
    default:
-      unreachable("unexpected priority count");
+      UNREACHABLE("unexpected priority count");
       break;
    }
 }
@@ -1995,11 +2000,27 @@ tu_trace_create_buffer(struct u_trace_context *utctx, uint64_t size_B)
    struct tu_device *device =
       container_of(utctx, struct tu_device, trace_context);
 
-   struct tu_bo *bo;
-   tu_bo_init_new(device, NULL, &bo, size_B, TU_BO_ALLOC_INTERNAL_RESOURCE, "trace");
-   tu_bo_map(device, bo, NULL);
+   mtx_lock(&device->trace_mutex);
 
-   return bo;
+   if (!device->trace_suballoc) {
+      device->trace_suballoc = (struct tu_suballocator *) vk_zalloc(
+         &device->vk.alloc, sizeof(struct tu_suballocator), 8,
+         VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
+
+      tu_bo_suballocator_init(device->trace_suballoc, device, 512 * 1024,
+                              TU_BO_ALLOC_INTERNAL_RESOURCE, "utrace");
+   }
+
+   struct tu_suballoc_bo *suballoc_bo = (struct tu_suballoc_bo *) vk_zalloc(
+      &device->vk.alloc, sizeof(struct tu_suballoc_bo), 8,
+      VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
+
+   VkResult result =
+      tu_suballoc_bo_alloc(suballoc_bo, device->trace_suballoc, size_B, 1);
+
+   mtx_unlock(&device->trace_mutex);
+
+   return result == VK_SUCCESS ? suballoc_bo : NULL;
 }
 
 static void
@@ -2007,9 +2028,21 @@ tu_trace_destroy_buffer(struct u_trace_context *utctx, void *timestamps)
 {
    struct tu_device *device =
       container_of(utctx, struct tu_device, trace_context);
-   struct tu_bo *bo = (struct tu_bo *) timestamps;
+   struct tu_suballoc_bo *bo = (struct tu_suballoc_bo *) timestamps;
 
-   tu_bo_finish(device, bo);
+   static_assert(U_TRACE_NO_TIMESTAMP == 0);
+   /* Newly allocated timestamp buffers are expected to be filled with
+    * U_TRACE_NO_TIMESTAMP. Since we reuse buffers, we must clear them
+    * before use. We do this here rather than in create_buffer since
+    * tu_trace_create_buffer is called on a hot path.
+    */
+   memset(tu_suballoc_bo_map(bo), U_TRACE_NO_TIMESTAMP, bo->size);
+
+   mtx_lock(&device->trace_mutex);
+   tu_suballoc_bo_free(device->trace_suballoc, bo);
+   mtx_unlock(&device->trace_mutex);
+
+   vk_free(&device->vk.alloc, bo);
 }
 
 template <chip CHIP>
@@ -2017,7 +2050,7 @@ static void
 tu_trace_record_ts(struct u_trace *ut, void *cs, void *timestamps,
                    uint64_t offset_B, uint32_t)
 {
-   struct tu_bo *bo = (struct tu_bo *) timestamps;
+   struct tu_suballoc_bo *bo = (struct tu_suballoc_bo *) timestamps;
    struct tu_cs *ts_cs = (struct tu_cs *) cs;
 
    if (CHIP == A6XX) {
@@ -2044,7 +2077,7 @@ tu_trace_read_ts(struct u_trace_context *utctx,
 {
    struct tu_device *device =
       container_of(utctx, struct tu_device, trace_context);
-   struct tu_bo *bo = (struct tu_bo *) timestamps;
+   struct tu_suballoc_bo *bo = (struct tu_suballoc_bo *) timestamps;
    struct tu_u_trace_submission_data *submission_data =
       (struct tu_u_trace_submission_data *) flush_data;
 
@@ -2054,11 +2087,7 @@ tu_trace_read_ts(struct u_trace_context *utctx,
                           1000000000);
    }
 
-   if (tu_bo_map(device, bo, NULL) != VK_SUCCESS) {
-      return U_TRACE_NO_TIMESTAMP;
-   }
-
-   uint64_t *ts = (uint64_t *) ((char *)bo->map + offset_B);
+   uint64_t *ts = (uint64_t *) ((char *) tu_suballoc_bo_map(bo) + offset_B);
 
    /* Don't translate the no-timestamp marker: */
    if (*ts == U_TRACE_NO_TIMESTAMP)
@@ -2085,8 +2114,8 @@ tu_copy_buffer(struct u_trace_context *utctx, void *cmdstream,
                uint64_t size_B)
 {
    struct tu_cs *cs = (struct tu_cs *) cmdstream;
-   struct tu_bo *bo_from = (struct tu_bo *) ts_from;
-   struct tu_bo *bo_to = (struct tu_bo *) ts_to;
+   struct tu_suballoc_bo *bo_from = (struct tu_suballoc_bo *) ts_from;
+   struct tu_suballoc_bo *bo_to = (struct tu_suballoc_bo *) ts_to;
 
    tu_cs_emit_pkt7(cs, CP_MEMCPY, 5);
    tu_cs_emit(cs, size_B / sizeof(uint32_t));
@@ -2114,78 +2143,60 @@ tu_trace_get_data(struct u_trace_context *utctx,
                   uint64_t offset_B,
                   uint32_t size_B)
 {
-   struct tu_bo *bo = (struct tu_bo *) buffer;
-   return (char *) bo->map + offset_B;
+   struct tu_suballoc_bo *bo = (struct tu_suballoc_bo *) buffer;
+   return (char *) tu_suballoc_bo_map(bo) + offset_B;
 }
 
-/* Special helpers instead of u_trace_begin_iterator()/u_trace_end_iterator()
- * that ignore tracepoints at the beginning/end that are part of a
- * suspend/resume chain.
- */
-static struct u_trace_iterator
-tu_cmd_begin_iterator(struct tu_cmd_buffer *cmdbuf)
-{
-   switch (cmdbuf->state.suspend_resume) {
-   case SR_IN_PRE_CHAIN:
-      return cmdbuf->trace_rp_drawcalls_end;
-   case SR_AFTER_PRE_CHAIN:
-   case SR_IN_CHAIN_AFTER_PRE_CHAIN:
-      return cmdbuf->pre_chain.trace_rp_drawcalls_end;
-   default:
-      return u_trace_begin_iterator(&cmdbuf->trace);
-   }
-}
-
-static struct u_trace_iterator
-tu_cmd_end_iterator(struct tu_cmd_buffer *cmdbuf)
-{
-   switch (cmdbuf->state.suspend_resume) {
-   case SR_IN_PRE_CHAIN:
-      return cmdbuf->trace_rp_drawcalls_end;
-   case SR_IN_CHAIN:
-   case SR_IN_CHAIN_AFTER_PRE_CHAIN:
-      return cmdbuf->trace_rp_drawcalls_start;
-   default:
-      return u_trace_end_iterator(&cmdbuf->trace);
-   }
-}
 VkResult
-tu_create_copy_timestamp_cs(struct tu_cmd_buffer *cmdbuf, struct tu_cs** cs,
-                            struct u_trace **trace_copy)
+tu_create_copy_timestamp_cs(struct tu_u_trace_submission_data *submission_data,
+                            struct tu_cmd_buffer **cmd_buffers,
+                            uint32_t cmd_buffer_count,
+                            uint32_t trace_chunks_to_copy)
 {
-   *cs = (struct tu_cs *) vk_zalloc(&cmdbuf->device->vk.alloc,
-                                    sizeof(struct tu_cs), 8,
-                                    VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
+   submission_data->last_buffer_with_tracepoints = -1;
 
-   if (*cs == NULL) {
-      return VK_ERROR_OUT_OF_HOST_MEMORY;
+   tu_device *device = cmd_buffers[0]->device;
+   uint32_t cs_size = trace_chunks_to_copy * 6 * 2 + 3;
+
+   if (!list_is_empty(&device->copy_timestamp_cs_pool)) {
+      submission_data->timestamp_copy_data =
+         list_first_entry(&device->copy_timestamp_cs_pool,
+                          struct tu_copy_timestamp_data, node);
+      list_del(&submission_data->timestamp_copy_data->node);
+   } else {
+      submission_data->timestamp_copy_data =
+         (struct tu_copy_timestamp_data *) vk_zalloc(
+            &device->vk.alloc, sizeof(struct tu_copy_timestamp_data), 8,
+            VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
+
+      tu_cs_init(&submission_data->timestamp_copy_data->cs, device,
+                 TU_CS_MODE_GROW, cs_size, "trace copy timestamp cs");
+      u_trace_init(&submission_data->timestamp_copy_data->trace,
+                   &device->trace_context);
    }
 
-   tu_cs_init(*cs, cmdbuf->device, TU_CS_MODE_GROW,
-              list_length(&cmdbuf->trace.trace_chunks) * 6 * 2 + 3, "trace copy timestamp cs");
+   tu_cs *cs = &submission_data->timestamp_copy_data->cs;
 
-   tu_cs_begin(*cs);
+   tu_cs_begin(cs);
 
-   tu_cs_emit_wfi(*cs);
-   tu_cs_emit_pkt7(*cs, CP_WAIT_FOR_ME, 0);
+   tu_cs_emit_wfi(cs);
+   tu_cs_emit_pkt7(cs, CP_WAIT_FOR_ME, 0);
 
-   *trace_copy = (struct u_trace *) vk_zalloc(
-      &cmdbuf->device->vk.alloc, sizeof(struct u_trace), 8,
-      VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
+   for (uint32_t i = 0; i < cmd_buffer_count; i++) {
+      struct tu_cmd_buffer *cmdbuf = cmd_buffers[i];
 
-   if (*trace_copy == NULL) {
-      return VK_ERROR_OUT_OF_HOST_MEMORY;
+      if (!u_trace_has_points(&cmdbuf->trace) ||
+          (cmdbuf->usage_flags & VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT))
+         continue;
+
+      u_trace_clone_append(
+         u_trace_begin_iterator(&cmdbuf->trace),
+         u_trace_end_iterator(&cmdbuf->trace),
+         &submission_data->timestamp_copy_data->trace, cs, tu_copy_buffer);
    }
 
-   u_trace_init(*trace_copy, cmdbuf->trace.utctx);
-   u_trace_clone_append(tu_cmd_begin_iterator(cmdbuf),
-                        tu_cmd_end_iterator(cmdbuf),
-                        *trace_copy, *cs,
-                        tu_copy_buffer);
-
-   tu_cs_emit_wfi(*cs);
-
-   tu_cs_end(*cs);
+   tu_cs_emit_wfi(cs);
+   tu_cs_end(cs);
 
    return VK_SUCCESS;
 }
@@ -2197,6 +2208,7 @@ tu_u_trace_submission_data_create(
    uint32_t cmd_buffer_count,
    struct tu_u_trace_submission_data **submission_data)
 {
+   MESA_TRACE_FUNC();
    *submission_data = (struct tu_u_trace_submission_data *)
       vk_zalloc(&device->vk.alloc,
                 sizeof(struct tu_u_trace_submission_data), 8,
@@ -2207,13 +2219,14 @@ tu_u_trace_submission_data_create(
    }
 
    struct tu_u_trace_submission_data *data = *submission_data;
+   uint32_t trace_chunks_to_copy = 0;
 
-   data->cmd_trace_data = (struct tu_u_trace_cmd_data *) vk_zalloc(
+   data->trace_per_cmd_buffer = (struct u_trace **) vk_zalloc(
       &device->vk.alloc,
-      cmd_buffer_count * sizeof(struct tu_u_trace_cmd_data), 8,
+      cmd_buffer_count * sizeof(struct u_trace *), 8,
       VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
 
-   if (!data->cmd_trace_data) {
+   if (!data->trace_per_cmd_buffer) {
       goto fail;
    }
 
@@ -2234,19 +2247,16 @@ tu_u_trace_submission_data_create(
           * single-use. Therefor we have to copy trace points and create
           * a new timestamp buffer on every submit of reusable command buffer.
           */
-         if (tu_create_copy_timestamp_cs(cmdbuf,
-               &data->cmd_trace_data[i].timestamp_copy_cs,
-               &data->cmd_trace_data[i].trace) != VK_SUCCESS) {
-            goto fail;
-         }
-
-         assert(data->cmd_trace_data[i].timestamp_copy_cs->entry_count == 1);
+         trace_chunks_to_copy += list_length(&cmdbuf->trace.trace_chunks);
       } else {
-         data->cmd_trace_data[i].trace = &cmdbuf->trace;
+         data->trace_per_cmd_buffer[i] = &cmdbuf->trace;
       }
    }
 
-   assert(data->last_buffer_with_tracepoints != -1);
+   if (trace_chunks_to_copy > 0) {
+      tu_create_copy_timestamp_cs(data, cmd_buffers, cmd_buffer_count,
+                                  trace_chunks_to_copy);
+   }
 
    return VK_SUCCESS;
 
@@ -2258,19 +2268,30 @@ fail:
 }
 
 void
+tu_free_copy_timestamp_data(struct tu_device *device,
+                            struct tu_copy_timestamp_data *data)
+{
+   if (list_is_linked(&data->node))
+      list_del(&data->node);
+   tu_cs_finish(&data->cs);
+   u_trace_fini(&data->trace);
+   vk_free(&device->vk.alloc, data);
+}
+
+void
 tu_u_trace_submission_data_finish(
    struct tu_device *device,
    struct tu_u_trace_submission_data *submission_data)
 {
-   for (uint32_t i = 0; i < submission_data->cmd_buffer_count; ++i) {
-      /* Only if we had to create a copy of trace we should free it */
-      struct tu_u_trace_cmd_data *cmd_data = &submission_data->cmd_trace_data[i];
-      if (cmd_data->timestamp_copy_cs) {
-         tu_cs_finish(cmd_data->timestamp_copy_cs);
-         vk_free(&device->vk.alloc, cmd_data->timestamp_copy_cs);
-
-         u_trace_fini(cmd_data->trace);
-         vk_free(&device->vk.alloc, cmd_data->trace);
+   if (submission_data->timestamp_copy_data) {
+      if (u_trace_enabled(&device->trace_context)) {
+         tu_cs_reset(&submission_data->timestamp_copy_data->cs);
+         u_trace_fini(&submission_data->timestamp_copy_data->trace);
+         list_addtail(&submission_data->timestamp_copy_data->node,
+                      &device->copy_timestamp_cs_pool);
+      } else {
+         tu_free_copy_timestamp_data(device,
+                                     submission_data->timestamp_copy_data);
       }
    }
 
@@ -2281,7 +2302,7 @@ tu_u_trace_submission_data_finish(
       mtx_unlock(&device->kgsl_profiling_mutex);
    }
 
-   vk_free(&device->vk.alloc, submission_data->cmd_trace_data);
+   vk_free(&device->vk.alloc, submission_data->trace_per_cmd_buffer);
    vk_free(&device->vk.alloc, submission_data);
 }
 
@@ -2404,58 +2425,58 @@ tu_init_cmdbuf_start_a725_quirk(struct tu_device *device)
    struct tu_cs sub_cs;
    tu_cs_begin_sub_stream(&device->sub_cs, 47, &sub_cs);
 
-   tu_cs_emit_regs(&sub_cs, HLSQ_INVALIDATE_CMD(A7XX,
+   tu_cs_emit_regs(&sub_cs, SP_UPDATE_CNTL(A7XX,
             .vs_state = true, .hs_state = true, .ds_state = true,
-            .gs_state = true, .fs_state = true, .gfx_ibo = true,
+            .gs_state = true, .fs_state = true, .gfx_uav = true,
             .cs_bindless = 0xff, .gfx_bindless = 0xff));
-   tu_cs_emit_regs(&sub_cs, HLSQ_CS_CNTL(A7XX,
+   tu_cs_emit_regs(&sub_cs, SP_CS_CONST_CONFIG(A7XX,
             .constlen = 4,
             .enabled = true));
    tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_CONFIG(.enabled = true));
-   tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_CTRL_REG0(
+   tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_CNTL_0(
             .threadmode = MULTI,
             .threadsize = THREAD128,
             .mergedregs = true));
-   tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_CTRL_REG1(.shared_size = 1));
-   tu_cs_emit_regs(&sub_cs, HLSQ_CS_KERNEL_GROUP_X(A7XX, 1),
-                     HLSQ_CS_KERNEL_GROUP_Y(A7XX, 1),
-                     HLSQ_CS_KERNEL_GROUP_Z(A7XX, 1));
-   tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_INSTRLEN(.sp_cs_instrlen = 1));
-   tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_TEX_COUNT(0));
-   tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_IBO_COUNT(0));
-   tu_cs_emit_regs(&sub_cs, HLSQ_CS_CNTL_1(A7XX,
+   tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_CNTL_1(.shared_size = 1));
+   tu_cs_emit_regs(&sub_cs, SP_CS_KERNEL_GROUP_X(A7XX, 1),
+                     SP_CS_KERNEL_GROUP_Y(A7XX, 1),
+                     SP_CS_KERNEL_GROUP_Z(A7XX, 1));
+   tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_INSTR_SIZE(.sp_cs_instr_size = 1));
+   tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_TSIZE(0));
+   tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_USIZE(0));
+   tu_cs_emit_regs(&sub_cs, SP_CS_WGE_CNTL(A7XX,
             .linearlocalidregid = regid(63, 0),
             .threadsize = THREAD128,
             .workgrouprastorderzfirsten = true,
             .wgtilewidth = 4,
             .wgtileheight = 17));
-   tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_CNTL_0(
+   tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_WIE_CNTL_0(
             .wgidconstid = regid(51, 3),
             .wgsizeconstid = regid(48, 0),
             .wgoffsetconstid = regid(63, 0),
             .localidregid = regid(63, 0)));
-   tu_cs_emit_regs(&sub_cs, SP_CS_CNTL_1(A7XX,
+   tu_cs_emit_regs(&sub_cs, SP_CS_WIE_CNTL_1(A7XX,
             .linearlocalidregid = regid(63, 0),
             .threadsize = THREAD128,
             .workitemrastorder = WORKITEMRASTORDER_TILED));
    tu_cs_emit_regs(&sub_cs, A7XX_SP_CS_UNKNOWN_A9BE(0));
 
    tu_cs_emit_regs(&sub_cs,
-                  HLSQ_CS_NDRANGE_0(A7XX, .kerneldim = 3,
+                  SP_CS_NDRANGE_0(A7XX, .kerneldim = 3,
                                           .localsizex = 255,
                                           .localsizey = 1,
                                           .localsizez = 1),
-                  HLSQ_CS_NDRANGE_1(A7XX, .globalsize_x = 3072),
-                  HLSQ_CS_NDRANGE_2(A7XX, .globaloff_x = 0),
-                  HLSQ_CS_NDRANGE_3(A7XX, .globalsize_y = 1),
-                  HLSQ_CS_NDRANGE_4(A7XX, .globaloff_y = 0),
-                  HLSQ_CS_NDRANGE_5(A7XX, .globalsize_z = 1),
-                  HLSQ_CS_NDRANGE_6(A7XX, .globaloff_z = 0));
-   tu_cs_emit_regs(&sub_cs, A7XX_HLSQ_CS_LAST_LOCAL_SIZE(
+                  SP_CS_NDRANGE_1(A7XX, .globalsize_x = 3072),
+                  SP_CS_NDRANGE_2(A7XX, .globaloff_x = 0),
+                  SP_CS_NDRANGE_3(A7XX, .globalsize_y = 1),
+                  SP_CS_NDRANGE_4(A7XX, .globaloff_y = 0),
+                  SP_CS_NDRANGE_5(A7XX, .globalsize_z = 1),
+                  SP_CS_NDRANGE_6(A7XX, .globaloff_z = 0));
+   tu_cs_emit_regs(&sub_cs, A7XX_SP_CS_NDRANGE_7(
             .localsizex = 255,
             .localsizey = 0,
             .localsizez = 0));
-   tu_cs_emit_pkt4(&sub_cs, REG_A6XX_SP_CS_OBJ_FIRST_EXEC_OFFSET, 3);
+   tu_cs_emit_pkt4(&sub_cs, REG_A6XX_SP_CS_PROGRAM_COUNTER_OFFSET, 3);
    tu_cs_emit(&sub_cs, 0);
    tu_cs_emit_qw(&sub_cs, shader_iova);
 
@@ -2568,6 +2589,7 @@ tu_CreateDevice(VkPhysicalDevice physicalDevice,
    mtx_init(&device->autotune_mutex, mtx_plain);
    mtx_init(&device->kgsl_profiling_mutex, mtx_plain);
    mtx_init(&device->event_mutex, mtx_plain);
+   mtx_init(&device->trace_mutex, mtx_plain);
    u_rwlock_init(&device->dma_bo_lock);
    pthread_mutex_init(&device->submit_mutex, NULL);
 
@@ -2841,6 +2863,7 @@ tu_CreateDevice(VkPhysicalDevice physicalDevice,
    tu_gpu_tracepoint_config_variable();
 
    device->submit_count = 0;
+   list_inithead(&device->copy_timestamp_cs_pool);
    u_trace_context_init(&device->trace_context, device,
                      sizeof(uint64_t),
                      12,
@@ -2999,6 +3022,17 @@ tu_DestroyDevice(VkDevice _device, const VkAllocationCallbacks *pAllocator)
 
    if (device->null_accel_struct_bo)
       tu_bo_finish(device, device->null_accel_struct_bo);
+
+   list_for_each_entry_safe(struct tu_copy_timestamp_data, data,
+                            &device->copy_timestamp_cs_pool, node)
+   {
+      tu_free_copy_timestamp_data(device, data);
+   }
+
+   if (device->trace_suballoc) {
+      tu_bo_suballocator_finish(device->trace_suballoc);
+      vk_free(&device->vk.alloc, device->trace_suballoc);
+   }
 
    for (unsigned i = 0; i < TU_MAX_QUEUE_FAMILIES; i++) {
       for (unsigned q = 0; q < device->queue_count[i]; q++)

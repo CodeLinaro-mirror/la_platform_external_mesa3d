@@ -173,7 +173,7 @@ decode_num_components_in_3bits(uint8_t value)
    if (value == 6)
       return 16;
 
-   unreachable("invalid num_components encoding");
+   UNREACHABLE("invalid num_components encoding");
    return 0;
 }
 
@@ -527,10 +527,9 @@ union packed_instr {
       unsigned exact : 1;
       unsigned no_signed_wrap : 1;
       unsigned no_unsigned_wrap : 1;
-      unsigned padding : 1;
       /* Swizzles for 2 srcs */
       unsigned two_swizzles : 4;
-      unsigned op : 9;
+      unsigned op : 10;
       unsigned packed_src_ssa_16bit : 1;
       /* Scalarized ALUs always have the same header. */
       unsigned num_followup_alu_sharing_header : 2;
@@ -709,8 +708,8 @@ write_alu(write_ctx *ctx, const nir_alu_instr *alu)
 {
    unsigned num_srcs = nir_op_infos[alu->op].num_inputs;
 
-   /* 9 bits for nir_op */
-   STATIC_ASSERT(nir_num_opcodes <= 512);
+   /* 10 bits for nir_op */
+   STATIC_ASSERT(nir_num_opcodes <= 1024);
    union packed_instr header;
    header.u32 = 0;
 
@@ -954,7 +953,7 @@ write_deref(write_ctx *ctx, const nir_deref_instr *deref)
       break;
 
    default:
-      unreachable("Invalid deref type");
+      UNREACHABLE("Invalid deref type");
    }
 }
 
@@ -1024,7 +1023,7 @@ read_deref(read_ctx *ctx, union packed_instr header)
       break;
 
    default:
-      unreachable("Invalid deref type");
+      UNREACHABLE("Invalid deref type");
    }
 
    if (deref_type == nir_deref_type_var) {
@@ -1032,7 +1031,7 @@ read_deref(read_ctx *ctx, union packed_instr header)
    } else if (deref->deref_type == nir_deref_type_cast) {
       deref->modes = decode_deref_modes(header.deref.modes);
    } else {
-      deref->modes = nir_instr_as_deref(deref->parent.ssa->parent_instr)->modes;
+      deref->modes = nir_def_as_deref(deref->parent.ssa)->modes;
    }
 
    return deref;
@@ -1214,7 +1213,7 @@ write_load_const(write_ctx *ctx, const nir_load_const_instr *lc)
          header.load_const.packed_value = lc->value[0].b;
          break;
       default:
-         unreachable("invalid bit_size");
+         UNREACHABLE("invalid bit_size");
       }
    }
 
@@ -1265,7 +1264,7 @@ read_load_const(read_ctx *ctx, union packed_instr header)
          lc->value[0].u32 = (uint64_t)header.load_const.packed_value << 13;
          break;
       default:
-         unreachable("invalid bit_size");
+         UNREACHABLE("invalid bit_size");
       }
       break;
 
@@ -1291,7 +1290,7 @@ read_load_const(read_ctx *ctx, union packed_instr header)
          lc->value[0].b = header.load_const.packed_value;
          break;
       default:
-         unreachable("invalid bit_size");
+         UNREACHABLE("invalid bit_size");
       }
       break;
 
@@ -1367,7 +1366,8 @@ union packed_tex_data {
       unsigned offset_non_uniform : 1;
       unsigned array_is_lowered_cube : 1;
       unsigned is_gather_implicit_lod : 1;
-      unsigned unused : 4; /* Mark unused for valgrind. */
+      unsigned can_speculate : 1;
+      unsigned unused : 3; /* Mark unused for valgrind. */
    } u;
 };
 
@@ -1407,6 +1407,7 @@ write_tex(write_ctx *ctx, const nir_tex_instr *tex)
       .u.offset_non_uniform = tex->offset_non_uniform,
       .u.array_is_lowered_cube = tex->array_is_lowered_cube,
       .u.is_gather_implicit_lod = tex->is_gather_implicit_lod,
+      .u.can_speculate = tex->can_speculate,
    };
    blob_write_uint32(ctx->blob, packed.u32);
 
@@ -1447,6 +1448,7 @@ read_tex(read_ctx *ctx, union packed_instr header)
    tex->offset_non_uniform = packed.u.offset_non_uniform;
    tex->array_is_lowered_cube = packed.u.array_is_lowered_cube;
    tex->is_gather_implicit_lod = packed.u.is_gather_implicit_lod;
+   tex->can_speculate = packed.u.can_speculate;
 
    for (unsigned i = 0; i < tex->num_srcs; i++) {
       union packed_src src = read_src(ctx, &tex->src[i].src);
@@ -1705,9 +1707,9 @@ write_instr(write_ctx *ctx, const nir_instr *instr)
       write_call(ctx, nir_instr_as_call(instr));
       break;
    case nir_instr_type_parallel_copy:
-      unreachable("Cannot write parallel copies");
+      UNREACHABLE("Cannot write parallel copies");
    default:
-      unreachable("bad instr type");
+      UNREACHABLE("bad instr type");
    }
 }
 
@@ -1759,9 +1761,9 @@ read_instr(read_ctx *ctx, nir_block *block)
       instr = &read_call(ctx)->instr;
       break;
    case nir_instr_type_parallel_copy:
-      unreachable("Cannot read parallel copies");
+      UNREACHABLE("Cannot read parallel copies");
    default:
-      unreachable("bad instr type");
+      UNREACHABLE("bad instr type");
    }
 
    if (unlikely(ctx->nir->has_debug_info)) {
@@ -1881,7 +1883,7 @@ write_cf_node(write_ctx *ctx, nir_cf_node *cf)
       write_loop(ctx, nir_cf_node_as_loop(cf));
       break;
    default:
-      unreachable("bad cf type");
+      UNREACHABLE("bad cf type");
    }
 }
 
@@ -1901,7 +1903,7 @@ read_cf_node(read_ctx *ctx, struct exec_list *list)
       read_loop(ctx, list);
       break;
    default:
-      unreachable("bad cf type");
+      UNREACHABLE("bad cf type");
    }
 }
 

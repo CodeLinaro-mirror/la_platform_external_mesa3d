@@ -616,7 +616,7 @@ static void *evergreen_create_sampler_state(struct pipe_context *ctx,
 		S_03C000_XY_MIN_FILTER(eg_tex_filter(state->min_img_filter, max_aniso)) |
 		S_03C000_MIP_FILTER(r600_tex_mipfilter(state->min_mip_filter)) |
 		S_03C000_MAX_ANISO_RATIO(max_aniso_ratio) |
-		S_03C000_DEPTH_COMPARE_FUNCTION(r600_tex_compare(state->compare_func)) |
+		S_03C000_DEPTH_COMPARE_FUNCTION(r600_tex_compare(state->compare_mode, state->compare_func)) |
 		S_03C000_BORDER_COLOR_TYPE(ss->border_color_use ? V_03C000_SQ_TEX_BORDER_COLOR_REGISTER : 0);
 	/* R_03C004_SQ_TEX_SAMPLER_WORD1_0 */
 	ss->tex_sampler_words[1] =
@@ -693,8 +693,7 @@ static void evergreen_fill_buffer_resource_words(struct r600_context *rctx,
 
 static struct pipe_sampler_view *
 texture_buffer_sampler_view(struct r600_context *rctx,
-			    struct r600_pipe_sampler_view *view,
-			    unsigned width0, unsigned height0)
+			    struct r600_pipe_sampler_view *view)
 {
 	struct r600_texture *tmp = (struct r600_texture*)view->base.texture;
 	struct eg_buf_res_params params;
@@ -703,7 +702,9 @@ texture_buffer_sampler_view(struct r600_context *rctx,
 
 	params.pipe_format = view->base.format;
 	params.offset = view->base.u.buf.offset;
-	params.size = view->base.u.buf.size;
+	params.size = MIN2(util_format_get_blocksize(view->base.format) *
+			   rctx->screen->b.b.caps.max_texel_buffer_elements,
+			   view->base.u.buf.size);
 	params.swizzle[0] = view->base.swizzle_r;
 	params.swizzle[1] = view->base.swizzle_g;
 	params.swizzle[2] = view->base.swizzle_b;
@@ -944,7 +945,7 @@ evergreen_create_sampler_view_custom(struct pipe_context *ctx,
 	view->base.context = ctx;
 
 	if (state->target == PIPE_BUFFER)
-		return texture_buffer_sampler_view(rctx, view, width0, height0);
+		return texture_buffer_sampler_view(rctx, view);
 
 	memset(&params, 0, sizeof(params));
 	params.pipe_format = state->format;
@@ -2596,9 +2597,9 @@ static void cayman_convert_border_color(union pipe_color_union *in,
 	}
 }
 
-static void evergreen_convert_border_color(union pipe_color_union *in,
-                                           union pipe_color_union *out,
-                                           struct pipe_sampler_view *view)
+void evergreen_convert_border_color(const union pipe_color_union *in,
+				    union pipe_color_union *out,
+				    const struct pipe_sampler_view *view)
 {
 	const enum pipe_format format = view->format;
 	const struct util_format_description *d = util_format_description(format);
@@ -4483,6 +4484,9 @@ static void evergreen_set_shader_images(struct pipe_context *ctx,
 			istate->compressed_colortex_mask |= 1 << i;
 		else
 			istate->compressed_colortex_mask &= ~(1 << i);
+
+		unsigned buffer_size = iview->u.buf.size;
+
 		if (!is_buffer) {
 
 			evergreen_set_color_surface_common(rctx, rtex,
@@ -4494,12 +4498,16 @@ static void evergreen_set_shader_images(struct pipe_context *ctx,
 			color.dim = S_028C78_WIDTH_MAX(u_minify(image->width0, iview->u.tex.level) - 1) |
 			  S_028C78_HEIGHT_MAX(u_minify(image->height0, iview->u.tex.level) - 1);
 		} else {
+			buffer_size = MIN2(util_format_get_blocksize(iview->format) *
+					   rctx->screen->b.b.caps.max_texel_buffer_elements,
+					   buffer_size);
+
 			color.offset = 0;
 			color.view = 0;
 			evergreen_set_color_surface_buffer(rctx, resource,
 							   iview->format,
 							   iview->u.buf.offset,
-							   iview->u.buf.size,
+							   buffer_size,
 							   &color);
 		}
 
@@ -4565,7 +4573,7 @@ static void evergreen_set_shader_images(struct pipe_context *ctx,
 		} else {
 			memset(&buf_params, 0, sizeof(buf_params));
 			buf_params.pipe_format = iview->format;
-			buf_params.size = iview->u.buf.size;
+			buf_params.size = buffer_size;
 			buf_params.offset = iview->u.buf.offset;
 			buf_params.swizzle[0] = PIPE_SWIZZLE_X;
 			buf_params.swizzle[1] = PIPE_SWIZZLE_Y;

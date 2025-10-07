@@ -27,6 +27,7 @@
 #include "anv_private.h"
 #include "anv_measure.h"
 
+#include "common/intel_common.h"
 #include "common/intel_compute_slm.h"
 #include "genxml/gen_macros.h"
 #include "genxml/genX_pack.h"
@@ -72,7 +73,7 @@ genX(cmd_buffer_ensure_cfe_state)(struct anv_cmd_buffer *cmd_buffer,
       case 512:  cfe.StackIDControl = StackIDs512;  break;
       case 1024: cfe.StackIDControl = StackIDs1024; break;
       case 2048: cfe.StackIDControl = StackIDs2048; break;
-      default:   unreachable("invalid stack_ids value");
+      default:   UNREACHABLE("invalid stack_ids value");
       }
 
 #if INTEL_WA_14021821874_GFX_VER || INTEL_WA_14018813551_GFX_VER
@@ -94,21 +95,24 @@ genX(cmd_buffer_ensure_cfe_state)(struct anv_cmd_buffer *cmd_buffer,
 
    comp_state->scratch_size = total_scratch;
 #else
-   unreachable("Invalid call");
+   UNREACHABLE("Invalid call");
 #endif
 }
 
 static void
 cmd_buffer_flush_compute_state(struct anv_cmd_buffer *cmd_buffer)
 {
+   struct anv_device *device = cmd_buffer->device;
    struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
+   const UNUSED struct intel_device_info *devinfo = cmd_buffer->device->info;
    struct anv_compute_pipeline *pipeline =
       anv_pipeline_to_compute(comp_state->base.pipeline);
-   const UNUSED struct intel_device_info *devinfo = cmd_buffer->device->info;
 
-   assert(pipeline->cs);
+   assert(comp_state->shader);
 
-   genX(cmd_buffer_config_l3)(cmd_buffer, pipeline->base.l3_config);
+   genX(cmd_buffer_config_l3)(cmd_buffer,
+                              pipeline->cs->prog_data->total_shared > 0 ?
+                              device->l3_slm_config : device->l3_config);
 
    genX(cmd_buffer_update_color_aux_op(cmd_buffer, ISL_AUX_OP_NONE));
 
@@ -141,7 +145,7 @@ cmd_buffer_flush_compute_state(struct anv_cmd_buffer *cmd_buffer)
       anv_batch_emit_batch(&cmd_buffer->batch, &pipeline->base.batch);
 
 #if GFX_VERx10 >= 125
-      const struct brw_cs_prog_data *prog_data = get_cs_prog_data(pipeline);
+      const struct brw_cs_prog_data *prog_data = get_cs_prog_data(comp_state);
       genX(cmd_buffer_ensure_cfe_state)(cmd_buffer, prog_data->base.total_scratch);
 #endif
 
@@ -166,15 +170,15 @@ cmd_buffer_flush_compute_state(struct anv_cmd_buffer *cmd_buffer)
 
    cmd_buffer->state.descriptors_dirty |=
       genX(cmd_buffer_flush_push_descriptors)(cmd_buffer,
-                                              &cmd_buffer->state.compute.base,
-                                              &pipeline->base);
+                                              &cmd_buffer->state.compute.base);
 
    if ((cmd_buffer->state.descriptors_dirty & VK_SHADER_STAGE_COMPUTE_BIT) ||
        cmd_buffer->state.compute.pipeline_dirty) {
-      genX(cmd_buffer_flush_descriptor_sets)(cmd_buffer,
-                                             &cmd_buffer->state.compute.base,
-                                             VK_SHADER_STAGE_COMPUTE_BIT,
-                                             &pipeline->cs, 1);
+      genX(cmd_buffer_flush_descriptor_sets)(
+         cmd_buffer,
+         &cmd_buffer->state.compute.base,
+         VK_SHADER_STAGE_COMPUTE_BIT,
+         (const struct anv_shader_bin **)&comp_state->shader, 1);
       cmd_buffer->state.descriptors_dirty &= ~VK_SHADER_STAGE_COMPUTE_BIT;
 
 #if GFX_VERx10 < 125
@@ -313,9 +317,8 @@ compute_load_indirect_params(struct anv_cmd_buffer *cmd_buffer,
       const uint32_t mocs = isl_mocs(&cmd_buffer->device->isl_dev, 0, false);
       mi_builder_set_mocs(&b, mocs);
 
-      struct anv_compute_pipeline *pipeline =
-         anv_pipeline_to_compute(cmd_buffer->state.compute.base.pipeline);
-      const struct brw_cs_prog_data *prog_data = get_cs_prog_data(pipeline);
+      struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
+      const struct brw_cs_prog_data *prog_data = get_cs_prog_data(comp_state);
 
       assert(util_is_power_of_two_or_zero(prog_data->local_size[0]));
       size_x = mi_udiv32_imm(&b, size_x, prog_data->local_size[0]);
@@ -366,6 +369,7 @@ get_interface_descriptor_data(struct anv_cmd_buffer *cmd_buffer,
       .BindingTableEntryCount = devinfo->verx10 == 125 ?
          0 : MIN2(shader->bind_map.surface_count, 30),
       .NumberofThreadsinGPGPUThreadGroup = dispatch->threads,
+      .ThreadGroupDispatchSize = intel_compute_threads_group_dispatch_size(dispatch->threads),
       .SharedLocalMemorySize = intel_compute_slm_encode_size(GFX_VER, prog_data->base.total_shared),
       .PreferredSLMAllocationSize =
          intel_compute_preferred_slm_calc_encode_size(devinfo,
@@ -379,9 +383,58 @@ get_interface_descriptor_data(struct anv_cmd_buffer *cmd_buffer,
    };
 }
 
+static void
+compute_update_async_threads_limit(struct anv_cmd_buffer *cmd_buffer,
+                                   const struct brw_cs_prog_data *prog_data,
+                                   const struct intel_cs_dispatch_info *dispatch)
+{
+   const struct intel_device_info *devinfo = cmd_buffer->device->info;
+   uint8_t pixel_async_compute_thread_limit, z_pass_async_compute_thread_limit,
+           np_z_async_throttle_settings;
+   bool slm_or_barrier_enabled = prog_data->base.total_shared != 0 || prog_data->uses_barrier;
+
+   if (cmd_buffer->queue_family->engine_class != INTEL_ENGINE_CLASS_COMPUTE ||
+       GFX_VERx10 >= 300)
+      return;
+
+   intel_compute_engine_async_threads_limit(devinfo, dispatch->threads,
+                                            slm_or_barrier_enabled,
+                                            &pixel_async_compute_thread_limit,
+                                            &z_pass_async_compute_thread_limit,
+                                            &np_z_async_throttle_settings);
+
+   if (cmd_buffer->state.compute.pixel_async_compute_thread_limit != pixel_async_compute_thread_limit ||
+       cmd_buffer->state.compute.z_pass_async_compute_thread_limit != z_pass_async_compute_thread_limit ||
+       cmd_buffer->state.compute.np_z_async_throttle_settings != np_z_async_throttle_settings) {
+
+      cmd_buffer->state.compute.pixel_async_compute_thread_limit = pixel_async_compute_thread_limit;
+      cmd_buffer->state.compute.z_pass_async_compute_thread_limit = z_pass_async_compute_thread_limit;
+      cmd_buffer->state.compute.np_z_async_throttle_settings = np_z_async_throttle_settings;
+
+      anv_batch_emit(&cmd_buffer->batch, GENX(STATE_COMPUTE_MODE), cm) {
+#if GFX_VER >= 20
+         cm.AsyncComputeThreadLimit = pixel_async_compute_thread_limit;
+         cm.ZPassAsyncComputeThreadLimit = z_pass_async_compute_thread_limit;
+         cm.ZAsyncThrottlesettings = np_z_async_throttle_settings;
+         cm.AsyncComputeThreadLimitMask = 0x7;
+         cm.ZPassAsyncComputeThreadLimitMask = 0x7;
+         cm.ZAsyncThrottlesettingsMask = 0x3;
+#else
+         cm.PixelAsyncComputeThreadLimit = pixel_async_compute_thread_limit;
+         cm.ZPassAsyncComputeThreadLimit = z_pass_async_compute_thread_limit;
+         cm.PixelAsyncComputeThreadLimitMask = 0x7;
+         cm.ZPassAsyncComputeThreadLimitMask = 0x7;
+         if (intel_device_info_is_mtl_or_arl(devinfo)) {
+            cm.ZAsyncThrottlesettings = np_z_async_throttle_settings;
+            cm.ZAsyncThrottlesettingsMask = 0x3;
+         }
+#endif
+      }
+   }
+}
+
 static inline void
 emit_indirect_compute_walker(struct anv_cmd_buffer *cmd_buffer,
-                             const struct anv_shader_bin *shader,
                              const struct brw_cs_prog_data *prog_data,
                              struct anv_address indirect_addr)
 {
@@ -400,6 +453,8 @@ emit_indirect_compute_walker(struct anv_cmd_buffer *cmd_buffer,
    uint64_t push_addr64 = anv_address_physical(
       anv_state_pool_state_address(&cmd_buffer->device->general_state_pool,
                                    comp_state->base.push_constants_state));
+
+   compute_update_async_threads_limit(cmd_buffer, prog_data, &dispatch);
 
    struct GENX(COMPUTE_WALKER_BODY) body =  {
       .SIMDSize                 = dispatch_size,
@@ -426,8 +481,8 @@ emit_indirect_compute_walker(struct anv_cmd_buffer *cmd_buffer,
       .ExecutionMask            = dispatch.right_mask,
       .PostSync.MOCS            = anv_mocs(cmd_buffer->device, NULL, 0),
       .InterfaceDescriptor =
-         get_interface_descriptor_data(cmd_buffer, shader, prog_data,
-                                       &dispatch),
+         get_interface_descriptor_data(cmd_buffer, comp_state->shader,
+                                       prog_data, &dispatch),
       .EmitInlineParameter      = prog_data->uses_inline_data,
       .InlineData               = {
          [ANV_INLINE_PARAM_PUSH_ADDRESS_OFFSET / 4 + 0]   = push_addr64 & 0xffffffff,
@@ -445,7 +500,7 @@ emit_indirect_compute_walker(struct anv_cmd_buffer *cmd_buffer,
          GENX(EXECUTE_INDIRECT_DISPATCH),
          .PredicateEnable            = predicate,
          .MaxCount                   = 1,
-         .COMPUTE_WALKER_BODY        = body,
+         .body                       = body,
          .ArgumentBufferStartAddress = indirect_addr,
          .MOCS                       = anv_mocs(cmd_buffer->device,
                                                 indirect_addr.bo, 0),
@@ -454,7 +509,6 @@ emit_indirect_compute_walker(struct anv_cmd_buffer *cmd_buffer,
 
 static inline void
 emit_compute_walker(struct anv_cmd_buffer *cmd_buffer,
-                    const struct anv_compute_pipeline *pipeline,
                     struct anv_address indirect_addr,
                     const struct brw_cs_prog_data *prog_data,
                     struct intel_cs_dispatch_info dispatch,
@@ -463,6 +517,8 @@ emit_compute_walker(struct anv_cmd_buffer *cmd_buffer,
 {
    const struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
    const bool predicate = cmd_buffer->state.conditional_render_enabled;
+
+   compute_update_async_threads_limit(cmd_buffer, prog_data, &dispatch);
 
    uint32_t num_workgroup_data[3];
    if (!anv_address_is_null(indirect_addr)) {
@@ -496,10 +552,10 @@ emit_compute_walker(struct anv_cmd_buffer *cmd_buffer,
       .ThreadGroupIDZDimension        = groupCountZ,
       .ExecutionMask                  = dispatch.right_mask,
       .PostSync                       = {
-         .MOCS                        = anv_mocs(pipeline->base.device, NULL, 0),
+         .MOCS                        = anv_mocs(cmd_buffer->device, NULL, 0),
       },
       .InterfaceDescriptor =
-         get_interface_descriptor_data(cmd_buffer, pipeline->cs,
+         get_interface_descriptor_data(cmd_buffer, comp_state->shader,
                                        prog_data, &dispatch),
       .EmitInlineParameter            = prog_data->uses_inline_data,
       .InlineData                     = {
@@ -508,7 +564,12 @@ emit_compute_walker(struct anv_cmd_buffer *cmd_buffer,
          [ANV_INLINE_PARAM_NUM_WORKGROUPS_OFFSET / 4 + 0] = num_workgroup_data[0],
          [ANV_INLINE_PARAM_NUM_WORKGROUPS_OFFSET / 4 + 1] = num_workgroup_data[1],
          [ANV_INLINE_PARAM_NUM_WORKGROUPS_OFFSET / 4 + 2] = num_workgroup_data[2],
-      }
+      },
+#if GFX_VER >= 30
+         /* HSD 14016252163 */
+      .DispatchWalkOrder = prog_data->uses_sampler ? MortonWalk : LinearWalk,
+      .ThreadGroupBatchSize = prog_data->uses_sampler ? TG_BATCH_4 : TG_BATCH_1,
+#endif
    };
 
    cmd_buffer->state.last_compute_walker =
@@ -529,14 +590,14 @@ emit_compute_walker(struct anv_cmd_buffer *cmd_buffer,
 
 static inline void
 emit_gpgpu_walker(struct anv_cmd_buffer *cmd_buffer,
-                  const struct anv_compute_pipeline *pipeline, bool indirect,
+                  bool indirect,
                   const struct brw_cs_prog_data *prog_data,
                   uint32_t groupCountX, uint32_t groupCountY,
                   uint32_t groupCountZ)
 {
    const bool predicate = cmd_buffer->state.conditional_render_enabled;
 
-   const struct intel_device_info *devinfo = pipeline->base.device->info;
+   const struct intel_device_info *devinfo = cmd_buffer->device->info;
    const struct intel_cs_dispatch_info dispatch =
       brw_cs_get_dispatch_info(devinfo, prog_data, NULL);
 
@@ -561,7 +622,6 @@ emit_gpgpu_walker(struct anv_cmd_buffer *cmd_buffer,
 
 static inline void
 emit_cs_walker(struct anv_cmd_buffer *cmd_buffer,
-               const struct anv_compute_pipeline *pipeline,
                const struct brw_cs_prog_data *prog_data,
                struct intel_cs_dispatch_info dispatch,
                struct anv_address indirect_addr,
@@ -586,7 +646,7 @@ emit_cs_walker(struct anv_cmd_buffer *cmd_buffer,
     */
    if (is_indirect && !is_unaligned_size_x &&
        cmd_buffer->device->info->has_indirect_unroll) {
-      emit_indirect_compute_walker(cmd_buffer, pipeline->cs, prog_data,
+      emit_indirect_compute_walker(cmd_buffer, prog_data,
                                    indirect_addr);
       return;
    }
@@ -597,10 +657,10 @@ emit_cs_walker(struct anv_cmd_buffer *cmd_buffer,
             is_unaligned_size_x);
 
 #if GFX_VERx10 >= 125
-   emit_compute_walker(cmd_buffer, pipeline, indirect_addr, prog_data,
+   emit_compute_walker(cmd_buffer, indirect_addr, prog_data,
                        dispatch, groupCountX, groupCountY, groupCountZ);
 #else
-   emit_gpgpu_walker(cmd_buffer, pipeline, is_indirect, prog_data,
+   emit_gpgpu_walker(cmd_buffer, is_indirect, prog_data,
                      groupCountX, groupCountY, groupCountZ);
 #endif
 }
@@ -615,9 +675,8 @@ void genX(CmdDispatchBase)(
     uint32_t                                    groupCountZ)
 {
    ANV_FROM_HANDLE(anv_cmd_buffer, cmd_buffer, commandBuffer);
-   struct anv_compute_pipeline *pipeline =
-      anv_pipeline_to_compute(cmd_buffer->state.compute.base.pipeline);
-   const struct brw_cs_prog_data *prog_data = get_cs_prog_data(pipeline);
+   struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
+   const struct brw_cs_prog_data *prog_data = get_cs_prog_data(comp_state);
    struct intel_cs_dispatch_info dispatch =
       brw_cs_get_dispatch_info(cmd_buffer->device->info, prog_data, NULL);
 
@@ -643,10 +702,14 @@ void genX(CmdDispatchBase)(
    if (cmd_buffer->state.conditional_render_enabled)
       genX(cmd_emit_conditional_render_predicate)(cmd_buffer);
 
-   emit_cs_walker(cmd_buffer, pipeline, prog_data, dispatch,
+   genX(emit_breakpoint)(&cmd_buffer->batch, cmd_buffer->device, true);
+
+   emit_cs_walker(cmd_buffer, prog_data, dispatch,
                   ANV_NULL_ADDRESS /* no indirect data */,
                   groupCountX, groupCountY, groupCountZ,
                   false);
+
+   genX(emit_breakpoint)(&cmd_buffer->batch, cmd_buffer->device, false);
 
    trace_intel_end_compute(&cmd_buffer->trace,
                            groupCountX, groupCountY, groupCountZ,
@@ -665,9 +728,8 @@ emit_unaligned_cs_walker(
     struct intel_cs_dispatch_info               dispatch)
 {
    ANV_FROM_HANDLE(anv_cmd_buffer, cmd_buffer, commandBuffer);
-   struct anv_compute_pipeline *pipeline =
-      anv_pipeline_to_compute(cmd_buffer->state.compute.base.pipeline);
-   const struct brw_cs_prog_data *prog_data = get_cs_prog_data(pipeline);
+   struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
+   const struct brw_cs_prog_data *prog_data = get_cs_prog_data(comp_state);
 
    if (anv_batch_has_error(&cmd_buffer->batch))
       return;
@@ -702,7 +764,7 @@ emit_unaligned_cs_walker(
       genX(cmd_emit_conditional_render_predicate)(cmd_buffer);
 
 #if GFX_VERx10 >= 125
-   emit_compute_walker(cmd_buffer, pipeline, ANV_NULL_ADDRESS, prog_data,
+   emit_compute_walker(cmd_buffer, ANV_NULL_ADDRESS, prog_data,
                        dispatch, groupCountX, groupCountY, groupCountZ);
 #endif
 
@@ -730,9 +792,8 @@ genX(cmd_dispatch_unaligned)(
     uint32_t                                    invocations_z)
 {
    ANV_FROM_HANDLE(anv_cmd_buffer, cmd_buffer, commandBuffer);
-   struct anv_compute_pipeline *pipeline =
-      anv_pipeline_to_compute(cmd_buffer->state.compute.base.pipeline);
-   const struct brw_cs_prog_data *prog_data = get_cs_prog_data(pipeline);
+   struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
+   const struct brw_cs_prog_data *prog_data = get_cs_prog_data(comp_state);
 
    /* Group X can be unaligned for RT dispatches. */
    uint32_t groupCountX = invocations_x / prog_data->local_size[0];
@@ -781,9 +842,8 @@ genX(cmd_buffer_dispatch_indirect)(struct anv_cmd_buffer *cmd_buffer,
                                    struct anv_address indirect_addr,
                                    bool is_unaligned_size_x)
 {
-   struct anv_compute_pipeline *pipeline =
-      anv_pipeline_to_compute(cmd_buffer->state.compute.base.pipeline);
-   const struct brw_cs_prog_data *prog_data = get_cs_prog_data(pipeline);
+   struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
+   const struct brw_cs_prog_data *prog_data = get_cs_prog_data(comp_state);
    UNUSED struct anv_batch *batch = &cmd_buffer->batch;
    struct intel_cs_dispatch_info dispatch =
       brw_cs_get_dispatch_info(cmd_buffer->device->info, prog_data, NULL);
@@ -806,8 +866,12 @@ genX(cmd_buffer_dispatch_indirect)(struct anv_cmd_buffer *cmd_buffer,
    if (cmd_buffer->state.conditional_render_enabled)
       genX(cmd_emit_conditional_render_predicate)(cmd_buffer);
 
-   emit_cs_walker(cmd_buffer, pipeline, prog_data, dispatch, indirect_addr, 0,
-                  0, 0, is_unaligned_size_x);
+   genX(emit_breakpoint)(&cmd_buffer->batch, cmd_buffer->device, true);
+
+   emit_cs_walker(cmd_buffer, prog_data, dispatch, indirect_addr,
+                  0, 0, 0, is_unaligned_size_x);
+
+   genX(emit_breakpoint)(&cmd_buffer->batch, cmd_buffer->device, false);
 
    trace_intel_end_compute_indirect(&cmd_buffer->trace,
                                     anv_address_utrace(indirect_addr),
@@ -864,7 +928,7 @@ genX(cmd_buffer_ray_query_globals)(struct anv_cmd_buffer *cmd_buffer)
 
    return anv_cmd_buffer_temporary_state_address(cmd_buffer, state);
 #else
-   unreachable("Not supported");
+   UNREACHABLE("Not supported");
 #endif
 }
 
@@ -1106,7 +1170,7 @@ cmd_buffer_trace_rays(struct anv_cmd_buffer *cmd_buffer,
 
    trace_intel_begin_rays(&cmd_buffer->trace);
 
-   genX(cmd_buffer_config_l3)(cmd_buffer, pipeline->base.l3_config);
+   genX(cmd_buffer_config_l3)(cmd_buffer, device->l3_config);
 
    genX(cmd_buffer_update_color_aux_op(cmd_buffer, ISL_AUX_OP_NONE));
 
@@ -1119,8 +1183,7 @@ cmd_buffer_trace_rays(struct anv_cmd_buffer *cmd_buffer,
    genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
 
    genX(cmd_buffer_flush_push_descriptors)(cmd_buffer,
-                                           &cmd_buffer->state.rt.base,
-                                           &pipeline->base);
+                                           &cmd_buffer->state.rt.base);
 
    /* Add these to the reloc list as they're internal buffers that don't
     * actually have relocs to pick them up manually.
@@ -1297,6 +1360,8 @@ cmd_buffer_trace_rays(struct anv_cmd_buffer *cmd_buffer,
       },
    };
 
+   compute_update_async_threads_limit(cmd_buffer, cs_prog_data, &dispatch);
+
    struct GENX(COMPUTE_WALKER_BODY) body =  {
       .SIMDSize                       = dispatch.simd_size / 16,
       .MessageSIMD                    = dispatch.simd_size / 16,
@@ -1309,6 +1374,11 @@ cmd_buffer_trace_rays(struct anv_cmd_buffer *cmd_buffer,
       .ExecutionMask                  = 0xff,
       .EmitInlineParameter            = true,
       .PostSync.MOCS                  = anv_mocs(pipeline->base.device, NULL, 0),
+#if GFX_VER >= 30
+         /* HSD 14016252163 */
+      .DispatchWalkOrder = cs_prog_data->uses_sampler ? MortonWalk : LinearWalk,
+      .ThreadGroupBatchSize = cs_prog_data->uses_sampler ? TG_BATCH_4 : TG_BATCH_1,
+#endif
 
       .InterfaceDescriptor = (struct GENX(INTERFACE_DESCRIPTOR_DATA)) {
          .KernelStartPointer = device->rt_trampoline->kernel.offset,
@@ -1317,6 +1387,8 @@ cmd_buffer_trace_rays(struct anv_cmd_buffer *cmd_buffer,
          .SamplerCount = 0,
          .BindingTablePointer = surfaces->offset,
          .NumberofThreadsinGPGPUThreadGroup = 1,
+         .ThreadGroupDispatchSize =
+            intel_compute_threads_group_dispatch_size(dispatch.threads),
          .BTDMode = true,
 #if INTEL_NEEDS_WA_14017794102 || INTEL_NEEDS_WA_14023061436
          .ThreadPreemption = false,

@@ -202,6 +202,7 @@ vk_common_CmdPipelineBarrier(
 
    VkDependencyInfo dep_info = {
       .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+      .dependencyFlags = dependencyFlags,
       .memoryBarrierCount = memoryBarrierCount,
       .pMemoryBarriers = memory_barriers,
       .bufferMemoryBarrierCount = bufferMemoryBarrierCount,
@@ -358,7 +359,7 @@ vk_common_GetQueueCheckpointDataNV(
     uint32_t*                                   pCheckpointDataCount,
     VkCheckpointDataNV*                         pCheckpointData)
 {
-   unreachable("Entrypoint not implemented");
+   UNREACHABLE("Entrypoint not implemented");
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL

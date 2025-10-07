@@ -21,7 +21,6 @@ idep_si_tracepoints = declare_dependency(
 
 files_libradeonsi = files(
   'driinfo_radeonsi.h',
-  'gfx10_shader_ngg.c',
   'gfx11_query.c',
   'si_barrier.c',
   'si_blit.c',
@@ -152,6 +151,11 @@ endforeach
 libradeonsi_cflags = []
 if with_amdgpu_virtio
   libradeonsi_cflags += ['-DHAVE_AMDGPU_VIRTIO']
+endif
+
+radeonsi_build_id = get_option('radeonsi-build-id')
+if radeonsi_build_id != ''
+  libradeonsi_cflags += '-DRADEONSI_BUILD_ID_OVERRIDE="' + radeonsi_build_id + '"'
 endif
 
 libradeonsi = static_library(

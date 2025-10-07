@@ -106,7 +106,7 @@ agx_resource_debug(struct agx_resource *res, const char *msg)
 
    agx_msg(
       "%s%s %dx%dx%d %dL %d/%dM %dS M:%llx %s%s %s%s S:0x%llx LS:0x%llx CS:0x%llx "
-      "Base=0x%llx Size=0x%llx Meta=0x%llx/0x%llx (%s) %s%s%s%s%s%sfd:%d(%d) B:%x @ %p\n",
+      "Base=0x%llx Size=0x%llx Meta=0x%llx/0x%llx (%s) %s%s%s%s%s%sfd:%d(%d) B:%x H:%x/%x @ %p\n",
       msg ?: "", util_format_short_name(res->base.format), res->base.width0,
       res->base.height0, res->base.depth0, res->base.array_size,
       res->base.last_level, res->layout.levels, res->layout.sample_count_sa,
@@ -128,7 +128,7 @@ agx_resource_debug(struct agx_resource *res, const char *msg)
       res->bo->flags & AGX_BO_WRITEBACK ? "WB " : "",
       res->bo->flags & AGX_BO_SHAREABLE ? "SA " : "",
       res->bo->flags & AGX_BO_READONLY ? "RO " : "", res->bo->prime_fd, ino,
-      res->base.bind, res);
+      res->base.bind, res->bo->handle, res->bo->uapi_handle, res);
 }
 
 static void
@@ -181,7 +181,7 @@ agx_resource_from_handle(struct pipe_screen *pscreen,
     */
    if (rsc->modifier == DRM_FORMAT_MOD_LINEAR && (whandle->stride % 16) != 0) {
       FREE(rsc);
-      return false;
+      return NULL;
    }
 
    prsc = &rsc->base;
@@ -259,6 +259,9 @@ agx_resource_get_handle(struct pipe_screen *pscreen, struct pipe_context *ctx,
       return renderonly_get_handle(rsrc->scanout, handle);
    } else if (handle->type == WINSYS_HANDLE_TYPE_KMS) {
       rsrc_debug(rsrc, "Get handle: %p (KMS)\n", rsrc);
+
+      /* BO must be considered shared at this point. */
+      agx_bo_make_shared(dev, rsrc->bo);
 
       handle->handle = rsrc->bo->handle;
    } else if (handle->type == WINSYS_HANDLE_TYPE_FD) {
@@ -921,7 +924,7 @@ agx_transfer_map(struct pipe_context *pctx, struct pipe_resource *resource,
     * compression in software. In some cases, we could use this path for
     * twiddled too, but we don't have a use case for that yet.
     */
-   bool staging_blit = ail_is_level_compressed(&rsrc->layout, level);
+   bool staging_blit = ail_is_level_logically_compressed(&rsrc->layout, level);
 
    agx_prepare_for_map(ctx, rsrc, level, usage, box, staging_blit);
 
@@ -2293,13 +2296,6 @@ agx_destroy_screen(struct pipe_screen *pscreen)
    ralloc_free(screen);
 }
 
-static const void *
-agx_get_compiler_options(struct pipe_screen *pscreen, enum pipe_shader_ir ir,
-                         enum pipe_shader_type shader)
-{
-   return &agx_nir_options;
-}
-
 static void
 agx_resource_set_stencil(struct pipe_resource *prsrc,
                          struct pipe_resource *stencil)
@@ -2432,9 +2428,11 @@ agx_screen_create(int fd, struct renderonly *ro,
    screen->fence_reference = agx_fence_reference;
    screen->fence_finish = agx_fence_finish;
    screen->fence_get_fd = agx_fence_get_fd;
-   screen->get_compiler_options = agx_get_compiler_options;
    screen->get_disk_shader_cache = agx_get_disk_shader_cache;
    screen->get_cl_cts_version = agx_get_cl_cts_version;
+
+   for (unsigned i = 0; i <= MESA_SHADER_COMPUTE; i++)
+      screen->nir_options[i] = &agx_nir_options;
 
    screen->resource_create = u_transfer_helper_resource_create;
    screen->resource_destroy = u_transfer_helper_resource_destroy;

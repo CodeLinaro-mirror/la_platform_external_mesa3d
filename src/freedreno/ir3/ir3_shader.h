@@ -385,7 +385,6 @@ struct ir3_shader_key {
          /*
           * Fragment shader variant parameters:
           */
-         unsigned sample_shading : 1;
          unsigned msaa           : 1;
          /* used when shader needs to handle flat varyings (a4xx)
           * for front/back color inputs to frag shader:
@@ -446,7 +445,7 @@ ir3_tess_mode(enum tess_primitive_mode tess_mode)
    case TESS_PRIMITIVE_QUADS:
       return IR3_TESS_QUADS;
    default:
-      unreachable("bad tessmode");
+      UNREACHABLE("bad tessmode");
    }
 }
 
@@ -462,7 +461,7 @@ ir3_tess_factor_stride(unsigned patch_type)
    case IR3_TESS_QUADS:
       return 28;
    default:
-      unreachable("bad tessmode");
+      UNREACHABLE("bad tessmode");
    }
 }
 
@@ -543,10 +542,10 @@ ir3_shader_key_changes_vs(struct ir3_shader_key *key,
  * mapping table to remap things from image/SSBO idx to hw idx.
  *
  * To make things less (more?) confusing, for the hw "SSBO" state
- * (since it is really both SSBO and Image) I'll use the name "IBO"
+ * (since it is really both SSBO and Image) I'll use the name "UAV"
  */
 struct ir3_ibo_mapping {
-#define IBO_INVALID 0xff
+#define UAV_INVALID 0xff
    /* Maps logical SSBO state to hw tex state: */
    uint8_t ssbo_to_tex[IR3_MAX_SHADER_BUFFERS];
 
@@ -555,10 +554,10 @@ struct ir3_ibo_mapping {
 
    /* Maps hw state back to logical SSBO or Image state:
     *
-    * note IBO_SSBO ORd into values to indicate that the
+    * note UAV_SSBO ORd into values to indicate that the
     * hw slot is used for SSBO state vs Image state.
     */
-#define IBO_SSBO 0x80
+#define UAV_SSBO 0x80
    uint8_t tex_to_image[32];
 
    /* including real textures */
@@ -693,6 +692,8 @@ struct ir3_shader_variant {
    (sizeof(struct ir3_shader_variant) - VARIANT_CACHE_START)
 
    struct ir3_info info;
+
+   char sha1_str[SHA1_DIGEST_STRING_LENGTH];
 
    struct ir3_shader_options shader_options;
 
@@ -847,7 +848,12 @@ struct ir3_shader_variant {
     */
    bool has_kill;
 
-   bool per_samp;
+   /* Whether the shader should run at sample rate (set by
+    * info->fs.uses_sample_shading, which is set when using a variable that
+    * implicitly enables it, or glMinSampleShading() or
+    * VkPipelineMultisampleStateCreateInfo->sampleShadingEnable forcing it.
+    */
+   bool sample_shading;
 
    bool post_depth_coverage;
 
@@ -893,11 +899,11 @@ struct ir3_shader_variant {
    /* Important for compute shader to determine max reg footprint */
    bool has_barrier;
 
-   /* The offset where images start in the IBO array. */
+   /* The offset where images start in the UAV array. */
    unsigned num_ssbos;
 
-   /* The total number of SSBOs and images, i.e. the number of hardware IBOs. */
-   unsigned num_ibos;
+   /* The total number of SSBOs and images, i.e. the number of hardware UAVs. */
+   unsigned num_uavs;
 
    union {
       struct {
@@ -963,7 +969,7 @@ ir3_shader_stage(struct ir3_shader_variant *v)
    case MESA_SHADER_KERNEL:
       return "CL";
    default:
-      unreachable("invalid type");
+      UNREACHABLE("invalid type");
       return NULL;
    }
 }
@@ -1428,9 +1434,9 @@ ir3_shader_halfregs(const struct ir3_shader_variant *v)
 }
 
 static inline uint32_t
-ir3_shader_nibo(const struct ir3_shader_variant *v)
+ir3_shader_num_uavs(const struct ir3_shader_variant *v)
 {
-   return v->num_ibos;
+   return v->num_uavs;
 }
 
 static inline uint32_t

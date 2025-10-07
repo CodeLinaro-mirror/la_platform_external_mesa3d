@@ -85,7 +85,7 @@ nvk_ubo_addr_format(const struct nvk_physical_device *pdev,
       case VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_2_EXT:
          return nir_address_format_64bit_bounded_global;
       default:
-         unreachable("Invalid robust buffer access behavior");
+         UNREACHABLE("Invalid robust buffer access behavior");
       }
    }
 }
@@ -105,7 +105,7 @@ nvk_ssbo_addr_format(const struct nvk_physical_device *pdev,
       case VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_2_EXT:
          return nir_address_format_64bit_bounded_global;
       default:
-         unreachable("Invalid robust buffer access behavior");
+         UNREACHABLE("Invalid robust buffer access behavior");
       }
    }
 }
@@ -137,6 +137,13 @@ nvk_preprocess_nir(struct vk_physical_device *vk_pdev,
       container_of(vk_pdev, struct nvk_physical_device, vk);
 
    nak_preprocess_nir(nir, pdev->nak);
+
+   if (nir->info.stage == MESA_SHADER_FRAGMENT) {
+      nir_input_attachment_options ia_opts = {
+         .use_ia_coord_intrin = true,
+      };
+      NIR_PASS(_, nir, nir_lower_input_attachments, &ia_opts);
+   }
 }
 
 static void
@@ -204,9 +211,6 @@ nvk_hash_state(struct vk_physical_device *device,
       nvk_populate_fs_key(&key, state);
       _mesa_blake3_update(&blake3_ctx, &key, sizeof(key));
 
-      const bool is_multiview = state->rp->view_mask != 0;
-      _mesa_blake3_update(&blake3_ctx, &is_multiview, sizeof(is_multiview));
-
       /* This doesn't impact the shader compile but it does go in the
        * nvk_shader and gets [de]serialized along with the binary so we
        * need to hash it.
@@ -246,7 +250,7 @@ lower_load_intrinsic(nir_builder *b, nir_intrinsic_instr *load,
                            .align_mul = align_mul,
                            .align_offset = align_offset);
       } else {
-         unreachable("Invalid UBO index");
+         UNREACHABLE("Invalid UBO index");
       }
       nir_def_rewrite_uses(&load->def, val);
       return true;
@@ -335,21 +339,11 @@ static void
 nvk_lower_nir(struct nvk_device *dev, nir_shader *nir,
               VkShaderCreateFlagsEXT shader_flags,
               const struct vk_pipeline_robustness_state *rs,
-              bool is_multiview,
               uint32_t set_layout_count,
               struct vk_descriptor_set_layout * const *set_layouts,
               struct nvk_cbuf_map *cbuf_map_out)
 {
    const struct nvk_physical_device *pdev = nvk_device_physical(dev);
-
-   if (nir->info.stage == MESA_SHADER_FRAGMENT) {
-      NIR_PASS(_, nir, nir_lower_input_attachments,
-               &(nir_input_attachment_options) {
-                  .use_fragcoord_sysval = true,
-                  .use_layer_id_sysval = true,
-                  .use_view_id_for_layer = is_multiview,
-               });
-   }
 
    if (nir->info.stage == MESA_SHADER_TESS_EVAL) {
       NIR_PASS(_, nir, nir_lower_patch_vertices,
@@ -896,10 +890,7 @@ nvk_compile_shader(struct nvk_device *dev,
       return vk_error(dev, VK_ERROR_OUT_OF_HOST_MEMORY);
    }
 
-   /* TODO: Multiview with ESO */
-   const bool is_multiview = state && state->rp->view_mask != 0;
-
-   nvk_lower_nir(dev, nir, info->flags, info->robustness, is_multiview,
+   nvk_lower_nir(dev, nir, info->flags, info->robustness,
                  info->set_layout_count, info->set_layouts,
                  &shader->cbuf_map);
 

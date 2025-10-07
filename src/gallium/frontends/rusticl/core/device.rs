@@ -73,6 +73,7 @@ impl Deref for Device {
 pub struct DeviceCaps {
     pub has_3d_image_writes: bool,
     pub has_depth_images: bool,
+    pub has_image_unorm_int_2_101010: bool,
     pub has_images: bool,
     pub has_rw_images: bool,
     pub has_timestamp: bool,
@@ -343,6 +344,16 @@ impl DeviceBase {
             .flatten()
             .any(|mask| *mask != 0);
 
+        // Got added to clang with 20.1
+        self.caps.has_image_unorm_int_2_101010 = self
+            .formats
+            .iter()
+            .filter_map(|(format, v)| {
+                (format.image_channel_data_type == CL_UNORM_INT_2_101010_EXT).then_some(v.values())
+            })
+            .flatten()
+            .any(|mask| *mask != 0);
+
         // if we can't advertize 3d image write ext, we have to disable them all
         if !self.caps.has_3d_image_writes {
             self.formats
@@ -601,6 +612,7 @@ impl DeviceBase {
         add_ext(1, 0, 0, "cl_khr_byte_addressable_store");
         add_ext(1, 0, 0, "cl_khr_create_command_queue");
         add_ext(1, 0, 0, "cl_khr_expect_assume");
+        add_ext(1, 0, 0, "cl_khr_extended_bit_ops");
         add_ext(1, 0, 0, "cl_khr_extended_versioning");
         add_ext(1, 0, 0, "cl_khr_global_int32_base_atomics");
         add_ext(1, 0, 0, "cl_khr_global_int32_extended_atomics");
@@ -620,12 +632,14 @@ impl DeviceBase {
             "__opencl_c_integer_dot_product_input_4x8bit_packed",
         );
 
+        add_spirv(c"SPV_KHR_bit_instructions");
         add_spirv(c"SPV_KHR_expect_assume");
         add_spirv(c"SPV_KHR_float_controls");
         add_spirv(c"SPV_KHR_integer_dot_product");
         add_spirv(c"SPV_KHR_no_integer_wrap_decoration");
 
         add_cap(SpvCapability::SpvCapabilityAddresses);
+        add_cap(SpvCapability::SpvCapabilityBitInstructions);
         add_cap(SpvCapability::SpvCapabilityDotProduct);
         add_cap(SpvCapability::SpvCapabilityDotProductInput4x8Bit);
         add_cap(SpvCapability::SpvCapabilityDotProductInput4x8BitPacked);
@@ -700,6 +714,11 @@ impl DeviceBase {
 
             if self.caps.has_depth_images {
                 add_ext(1, 0, 0, "cl_khr_depth_images");
+            }
+
+            if self.caps.has_image_unorm_int_2_101010 {
+                add_ext(1, 0, 0, "cl_ext_image_unorm_int_2_101010");
+                add_feat(1, 0, 0, "__opencl_c_ext_image_unorm_int_2_101010");
             }
         }
 
@@ -1213,11 +1232,13 @@ impl DeviceBase {
     pub fn cl_features(&self) -> clc_optional_features {
         let subgroups_supported = self.subgroups_supported();
         clc_optional_features {
+            extended_bit_ops: true,
             fp16: self.fp16_supported(),
             fp64: self.fp64_supported(),
             int64: self.int64_supported(),
             images: self.caps.has_images,
             images_depth: self.caps.has_depth_images,
+            images_unorm_int_2_101010: self.caps.has_image_unorm_int_2_101010,
             images_read_write: self.caps.has_rw_images,
             images_write_3d: self.caps.has_3d_image_writes,
             integer_dot_product: true,
@@ -1285,7 +1306,7 @@ impl Device {
         }
 
         Some(Device {
-            base: CLObjectBase::new(RusticlTypes::Device),
+            base: CLObjectBase::new_no_dispatch(RusticlTypes::Device),
             dev_base: dev_base,
             lib_clc: lib_clc?,
         })

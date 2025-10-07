@@ -912,9 +912,10 @@ validate_ir(Program* program)
                check(op.isOfType(RegType::vgpr) || op.physReg() == m0 || op.isUndefined(),
                      "Only VGPRs are valid DS instruction operands", instr.get());
             }
-            if (!instr->definitions.empty())
-               check(instr->definitions[0].regClass().type() == RegType::vgpr,
-                     "DS instruction must return VGPR", instr.get());
+            for (const Definition& def : instr->definitions) {
+               check(def.regClass().type() == RegType::vgpr, "DS instruction must return VGPR",
+                     instr.get());
+            }
             break;
          }
          case Format::EXP: {
@@ -961,6 +962,39 @@ validate_ir(Program* program)
          }
          default: break;
          }
+      }
+   }
+
+   auto check_edge = [&program, &is_valid](const char* msg, const Block::edge_vec& vec,
+                                           Block* block, Block* other, bool other_is_pred) -> void
+   {
+      if (std::find(vec.begin(), vec.end(), block->index) == vec.end()) {
+         Block* pred = other_is_pred ? other : block;
+         Block* succ = other_is_pred ? block : other;
+         aco_err(program, "%s: BB%u->BB%u", msg, pred->index, succ->index);
+         is_valid = false;
+      }
+   };
+
+   for (Block& block : program->blocks) {
+      for (unsigned pred_idx : block.linear_preds) {
+         Block* pred = &program->blocks[pred_idx];
+         check_edge("Block is missing in linear_succs", pred->linear_succs, &block, pred, true);
+      }
+
+      for (unsigned pred_idx : block.logical_preds) {
+         Block* pred = &program->blocks[pred_idx];
+         check_edge("Block is missing in logical_succs", pred->logical_succs, &block, pred, true);
+      }
+
+      for (unsigned succ_idx : block.linear_succs) {
+         Block* succ = &program->blocks[succ_idx];
+         check_edge("Block is missing in linear_preds", succ->linear_preds, &block, succ, false);
+      }
+
+      for (unsigned succ_idx : block.logical_succs) {
+         Block* succ = &program->blocks[succ_idx];
+         check_edge("Block is missing in logical_preds", succ->logical_preds, &block, succ, false);
       }
    }
 
@@ -1284,9 +1318,8 @@ get_subdword_bytes_written(Program* program, const aco_ptr<Instruction>& instr, 
 
    if (instr->isPseudo())
       return gfx_level >= GFX8 ? def.bytes() : def.size() * 4u;
-   if (instr->isVALU() || instr->isVINTRP()) {
-      assert(def.bytes() <= 2);
 
+   if (instr->isVALU() || instr->isVINTRP()) {
       if (instr->isSDWA())
          return instr->sdwa().dst_sel.size();
 

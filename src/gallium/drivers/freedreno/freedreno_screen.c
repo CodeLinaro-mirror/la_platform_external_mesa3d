@@ -676,8 +676,8 @@ fd_init_screen_caps(struct fd_screen *screen)
    caps->shader_clock = is_a6xx(screen);
 }
 
-static const void *
-fd_get_compiler_options(struct pipe_screen *pscreen, enum pipe_shader_ir ir,
+static const struct nir_shader_compiler_options *
+fd_get_compiler_options(struct pipe_screen *pscreen,
                         enum pipe_shader_type shader)
 {
    struct fd_screen *screen = fd_screen(pscreen);
@@ -744,6 +744,12 @@ is_format_supported(struct pipe_screen *pscreen,
    return modifier == DRM_FORMAT_MOD_LINEAR;
 }
 
+static bool
+is_rendering_supported(struct pipe_screen *pscreen, enum pipe_format format)
+{
+   return pscreen->is_format_supported(pscreen, format, PIPE_TEXTURE_2D, 0, 0, PIPE_BIND_RENDER_TARGET);
+}
+
 static void
 fd_screen_query_dmabuf_modifiers(struct pipe_screen *pscreen,
                                  enum pipe_format format, int max,
@@ -767,7 +773,7 @@ fd_screen_query_dmabuf_modifiers(struct pipe_screen *pscreen,
             modifiers[num] = all_modifiers[i];
 
          if (external_only)
-            external_only[num] = false;
+            external_only[num] = !is_rendering_supported(pscreen, format);
       }
 
       num++;
@@ -1048,8 +1054,10 @@ fd_screen_create(int fd,
    pscreen->destroy = fd_screen_destroy;
    pscreen->get_screen_fd = fd_screen_get_fd;
    pscreen->query_memory_info = fd_query_memory_info;
-   pscreen->get_compiler_options = fd_get_compiler_options;
    pscreen->get_disk_shader_cache = fd_get_disk_shader_cache;
+
+   for (unsigned i = 0; i <= MESA_SHADER_COMPUTE; i++)
+      pscreen->nir_options[i] = fd_get_compiler_options(pscreen, i);
 
    fd_resource_screen_init(pscreen);
    fd_query_screen_init(pscreen);

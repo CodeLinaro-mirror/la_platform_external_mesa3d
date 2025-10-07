@@ -27,12 +27,12 @@ use std::os::raw::c_void;
 use std::ptr;
 use std::sync::Arc;
 
-fn validate_mem_flags(flags: cl_mem_flags, images: bool) -> CLResult<()> {
+fn validate_mem_flags(flags: cl_mem_flags, import: bool) -> CLResult<()> {
     let mut valid_flags = cl_bitfield::from(
         CL_MEM_READ_WRITE | CL_MEM_WRITE_ONLY | CL_MEM_READ_ONLY | CL_MEM_KERNEL_READ_AND_WRITE,
     );
 
-    if !images {
+    if !import {
         valid_flags |= cl_bitfield::from(
             CL_MEM_USE_HOST_PTR
                 | CL_MEM_ALLOC_HOST_PTR
@@ -912,7 +912,7 @@ fn get_supported_image_formats(
     let c = Context::ref_from_raw(context)?;
 
     // CL_INVALID_VALUE if flags
-    validate_mem_flags(flags, true)?;
+    validate_mem_flags(flags, false)?;
 
     // or image_type are not valid
     if !image_type_valid(image_type) {
@@ -2449,17 +2449,17 @@ fn enqueue_svm_free_impl(
     let cb_opt = unsafe { SVMFreeCb::new(pfn_free_func, user_data) }.ok();
 
     create_and_queue(
-        q,
+        Arc::clone(&q),
         cmd_type,
         evs,
         event,
         false,
-        Box::new(move |q, _| {
+        Box::new(move |cl_ctx, _| {
             if let Some(cb) = cb_opt {
-                cb.call(q, &mut svm_pointers);
+                cb.call(&q, &mut svm_pointers);
             } else {
                 for ptr in svm_pointers {
-                    q.context.remove_svm_ptr(ptr);
+                    cl_ctx.remove_svm_ptr(ptr);
                 }
             }
 
@@ -2558,7 +2558,7 @@ fn enqueue_svm_memcpy_impl(
         evs,
         event,
         block,
-        Box::new(move |q, ctx| q.context.copy_svm(ctx, src_ptr, dst_ptr, size)),
+        Box::new(move |cl_ctx, ctx| cl_ctx.copy_svm(ctx, src_ptr, dst_ptr, size)),
     )
 }
 
@@ -2702,7 +2702,7 @@ fn enqueue_svm_mem_fill_impl(
             let pattern = unsafe { pattern_ptr.read_unaligned() };
             let svm_ptr = svm_ptr as usize;
 
-            Box::new(move |q, ctx| q.context.clear_svm(ctx, svm_ptr, size, pattern.0))
+            Box::new(move |cl_ctx, ctx| cl_ctx.clear_svm(ctx, svm_ptr, size, pattern.0))
         }};
     }
 
@@ -2814,7 +2814,7 @@ fn enqueue_svm_map_impl(
         evs,
         event,
         block,
-        Box::new(move |q, ctx| q.context.copy_svm_to_host(ctx, svm_ptr, flags)),
+        Box::new(move |cl_ctx, ctx| cl_ctx.copy_svm_to_host(ctx, svm_ptr, flags)),
     )
 }
 
@@ -2999,9 +2999,8 @@ fn enqueue_svm_migrate_mem(
         evs,
         event,
         false,
-        Box::new(move |q, ctx| {
-            q.context
-                .migrate_svm(ctx, svm_pointers, sizes, to_device, content_undefined)
+        Box::new(move |cl_ctx, ctx| {
+            cl_ctx.migrate_svm(ctx, svm_pointers, sizes, to_device, content_undefined)
         }),
     )
 }
@@ -3051,7 +3050,7 @@ fn create_from_gl(
 
     // CL_INVALID_VALUE if values specified in flags are not valid or if value specified in
     // texture_target is not one of the values specified in the description of texture_target.
-    validate_mem_flags(flags, target == GL_ARRAY_BUFFER)?;
+    validate_mem_flags(flags, true)?;
 
     // CL_INVALID_MIP_LEVEL if miplevel is greather than zero and the OpenGL
     // implementation does not support creating from non-zero mipmap levels.

@@ -523,6 +523,7 @@ static const struct intel_device_info intel_device_info_chv = {
 
 #define CMAT_PRE_XEHP_CONFIGURATIONS                                                                                            \
    .cooperative_matrix_configurations = {                                                                                       \
+    { INTEL_CMAT_SCOPE_SUBGROUP, 8, 8, 16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16 },    \
     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 8, 16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT32, INTEL_CMAT_FLOAT32 },    \
     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 8, 32, INTEL_CMAT_SINT8, INTEL_CMAT_SINT8, INTEL_CMAT_SINT32, INTEL_CMAT_SINT32 },          \
     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 8, 32, INTEL_CMAT_UINT8, INTEL_CMAT_UINT8, INTEL_CMAT_UINT32, INTEL_CMAT_UINT32 },          \
@@ -538,7 +539,9 @@ static const struct intel_device_info intel_device_info_chv = {
 
 #define CMAT_XE2_CONFIGURATIONS                                                                                                 \
    .cooperative_matrix_configurations = {                                                                                       \
+    { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16 },   \
     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT32, INTEL_CMAT_FLOAT32 },   \
+    { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 16, INTEL_CMAT_BFLOAT16, INTEL_CMAT_BFLOAT16, INTEL_CMAT_BFLOAT16, INTEL_CMAT_BFLOAT16 }, \
     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 16, INTEL_CMAT_BFLOAT16, INTEL_CMAT_BFLOAT16, INTEL_CMAT_FLOAT32, INTEL_CMAT_FLOAT32 }, \
     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 32, INTEL_CMAT_SINT8, INTEL_CMAT_SINT8, INTEL_CMAT_SINT32, INTEL_CMAT_SINT32 },         \
     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 32, INTEL_CMAT_UINT8, INTEL_CMAT_UINT8, INTEL_CMAT_UINT32, INTEL_CMAT_UINT32 },         \
@@ -1224,6 +1227,12 @@ static const struct intel_device_info intel_device_info_lnl = {
 static const struct intel_device_info intel_device_info_ptl = {
    XE3_CONFIG(PTL),
    .has_local_mem = false,
+};
+
+static const struct intel_device_info intel_device_info_wcl = {
+   XE3_CONFIG(WCL),
+   .has_local_mem = false,
+   .has_ray_tracing = false,
 };
 
 void
@@ -1929,7 +1938,7 @@ intel_get_device_info_from_fd(int fd, struct intel_device_info *devinfo, int min
       break;
    default:
       ret = false;
-      unreachable("Missing");
+      UNREACHABLE("Missing");
    }
    if (!ret) {
       mesa_logw("Could not get intel_device_info.");

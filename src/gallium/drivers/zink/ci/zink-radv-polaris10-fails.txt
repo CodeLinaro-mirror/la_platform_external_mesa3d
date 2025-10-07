@@ -8,8 +8,6 @@ glx@extension string sanity,Fail
 # #6322
 spec@arb_framebuffer_object@fbo-blit-scaled-linear,Fail
 
-spec@arb_bindless_texture@compiler@samplers@arith-bound-sampler-texture2d.frag,Crash
-
 spec@arb_gpu_shader_fp64@execution@arb_gpu_shader_fp64-tf-separate,Fail
 spec@arb_program_interface_query@arb_program_interface_query-getprogramresourceindex,Fail
 spec@arb_program_interface_query@arb_program_interface_query-getprogramresourceindex@'vs_input2[1][0]' on GL_PROGRAM_INPUT,Fail
@@ -82,6 +80,7 @@ spec@!opengl 1.1@polygon-mode-offset@config 6: Expected blue pixel in center,Fai
 spec@!opengl 1.1@polygon-mode-offset@config 6: Expected white pixel on right edge,Fail
 spec@!opengl 1.1@polygon-mode-offset@config 6: Expected white pixel on top edge,Fail
 spec@!opengl 1.1@polygon-mode-offset,Fail
+spec@!opengl 1.2@tex3d-maxsize,Fail
 spec@!opengl 1.5@depth-tex-compare,Fail
 
 spec@!opengl 2.0@vs-point_size-zero,Fail

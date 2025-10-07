@@ -480,13 +480,6 @@ panfrost_set_min_samples(struct pipe_context *pipe, unsigned min_samples)
 }
 
 static void
-panfrost_set_clip_state(struct pipe_context *pipe,
-                        const struct pipe_clip_state *clip)
-{
-   // struct panfrost_context *panfrost = pan_context(pipe);
-}
-
-static void
 panfrost_set_viewport_states(struct pipe_context *pipe, unsigned start_slot,
                              unsigned num_viewports,
                              const struct pipe_viewport_state *viewports)
@@ -920,7 +913,7 @@ panfrost_set_global_binding(struct pipe_context *pctx, unsigned first,
       /* we are screwed no matter what */
       if (!util_dynarray_grow(&ctx->global_buffers, *resources,
                               (first + count) - old_size))
-         unreachable("out of memory");
+         UNREACHABLE("out of memory");
 
       for (unsigned i = old_size; i < first + count; i++)
          *util_dynarray_element(&ctx->global_buffers, struct pipe_resource *,
@@ -967,11 +960,13 @@ panfrost_create_fence_fd(struct pipe_context *pctx,
 
 static void
 panfrost_fence_server_sync(struct pipe_context *pctx,
-                           struct pipe_fence_handle *f)
+                           struct pipe_fence_handle *f,
+                           uint64_t value)
 {
    struct panfrost_device *dev = pan_device(pctx->screen);
    struct panfrost_context *ctx = pan_context(pctx);
    int fd = -1, ret;
+   assert(!value);
 
    ret = drmSyncobjExportSyncFile(panfrost_device_fd(dev), f->syncobj, &fd);
    assert(!ret);
@@ -1045,7 +1040,6 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
    gallium->set_sample_mask = panfrost_set_sample_mask;
    gallium->set_min_samples = panfrost_set_min_samples;
 
-   gallium->set_clip_state = panfrost_set_clip_state;
    gallium->set_viewport_states = panfrost_set_viewport_states;
    gallium->set_scissor_states = panfrost_set_scissor_states;
    gallium->set_polygon_stipple = panfrost_set_polygon_stipple;

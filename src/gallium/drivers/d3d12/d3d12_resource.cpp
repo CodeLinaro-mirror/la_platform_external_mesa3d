@@ -171,7 +171,7 @@ init_buffer(struct d3d12_screen *screen,
       buf_desc.usage = (pb_usage_flags)(PB_USAGE_GPU_WRITE | PB_USAGE_CPU_READ_WRITE);
       break;
    default:
-      unreachable("Invalid pipe usage");
+      UNREACHABLE("Invalid pipe usage");
    }
 
    /* We can't suballocate buffers that might be bound as a sampler view, *only*
@@ -243,7 +243,7 @@ init_texture(struct d3d12_screen *screen,
       break;
 
    default:
-      unreachable("Invalid texture type");
+      UNREACHABLE("Invalid texture type");
    }
 
    if (templ->bind & PIPE_BIND_SHADER_BUFFER)
@@ -674,7 +674,7 @@ d3d12_resource_from_handle(struct pipe_screen *pscreen,
       res->base.b.depth0 = static_cast<uint16_t>(footprint->Depth);
       break;
    default:
-      unreachable("Invalid dimension");
+      UNREACHABLE("Invalid dimension");
       break;
    }
    res->base.b.nr_samples = static_cast<uint8_t>(incoming_res_desc.SampleDesc.Count);
@@ -1202,6 +1202,7 @@ copy_texture_region(struct d3d12_context *ctx,
    d3d12_apply_resource_states(ctx, false);
    ctx->cmdlist->CopyTextureRegion(&info.dst_loc, info.dst_x, info.dst_y, info.dst_z,
                                    &info.src_loc, info.src_box);
+   ctx->has_commands = true;
 }
 
 static void
@@ -1396,6 +1397,7 @@ transfer_buf_to_buf(struct d3d12_context *ctx,
    ctx->cmdlist->CopyBufferRegion(dst_d3d12, dst_offset,
                                   src_d3d12, src_offset,
                                   width);
+   ctx->has_commands = true;
 }
 
 static size_t
@@ -1617,7 +1619,7 @@ read_zs_surface(struct d3d12_context *ctx, struct d3d12_resource *res,
                                                     trans->base.b.box.width, trans->base.b.box.height);
       break;
    default:
-      unreachable("Unsupported depth steancil format");
+      UNREACHABLE("Unsupported depth steancil format");
    };
 
    return trans->data;
@@ -1705,7 +1707,7 @@ write_zs_surface(struct pipe_context *pctx, struct d3d12_resource *res,
                                                       trans->base.b.box.height);
       break;
    default:
-      unreachable("Unsupported depth steancil format");
+      UNREACHABLE("Unsupported depth steancil format");
    };
 
    stencil_buffer.unmap();

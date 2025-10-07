@@ -48,8 +48,7 @@ brw_set_dest(struct brw_codegen *p, brw_eu_inst *inst, struct brw_reg dest)
     * instruction, the stride must be at least 2, even when the destination
     * is the NULL register.
     */
-   if (dest.file == ARF &&
-       dest.nr == BRW_ARF_NULL &&
+   if (brw_reg_is_arf(dest, BRW_ARF_NULL) &&
        brw_type_size_bytes(dest.type) == 1 &&
        dest.hstride == BRW_HORIZONTAL_STRIDE_1) {
       dest.hstride = BRW_HORIZONTAL_STRIDE_2;
@@ -163,7 +162,7 @@ brw_set_src0(struct brw_codegen *p, brw_eu_inst *inst, struct brw_reg reg)
       brw_eu_inst_set_send_src0_reg_file(devinfo, inst, phys_file(reg));
       brw_eu_inst_set_src0_da_reg_nr(devinfo, inst, phys_nr(devinfo, reg));
 
-      if (reg.file == ARF && reg.nr == BRW_ARF_SCALAR) {
+      if (brw_reg_is_arf(reg, BRW_ARF_SCALAR)) {
          assert(reg.subnr % 2 == 0);
          brw_eu_inst_set_send_src0_subreg_nr(devinfo, inst, reg.subnr / 2);
       } else {
@@ -284,8 +283,7 @@ brw_set_src1(struct brw_codegen *p, brw_eu_inst *inst, struct brw_reg reg)
        *    "Accumulator registers may be accessed explicitly as src0
        *    operands only."
        */
-      assert(reg.file != ARF ||
-             (reg.nr & 0xF0) != BRW_ARF_ACCUMULATOR);
+      assert(!brw_reg_is_arf(reg, BRW_ARF_ACCUMULATOR));
 
       brw_eu_inst_set_src1_file_type(devinfo, inst, phys_file(reg), reg.type);
       brw_eu_inst_set_src1_abs(devinfo, inst, reg.abs);
@@ -527,7 +525,7 @@ to_3src_align1_vstride(const struct intel_device_info *devinfo,
    case BRW_VERTICAL_STRIDE_16:
       return BRW_ALIGN1_3SRC_VERTICAL_STRIDE_8;
    default:
-      unreachable("invalid vstride");
+      UNREACHABLE("invalid vstride");
    }
 }
 
@@ -540,7 +538,7 @@ to_3src_align1_dst_hstride(enum brw_horizontal_stride hstride)
    case BRW_HORIZONTAL_STRIDE_2:
       return BRW_ALIGN1_3SRC_DST_HORIZONTAL_STRIDE_2;
    default:
-      unreachable("invalid hstride");
+      UNREACHABLE("invalid hstride");
    }
 }
 
@@ -557,7 +555,7 @@ to_3src_align1_hstride(enum brw_horizontal_stride hstride)
    case BRW_HORIZONTAL_STRIDE_4:
       return BRW_ALIGN1_3SRC_SRC_HORIZONTAL_STRIDE_4;
    default:
-      unreachable("invalid hstride");
+      UNREACHABLE("invalid hstride");
    }
 }
 
@@ -602,8 +600,7 @@ brw_alu3(struct brw_codegen *p, unsigned opcode, struct brw_reg dest,
 
    if (brw_eu_inst_access_mode(devinfo, inst) == BRW_ALIGN_1) {
       assert(dest.file == FIXED_GRF ||
-             (dest.file == ARF &&
-              (dest.nr & 0xF0) == BRW_ARF_ACCUMULATOR));
+             brw_reg_is_arf(dest, BRW_ARF_ACCUMULATOR));
 
       brw_eu_inst_set_3src_a1_dst_reg_file(devinfo, inst, phys_file(dest));
       brw_eu_inst_set_3src_dst_reg_nr(devinfo, inst, phys_nr(devinfo, dest));
@@ -665,8 +662,7 @@ brw_alu3(struct brw_codegen *p, unsigned opcode, struct brw_reg dest,
       assert(src0.file == FIXED_GRF ||
              src0.file == IMM);
       assert(src1.file == FIXED_GRF ||
-             (src1.file == ARF &&
-              src1.nr == BRW_ARF_ACCUMULATOR));
+             brw_reg_is_arf(src1, BRW_ARF_ACCUMULATOR));
       assert(src2.file == FIXED_GRF ||
              src2.file == IMM);
 
@@ -788,8 +784,7 @@ brw_dpas_three_src(struct brw_codegen *p, enum opcode opcode,
    brw_eu_inst_set_dpas_3src_src2_type(devinfo, inst, src2.type);
 
    assert(src0.file == FIXED_GRF ||
-          (src0.file == ARF &&
-           src0.nr == BRW_ARF_NULL));
+          brw_reg_is_arf(src0, BRW_ARF_NULL));
 
    brw_eu_inst_set_dpas_3src_src0_reg_file(devinfo, inst, phys_file(src0));
    brw_eu_inst_set_dpas_3src_src0_reg_nr(devinfo, inst, phys_nr(devinfo, src0));
@@ -955,7 +950,7 @@ brw_AVG(struct brw_codegen *p, struct brw_reg dest,
    case BRW_TYPE_UD:
       break;
    default:
-      unreachable("Bad type for brw_AVG");
+      UNREACHABLE("Bad type for brw_AVG");
    }
 
    return brw_alu2(p, BRW_OPCODE_AVG, dest, src0, src1);
@@ -987,10 +982,8 @@ brw_MUL(struct brw_codegen *p, struct brw_reg dest,
       assert(src0.type != BRW_TYPE_D);
    }
 
-   assert(src0.file != ARF ||
-	  src0.nr != BRW_ARF_ACCUMULATOR);
-   assert(src1.file != ARF ||
-	  src1.nr != BRW_ARF_ACCUMULATOR);
+   assert(!brw_reg_is_arf(src0, BRW_ARF_ACCUMULATOR));
+   assert(!brw_reg_is_arf(src1, BRW_ARF_ACCUMULATOR));
 
    return brw_alu2(p, BRW_OPCODE_MUL, dest, src0, src1);
 }
@@ -1490,6 +1483,7 @@ brw_send_indirect_split_message(struct brw_codegen *p,
                                 struct brw_reg payload1,
                                 struct brw_reg desc,
                                 struct brw_reg ex_desc,
+                                uint32_t ex_desc_imm_inst,
                                 unsigned ex_mlen,
                                 bool ex_bso,
                                 bool eot,
@@ -1517,6 +1511,7 @@ brw_send_indirect_split_message(struct brw_codegen *p,
    }
 
    if (ex_desc.file == IMM) {
+      assert(ex_desc_imm_inst == 0);
       brw_eu_inst_set_send_sel_reg32_ex_desc(devinfo, send, 0);
       brw_eu_inst_set_sends_ex_desc(devinfo, send, ex_desc.ud, gather);
    } else {
@@ -1525,6 +1520,19 @@ brw_send_indirect_split_message(struct brw_codegen *p,
       brw_eu_inst_set_send_sel_reg32_ex_desc(devinfo, send, 1);
       brw_eu_inst_set_send_ex_desc_ia_subreg_nr(devinfo, send, phys_subnr(devinfo, ex_desc) >> 2);
 
+      if (ex_desc_imm_inst) {
+         /* Write the immediate extended descriptor immediate value, but only
+          * the part used for encoding an offset. This matches to bits
+          * 12:15-19:31 as described in BSpec 70586 (extended descriptor
+          * format) & BSpec 56890 (SEND instruction format).
+          */
+         assert(devinfo->ver >= 20);
+         brw_eu_inst_set_bits(send, 127, 124, GET_BITS(ex_desc_imm_inst, 31, 28));
+         brw_eu_inst_set_bits(send, 97, 96, GET_BITS(ex_desc_imm_inst, 27, 26));
+         brw_eu_inst_set_bits(send, 65, 64, GET_BITS(ex_desc_imm_inst, 25, 24));
+         brw_eu_inst_set_bits(send, 47, 43, GET_BITS(ex_desc_imm_inst, 23, 19));
+         brw_eu_inst_set_bits(send, 39, 36, GET_BITS(ex_desc_imm_inst, 15, 12));
+      }
       if (devinfo->ver >= 20 && sfid == BRW_SFID_UGM)
          brw_eu_inst_set_bits(send, 103, 99, ex_mlen / reg_unit(devinfo));
    }
@@ -1621,7 +1629,7 @@ brw_find_loop_end(struct brw_codegen *p, int start_offset)
 	    return offset;
       }
    }
-   unreachable("not reached");
+   UNREACHABLE("not reached");
 }
 
 /* After program generation, go back and update the UIP and JIP of

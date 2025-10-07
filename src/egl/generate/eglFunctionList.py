@@ -195,10 +195,6 @@ EGL_FUNCTIONS = (
     # EGL_KHR_wait_sync
     _eglFunc("eglWaitSyncKHR",                       "display"),
 
-    # EGL_MESA_drm_image
-    _eglFunc("eglCreateDRMImageMESA",                "display"),
-    _eglFunc("eglExportDRMImageMESA",                "display"),
-
     # EGL_MESA_image_dma_buf_export
     _eglFunc("eglExportDMABUFImageQueryMESA",        "display"),
     _eglFunc("eglExportDMABUFImageMESA",             "display"),
@@ -245,4 +241,7 @@ EGL_FUNCTIONS = (
 
     # EGL_EXT_surface_compression
     _eglFunc("eglQuerySupportedCompressionRatesEXT", "display"),
+
+    # EGL_EXT_device_persistent_id
+    _eglFunc("eglQueryDeviceBinaryEXT",              "device"),
 )

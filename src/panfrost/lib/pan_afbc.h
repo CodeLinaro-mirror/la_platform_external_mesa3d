@@ -101,6 +101,51 @@ enum pan_afbc_mode {
 };
 
 /*
+ * An AFBC header block provides access to an associated superblock payload of
+ * 4x4 subblocks or to an embedded solid color.
+ */
+struct pan_afbc_headerblock {
+   union {
+      /* Superblock payload. */
+      struct {
+         /* Offset in bytes from the start of the AFBC buffer (1st header
+          * block) to the start of the superblock payload data. */
+         uint32_t offset;
+
+         /* Sizes in bytes of the 4x4 6-bit subblocks. */
+         uint8_t subblock_sizes[12];
+      } payload;
+
+      /* Solid color. */
+      struct {
+         uint64_t reserved;
+
+         /* RGBA 8-8-8-8 color format. */
+         /* XXX: Add other formats. */
+         struct {
+            uint8_t r, g, b, a;
+            uint32_t reserved;
+         } rgba8888;
+      } color;
+
+      /* Random access. */
+      uint8_t u8[16];
+      uint16_t u16[8];
+      uint32_t u32[4];
+      uint64_t u64[2];
+   };
+};
+
+/*
+ * An AFBC payload extent describes the extent of the payload data (compressed
+ * superblock data) associated to a pan_afbc_headerblock.
+ */
+struct pan_afbc_payload_extent {
+   uint32_t size;
+   uint32_t offset;
+};
+
+/*
  * Given an AFBC modifier, return the superblock size.
  *
  * We do not yet have any use cases for multiplanar YCBCr formats with different
@@ -127,6 +172,22 @@ pan_afbc_superblock_size(uint64_t modifier)
    }
 }
 
+/* Same as pan_afbc_superblock_size_el() but counted in block elements
+ * instead of pixels. For anything non-YUV this is the same. */
+static inline struct pan_image_block_size
+pan_afbc_superblock_size_el(enum pipe_format format, uint64_t modifier)
+{
+   struct pan_image_block_size sb_size_px = pan_afbc_superblock_size(modifier);
+
+   assert(sb_size_px.width % util_format_get_blockwidth(format) == 0);
+   assert(sb_size_px.height % util_format_get_blockheight(format) == 0);
+
+   return (struct pan_image_block_size){
+      .width = sb_size_px.width / util_format_get_blockwidth(format),
+      .height = sb_size_px.height / util_format_get_blockheight(format),
+   };
+}
+
 /*
  * Given an AFBC modifier, return the render size.
  */
@@ -140,6 +201,23 @@ pan_afbc_renderblock_size(uint64_t modifier)
     */
    blk_size.height = ALIGN_POT(blk_size.height, 16);
    return blk_size;
+}
+
+
+/* Same as pan_afbc_renderblock_size() but counted in block elements
+ * instead of pixels. For anything non-YUV this is the same. */
+static inline struct pan_image_block_size
+pan_afbc_renderblock_size_el(enum pipe_format format, uint64_t modifier)
+{
+   struct pan_image_block_size rb_size_px = pan_afbc_renderblock_size(modifier);
+
+   assert(rb_size_px.width % util_format_get_blockwidth(format) == 0);
+   assert(rb_size_px.height % util_format_get_blockheight(format) == 0);
+
+   return (struct pan_image_block_size){
+      .width = rb_size_px.width / util_format_get_blockwidth(format),
+      .height = rb_size_px.height / util_format_get_blockheight(format),
+   };
 }
 
 /*
@@ -182,6 +260,89 @@ pan_afbc_subblock_size(uint64_t modifier)
    return (struct pan_image_block_size){4, 4};
 }
 
+/*
+ * Given an AFBC header block, return the size of the subblock at the given
+ * index in the range [0, 15].
+ */
+static inline unsigned
+pan_afbc_header_subblock_size(struct pan_afbc_headerblock header,
+                              uint32_t index)
+{
+   uint64_t mask = BITFIELD_MASK(6);
+
+   switch (index) {
+   case  0: return  (header.u64[0] >> 32)  & mask; break;
+   case  1: return  (header.u64[0] >> 38)  & mask; break;
+   case  2: return  (header.u64[0] >> 44)  & mask; break;
+   case  3: return  (header.u64[0] >> 50)  & mask; break;
+   case  4: return  (header.u64[0] >> 56)  & mask; break;
+   case  5: return ((header.u64[0] >> 62) |
+                    (header.u64[1] <<  2)) & mask; break;
+   case  6: return  (header.u64[1] >>  4)  & mask; break;
+   case  7: return  (header.u64[1] >> 10)  & mask; break;
+   case  8: return  (header.u64[1] >> 16)  & mask; break;
+   case  9: return  (header.u64[1] >> 22)  & mask; break;
+   case 10: return  (header.u64[1] >> 28)  & mask; break;
+   case 11: return  (header.u64[1] >> 34)  & mask; break;
+   case 12: return  (header.u64[1] >> 40)  & mask; break;
+   case 13: return  (header.u64[1] >> 46)  & mask; break;
+   case 14: return  (header.u64[1] >> 52)  & mask; break;
+   case 15: return  (header.u64[1] >> 58)  & mask; break;
+   default: UNREACHABLE("invalid index"); return 0;
+   }
+}
+
+/*
+ * Given an AFBC header block, return the size in bytes of the associated
+ * superblock payload data (for the superblock layouts 0, 3, 4 and 7).
+ */
+static inline uint32_t
+pan_afbc_payload_size(unsigned arch,
+                      struct pan_afbc_headerblock header,
+                      uint32_t uncompressed_size)
+{
+   /* Skip sum if the 1st subblock is 0 (solid color encoding). */
+   if (arch >= 7 && pan_afbc_header_subblock_size(header, 0) == 0)
+      return 0;
+
+   uint64_t size = 0;
+
+   for (unsigned i = 0; i < 16; i++) {
+      unsigned sub_size = pan_afbc_header_subblock_size(header, i);
+      size += sub_size != 1 ? sub_size : uncompressed_size;
+   }
+
+   return ALIGN_POT(size, 16);
+}
+
+/*
+ * Given a format and a modifier, return the size in bytes of an uncompressed
+ * superblock payload.
+ */
+static inline uint32_t
+pan_afbc_payload_uncompressed_size(enum pipe_format format, uint64_t modifier)
+{
+   struct pan_image_block_size size_px = pan_afbc_subblock_size(modifier);
+   uint32_t size_B = util_format_get_blocksizebits(format) / 8;
+   size_B *= size_px.width * size_px.height;
+
+   assert(size_B == ALIGN_POT(size_B, 16));
+
+   return size_B;
+}
+
+/*
+ * Calculate the size of each AFBC superblock payload data from the given
+ * header blocks, generate a packed AFBC payload layout and return the body
+ * size.
+ */
+uint32_t
+pan_afbc_payload_layout_packed(unsigned arch,
+                               const struct pan_afbc_headerblock *headers,
+                               struct pan_afbc_payload_extent *layout,
+                               uint32_t nr_blocks, enum pipe_format format,
+                               uint64_t modifier);
+
 static inline uint32_t
 pan_afbc_header_row_stride_align(unsigned arch, enum pipe_format format,
                                  uint64_t modifier)
@@ -200,8 +361,10 @@ pan_afbc_header_align(unsigned arch, uint64_t modifier)
 {
    if (modifier & AFBC_FORMAT_MOD_TILED)
       return 4096;
-   else
+   else if (arch >= 6)
       return 128;
+   else
+      return 64;
 }
 
 /*
@@ -212,13 +375,15 @@ pan_afbc_header_align(unsigned arch, uint64_t modifier)
 static inline uint32_t
 pan_afbc_body_align(unsigned arch, uint64_t modifier)
 {
-   if (modifier & AFBC_FORMAT_MOD_TILED)
-      return 4096;
+   /* Body and header alignments are actually the same. */
+   return pan_afbc_header_align(arch, modifier);
+}
 
-   if (arch >= 6)
-      return 128;
-
-   return 64;
+/* Get the body offset for a given AFBC header size. */
+static inline uint32_t
+pan_afbc_body_offset(unsigned arch, uint64_t modifier, uint32_t header_size)
+{
+   return ALIGN_POT(header_size, pan_afbc_body_align(arch, modifier));
 }
 
 /*
@@ -258,6 +423,17 @@ pan_afbc_stride_blocks(uint64_t modifier, uint32_t row_stride_bytes)
 {
    return row_stride_bytes /
           (AFBC_HEADER_BYTES_PER_TILE * pan_afbc_tile_size(modifier));
+}
+
+/* Returns a height in superblocks taking into account the tile alignment
+ * requirement coming from the modifier.
+ */
+static inline uint32_t
+pan_afbc_height_blocks(uint64_t modifier, uint32_t height_px)
+{
+   return ALIGN_POT(
+      DIV_ROUND_UP(height_px, pan_afbc_superblock_height(modifier)),
+      pan_afbc_tile_size(modifier));
 }
 
 static inline enum pipe_format
@@ -335,6 +511,10 @@ pan_afbc_format(unsigned arch, enum pipe_format format, unsigned plane_idx)
    case PIPE_FORMAT_R10_G10B10_422_UNORM:
       return plane_idx == 0 ? PAN_AFBC_MODE_YUV422_1C10
                             : PAN_AFBC_MODE_YUV422_2C10;
+   case PIPE_FORMAT_R8G8B8_420_UNORM_PACKED:
+      return PAN_AFBC_MODE_YUV420_6C8;
+   case PIPE_FORMAT_R10G10B10_420_UNORM_PACKED:
+      return PAN_AFBC_MODE_YUV420_6C10;
    default:
       break;
    }
@@ -387,7 +567,7 @@ pan_afbc_format(unsigned arch, enum pipe_format format, unsigned plane_idx)
 /* A format may be compressed as AFBC if it has an AFBC internal format */
 
 static inline bool
-pan_format_supports_afbc(unsigned arch, enum pipe_format format)
+pan_afbc_supports_format(unsigned arch, enum pipe_format format)
 {
    unsigned plane_count = util_format_get_num_planes(format);
 
@@ -514,10 +694,10 @@ pan_afbc_compression_mode(enum pipe_format format, unsigned plane_idx)
    case PAN_AFBC_MODE_YUV422_1C10:
       return MALI_AFBC_COMPRESSION_MODE_YUV422_1C10;
    case PAN_AFBC_MODE_INVALID:
-      unreachable("Invalid AFBC format");
+      UNREACHABLE("Invalid AFBC format");
    }
 
-   unreachable("all AFBC formats handled");
+   UNREACHABLE("all AFBC formats handled");
 }
 #endif
 

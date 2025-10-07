@@ -90,7 +90,7 @@ agx_translate_layout(enum ail_tiling tiling)
       return AGX_LAYOUT_LINEAR;
    }
 
-   unreachable("Invalid tiling");
+   UNREACHABLE("Invalid tiling");
 }
 
 static inline enum agx_zls_tiling
@@ -102,7 +102,7 @@ agx_translate_zls_tiling(enum ail_tiling tiling)
    case AIL_TILING_TWIDDLED:
       return AGX_ZLS_TILING_TWIDDLED;
    default:
-      unreachable("Invalid ZLS tiling");
+      UNREACHABLE("Invalid ZLS tiling");
    }
 }
 
@@ -150,7 +150,7 @@ agx_translate_sample_count(unsigned samples)
    case 4:
       return AGX_SAMPLE_COUNT_4;
    default:
-      unreachable("Invalid sample count");
+      UNREACHABLE("Invalid sample count");
    }
 }
 
@@ -167,7 +167,7 @@ agx_translate_depth_layout(enum gl_frag_depth_layout layout)
    case FRAG_DEPTH_LAYOUT_UNCHANGED:
       return AGX_CONSERVATIVE_DEPTH_UNCHANGED;
    default:
-      unreachable("depth layout should have been canonicalized");
+      UNREACHABLE("depth layout should have been canonicalized");
    }
 }
 
@@ -233,7 +233,7 @@ agx_set_null_texture(struct agx_texture_packed *tex)
 }
 
 static void
-agx_set_null_pbe(struct agx_pbe_packed *pbe, uint64_t sink)
+agx_set_null_pbe(struct agx_pbe_packed *pbe)
 {
    agx_pack(pbe, PBE, cfg) {
       cfg.width = 1;
@@ -246,7 +246,7 @@ agx_set_null_pbe(struct agx_pbe_packed *pbe, uint64_t sink)
       cfg.swizzle_g = AGX_CHANNEL_R;
       cfg.swizzle_b = AGX_CHANNEL_R;
       cfg.swizzle_a = AGX_CHANNEL_R;
-      cfg.buffer = sink;
+      cfg.buffer = AGX_SCRATCH_PAGE_ADDRESS;
    }
 }
 

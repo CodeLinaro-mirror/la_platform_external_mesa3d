@@ -8,8 +8,6 @@ glx@extension string sanity,Fail
 # #6322
 spec@arb_framebuffer_object@fbo-blit-scaled-linear,Fail
 
-spec@arb_bindless_texture@compiler@samplers@arith-bound-sampler-texture2d.frag,Crash
-
 spec@arb_gpu_shader_fp64@execution@arb_gpu_shader_fp64-tf-separate,Fail
 spec@arb_program_interface_query@arb_program_interface_query-getprogramresourceindex,Fail
 spec@arb_program_interface_query@arb_program_interface_query-getprogramresourceindex@'vs_input2[1][0]' on GL_PROGRAM_INPUT,Fail
@@ -167,10 +165,6 @@ spec@arb_viewport_array@display-list,Fail
 # https://gitlab.freedesktop.org/mesa/mesa/-/issues/12495
 spec@arb_framebuffer_object@execution@msaa-alpha-to-coverage_alpha-to-one,Fail
 spec@arb_framebuffer_object@execution@msaa-alpha-to-coverage_alpha-to-one_write-z,Fail
-
-# https://gitlab.freedesktop.org/mesa/mesa/-/issues/12496
-# ../src/amd/vulkan/radv_shader_info.c:1559: gfx10_get_ngg_info: Assertion `max_esverts >= max_verts_per_prim && max_gsprims >= 1' failed.
-spec@glsl-1.50@gs-max-output,Crash
 
 spec@arb_sample_locations@test,Fail
 spec@arb_sample_locations@test@MSAA: 1- X: 0- Y: 0- Grid: false,Fail

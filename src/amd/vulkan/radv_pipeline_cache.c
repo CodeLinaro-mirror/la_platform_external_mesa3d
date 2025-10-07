@@ -11,14 +11,14 @@
 #include "util/mesa-sha1.h"
 #include "util/u_atomic.h"
 #include "util/u_debug.h"
-#include "nir_serialize.h"
 #include "nir.h"
+#include "nir_serialize.h"
 #include "radv_debug.h"
 #include "radv_descriptor_set.h"
 #include "radv_pipeline.h"
+#include "radv_pipeline_binary.h"
 #include "radv_pipeline_compute.h"
 #include "radv_pipeline_graphics.h"
-#include "radv_pipeline_binary.h"
 #include "radv_pipeline_rt.h"
 #include "radv_shader.h"
 #include "vk_pipeline.h"
@@ -95,7 +95,7 @@ radv_shader_cache_deserialize(struct vk_pipeline_cache *cache, const void *key_d
 void
 radv_shader_serialize(struct radv_shader *shader, struct blob *blob)
 {
-   size_t stats_size = shader->statistics ? aco_num_statistics * sizeof(uint32_t) : 0;
+   size_t stats_size = shader->statistics ? sizeof(struct amd_stats) : 0;
    size_t code_size = shader->code_size;
    uint32_t total_size = sizeof(struct radv_shader_binary_legacy) + code_size + stats_size;
 
@@ -335,7 +335,7 @@ radv_pipeline_cache_object_search(struct radv_device *device, struct vk_pipeline
    *found_in_application_cache = false;
 
    if (radv_is_cache_disabled(device, cache))
-      return false;
+      return NULL;
 
    bool *found = found_in_application_cache;
    if (!cache) {
@@ -349,7 +349,7 @@ radv_pipeline_cache_object_search(struct radv_device *device, struct vk_pipeline
    radv_report_pso_cache_stats(device, pipeline, !!object);
 
    if (!object)
-      return false;
+      return NULL;
 
    return container_of(object, struct radv_pipeline_cache_object, base);
 }
@@ -448,8 +448,7 @@ struct radv_ray_tracing_pipeline_cache_data {
 
 bool
 radv_ray_tracing_pipeline_cache_search(struct radv_device *device, struct vk_pipeline_cache *cache,
-                                       struct radv_ray_tracing_pipeline *pipeline,
-                                       bool *found_in_application_cache)
+                                       struct radv_ray_tracing_pipeline *pipeline, bool *found_in_application_cache)
 {
    struct radv_pipeline_cache_object *pipeline_obj;
 

@@ -15,6 +15,7 @@
 
 #include "radv_descriptor_set.h"
 #include "radv_pipeline.h"
+#include "radv_pipeline_layout.h"
 #include "radv_shader.h"
 
 #include "vk_graphics_state.h"
@@ -114,7 +115,6 @@ struct radv_graphics_pipeline {
    gl_shader_stage last_vgt_api_stage;
 
    unsigned rast_prim;
-
 
    /* Custom blend mode for internal operations. */
    unsigned custom_blend_mode;
@@ -255,7 +255,7 @@ radv_translate_prim(unsigned topology)
    case VK_PRIMITIVE_TOPOLOGY_META_RECT_LIST_MESA:
       return V_008958_DI_PT_RECTLIST;
    default:
-      unreachable("unhandled primitive type");
+      UNREACHABLE("unhandled primitive type");
    }
 }
 
@@ -415,7 +415,7 @@ radv_translate_blend_logic_op(VkLogicOp op)
    case VK_LOGIC_OP_SET:
       return V_028808_ROP3_SET;
    default:
-      unreachable("Unhandled logic op");
+      UNREACHABLE("Unhandled logic op");
    }
 }
 

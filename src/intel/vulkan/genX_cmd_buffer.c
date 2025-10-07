@@ -216,7 +216,7 @@ fill_state_base_addr(struct anv_cmd_buffer *cmd_buffer,
       sba->BindlessSurfaceStateMOCS = mocs;
       sba->BindlessSurfaceStateBaseAddressModifyEnable = true;
 #else
-      unreachable("Direct descriptor not supported");
+      UNREACHABLE("Direct descriptor not supported");
 #endif
    } else {
       sba->BindlessSurfaceStateBaseAddress =
@@ -1171,9 +1171,9 @@ transition_color_buffer(struct anv_cmd_buffer *cmd_buffer,
          final_fast_clear : ANV_FAST_CLEAR_NONE;
    }
 
-   assert(image->planes[plane].primary_surface.isl.tiling != ISL_TILING_LINEAR);
-
-   /* The following layouts are equivalent for non-linear images. */
+   /* The following layouts are equivalent for non-linear images and
+    * for images not bound to host-visible memory.
+    */
    const bool initial_layout_undefined =
       initial_layout == VK_IMAGE_LAYOUT_UNDEFINED ||
       initial_layout == VK_IMAGE_LAYOUT_PREINITIALIZED;
@@ -1607,12 +1607,6 @@ genX(invalidate_aux_map)(struct anv_batch *batch,
          lri.DataDWord = 1;
       }
 
-      /* Wa_16018063123 - emit fast color dummy blit before MI_FLUSH_DW. */
-      if (intel_needs_workaround(device->info, 16018063123) &&
-          engine_class == INTEL_ENGINE_CLASS_COPY) {
-         genX(batch_emit_fast_color_dummy_blit)(batch, device);
-      }
-
       /* HSD 22012751911: SW Programming sequence when issuing aux invalidation:
        *
        *    "Poll Aux Invalidation bit once the invalidation is set
@@ -1846,10 +1840,7 @@ genX(emit_apply_pipe_flushes)(struct anv_batch *batch,
       genx_batch_emit_pipe_control_write(batch, device->info, current_pipeline,
                                          sync_op, addr, 0, bits);
 
-      enum intel_engine_class engine_class =
-         current_pipeline == GPGPU ? INTEL_ENGINE_CLASS_COMPUTE :
-                                     INTEL_ENGINE_CLASS_RENDER;
-      genX(invalidate_aux_map)(batch, device, engine_class, bits);
+      genX(invalidate_aux_map)(batch, device, batch->engine_class, bits);
 
       bits &= ~ANV_PIPE_INVALIDATE_BITS;
    }
@@ -1889,8 +1880,19 @@ genX(cmd_buffer_apply_pipe_flushes)(struct anv_cmd_buffer *cmd_buffer)
    if (anv_cmd_buffer_is_blitter_queue(cmd_buffer) ||
        anv_cmd_buffer_is_video_queue(cmd_buffer)) {
       if (bits & ANV_PIPE_INVALIDATE_BITS) {
-         genX(invalidate_aux_map)(&cmd_buffer->batch, cmd_buffer->device,
-                                  cmd_buffer->queue_family->engine_class, bits);
+         if (bits & ANV_PIPE_AUX_TABLE_INVALIDATE_BIT) {
+            if (anv_cmd_buffer_is_video_queue(cmd_buffer) || GFX_VERx10 == 125) {
+               /* Wa_16018063123 - emit fast color dummy blit before MI_FLUSH_DW. */
+               if (INTEL_WA_16018063123_GFX_VER &&
+                   anv_cmd_buffer_is_blitter_queue(cmd_buffer))
+                  genX(batch_emit_fast_color_dummy_blit)(&cmd_buffer->batch, cmd_buffer->device);
+
+               anv_batch_emit(&cmd_buffer->batch, GENX(MI_FLUSH_DW), mi_flush);
+            }
+
+            genX(invalidate_aux_map)(&cmd_buffer->batch, cmd_buffer->device,
+                                     cmd_buffer->queue_family->engine_class, bits);
+         }
          bits &= ~ANV_PIPE_INVALIDATE_BITS;
       }
       cmd_buffer->state.pending_pipe_bits = bits;
@@ -1935,7 +1937,7 @@ genX(cmd_buffer_apply_pipe_flushes)(struct anv_cmd_buffer *cmd_buffer)
 static inline struct anv_state
 emit_dynamic_buffer_binding_table_entry(struct anv_cmd_buffer *cmd_buffer,
                                         struct anv_cmd_pipeline_state *pipe_state,
-                                        struct anv_pipeline_binding *binding,
+                                        const struct anv_pipeline_binding *binding,
                                         const struct anv_descriptor *desc)
 {
    if (!desc->buffer)
@@ -1983,7 +1985,7 @@ emit_dynamic_buffer_binding_table_entry(struct anv_cmd_buffer *cmd_buffer,
 static uint32_t
 emit_indirect_descriptor_binding_table_entry(struct anv_cmd_buffer *cmd_buffer,
                                              struct anv_cmd_pipeline_state *pipe_state,
-                                             struct anv_pipeline_binding *binding,
+                                             const struct anv_pipeline_binding *binding,
                                              const struct anv_descriptor *desc)
 {
    struct anv_device *device = cmd_buffer->device;
@@ -2067,7 +2069,7 @@ emit_indirect_descriptor_binding_table_entry(struct anv_cmd_buffer *cmd_buffer,
       break;
 
    default:
-      unreachable("Invalid descriptor type");
+      UNREACHABLE("Invalid descriptor type");
    }
 
    return surface_state.offset;
@@ -2077,7 +2079,7 @@ static uint32_t
 emit_direct_descriptor_binding_table_entry(struct anv_cmd_buffer *cmd_buffer,
                                            struct anv_cmd_pipeline_state *pipe_state,
                                            const struct anv_descriptor_set *set,
-                                           struct anv_pipeline_binding *binding,
+                                           const struct anv_pipeline_binding *binding,
                                            const struct anv_descriptor *desc)
 {
    uint32_t desc_offset;
@@ -2109,7 +2111,7 @@ emit_direct_descriptor_binding_table_entry(struct anv_cmd_buffer *cmd_buffer,
    }
 
    default:
-      unreachable("Invalid descriptor type");
+      UNREACHABLE("Invalid descriptor type");
    }
 
    return desc_offset;
@@ -2118,12 +2120,12 @@ emit_direct_descriptor_binding_table_entry(struct anv_cmd_buffer *cmd_buffer,
 static VkResult
 emit_binding_table(struct anv_cmd_buffer *cmd_buffer,
                    struct anv_cmd_pipeline_state *pipe_state,
-                   struct anv_shader_bin *shader,
+                   const struct anv_shader_bin *shader,
                    struct anv_state *bt_state)
 {
    uint32_t state_offset;
 
-   struct anv_pipeline_bind_map *map = &shader->bind_map;
+   const struct anv_pipeline_bind_map *map = &shader->bind_map;
    if (map->surface_count == 0) {
       *bt_state = (struct anv_state) { 0, };
       return VK_SUCCESS;
@@ -2138,7 +2140,8 @@ emit_binding_table(struct anv_cmd_buffer *cmd_buffer,
       return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 
    for (uint32_t s = 0; s < map->surface_count; s++) {
-      struct anv_pipeline_binding *binding = &map->surface_to_descriptor[s];
+      const struct anv_pipeline_binding *binding =
+         &map->surface_to_descriptor[s];
 
       struct anv_state surface_state;
 
@@ -2172,7 +2175,7 @@ emit_binding_table(struct anv_cmd_buffer *cmd_buffer,
          /* If the shader doesn't access the set buffer, just put the null
           * surface.
           */
-         if (set->is_push && !shader->push_desc_info.used_set_buffer) {
+         if (set->is_push && shader->push_desc_info.push_set_buffer == 0) {
             bt_map[s] = 0;
             break;
          }
@@ -2196,7 +2199,7 @@ emit_binding_table(struct anv_cmd_buffer *cmd_buffer,
 
       default: {
          assert(binding->set < MAX_SETS);
-         const struct anv_descriptor_set *set =
+         struct anv_descriptor_set *set =
             pipe_state->descriptors[binding->set];
 
          if (binding->index >= set->descriptor_count) {
@@ -2238,16 +2241,15 @@ emit_binding_table(struct anv_cmd_buffer *cmd_buffer,
             continue;
          }
 
-         const struct anv_pipeline *pipeline = pipe_state->pipeline;
          uint32_t surface_state_offset;
-         if (pipeline->layout.type == ANV_PIPELINE_DESCRIPTOR_SET_LAYOUT_TYPE_INDIRECT) {
+         if (map->layout_type == ANV_PIPELINE_DESCRIPTOR_SET_LAYOUT_TYPE_INDIRECT) {
             surface_state_offset =
                emit_indirect_descriptor_binding_table_entry(cmd_buffer,
                                                             pipe_state,
                                                             binding, desc);
          } else {
-            assert(pipeline->layout.type == ANV_PIPELINE_DESCRIPTOR_SET_LAYOUT_TYPE_DIRECT ||
-                   pipeline->layout.type == ANV_PIPELINE_DESCRIPTOR_SET_LAYOUT_TYPE_BUFFER);
+            assert(map->layout_type == ANV_PIPELINE_DESCRIPTOR_SET_LAYOUT_TYPE_DIRECT ||
+                   map->layout_type == ANV_PIPELINE_DESCRIPTOR_SET_LAYOUT_TYPE_BUFFER);
             surface_state_offset =
                emit_direct_descriptor_binding_table_entry(cmd_buffer, pipe_state,
                                                           set, binding, desc);
@@ -2265,10 +2267,10 @@ emit_binding_table(struct anv_cmd_buffer *cmd_buffer,
 static VkResult
 emit_samplers(struct anv_cmd_buffer *cmd_buffer,
               struct anv_cmd_pipeline_state *pipe_state,
-              struct anv_shader_bin *shader,
+              const struct anv_shader_bin *shader,
               struct anv_state *state)
 {
-   struct anv_pipeline_bind_map *map = &shader->bind_map;
+   const struct anv_pipeline_bind_map *map = &shader->bind_map;
    if (map->sampler_count == 0) {
       *state = (struct anv_state) { 0, };
       return VK_SUCCESS;
@@ -2281,7 +2283,8 @@ emit_samplers(struct anv_cmd_buffer *cmd_buffer,
       return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 
    for (uint32_t s = 0; s < map->sampler_count; s++) {
-      struct anv_pipeline_binding *binding = &map->sampler_to_descriptor[s];
+      const struct anv_pipeline_binding *binding =
+         &map->sampler_to_descriptor[s];
       const struct anv_descriptor *desc =
          &pipe_state->descriptors[binding->set]->descriptors[binding->index];
 
@@ -2308,7 +2311,7 @@ uint32_t
 genX(cmd_buffer_flush_descriptor_sets)(struct anv_cmd_buffer *cmd_buffer,
                                        struct anv_cmd_pipeline_state *pipe_state,
                                        const VkShaderStageFlags dirty,
-                                       struct anv_shader_bin **shaders,
+                                       const struct anv_shader_bin **shaders,
                                        uint32_t num_shaders)
 {
    VkShaderStageFlags flushed = 0;
@@ -2442,7 +2445,7 @@ emit_pipe_control(struct anv_batch *batch,
 {
    if ((batch->engine_class == INTEL_ENGINE_CLASS_COPY) ||
        (batch->engine_class == INTEL_ENGINE_CLASS_VIDEO))
-      unreachable("Trying to emit unsupported PIPE_CONTROL command.");
+      UNREACHABLE("Trying to emit unsupported PIPE_CONTROL command.");
 
    const bool trace_flush =
       (bits & (ANV_PIPE_FLUSH_BITS |
@@ -3153,7 +3156,7 @@ genX(cmd_buffer_set_protected_memory)(struct anv_cmd_buffer *cmd_buffer,
          pc.ProtectedMemoryDisable = true;
    }
 #else
-   unreachable("Protected content not supported");
+   UNREACHABLE("Protected content not supported");
 #endif
 }
 
@@ -4255,7 +4258,7 @@ cmd_buffer_barrier_blitter(struct anv_cmd_buffer *cmd_buffer,
 
    if (flush_ccs || flush_llc) {
       /* Wa_16018063123 - emit fast color dummy blit before MI_FLUSH_DW. */
-      if (intel_needs_workaround(cmd_buffer->device->info, 16018063123)) {
+      if (INTEL_WA_16018063123_GFX_VER) {
          genX(batch_emit_fast_color_dummy_blit)(&cmd_buffer->batch,
                                                 cmd_buffer->device);
       }
@@ -4689,7 +4692,7 @@ cmd_buffer_barrier(struct anv_cmd_buffer *cmd_buffer,
    }
 
    default:
-      unreachable("Invalid engine class");
+      UNREACHABLE("Invalid engine class");
    }
 }
 
@@ -4705,27 +4708,42 @@ void genX(CmdPipelineBarrier2)(
 void
 genX(batch_emit_breakpoint)(struct anv_batch *batch,
                             struct anv_device *device,
-                            bool emit_before_draw)
+                            bool emit_before_draw_or_dispatch)
 {
-   /* Update draw call count once */
-   uint32_t draw_count = emit_before_draw ?
-                         p_atomic_inc_return(&device->draw_call_count) :
-                         p_atomic_read(&device->draw_call_count);
+   uint32_t before_count = 0, after_count = 0;
+   uint32_t *counter = NULL;
 
-   if (((draw_count == intel_debug_bkp_before_draw_count &&
-        emit_before_draw) ||
-       (draw_count == intel_debug_bkp_after_draw_count &&
-        !emit_before_draw))) {
-      struct anv_address wait_addr =
-         anv_state_pool_state_address(&device->dynamic_state_pool,
-                                      device->breakpoint);
+   if (INTEL_DEBUG(DEBUG_DRAW_BKP)) {
+      counter = &device->draw_call_count;
+      before_count = intel_debug_bkp_before_draw_count;
+      after_count = intel_debug_bkp_after_draw_count;
+   } else if (INTEL_DEBUG(DEBUG_DISPATCH_BKP)) {
+      counter = &device->dispatch_call_count;
+      before_count = intel_debug_bkp_before_dispatch_count;
+      after_count = intel_debug_bkp_after_dispatch_count;
+   }
 
-      anv_batch_emit(batch, GENX(MI_SEMAPHORE_WAIT), sem) {
-         sem.WaitMode            = PollingMode;
-         sem.CompareOperation    = COMPARE_SAD_EQUAL_SDD;
-         sem.SemaphoreDataDword  = 0x1;
-         sem.SemaphoreAddress    = wait_addr;
-      };
+   if (counter) {
+      uint32_t count = emit_before_draw_or_dispatch ?
+         p_atomic_inc_return(counter) :
+         p_atomic_read(counter);
+
+      bool should_emit =
+         (emit_before_draw_or_dispatch && count == before_count) ||
+         (!emit_before_draw_or_dispatch && count == after_count);
+
+      if (should_emit) {
+         struct anv_address wait_addr =
+            anv_state_pool_state_address(&device->dynamic_state_pool,
+                                         device->breakpoint);
+
+         anv_batch_emit(batch, GENX(MI_SEMAPHORE_WAIT), sem) {
+            sem.WaitMode            = PollingMode;
+            sem.CompareOperation    = COMPARE_SAD_EQUAL_SDD;
+            sem.SemaphoreDataDword  = 0x1;
+            sem.SemaphoreAddress    = wait_addr;
+         }
+      }
    }
 }
 
@@ -5466,6 +5484,7 @@ void genX(CmdBeginRendering)(
          const bool fast_clear =
             (!is_multiview || (gfx->view_mask & 1)) &&
             anv_can_fast_clear_color(cmd_buffer, iview->image,
+                                     iview->vk.aspects,
                                      iview->vk.base_mip_level,
                                      &clear_rect, att->imageLayout,
                                      iview->planes[0].isl.format,
@@ -5838,7 +5857,7 @@ void genX(CmdBeginRendering)(
     * with this edge case, we just dirty the pipeline at the start of every
     * subpass.
     */
-   gfx->dirty |= ANV_CMD_DIRTY_PIPELINE;
+   gfx->dirty |= ANV_CMD_DIRTY_ALL_SHADERS(cmd_buffer->device);
 
 #if GFX_VER >= 11
    if (render_target_change) {
@@ -6182,7 +6201,7 @@ void genX(CmdSetEvent2)(
    }
 
    default:
-      unreachable("Invalid engine class");
+      UNREACHABLE("Invalid engine class");
    }
 }
 
@@ -6228,7 +6247,7 @@ void genX(CmdResetEvent2)(
    }
 
    default:
-      unreachable("Invalid engine class");
+      UNREACHABLE("Invalid engine class");
    }
 }
 
@@ -6285,7 +6304,7 @@ VkResult genX(CmdSetPerformanceOverrideINTEL)(
       break;
 
    default:
-      unreachable("Invalid override");
+      UNREACHABLE("Invalid override");
    }
 
    return VK_SUCCESS;
@@ -6329,7 +6348,8 @@ void genX(cmd_emit_timestamp)(struct anv_batch *batch,
       if ((batch->engine_class == INTEL_ENGINE_CLASS_COPY) ||
           (batch->engine_class == INTEL_ENGINE_CLASS_VIDEO)) {
          /* Wa_16018063123 - emit fast color dummy blit before MI_FLUSH_DW. */
-         if (intel_needs_workaround(device->info, 16018063123))
+         if (INTEL_WA_16018063123_GFX_VER &&
+             batch->engine_class == INTEL_ENGINE_CLASS_COPY)
             genX(batch_emit_fast_color_dummy_blit)(batch, device);
          anv_batch_emit(batch, GENX(MI_FLUSH_DW), fd) {
             fd.PostSyncOperation = WriteTimestamp;
@@ -6375,7 +6395,7 @@ void genX(cmd_emit_timestamp)(struct anv_batch *batch,
       GENX(EXECUTE_INDIRECT_DISPATCH_pack)
       (batch, dwords, &(struct GENX(EXECUTE_INDIRECT_DISPATCH)) {
             .MOCS = anv_mocs(device, NULL, 0),
-            .COMPUTE_WALKER_BODY = {
+            .body = {
                .PostSync = (struct GENX(POSTSYNC_DATA)) {
                   .Operation = WriteTimestamp,
                   .DestinationAddress = addr,
@@ -6397,7 +6417,7 @@ void genX(cmd_emit_timestamp)(struct anv_batch *batch,
       break;
 
    default:
-      unreachable("invalid");
+      UNREACHABLE("invalid");
    }
 }
 
@@ -6472,15 +6492,10 @@ ALWAYS_INLINE void
 genX(batch_emit_fast_color_dummy_blit)(struct anv_batch *batch,
                                       struct anv_device *device)
 {
-#if GFX_VERx10 >= 125
+#if INTEL_WA_16018063123_GFX_VER
    anv_batch_emit(batch, GENX(XY_FAST_COLOR_BLT), blt) {
       blt.DestinationBaseAddress = device->workaround_address;
-#if GFX_VERx10 >= 200
-      blt.DestinationMOCSindex = MOCS_GET_INDEX(device->isl_dev.mocs.blitter_dst);
-      blt.DestinationEncryptEn = MOCS_GET_ENCRYPT_EN(device->isl_dev.mocs.blitter_dst);
-#else
       blt.DestinationMOCS = device->isl_dev.mocs.blitter_dst;
-#endif
       blt.DestinationPitch = 63;
       blt.DestinationX2 = 1;
       blt.DestinationY2 = 4;
@@ -6490,6 +6505,8 @@ genX(batch_emit_fast_color_dummy_blit)(struct anv_batch *batch,
       blt.DestinationSurfaceQPitch = 4;
       blt.DestinationTiling = XY_TILE_LINEAR;
    }
+#else
+   UNREACHABLE("Not implemented");
 #endif
 }
 
@@ -6525,7 +6542,7 @@ genX(cmd_buffer_begin_companion_rcs_syncpoint)(
       genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
    } else if (anv_cmd_buffer_is_blitter_queue(cmd_buffer)) {
       /* Wa_16018063123 - emit fast color dummy blit before MI_FLUSH_DW. */
-      if (intel_needs_workaround(cmd_buffer->device->info, 16018063123)) {
+      if (INTEL_WA_16018063123_GFX_VER) {
          genX(batch_emit_fast_color_dummy_blit)(&cmd_buffer->batch,
                                                 cmd_buffer->device);
       }
@@ -6571,7 +6588,7 @@ genX(cmd_buffer_begin_companion_rcs_syncpoint)(
 
    return syncpoint;
 #else
-   unreachable("Not implemented");
+   UNREACHABLE("Not implemented");
 #endif
 }
 
@@ -6600,7 +6617,7 @@ genX(cmd_buffer_end_companion_rcs_syncpoint)(struct anv_cmd_buffer *cmd_buffer,
                    &cmd_buffer->companion_rcs_cmd_buffer->batch);
    mi_store(&b, mi_mem32(xcs_wait_addr), mi_imm(0x1));
 #else
-   unreachable("Not implemented");
+   UNREACHABLE("Not implemented");
 #endif
 }
 
@@ -6703,7 +6720,7 @@ genX(write_trtt_entries)(struct anv_async_submit *submit,
                                 ANV_PIPE_CS_STALL_BIT |
                                 ANV_PIPE_TLB_INVALIDATE_BIT);
 #else
-   unreachable("Not implemented");
+   UNREACHABLE("Not implemented");
 #endif
 }
 

@@ -598,7 +598,7 @@ static void *r600_create_sampler_state(struct pipe_context *ctx,
 		S_03C000_XY_MIN_FILTER(r600_tex_filter(state->min_img_filter, max_aniso)) |
 		S_03C000_MIP_FILTER(r600_tex_mipfilter(state->min_mip_filter)) |
 		S_03C000_MAX_ANISO_RATIO(max_aniso_ratio) |
-		S_03C000_DEPTH_COMPARE_FUNCTION(r600_tex_compare(state->compare_func)) |
+		S_03C000_DEPTH_COMPARE_FUNCTION(r600_tex_compare(state->compare_mode, state->compare_func)) |
 		S_03C000_BORDER_COLOR_TYPE(ss->border_color_use ? V_03C000_SQ_TEX_BORDER_COLOR_REGISTER : 0);
 	/* R_03C004_SQ_TEX_SAMPLER_WORD1_0 */
 	ss->tex_sampler_words[1] =
@@ -615,15 +615,17 @@ static void *r600_create_sampler_state(struct pipe_context *ctx,
 }
 
 static struct pipe_sampler_view *
-texture_buffer_sampler_view(struct r600_pipe_sampler_view *view,
-			    unsigned width0, unsigned height0)
-
+texture_buffer_sampler_view(struct pipe_context *ctx,
+			    struct r600_pipe_sampler_view *view)
 {
+	struct r600_context *rctx = (struct r600_context *)ctx;
 	struct r600_texture *tmp = (struct r600_texture*)view->base.texture;
-	int stride = util_format_get_blocksize(view->base.format);
+	const unsigned stride = util_format_get_blocksize(view->base.format);
 	unsigned format, num_format, format_comp, endian;
 	uint64_t offset = view->base.u.buf.offset;
-	unsigned size = view->base.u.buf.size;
+	const unsigned size = MIN2(stride *
+				   rctx->screen->b.b.caps.max_texel_buffer_elements,
+				   view->base.u.buf.size);
 
 	r600_vertex_data_type(view->base.format,
 			      &format, &num_format, &format_comp,
@@ -678,7 +680,7 @@ r600_create_sampler_view_custom(struct pipe_context *ctx,
 	view->base.context = ctx;
 
 	if (texture->target == PIPE_BUFFER)
-		return texture_buffer_sampler_view(view, texture->width0, 1);
+		return texture_buffer_sampler_view(ctx, view);
 
 	swizzle[0] = state->swizzle_r;
 	swizzle[1] = state->swizzle_g;
@@ -1859,12 +1861,18 @@ static void r600_emit_sampler_states(struct r600_context *rctx,
 		radeon_emit_array(cs, rstate->tex_sampler_words, 3);
 
 		if (rstate->border_color_use) {
+			union pipe_color_union border_color = {{0,0,0,1}};
 			unsigned offset;
+
+			/* The rv770 border color is fully compatible with
+			 * evergreen. */
+			evergreen_convert_border_color(&rstate->border_color,
+						       &border_color, &rview->base);
 
 			offset = border_color_reg;
 			offset += i * 16;
 			radeon_set_config_reg_seq(cs, offset, 4);
-			radeon_emit_array(cs, rstate->border_color.ui, 4);
+			radeon_emit_array(cs, border_color.ui, 4);
 		}
 	}
 	texinfo->states.dirty_mask = 0;

@@ -463,7 +463,7 @@ enum pipe_flush_flags
 #define PIPE_BIND_CONSTANT_BUFFER      (1 << 6) /* set_constant_buffer */
 #define PIPE_BIND_DISPLAY_TARGET       (1 << 7) /* flush_front_buffer */
 #define PIPE_BIND_VERTEX_STATE         (1 << 8) /* create_vertex_state */
-/* gap */
+#define PIPE_BIND_SAMPLER_VIEW_SUBOPTIMAL (1 << 9) /* create_sampler_view */
 #define PIPE_BIND_STREAM_OUTPUT        (1 << 10) /* set_stream_output_buffers */
 #define PIPE_BIND_CURSOR               (1 << 11) /* mouse cursor */
 #define PIPE_BIND_CUSTOM               (1 << 12) /* gallium frontend/winsys usages */
@@ -893,6 +893,7 @@ struct pipe_caps {
    bool generate_mipmap;
    bool string_marker;
    bool surface_reinterpret_blocks;
+   bool compressed_surface_reinterpret_blocks_layered;
    bool query_buffer_object;
    bool query_memory_info;
    bool framebuffer_no_attachment;
@@ -1087,6 +1088,7 @@ struct pipe_caps {
    unsigned shader_subgroup_supported_stages;
    unsigned shader_subgroup_supported_features;
    unsigned multiview;
+   uint64_t max_timeline_semaphore_difference;
 
    /** for CL SVM */
    uint64_t min_vma;
@@ -1312,7 +1314,8 @@ enum pipe_fd_type
 {
    PIPE_FD_TYPE_NATIVE_SYNC,
    PIPE_FD_TYPE_SYNCOBJ,
-   PIPE_FD_TYPE_TIMELINE_SEMAPHORE,
+   PIPE_FD_TYPE_TIMELINE_SEMAPHORE_D3D12,
+   PIPE_FD_TYPE_TIMELINE_SEMAPHORE_VK,
 };
 
 /**

@@ -145,7 +145,7 @@ def_only_used_in_cf_node(nir_def *def, void *_node)
        * corresponding predecessor is inside the loop or not because the value
        * can go through the phi into the outside world and escape the loop.
        */
-      if (block != def->parent_instr->block && !block_in_cf_node(block, node))
+      if (block != nir_def_block(def) && !block_in_cf_node(block, node))
          return false;
    }
 
@@ -217,6 +217,7 @@ node_is_dead(nir_cf_node *node)
             case nir_intrinsic_load_deref:
             case nir_intrinsic_load_ssbo:
             case nir_intrinsic_load_global:
+            case nir_intrinsic_load_ssbo_intel:
                /* If there's a memory barrier after the loop, a load might be
                 * required to happen before some other instruction after the
                 * barrier, so it is not valid to eliminate it -- unless we
@@ -372,7 +373,7 @@ dead_cf_list(struct exec_list *list, bool *list_ends_in_jump)
       }
 
       default:
-         unreachable("unknown cf node type");
+         UNREACHABLE("unknown cf node type");
       }
 
       prev = cur;

@@ -11,14 +11,15 @@
 #include "Resources.h"
 #include "VkEncoder.h"
 #include "gfxstream_vk_private.h"
+#include "git_sha1.h"
 #include "goldfish_address_space.h"
 #include "goldfish_vk_private_defs.h"
 #include "util/anon_file.h"
+#include "util/detect_os.h"
 #include "util/log.h"
 #include "util/macros.h"
-#include "vulkan/vulkan_core.h"
-#include "util/detect_os.h"
 #include "virtio/virtio-gpu/virgl_hw.h"
+#include "vulkan/vulkan_core.h"
 
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 #include "vk_format_info.h"
@@ -29,10 +30,23 @@
 
 #include <algorithm>
 #include <chrono>
+#include <random>
 #include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+
+#ifdef HAVE_PERFETTO
+#include <perfetto/tracing.h>
+
+#define GFXSTREAM_TRACE_DEFAULT_CATEGORY "gfxstream.default"
+
+PERFETTO_DEFINE_CATEGORIES(
+    perfetto::Category(GFXSTREAM_TRACE_DEFAULT_CATEGORY)
+                       .SetDescription("Default events")
+                       .SetTags("default"));
+
+#endif // HAVE_PERFETTO
 
 #include "vk_util.h"
 
@@ -77,8 +91,34 @@ static T vk_make_orphan_copy(const T& vk_struct) {
     return copy;
 }
 
+
 namespace gfxstream {
 namespace vk {
+namespace {
+
+uint64_t GeneratePseudoUniqueId() {
+    thread_local std::mt19937 generator(std::random_device{}());
+    std::uniform_int_distribution<uint64_t> distribution(0, std::numeric_limits<uint64_t>::max());
+    return distribution(generator);
+}
+
+void EmitGuestAndHostTraceMarker(VkEncoder* encoder) {
+#ifdef HAVE_PERFETTO
+    const uint64_t flowId = GeneratePseudoUniqueId();
+
+    TRACE_EVENT_INSTANT(
+        GFXSTREAM_TRACE_DEFAULT_CATEGORY,
+        "vkTraceAsyncGOOGLE",
+        perfetto::Flow::Global(flowId),
+        "flow id", flowId);
+
+    encoder->vkTraceAsyncGOOGLE(flowId, true /* do lock */);
+#else
+    (void)encoder;
+#endif  // HAVE_PERFETTO
+}
+
+}  // namespace
 
 #define MAKE_HANDLE_MAPPING_FOREACH(type_name, map_impl, map_to_u64_impl, map_from_u64_impl)       \
     void mapHandles_##type_name(type_name* handles, size_t count) override {                       \
@@ -1580,7 +1620,7 @@ void ResourceTracker::deviceMemoryTransform_tohost(VkDeviceMemory* memory, uint3
 
             auto it = info_VkDeviceMemory.find(mem);
             if (it == info_VkDeviceMemory.end()) {
-                mesa_logw("%s cannot find memory %p!", __func__, mem);
+                mesa_logw("%s cannot find memory!", __func__);
                 return;
             }
 
@@ -2118,21 +2158,6 @@ VkResult ResourceTracker::on_vkEnumeratePhysicalDevices(void* context, VkResult,
     }
 }
 
-void ResourceTracker::on_vkGetPhysicalDeviceProperties(void*, VkPhysicalDevice,
-                                                       VkPhysicalDeviceProperties* pProperties) {
-#ifdef LINUX_GUEST_BUILD
-    if (pProperties) {
-        if (VK_PHYSICAL_DEVICE_TYPE_CPU == pProperties->deviceType) {
-            /* For Linux guest: Even if host driver reports DEVICE_TYPE_CPU,
-             * override this to VIRTUAL_GPU, otherwise Linux DRM interfaces
-             * will take unexpected code paths to deal with "software" driver
-             */
-            pProperties->deviceType = VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU;
-        }
-    }
-#endif
-}
-
 void ResourceTracker::on_vkGetPhysicalDeviceFeatures2(void*, VkPhysicalDevice,
                                                       VkPhysicalDeviceFeatures2* pFeatures) {
     if (pFeatures) {
@@ -2153,44 +2178,93 @@ void ResourceTracker::on_vkGetPhysicalDeviceFeatures2KHR(void* context,
 void ResourceTracker::on_vkGetPhysicalDeviceProperties2(void* context,
                                                         VkPhysicalDevice physicalDevice,
                                                         VkPhysicalDeviceProperties2* pProperties) {
-    if (pProperties) {
-        on_vkGetPhysicalDeviceProperties(context, physicalDevice, &pProperties->properties);
-        VirtGpuDevice* instance = VirtGpuDevice::getInstance();
-        VkPhysicalDeviceDrmPropertiesEXT* drmProps =
-            vk_find_struct(pProperties, PHYSICAL_DEVICE_DRM_PROPERTIES_EXT);
+    if (!pProperties) {
+        return;
+    }
+#ifdef LINUX_GUEST_BUILD
+    if (VK_PHYSICAL_DEVICE_TYPE_CPU == pProperties->properties.deviceType) {
+        /* For Linux guest: Even if host driver reports DEVICE_TYPE_CPU,
+         * override this to VIRTUAL_GPU, otherwise Linux DRM interfaces
+         * will take unexpected code paths to deal with "software" driver
+         */
+        pProperties->properties.deviceType = VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU;
+    }
+#endif
 
-        if (instance && drmProps) {
-            VirtGpuDrmInfo drmInfo;
-            if (instance->getDrmInfo(&drmInfo)) {
-                drmProps->hasPrimary = drmInfo.hasPrimary;
-                drmProps->hasRender = drmInfo.hasRender;
-                drmProps->primaryMajor = drmInfo.primaryMajor;
-                drmProps->primaryMinor = drmInfo.primaryMinor;
-                drmProps->renderMajor = drmInfo.renderMajor;
-                drmProps->renderMinor = drmInfo.renderMinor;
-            } else {
-                mesa_logd(
-                    "%s: encountered VkPhysicalDeviceDrmPropertiesEXT in pProperties::pNext chain, "
-                    "but failed to query DrmInfo from the VirtGpuDevice",
-                    __func__);
-            }
+    /* Get driverVersion from Mesa version, not host's driverVersion */
+    pProperties->properties.driverVersion = vk_get_driver_version();
+
+    // TODO: VkPhysicalDeviceVulkan12Properties::driverID and
+    // VkPhysicalDeviceDriverProperties::driverID for gfxstream in Mesa
+    VkPhysicalDeviceVulkan12Properties* vulkan12Props =
+        vk_find_struct(pProperties, PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES);
+    if (vulkan12Props) {
+        // TODO: driverId for gfxstream_vk? update conformanceVersion?
+        snprintf(vulkan12Props->driverName, sizeof(vulkan12Props->driverName), "gfxstream");
+        snprintf(vulkan12Props->driverInfo, sizeof(vulkan12Props->driverInfo),
+                 "Mesa " PACKAGE_VERSION MESA_GIT_SHA1);
+    }
+    VkPhysicalDeviceDriverProperties* driverProps =
+        vk_find_struct(pProperties, PHYSICAL_DEVICE_DRIVER_PROPERTIES);
+    if (driverProps) {
+        // TODO: driverId for gfxstream_vk? update conformanceVersion?
+        snprintf(driverProps->driverName, sizeof(driverProps->driverName), "gfxstream");
+        snprintf(driverProps->driverInfo, sizeof(driverProps->driverInfo),
+                 "Mesa " PACKAGE_VERSION MESA_GIT_SHA1);
+    }
+
+    // Note: VirtGpuDevice::getInstance() will return null for Goldfish, as it
+    // does not have the virtio-gpu interface that is expected.
+    VirtGpuDevice* instance = VirtGpuDevice::getInstance();
+
+    const char* transport_name = instance ? "Virtio-GPU GFXStream" : "Goldfish GFXStream";
+
+    char device_name[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE];
+    int device_name_len = snprintf(device_name, sizeof(device_name), "%s (%s)",
+                                   transport_name, pProperties->properties.deviceName);
+    if (device_name_len >= (int)VK_MAX_PHYSICAL_DEVICE_NAME_SIZE) {
+        memcpy(device_name + VK_MAX_PHYSICAL_DEVICE_NAME_SIZE - 5, "...)", 4);
+        device_name_len = VK_MAX_PHYSICAL_DEVICE_NAME_SIZE - 1;
+    }
+    memcpy(pProperties->properties.deviceName, device_name, device_name_len + 1);
+
+    if (!instance) {
+        mesa_logd("%s(): Could not get an instance of the VirtGpuDevice", __func__);
+    }
+
+    VkPhysicalDeviceDrmPropertiesEXT* drmProps =
+        vk_find_struct(pProperties, PHYSICAL_DEVICE_DRM_PROPERTIES_EXT);
+    if (instance && drmProps) {
+        VirtGpuDrmInfo drmInfo;
+        if (instance->getDrmInfo(&drmInfo)) {
+            drmProps->hasPrimary = drmInfo.hasPrimary;
+            drmProps->hasRender = drmInfo.hasRender;
+            drmProps->primaryMajor = drmInfo.primaryMajor;
+            drmProps->primaryMinor = drmInfo.primaryMinor;
+            drmProps->renderMajor = drmInfo.renderMajor;
+            drmProps->renderMinor = drmInfo.renderMinor;
+        } else {
+            mesa_logd(
+                "%s: encountered VkPhysicalDeviceDrmPropertiesEXT in pProperties::pNext chain, "
+                "but failed to query DrmInfo from the VirtGpuDevice",
+                __func__);
         }
+    }
 
-        VkPhysicalDevicePCIBusInfoPropertiesEXT* pciBusInfoProps =
-            vk_find_struct(pProperties, PHYSICAL_DEVICE_PCI_BUS_INFO_PROPERTIES_EXT);
-        if (instance && pciBusInfoProps) {
-            VirtGpuPciBusInfo pciBusInfo;
-            if (instance->getPciBusInfo(&pciBusInfo)) {
-                pciBusInfoProps->pciDomain = pciBusInfo.domain;
-                pciBusInfoProps->pciBus = pciBusInfo.bus;
-                pciBusInfoProps->pciDevice = pciBusInfo.device;
-                pciBusInfoProps->pciFunction = pciBusInfo.function;
-            } else {
-                mesa_logd(
-                    "%s: encountered VkPhysicalDevicePCIBusInfoPropertiesEXT in pProperties::pNext "
-                    "chain, but failed to query PciBusInfo from the VirtGpuDevice",
-                    __func__);
-            }
+    VkPhysicalDevicePCIBusInfoPropertiesEXT* pciBusInfoProps =
+        vk_find_struct(pProperties, PHYSICAL_DEVICE_PCI_BUS_INFO_PROPERTIES_EXT);
+    if (instance && pciBusInfoProps) {
+        VirtGpuPciBusInfo pciBusInfo;
+        if (instance->getPciBusInfo(&pciBusInfo)) {
+            pciBusInfoProps->pciDomain = pciBusInfo.domain;
+            pciBusInfoProps->pciBus = pciBusInfo.bus;
+            pciBusInfoProps->pciDevice = pciBusInfo.device;
+            pciBusInfoProps->pciFunction = pciBusInfo.function;
+        } else {
+            mesa_logd(
+                "%s: encountered VkPhysicalDevicePCIBusInfoPropertiesEXT in pProperties::pNext "
+                "chain, but failed to query PciBusInfo from the VirtGpuDevice",
+                __func__);
         }
     }
 }
@@ -2210,18 +2284,6 @@ void ResourceTracker::on_vkGetPhysicalDeviceMemoryProperties(
 void ResourceTracker::on_vkGetPhysicalDeviceMemoryProperties2(
     void*, VkPhysicalDevice physdev, VkPhysicalDeviceMemoryProperties2* out) {
     on_vkGetPhysicalDeviceMemoryProperties(nullptr, physdev, &out->memoryProperties);
-}
-
-void ResourceTracker::on_vkGetDeviceQueue(void*, VkDevice device, uint32_t, uint32_t,
-                                          VkQueue* pQueue) {
-    std::lock_guard<std::recursive_mutex> lock(mLock);
-    info_VkQueue[*pQueue].device = device;
-}
-
-void ResourceTracker::on_vkGetDeviceQueue2(void*, VkDevice device, const VkDeviceQueueInfo2*,
-                                           VkQueue* pQueue) {
-    std::lock_guard<std::recursive_mutex> lock(mLock);
-    info_VkQueue[*pQueue].device = device;
 }
 
 VkResult ResourceTracker::on_vkCreateInstance(void* context, VkResult input_result,
@@ -3136,13 +3198,13 @@ VkResult ResourceTracker::allocateCoherentMemory(VkDevice device,
     // Support device address capture/replay allocations
     if (deviceAddressMemoryAllocation) {
         if (allocFlagsInfoPtr) {
-            mesa_logd("%s: has alloc flags\n", __func__);
+            MESA_TRACE_SCOPE("%s: has alloc flags\n", __func__);
             allocFlagsInfo = *allocFlagsInfoPtr;
             vk_append_struct(&structChainIter, &allocFlagsInfo);
         }
 
         if (opaqueCaptureAddressAllocInfoPtr) {
-            mesa_logd("%s: has opaque capture address\n", __func__);
+            MESA_TRACE_SCOPE("%s: has opaque capture address\n", __func__);
             opaqueCaptureAddressAllocInfo = *opaqueCaptureAddressAllocInfoPtr;
             vk_append_struct(&structChainIter, &opaqueCaptureAddressAllocInfo);
         }
@@ -3343,13 +3405,13 @@ VkResult ResourceTracker::on_vkAllocateMemory(void* context, VkResult input_resu
         vk_find_struct_const(pAllocateInfo, MEMORY_OPAQUE_CAPTURE_ADDRESS_ALLOCATE_INFO);
 
     if (allocFlagsInfoPtr) {
-        mesa_logd("%s: has alloc flags\n", __func__);
+        MESA_TRACE_SCOPE("%s: has alloc flags\n", __func__);
         allocFlagsInfo = *allocFlagsInfoPtr;
         vk_append_struct(&structChainIter, &allocFlagsInfo);
     }
 
     if (opaqueCaptureAddressAllocInfoPtr) {
-        mesa_logd("%s: has opaque capture address\n", __func__);
+        MESA_TRACE_SCOPE("%s: has opaque capture address\n", __func__);
         opaqueCaptureAddressAllocInfo = *opaqueCaptureAddressAllocInfoPtr;
         vk_append_struct(&structChainIter, &opaqueCaptureAddressAllocInfo);
     }
@@ -4764,11 +4826,11 @@ VkResult ResourceTracker::on_vkCreateFence(void* context, VkResult input_result,
 #if defined(VK_USE_PLATFORM_ANDROID_KHR) || DETECT_OS_LINUX
     if (exportSyncFd) {
         if (!mFeatureInfo.hasVirtioGpuNativeSync) {
-            mesa_logd("%s: ensure sync device\n", __func__);
+            MESA_TRACE_SCOPE("%s: ensure sync device\n", __func__);
             ensureSyncDeviceFd();
         }
 
-        mesa_logd("%s: getting fence info\n", __func__);
+        MESA_TRACE_SCOPE("%s: getting fence info\n", __func__);
         std::lock_guard<std::recursive_mutex> lock(mLock);
         auto it = info_VkFence.find(*pFence);
 
@@ -4778,7 +4840,7 @@ VkResult ResourceTracker::on_vkCreateFence(void* context, VkResult input_result,
 
         info.external = true;
         info.exportFenceCreateInfo = *exportFenceInfoPtr;
-        mesa_logd("%s: info set (fence still -1). fence: %p\n", __func__, (void*)(*pFence));
+        MESA_TRACE_SCOPE("%s: info set (fence still -1). fence: %p\n", __func__, (void*)(*pFence));
         // syncFd is still -1 because we expect user to explicitly
         // export it via vkGetFenceFdKHR
     }
@@ -4814,7 +4876,7 @@ VkResult ResourceTracker::on_vkResetFences(void* context, VkResult, VkDevice dev
 
 #if GFXSTREAM_ENABLE_GUEST_GOLDFISH
         if (info.syncFd && *info.syncFd >= 0) {
-            mesa_logd("%s: resetting fence. make fd -1\n", __func__);
+            MESA_TRACE_SCOPE("%s: resetting fence. make fd -1\n", __func__);
             goldfish_sync_signal(*info.syncFd);
             mSyncHelper->close(*info.syncFd);
         }
@@ -4858,17 +4920,17 @@ VkResult ResourceTracker::on_vkImportFenceFdKHR(void* context, VkResult, VkDevic
 
 #if GFXSTREAM_ENABLE_GUEST_GOLDFISH
     if (info.syncFd && *info.syncFd >= 0) {
-        mesa_logd("%s: previous sync fd exists, close it\n", __func__);
+        MESA_TRACE_SCOPE("%s: previous sync fd exists, close it\n", __func__);
         goldfish_sync_signal(*info.syncFd);
         mSyncHelper->close(*info.syncFd);
     }
 #endif
 
     if (pImportFenceFdInfo->fd < 0) {
-        mesa_logd("%s: import -1, set to -1 and exit\n", __func__);
+        MESA_TRACE_SCOPE("%s: import -1, set to -1 and exit\n", __func__);
         info.syncFd = -1;
     } else {
-        mesa_logd("%s: import actual fd, dup and close()\n", __func__);
+        MESA_TRACE_SCOPE("%s: import actual fd, dup and close()\n", __func__);
 
         int fenceCopy = mSyncHelper->dup(pImportFenceFdInfo->fd);
         if (fenceCopy < 0) {
@@ -4963,7 +5025,7 @@ VkResult ResourceTracker::on_vkGetFenceFdKHR(void* context, VkResult, VkDevice d
         // relinquish ownership
         info.syncFd.reset();
 
-        mesa_logd("%s: got fd: %d\n", __func__, *pFd);
+        MESA_TRACE_SCOPE("%s: got fd: %d\n", __func__, *pFd);
         return VK_SUCCESS;
     }
     return VK_ERROR_DEVICE_LOST;
@@ -5031,7 +5093,7 @@ VkResult ResourceTracker::on_vkWaitForFences(void* context, VkResult, VkDevice d
     lock.unlock();
 
     for (auto fd : fencesExternalSyncFds) {
-        mesa_logd("Waiting on sync fd: %d", fd);
+        MESA_TRACE_SCOPE("Waiting on sync fd: %d", fd);
 
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         // syncHelper works in milliseconds
@@ -5045,7 +5107,7 @@ VkResult ResourceTracker::on_vkWaitForFences(void* context, VkResult, VkDevice d
         }
 
         timeout -= timeTaken;
-        mesa_logd("Done waiting on sync fd: %d", fd);
+        MESA_TRACE_SCOPE("Done waiting on sync fd: %d", fd);
 
 #if GFXSTREAM_SYNC_DEBUG
         mSyncHelper->debugPrint(fd);
@@ -5055,7 +5117,7 @@ VkResult ResourceTracker::on_vkWaitForFences(void* context, VkResult, VkDevice d
     if (!fencesNonExternal.empty()) {
         auto hostConn = ResourceTracker::threadingCallbacks.hostConnectionGetFunc();
         auto vkEncoder = ResourceTracker::threadingCallbacks.vkEncoderGetFunc(hostConn);
-        mesa_logd("vkWaitForFences to host");
+        MESA_TRACE_SCOPE("vkWaitForFences to host");
         return vkEncoder->vkWaitForFences(device, fencesNonExternal.size(),
                                           fencesNonExternal.data(), waitAll, timeout,
                                           true /* do lock */);
@@ -6196,6 +6258,7 @@ VkResult ResourceTracker::on_vkQueueSubmit(void* context, VkResult input_result,
                                            uint32_t submitCount, const VkSubmitInfo* pSubmits,
                                            VkFence fence) {
     MESA_TRACE_SCOPE("on_vkQueueSubmit");
+    EmitGuestAndHostTraceMarker((VkEncoder*)context);
 
     /* From the Vulkan 1.3.204 spec:
      *
@@ -6233,6 +6296,7 @@ VkResult ResourceTracker::on_vkQueueSubmit2(void* context, VkResult input_result
                                             uint32_t submitCount, const VkSubmitInfo2* pSubmits,
                                             VkFence fence) {
     MESA_TRACE_SCOPE("on_vkQueueSubmit2");
+    EmitGuestAndHostTraceMarker((VkEncoder*)context);
     return on_vkQueueSubmitTemplate<VkSubmitInfo2, VkSemaphoreSubmitInfo>(context, input_result, queue, submitCount,
                                                    pSubmits, fence);
 }
@@ -6534,7 +6598,7 @@ VkResult ResourceTracker::on_vkQueueSubmitTemplate(void* context, VkResult input
             }
 
             if (externalFenceFdToSignal >= 0) {
-                mesa_logd("%s: external fence real signal: %d\n", __func__,
+                MESA_TRACE_SCOPE("%s: external fence real signal: %d\n", __func__,
                           externalFenceFdToSignal);
                 goldfish_sync_signal(externalFenceFdToSignal);
             }
@@ -7598,8 +7662,6 @@ void ResourceTracker::on_vkCmdClearColorImage(void* context, VkCommandBuffer com
         return;
     }
 
-    auto& imageInfo = imageInfoIt->second;
-    VkFormat actualFormat = imageInfo.createInfo.format;
     VkClearColorValue convertedColor = *pColor;
 
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
@@ -7607,6 +7669,8 @@ void ResourceTracker::on_vkCmdClearColorImage(void* context, VkCommandBuffer com
     // it'll have the identical parameters, so we need to convert the linearized
     // clear color back to sRGB at this point.
     // TODO(b/420857458): revise the allocation logic to support mutable formats better
+    auto& imageInfo = imageInfoIt->second;
+    VkFormat actualFormat = imageInfo.createInfo.format;
     if (imageInfo.hasAnb && srgbFormatNeedsConversionForClearColor(actualFormat)) {
        // Perform linear to srgb conversion
        // Backing image is UNORM for vkCmdClearColorImage so we convert pColor
@@ -7675,7 +7739,7 @@ VkResult ResourceTracker::exportSyncFdForQSRILocked(VkImage image, int* fd) {
 #endif
     }
 
-    mesa_logd("%s: got fd: %d\n", __func__, *fd);
+    MESA_TRACE_SCOPE("%s: got fd: %d\n", __func__, *fd);
     auto imageInfoIt = info_VkImage.find(image);
     if (imageInfoIt != info_VkImage.end()) {
         auto& imageInfo = imageInfoIt->second;

@@ -4036,7 +4036,7 @@ llvmpipe_create_fs_state(struct pipe_context *pipe,
 
    /* lower FRAG_RESULT_COLOR -> DATA[0-7] to correctly handle unused attachments */
    nir_shader *nir = shader->base.ir.nir;
-   NIR_PASS_V(nir, nir_lower_fragcolor, nir->info.fs.color_is_dual_source ? 1 : 8);
+   NIR_PASS(_, nir, nir_lower_fragcolor, nir->info.fs.color_is_dual_source ? 1 : 8);
 
    nir_shader_gather_info(nir, nir_shader_get_entrypoint(nir));
    nir_tgsi_scan_shader(nir, &shader->info.base, true);
@@ -4273,7 +4273,7 @@ llvmpipe_set_constant_buffer(struct pipe_context *pipe,
       llvmpipe->dirty |= LP_NEW_MESH_CONSTANTS;
       break;
    default:
-      unreachable("Illegal shader type");
+      UNREACHABLE("Illegal shader type");
       break;
    }
 }
@@ -4330,7 +4330,7 @@ llvmpipe_set_shader_buffers(struct pipe_context *pipe,
          llvmpipe->dirty |= LP_NEW_FS_SSBOS;
          break;
       default:
-         unreachable("Illegal shader type");
+         UNREACHABLE("Illegal shader type");
          break;
       }
    }
@@ -4381,7 +4381,7 @@ llvmpipe_set_shader_images(struct pipe_context *pipe,
       llvmpipe->dirty |= LP_NEW_MESH_IMAGES;
       break;
    default:
-      unreachable("Illegal shader type");
+      UNREACHABLE("Illegal shader type");
       break;
    }
 

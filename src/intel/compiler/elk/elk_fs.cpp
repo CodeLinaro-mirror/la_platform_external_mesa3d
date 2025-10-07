@@ -88,7 +88,7 @@ elk_fs_inst::init(enum elk_opcode opcode, uint8_t exec_size, const elk_fs_reg &d
       break;
    case IMM:
    case UNIFORM:
-      unreachable("Invalid destination register file");
+      UNREACHABLE("Invalid destination register file");
    }
 
    this->writes_accumulator = false;
@@ -529,7 +529,7 @@ elk_fs_reg::is_contiguous() const
       return true;
    }
 
-   unreachable("Invalid register file");
+   UNREACHABLE("Invalid register file");
 }
 
 unsigned
@@ -909,7 +909,7 @@ elk_fs_inst::size_read(int arg) const
    case ATTR:
       return components_read(arg) * src[arg].component_size(exec_size);
    case MRF:
-      unreachable("MRF registers are not allowed as sources");
+      UNREACHABLE("MRF registers are not allowed as sources");
    }
    return 0;
 }
@@ -931,7 +931,7 @@ namespace {
       case ELK_PREDICATE_ALIGN1_ALL16H:   return 16;
       case ELK_PREDICATE_ALIGN1_ANY32H:   return 32;
       case ELK_PREDICATE_ALIGN1_ALL32H:   return 32;
-      default: unreachable("Unsupported predicate");
+      default: UNREACHABLE("Unsupported predicate");
       }
    }
 
@@ -1063,7 +1063,7 @@ elk_fs_inst::implied_mrf_writes() const
    case ELK_SHADER_OPCODE_GFX4_SCRATCH_WRITE:
       return mlen;
    default:
-      unreachable("not reached");
+      UNREACHABLE("not reached");
    }
 }
 
@@ -1149,7 +1149,7 @@ elk_barycentric_mode(nir_intrinsic_instr *intr)
       bary = ELK_BARYCENTRIC_PERSPECTIVE_SAMPLE;
       break;
    default:
-      unreachable("invalid intrinsic");
+      UNREACHABLE("invalid intrinsic");
    }
 
    if (mode == INTERP_MODE_NOPERSPECTIVE)
@@ -1178,12 +1178,12 @@ centroid_to_pixel(enum elk_barycentric_mode bary)
 bool
 elk_fs_visitor::mark_last_urb_write_with_eot()
 {
-   foreach_in_list_reverse(elk_fs_inst, prev, &this->instructions) {
+   brw_foreach_in_list_reverse(elk_fs_inst, prev, &this->instructions) {
       if (prev->opcode == ELK_SHADER_OPCODE_URB_WRITE_LOGICAL) {
          prev->eot = true;
 
          /* Delete now dead instructions. */
-         foreach_in_list_reverse_safe(exec_node, dead, &this->instructions) {
+         brw_foreach_in_list_reverse_safe(brw_exec_node, dead, &this->instructions) {
             if (dead == prev)
                break;
             dead->remove();
@@ -1451,17 +1451,17 @@ calculate_urb_setup(const struct intel_device_info *devinfo,
          if (i == VARYING_SLOT_PSIZ)
             continue;
 
-	 if (key->input_slots_valid & BITFIELD64_BIT(i)) {
-	    /* The back color slot is skipped when the front color is
-	     * also written to.  In addition, some slots can be
-	     * written in the vertex shader and not read in the
-	     * fragment shader.  So the register number must always be
-	     * incremented, mapped or not.
-	     */
-	    if (_mesa_varying_slot_in_fs((gl_varying_slot) i))
-	       prog_data->urb_setup[i] = urb_next;
+         if (key->input_slots_valid & BITFIELD64_BIT(i)) {
+            /* The back color slot is skipped when the front color is
+             * also written to.  In addition, some slots can be
+             * written in the vertex shader and not read in the
+             * fragment shader.  So the register number must always be
+             * incremented, mapped or not.
+             */
+            if (_mesa_varying_slot_in_fs((gl_varying_slot) i))
+               prog_data->urb_setup[i] = urb_next;
             urb_next++;
-	 }
+         }
       }
 
       /*
@@ -1470,7 +1470,7 @@ calculate_urb_setup(const struct intel_device_info *devinfo,
        *
        * See compile_sf_prog() for more info.
        */
-      if (inputs_read & BITFIELD64_BIT(VARYING_SLOT_PNTC))
+      if (inputs_read & VARYING_BIT_PNTC)
          prog_data->urb_setup[VARYING_SLOT_PNTC] = urb_next++;
    }
 
@@ -2126,7 +2126,7 @@ src_as_uint(const elk_fs_reg &src)
       return src.u64;
 
    default:
-      unreachable("Invalid integer type.");
+      UNREACHABLE("Invalid integer type.");
    }
 }
 
@@ -2153,7 +2153,7 @@ elk_imm_for_type(uint64_t value, enum elk_reg_type type)
       return elk_imm_uq(value);
 
    default:
-      unreachable("Invalid integer type.");
+      UNREACHABLE("Invalid integer type.");
    }
 }
 
@@ -2230,7 +2230,7 @@ elk_fs_visitor::opt_algebraic()
             if (inst->dst.type != inst->src[0].type &&
                 inst->dst.type != ELK_REGISTER_TYPE_DF &&
                 inst->src[0].type != ELK_REGISTER_TYPE_F)
-               unreachable("unimplemented: saturate mixed types");
+               UNREACHABLE("unimplemented: saturate mixed types");
 
             if (elk_saturate_immediate(inst->src[0].type,
                                        &inst->src[0].as_elk_reg())) {
@@ -2487,7 +2487,7 @@ elk_fs_visitor::opt_algebraic()
                break;
             default:
                /* Just in case a future platform re-enables B or UB types. */
-               unreachable("Invalid source size.");
+               UNREACHABLE("Invalid source size.");
             }
 
             inst->opcode = ELK_OPCODE_MOV;
@@ -4172,7 +4172,7 @@ elk_fb_write_msg_control(const elk_fs_inst *inst,
       else if (inst->group % 16 == 8)
          mctl = ELK_DATAPORT_RENDER_TARGET_WRITE_SIMD8_DUAL_SOURCE_SUBSPAN23;
       else
-         unreachable("Invalid dual-source FB write instruction group");
+         UNREACHABLE("Invalid dual-source FB write instruction group");
    } else {
       assert(inst->group == 0 || (inst->group == 16 && inst->exec_size == 16));
 
@@ -4181,7 +4181,7 @@ elk_fb_write_msg_control(const elk_fs_inst *inst,
       else if (inst->exec_size == 8)
          mctl = ELK_DATAPORT_RENDER_TARGET_WRITE_SIMD8_SINGLE_SOURCE_SUBSPAN01;
       else
-         unreachable("Invalid FB write execution size");
+         UNREACHABLE("Invalid FB write execution size");
    }
 
    return mctl;
@@ -5123,7 +5123,7 @@ elk_fs_visitor::lower_simd_width()
           * instructions (this is required for some render target writes), we
           * split from the highest group to lowest.
           */
-         exec_node *const after_inst = inst->next;
+         brw_exec_node *const after_inst = inst->next;
          for (int i = n - 1; i >= 0; i--) {
             /* Emit a copy of the original instruction with the lowered width.
              * If the EOT flag was set throw it away except for the last
@@ -5345,7 +5345,7 @@ elk_fs_visitor::dump_instructions_to_file(FILE *file) const
       fprintf(file, "Maximum %3d registers live at once.\n", max_pressure);
    } else {
       int ip = 0;
-      foreach_in_list(elk_backend_instruction, inst, &instructions) {
+      brw_foreach_in_list(elk_backend_instruction, inst, &instructions) {
          fprintf(file, "%4d: ", ip++);
          dump_instruction(inst, file);
       }
@@ -5427,7 +5427,7 @@ elk_fs_visitor::dump_instruction_to_file(const elk_backend_instruction *be_inst,
       }
       break;
    case IMM:
-      unreachable("not reached");
+      UNREACHABLE("not reached");
    }
 
    if (inst->dst.offset ||
@@ -6265,7 +6265,9 @@ elk_fs_visitor::run_fs(bool allow_spilling, bool do_rep_send)
       emit_repclear_shader();
    } else {
       if (nir->info.inputs_read > 0 ||
-          BITSET_TEST(nir->info.system_values_read, SYSTEM_VALUE_FRAG_COORD) ||
+          BITSET_TEST(nir->info.system_values_read, SYSTEM_VALUE_PIXEL_COORD) ||
+          BITSET_TEST(nir->info.system_values_read, SYSTEM_VALUE_FRAG_COORD_Z) ||
+          BITSET_TEST(nir->info.system_values_read, SYSTEM_VALUE_FRAG_COORD_W) ||
           (nir->info.outputs_read > 0 && !wm_key->coherent_fb_fetch)) {
          if (devinfo->ver < 6)
             emit_interpolation_setup_gfx4();
@@ -6361,24 +6363,6 @@ elk_fs_visitor::run_cs(bool allow_spilling)
    return !failed;
 }
 
-static bool
-is_used_in_not_interp_frag_coord(nir_def *def)
-{
-   nir_foreach_use_including_if(src, def) {
-      if (nir_src_is_if(src))
-         return true;
-
-      if (nir_src_parent_instr(src)->type != nir_instr_type_intrinsic)
-         return true;
-
-      nir_intrinsic_instr *intrin = nir_instr_as_intrinsic(nir_src_parent_instr(src));
-      if (intrin->intrinsic != nir_intrinsic_load_frag_coord)
-         return true;
-   }
-
-   return false;
-}
-
 /**
  * Return a bitfield where bit n is set if barycentric interpolation mode n
  * (see enum elk_barycentric_mode) is needed by the fragment shader.
@@ -6410,10 +6394,6 @@ elk_compute_barycentric_interp_modes(const struct intel_device_info *devinfo,
             default:
                continue;
             }
-
-            /* Ignore WPOS; it doesn't require interpolation. */
-            if (!is_used_in_not_interp_frag_coord(&intrin->def))
-               continue;
 
             nir_intrinsic_op bary_op = intrin->intrinsic;
             enum elk_barycentric_mode bary =
@@ -6670,9 +6650,9 @@ elk_nir_populate_wm_prog_data(nir_shader *shader,
    prog_data->uses_vmask = true;
 
    prog_data->uses_src_w =
-      BITSET_TEST(shader->info.system_values_read, SYSTEM_VALUE_FRAG_COORD);
+      BITSET_TEST(shader->info.system_values_read, SYSTEM_VALUE_FRAG_COORD_W);
    prog_data->uses_src_depth =
-      BITSET_TEST(shader->info.system_values_read, SYSTEM_VALUE_FRAG_COORD);
+      BITSET_TEST(shader->info.system_values_read, SYSTEM_VALUE_FRAG_COORD_Z);
 
    calculate_urb_setup(devinfo, key, prog_data, shader);
    elk_compute_flat_inputs(prog_data, shader);

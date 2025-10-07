@@ -16,6 +16,28 @@
 
 #include "ac_formats.h"
 
+static bool
+radv_is_clear_rect_full(const struct radv_image_view *iview, const VkClearRect *clear_rect, uint32_t view_mask)
+{
+   const struct radv_image *image = iview->image;
+
+   if (clear_rect->rect.offset.x || clear_rect->rect.offset.y ||
+       clear_rect->rect.extent.width != image->vk.extent.width ||
+       clear_rect->rect.extent.height != image->vk.extent.height)
+      return false;
+
+   if (view_mask && (image->vk.array_layers >= 32 || (1u << image->vk.array_layers) - 1u != view_mask))
+      return false;
+
+   if (!view_mask && clear_rect->baseArrayLayer != 0)
+      return false;
+
+   if (!view_mask && clear_rect->layerCount != image->vk.array_layers)
+      return false;
+
+   return true;
+}
+
 static VkResult
 get_color_pipeline_layout(struct radv_device *device, VkPipelineLayout *layout_out)
 {
@@ -678,7 +700,7 @@ radv_get_htile_mask(struct radv_cmd_buffer *cmd_buffer, const struct radv_image 
 
       /* Preserve VRS rates during clears but not during initialization. */
       if (is_clear && radv_image_has_vrs_htile(device, image)) {
-         mask &= ~(0x3 << 6); /* VRS X-rate */
+         mask &= ~(0x3 << 6);  /* VRS X-rate */
          mask &= ~(0x3 << 10); /* VRS Y-rate */
       }
 
@@ -719,16 +741,7 @@ radv_can_fast_clear_depth(struct radv_cmd_buffer *cmd_buffer, const struct radv_
                                         radv_image_queue_family_mask(iview->image, cmd_buffer->qf, cmd_buffer->qf)))
       return false;
 
-   if (clear_rect->rect.offset.x || clear_rect->rect.offset.y ||
-       clear_rect->rect.extent.width != iview->image->vk.extent.width ||
-       clear_rect->rect.extent.height != iview->image->vk.extent.height)
-      return false;
-
-   if (view_mask && (iview->image->vk.array_layers >= 32 || (1u << iview->image->vk.array_layers) - 1u != view_mask))
-      return false;
-   if (!view_mask && clear_rect->baseArrayLayer != 0)
-      return false;
-   if (!view_mask && clear_rect->layerCount != iview->image->vk.array_layers)
+   if (!radv_is_clear_rect_full(iview, clear_rect, view_mask))
       return false;
 
    if (device->vk.enabled_extensions.EXT_depth_range_unrestricted && (aspects & VK_IMAGE_ASPECT_DEPTH_BIT) &&
@@ -1012,7 +1025,7 @@ radv_clear_dcc_comp_to_single(struct radv_cmd_buffer *cmd_buffer, struct radv_im
       format = VK_FORMAT_R32G32B32A32_UINT;
       break;
    default:
-      unreachable("Unsupported number of bytes per pixel");
+      UNREACHABLE("Unsupported number of bytes per pixel");
    }
 
    result = get_clear_dcc_comp_to_single_pipeline(device, is_msaa, &pipeline, &layout);
@@ -1384,16 +1397,7 @@ radv_can_fast_clear_color(struct radv_cmd_buffer *cmd_buffer, const struct radv_
                                    radv_image_queue_family_mask(iview->image, cmd_buffer->qf, cmd_buffer->qf)))
       return false;
 
-   if (clear_rect->rect.offset.x || clear_rect->rect.offset.y ||
-       clear_rect->rect.extent.width != iview->image->vk.extent.width ||
-       clear_rect->rect.extent.height != iview->image->vk.extent.height)
-      return false;
-
-   if (view_mask && (iview->image->vk.array_layers >= 32 || (1u << iview->image->vk.array_layers) - 1u != view_mask))
-      return false;
-   if (!view_mask && clear_rect->baseArrayLayer != 0)
-      return false;
-   if (!view_mask && clear_rect->layerCount != iview->image->vk.array_layers)
+   if (!radv_is_clear_rect_full(iview, clear_rect, view_mask))
       return false;
 
    /* DCC */

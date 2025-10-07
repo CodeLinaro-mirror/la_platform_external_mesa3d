@@ -80,6 +80,12 @@ agx_1d(uint32_t x)
 }
 
 static struct agx_grid
+agx_2d(uint32_t x, uint32_t y)
+{
+   return agx_3d(x, y, 1);
+}
+
+static struct agx_grid
 agx_grid_indirect(uint64_t ptr)
 {
    return (struct agx_grid){.mode = AGX_CDM_MODE_INDIRECT_GLOBAL, .ptr = ptr};
@@ -343,6 +349,23 @@ agx_vdm_draw_size(enum agx_chip chip, struct agx_draw draw)
    }
 
    return size;
+}
+
+static inline GLOBAL uint32_t *
+agx_vdm_barrier(GLOBAL uint32_t *out, enum agx_chip chip)
+{
+   agx_push(out, VDM_BARRIER, cfg) {
+      cfg.unk_4 = (chip == AGX_CHIP_G13X);
+      cfg.unk_5 = true;
+      cfg.unk_6 = true;
+      cfg.unk_8 = true;
+      cfg.unk_11 = true;
+      cfg.unk_20 = true;
+      cfg.unk_24 = (chip == AGX_CHIP_G13X) || (chip == AGX_CHIP_G14X);
+      cfg.unk_26 = (chip == AGX_CHIP_G13X);
+   }
+
+   return out;
 }
 
 static inline GLOBAL uint32_t *

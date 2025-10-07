@@ -903,8 +903,15 @@ static void si_fast_clear(struct si_context *sctx, unsigned *buffers,
       bool update_db_stencil_clear = false;
       bool fb_too_small = num_pixels * zs_num_layers <= 512 * 512;
 
-      /* Transition from TC-incompatible to TC-compatible HTILE if requested. */
-      if (zstex->enable_tc_compatible_htile_next_clear) {
+      /* Transition from TC-incompatible to TC-compatible HTILE if requested.
+       * (the transition applies to the whole buffer, so make sure we're clearing
+       * everything).
+       */
+      bool whole_clear =
+         ((*buffers & PIPE_CLEAR_DEPTHSTENCIL) == PIPE_CLEAR_DEPTHSTENCIL) ||
+         (*buffers & PIPE_CLEAR_DEPTH && (!zstex->surface.has_stencil ||
+                                          zstex->htile_stencil_disabled));
+      if (zstex->enable_tc_compatible_htile_next_clear && whole_clear) {
          assert(zstex->buffer.b.b.last_level == 0);
          assert(!zstex->tc_compatible_htile);
 
@@ -1267,7 +1274,7 @@ static bool si_try_normal_clear(struct si_context *sctx, struct pipe_surface *ds
        dst->last_layer == util_max_layer(dst->texture, dst->level) &&
        /* pipe->clear honors render_condition, so only use it if it's unset or if it's set and enabled. */
        (!sctx->render_cond || render_condition_enabled) &&
-       sctx->has_graphics) {
+       sctx->is_gfx_queue) {
       struct pipe_context *ctx = &sctx->b;
       struct pipe_framebuffer_state saved_fb = {}, fb = {};
 
@@ -1439,7 +1446,7 @@ void si_init_clear_functions(struct si_context *sctx)
    sctx->b.clear_render_target = si_clear_render_target;
    sctx->b.clear_texture = u_default_clear_texture;
 
-   if (sctx->has_graphics) {
+   if (sctx->is_gfx_queue) {
       if (sctx->gfx_level >= GFX12)
          sctx->b.clear = gfx12_clear;
       else

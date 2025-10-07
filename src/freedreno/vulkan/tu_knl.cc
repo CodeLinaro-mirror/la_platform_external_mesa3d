@@ -37,6 +37,7 @@ tu_bo_init_new_explicit_iova(struct tu_device *dev,
                              VkMemoryPropertyFlags mem_property,
                              enum tu_bo_alloc_flags flags, const char *name)
 {
+   MESA_TRACE_FUNC();
    struct tu_instance *instance = dev->physical_device->instance;
 
    VkResult result =
@@ -88,6 +89,7 @@ tu_bo_export_dmabuf(struct tu_device *dev, struct tu_bo *bo)
 void
 tu_bo_finish(struct tu_device *dev, struct tu_bo *bo)
 {
+   MESA_TRACE_FUNC();
    struct tu_instance *instance = dev->physical_device->instance;
 
    vk_address_binding_report(&instance->vk, bo->base ? bo->base : &dev->vk.base,
@@ -145,7 +147,7 @@ tu_sync_cacheline_to_gpu(void const *p __attribute__((unused)))
     * Seems to be illegal to call from userspace.
     */
    //__asm volatile("mcr p15, 0, %0, c7, c10, 1" : : "r" (p) : "memory");
-   unreachable("Cache line clean is unsupported on ARMv7");
+   UNREACHABLE("Cache line clean is unsupported on ARMv7");
 #endif
 }
 
@@ -162,7 +164,7 @@ tu_sync_cacheline_from_gpu(void const *p __attribute__((unused)))
     * Seems to be illegal to call from userspace.
     */
    //__asm volatile("mcr p15, 0, %0, c7, c14, 1" : : "r" (p) : "memory");
-   unreachable("Cache line invalidate is unsupported on ARMv7");
+   UNREACHABLE("Cache line invalidate is unsupported on ARMv7");
 #endif
 }
 

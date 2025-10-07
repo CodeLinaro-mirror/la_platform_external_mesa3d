@@ -952,7 +952,7 @@ emit_reduction(lower_context* ctx, aco_opcode op, ReduceOp reduce_op, unsigned c
                      false, identity);
       }
       break;
-   default: unreachable("Invalid reduction mode");
+   default: UNREACHABLE("Invalid reduction mode");
    }
 
    if (op == aco_opcode::p_reduce) {
@@ -1119,6 +1119,35 @@ emit_bpermute_shared_vgpr(Builder& bld, aco_ptr<Instruction>& instr)
    bld.sop1(aco_opcode::s_mov_b64, Definition(exec, s2), Operand(tmp_exec.physReg(), s2));
 
    adjust_bpermute_dst(bld, dst, input_data);
+}
+
+void
+emit_permlane64_shared_vgpr(Builder& bld, aco_ptr<Instruction>& instr)
+{
+   /* Manually swap the data between the two halves using two shared VGPRs. */
+   Operand input_data = instr->operands[0];
+   Definition dst = instr->definitions[0];
+   assert(input_data.size() == 1 && input_data.physReg().byte() == 0);
+   assert(dst.size() == 1 && dst.physReg().byte() == 0);
+
+   assert(bld.program->gfx_level >= GFX10 && bld.program->gfx_level <= GFX10_3);
+   assert(bld.program->wave_size == 64);
+
+   unsigned shared_vgpr_reg_0 = align(bld.program->config->num_vgprs, 4) + 256;
+   PhysReg shared_vgpr_lo(shared_vgpr_reg_0);
+   PhysReg shared_vgpr_hi(shared_vgpr_reg_0 + 1);
+
+   /* Copy low and high parts to separate shared vgprs. */
+   bld.vop1_dpp(aco_opcode::v_mov_b32, Definition(shared_vgpr_lo, v1), input_data,
+                dpp_quad_perm(0, 1, 2, 3), 0x3, 0xf, false);
+   bld.vop1_dpp(aco_opcode::v_mov_b32, Definition(shared_vgpr_hi, v1), input_data,
+                dpp_quad_perm(0, 1, 2, 3), 0xc, 0xf, false);
+
+   /* Copy data back to the opposite half. */
+   bld.vop1_dpp(aco_opcode::v_mov_b32, dst, Operand(shared_vgpr_lo, v1), dpp_quad_perm(0, 1, 2, 3),
+                0xc, 0xf, false);
+   bld.vop1_dpp(aco_opcode::v_mov_b32, dst, Operand(shared_vgpr_hi, v1), dpp_quad_perm(0, 1, 2, 3),
+                0x3, 0xf, false);
 }
 
 void
@@ -1389,7 +1418,7 @@ do_copy(lower_context* ctx, Builder& bld, const copy_operation& copy, bool* pres
       } else if (def.regClass().is_subdword()) {
          bld.vop1_sdwa(aco_opcode::v_mov_b32, def, op);
       } else {
-         unreachable("unsupported copy");
+         UNREACHABLE("unsupported copy");
       }
 
       did_copy = true;
@@ -1806,8 +1835,7 @@ handle_operands(std::map<PhysReg, copy_operation>& copy_map, lower_context* ctx,
    bool skip_partial_copies = true;
    for (auto it = copy_map.begin();;) {
       if (copy_map.empty()) {
-         ctx->program->statistics[aco_statistic_copies] +=
-            ctx->instructions.size() - num_instructions_before;
+         ctx->program->statistics.copies += ctx->instructions.size() - num_instructions_before;
          return;
       }
       if (it == copy_map.end()) {
@@ -2085,8 +2113,7 @@ handle_operands(std::map<PhysReg, copy_operation>& copy_map, lower_context* ctx,
             break;
       }
    }
-   ctx->program->statistics[aco_statistic_copies] +=
-      ctx->instructions.size() - num_instructions_before;
+   ctx->program->statistics.copies += ctx->instructions.size() - num_instructions_before;
 }
 
 void
@@ -2122,47 +2149,7 @@ handle_operands_linear_vgpr(std::map<PhysReg, copy_operation>& copy_map, lower_c
       pi->scratch_sgpr = scratch_sgpr;
    }
 
-   ctx->program->statistics[aco_statistic_copies] += scratch_sgpr == scc ? 2 : 4;
-}
-
-void
-emit_set_mode(Builder& bld, float_mode new_mode, bool set_round, bool set_denorm)
-{
-   if (bld.program->gfx_level >= GFX10) {
-      if (set_round)
-         bld.sopp(aco_opcode::s_round_mode, new_mode.round);
-      if (set_denorm)
-         bld.sopp(aco_opcode::s_denorm_mode, new_mode.denorm);
-   } else if (set_round || set_denorm) {
-      /* "((size - 1) << 11) | register" (MODE is encoded as register 1) */
-      bld.sopk(aco_opcode::s_setreg_imm32_b32, Operand::literal32(new_mode.val), (7 << 11) | 1);
-   }
-}
-
-void
-emit_set_mode_from_block(Builder& bld, Program& program, Block* block)
-{
-   float_mode initial;
-   initial.val = program.config->float_mode;
-
-   bool inital_unknown =
-      (program.info.merged_shader_compiled_separately && program.stage.sw == SWStage::GS) ||
-      (program.info.merged_shader_compiled_separately && program.stage.sw == SWStage::TCS);
-   bool is_start = block->index == 0;
-   bool set_round = is_start && (inital_unknown || block->fp_mode.round != initial.round);
-   bool set_denorm = is_start && (inital_unknown || block->fp_mode.denorm != initial.denorm);
-   if (block->kind & block_kind_top_level) {
-      for (unsigned pred : block->linear_preds) {
-         if (program.blocks[pred].fp_mode.round != block->fp_mode.round)
-            set_round = true;
-         if (program.blocks[pred].fp_mode.denorm != block->fp_mode.denorm)
-            set_denorm = true;
-      }
-   }
-   /* only allow changing modes at top-level blocks so this doesn't break
-    * the "jump over empty blocks" optimization */
-   assert((!set_round && !set_denorm) || (block->kind & block_kind_top_level));
-   emit_set_mode(bld, block->fp_mode, set_round, set_denorm);
+   ctx->program->statistics.copies += scratch_sgpr == scc ? 2 : 4;
 }
 
 void
@@ -2280,8 +2267,6 @@ lower_to_hw_instr(Program* program)
       ctx.block = block;
       ctx.instructions.reserve(block->instructions.size());
       Builder bld(program, &ctx.instructions);
-
-      emit_set_mode_from_block(bld, *program, block);
 
       for (size_t instr_idx = 0; instr_idx < block->instructions.size(); instr_idx++) {
          aco_ptr<Instruction>& instr = block->instructions[instr_idx];
@@ -2429,6 +2414,7 @@ lower_to_hw_instr(Program* program)
                      discard_exit_block = discard_block;
                   }
                   block = &program->blocks[block_idx];
+                  ctx.block = block;
 
                   /* sendmsg(dealloc_vgprs) releases scratch, so it isn't safe if there is an
                    * in-progress scratch store. */
@@ -2537,6 +2523,10 @@ lower_to_hw_instr(Program* program)
                emit_bpermute_permlane(bld, instr);
                break;
             }
+            case aco_opcode::p_permlane64_shared_vgpr: {
+               emit_permlane64_shared_vgpr(bld, instr);
+               break;
+            };
             case aco_opcode::p_constaddr: {
                unsigned id = instr->definitions[0].tempId();
                PhysReg reg = instr->definitions[0].physReg();
@@ -2887,6 +2877,21 @@ lower_to_hw_instr(Program* program)
                         ((32 - 1) << 11) | shader_cycles_hi);
                break;
             }
+            case aco_opcode::p_callee_stack_ptr: {
+               unsigned caller_stack_size =
+                  ctx.program->config->scratch_bytes_per_wave / ctx.program->wave_size;
+               unsigned scratch_param_size = instr->operands[0].constantValue();
+               unsigned callee_stack_start = caller_stack_size + scratch_param_size;
+               if (ctx.program->gfx_level < GFX9)
+                  callee_stack_start *= ctx.program->wave_size;
+               if (instr->operands.size() < 2)
+                  bld.sop1(aco_opcode::s_mov_b32, instr->definitions[0],
+                           Operand::c32(callee_stack_start));
+               else
+                  bld.sop2(aco_opcode::s_add_u32, instr->definitions[0], Definition(scc, s1),
+                           instr->operands[1], Operand::c32(callee_stack_start));
+               break;
+            }
             default: break;
             }
          } else if (instr->isReduction()) {
@@ -2913,21 +2918,6 @@ lower_to_hw_instr(Program* program)
             } else if (emit_s_barrier) {
                bld.sopp(aco_opcode::s_barrier);
             }
-         } else if (instr->opcode == aco_opcode::p_v_cvt_f16_f32_rtne ||
-                    instr->opcode == aco_opcode::p_s_cvt_f16_f32_rtne) {
-            float_mode new_mode = block->fp_mode;
-            new_mode.round16_64 = fp_round_ne;
-            bool set_round = new_mode.round != block->fp_mode.round;
-
-            emit_set_mode(bld, new_mode, set_round, false);
-
-            if (instr->opcode == aco_opcode::p_v_cvt_f16_f32_rtne)
-               instr->opcode = aco_opcode::v_cvt_f16_f32;
-            else
-               instr->opcode = aco_opcode::s_cvt_f16_f32;
-            ctx.instructions.emplace_back(std::move(instr));
-
-            emit_set_mode(bld, block->fp_mode, set_round, false);
          } else if (instr->isMIMG() && instr->mimg().strict_wqm) {
             lower_image_sample(&ctx, instr);
             ctx.instructions.emplace_back(std::move(instr));

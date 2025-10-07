@@ -30,6 +30,7 @@
 
 #include "genxml/gen_macros.h"
 #include "genxml/genX_pack.h"
+#include "common/intel_common.h"
 #include "common/intel_compute_slm.h"
 #include "common/intel_genX_state_brw.h"
 
@@ -115,17 +116,23 @@ genX(emit_simpler_shader_init_fragment)(struct anv_simple_shader *state)
     * allocate space for the VS.  Even though one isn't run, we need VUEs to
     * store the data that VF is going to pass to SOL.
     */
-   struct intel_urb_config urb_cfg_out = {
+   struct intel_urb_config urb_cfg = {
       .size = { DIV_ROUND_UP(32, 64), 1, 1, 1 },
    };
 
-   genX(emit_l3_config)(batch, device, state->l3_config);
-   state->cmd_buffer->state.current_l3_config = state->l3_config;
+   genX(emit_l3_config)(batch, device, device->l3_config);
+   state->cmd_buffer->state.current_l3_config = device->l3_config;
 
-   enum intel_urb_deref_block_size deref_block_size;
-   genX(emit_urb_setup)(device, batch, state->l3_config,
-                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                        state->urb_cfg, &urb_cfg_out, &deref_block_size);
+   bool constrained;
+   intel_get_urb_config(device->info, device->l3_config, false, false,
+                        &urb_cfg, &constrained);
+
+   if (genX(need_wa_16014912113)(&state->cmd_buffer->state.gfx.urb_cfg,
+                                 &urb_cfg)) {
+      genX(batch_emit_wa_16014912113)(
+         batch, &state->cmd_buffer->state.gfx.urb_cfg);
+   }
+   genX(emit_urb_setup)(batch, device, &urb_cfg);
 
    anv_batch_emit(batch, GENX(3DSTATE_PS_BLEND), ps_blend) {
       ps_blend.HasWriteableRT = true;
@@ -168,7 +175,7 @@ genX(emit_simpler_shader_init_fragment)(struct anv_simple_shader *state)
 
    anv_batch_emit(batch, GENX(3DSTATE_SF), sf) {
 #if GFX_VER >= 12
-      sf.DerefBlockSize = deref_block_size;
+      sf.DerefBlockSize = urb_cfg.deref_block_size;
 #endif
    }
 
@@ -376,8 +383,8 @@ genX(emit_simpler_shader_init_fragment)(struct anv_simple_shader *state)
    }
 
    /* Update urb config after simple shader. */
-   memcpy(&state->cmd_buffer->state.gfx.urb_cfg, &urb_cfg_out,
-          sizeof(struct intel_urb_config));
+   memcpy(&state->cmd_buffer->state.gfx.urb_cfg, &urb_cfg,
+          sizeof(urb_cfg));
 
    state->cmd_buffer->state.gfx.vb_dirty = BITFIELD_BIT(0);
    state->cmd_buffer->state.gfx.dirty |= ~(ANV_CMD_DIRTY_INDEX_BUFFER |
@@ -585,6 +592,39 @@ genX(emit_simple_shader_dispatch)(struct anv_simple_shader *state,
          brw_cs_get_dispatch_info(devinfo, prog_data, NULL);
 
 #if GFX_VERx10 >= 125
+
+/* Not need with VRT enabled */
+#if GFX_VERx10 < 300
+      uint8_t pixel_async_compute_thread_limit, z_pass_async_compute_thread_limit,
+              np_z_async_throttle_settings;
+      bool slm_or_barrier_enabled = prog_data->base.total_shared != 0 || prog_data->uses_barrier;
+
+      intel_compute_engine_async_threads_limit(devinfo, dispatch.threads,
+                                               slm_or_barrier_enabled,
+                                               &pixel_async_compute_thread_limit,
+                                               &z_pass_async_compute_thread_limit,
+                                               &np_z_async_throttle_settings);
+      anv_batch_emit(batch, GENX(STATE_COMPUTE_MODE), cm) {
+   #if GFX_VER >= 20
+         cm.AsyncComputeThreadLimit = pixel_async_compute_thread_limit;
+         cm.ZPassAsyncComputeThreadLimit = z_pass_async_compute_thread_limit;
+         cm.ZAsyncThrottlesettings = np_z_async_throttle_settings;
+         cm.AsyncComputeThreadLimitMask = 0x7;
+         cm.ZPassAsyncComputeThreadLimitMask = 0x7;
+         cm.ZAsyncThrottlesettingsMask = 0x3;
+   #else
+         cm.PixelAsyncComputeThreadLimit = pixel_async_compute_thread_limit;
+         cm.ZPassAsyncComputeThreadLimit = z_pass_async_compute_thread_limit;
+         cm.PixelAsyncComputeThreadLimitMask = 0x7;
+         cm.ZPassAsyncComputeThreadLimitMask = 0x7;
+         if (intel_device_info_is_mtl_or_arl(devinfo)) {
+            cm.ZAsyncThrottlesettings = np_z_async_throttle_settings;
+            cm.ZAsyncThrottlesettingsMask = 0x3;
+         }
+   #endif
+      }
+#endif /* GFX_VERx10 < 300 */
+
       struct GENX(COMPUTE_WALKER_BODY) body = {
          .SIMDSize                       = dispatch.simd_size / 16,
          .MessageSIMD                    = dispatch.simd_size / 16,
@@ -613,6 +653,7 @@ genX(emit_simple_shader_dispatch)(struct anv_simple_shader *state,
             .BindingTablePointer               = 0,
             .BindingTableEntryCount            = 0,
             .NumberofThreadsinGPGPUThreadGroup = dispatch.threads,
+            .ThreadGroupDispatchSize           = intel_compute_threads_group_dispatch_size(dispatch.threads),
             .SharedLocalMemorySize             = intel_compute_slm_encode_size(GFX_VER,
                                                                                prog_data->base.total_shared),
             .NumberOfBarriers                  = prog_data->uses_barrier,

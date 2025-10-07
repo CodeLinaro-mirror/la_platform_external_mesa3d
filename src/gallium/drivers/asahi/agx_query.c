@@ -11,6 +11,7 @@
 #include "util/ralloc.h"
 #include "util/u_dump.h"
 #include "util/u_inlines.h"
+#include "agx_abi.h"
 #include "agx_bo.h"
 #include "agx_device.h"
 #include "agx_state.h"
@@ -417,7 +418,7 @@ agx_get_query_result(struct pipe_context *pctx, struct pipe_query *pquery,
       return true;
 
    default:
-      unreachable("Other queries not yet supported");
+      UNREACHABLE("Other queries not yet supported");
    }
 }
 
@@ -567,7 +568,7 @@ agx_get_query_address(struct agx_batch *batch, struct agx_query *query)
       agx_add_query_to_batch(batch, query);
       return query->ptr.gpu;
    } else {
-      return 0;
+      return AGX_SCRATCH_PAGE_ADDRESS;
    }
 }
 

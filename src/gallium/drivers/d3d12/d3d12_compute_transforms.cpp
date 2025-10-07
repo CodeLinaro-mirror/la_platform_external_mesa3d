@@ -302,7 +302,7 @@ get_query_resolve(const nir_shader_compiler_options *options, const d3d12_comput
          stride = sizeof(D3D12_QUERY_DATA_PIPELINE_STATISTICS) / sizeof(UINT64);
          break;
       default:
-         unreachable("Unhandled query resolve");
+         UNREACHABLE("Unhandled query resolve");
       }
 
       if (!key->query_resolve.is_resolve_in_place && key->query_resolve.num_subqueries == 1)
@@ -316,9 +316,7 @@ get_query_resolve(const nir_shader_compiler_options *options, const d3d12_comput
       nir_loop *loop = nir_push_loop(&b);
 
       nir_def *loop_counter_value = nir_load_var(&b, loop_counter);
-      nir_if *nif = nir_push_if(&b, nir_ieq(&b, loop_counter_value, num_results));
-      nir_jump(&b, nir_jump_break);
-      nir_pop_if(&b, nif);
+      nir_break_if(&b, nir_ieq(&b, loop_counter_value, num_results));
 
       /* For each field in the query result, accumulate */
       nir_def *array_index = nir_iadd(&b, nir_imul_imm(&b, loop_counter_value, stride), base_array_index);
@@ -382,7 +380,7 @@ get_query_resolve(const nir_shader_compiler_options *options, const d3d12_comput
    b.shader->info.num_ssbos = key->query_resolve.num_subqueries + !key->query_resolve.is_resolve_in_place;
    b.shader->info.num_ubos = 0;
 
-   NIR_PASS_V(b.shader, nir_lower_convert_alu_types, NULL);
+   NIR_PASS(_, b.shader, nir_lower_convert_alu_types, NULL);
 
    return b.shader;
 }
@@ -402,7 +400,7 @@ create_compute_transform(const nir_shader_compiler_options *options, const d3d12
    case d3d12_compute_transform_type::query_resolve:
       return get_query_resolve(options, key);
    default:
-      unreachable("Invalid transform");
+      UNREACHABLE("Invalid transform");
    }
 }
 

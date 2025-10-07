@@ -389,11 +389,9 @@ public:
    bool source_depth_to_render_target;
    bool runtime_check_aads_emit;
 
-   elk_fs_reg pixel_x;
-   elk_fs_reg pixel_y;
+   elk_fs_reg uw_pixel_x;
+   elk_fs_reg uw_pixel_y;
    elk_fs_reg pixel_z;
-   elk_fs_reg wpos_w;
-   elk_fs_reg pixel_w;
    elk_fs_reg delta_xy[ELK_BARYCENTRIC_MODE_COUNT];
    elk_fs_reg final_gs_vertex_count;
    elk_fs_reg control_data_bits;
@@ -523,7 +521,7 @@ private:
 
    unsigned dispatch_width; /**< 8, 16 or 32 */
 
-   exec_list discard_halt_patches;
+   brw_exec_list discard_halt_patches;
    bool runtime_check_aads_emit;
    bool debug_flag;
    const char *shader_name;

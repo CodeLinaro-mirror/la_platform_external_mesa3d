@@ -31,10 +31,9 @@
 #include <vulkan/vulkan_core.h>
 
 uint64_t
-panvk_per_arch(cmd_dispatch_prepare_tls)(struct panvk_cmd_buffer *cmdbuf,
-                                         const struct panvk_shader *shader,
-                                         const struct pan_compute_dim *dim,
-                                         bool indirect)
+panvk_per_arch(cmd_dispatch_prepare_tls)(
+   struct panvk_cmd_buffer *cmdbuf, const struct panvk_shader_variant *shader,
+   const struct pan_compute_dim *dim, bool indirect)
 {
    struct panvk_batch *batch = cmdbuf->cur_batch;
 
@@ -64,7 +63,8 @@ panvk_per_arch(cmd_dispatch_prepare_tls)(struct panvk_cmd_buffer *cmdbuf,
 static void
 cmd_dispatch(struct panvk_cmd_buffer *cmdbuf, struct panvk_dispatch_info *info)
 {
-   const struct panvk_shader *shader = cmdbuf->state.compute.shader;
+   const struct panvk_shader_variant *shader =
+      panvk_shader_only_variant(cmdbuf->state.compute.shader);
    VkResult result;
 
    /* If there's no compute shader, we can skip the dispatch. */
@@ -104,7 +104,7 @@ cmd_dispatch(struct panvk_cmd_buffer *cmdbuf, struct panvk_dispatch_info *info)
    panvk_per_arch(cmd_prepare_dispatch_sysvals)(cmdbuf, info);
 
    result = panvk_per_arch(cmd_prepare_push_uniforms)(
-      cmdbuf, cmdbuf->state.compute.shader, 1);
+      cmdbuf, shader, 1);
    if (result != VK_SUCCESS)
       return;
 
@@ -203,12 +203,12 @@ cmd_dispatch(struct panvk_cmd_buffer *cmdbuf, struct panvk_dispatch_info *info)
    unsigned copy_desc_dep =
       copy_desc_job.gpu
          ? pan_jc_add_job(&batch->vtc_jc, MALI_JOB_TYPE_COMPUTE, false,
-                          indirect, 0, 0, &copy_desc_job, false)
+                          indirect, 0, indirect_dep, &copy_desc_job, false)
          : indirect_dep;
 
    pan_jc_add_job(&batch->vtc_jc,
                   indirect ? MALI_JOB_TYPE_NOT_STARTED : MALI_JOB_TYPE_COMPUTE,
-                  indirect, false, 0, copy_desc_dep, &job, false);
+                  false, false, 0, copy_desc_dep, &job, false);
 
    panvk_per_arch(cmd_close_batch)(cmdbuf);
    clear_dirty_after_dispatch(cmdbuf);

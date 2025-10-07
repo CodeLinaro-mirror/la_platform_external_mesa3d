@@ -49,7 +49,7 @@ NORETURN static void PRINTFLIKE(2, 3)
    bi_print_instr(I, stderr);
    fprintf(stderr, "\n");
 
-   unreachable("Invalid instruction");
+   UNREACHABLE("Invalid instruction");
 }
 
 /*
@@ -435,7 +435,7 @@ va_pack_rhadd(const bi_instr *I)
    case BI_ROUND_RTP:
       return BITFIELD_BIT(30); /* rhadd */
    default:
-      unreachable("Invalid round for HADD");
+      UNREACHABLE("Invalid round for HADD");
    }
 }
 
@@ -909,6 +909,37 @@ va_pack_instr(const bi_instr *I, unsigned arch)
       hex |= va_pack_store(I);
       break;
 
+   case BI_OPCODE_ATOM1_RETURN_I64:
+      /* Permit omitting the destination for plain ATOM1 */
+      if (!bi_count_write_registers(I, 0)) {
+         hex |= (0x40ull << 40); // fake read
+      }
+
+      /* 64-bit source */
+      va_validate_register_pair(I, 0);
+      hex |= (uint64_t)va_pack_src(I, 0) << 0;
+      hex |= va_pack_byte_offset_8(I);
+      hex |= ((uint64_t)va_pack_atom_opc_1(I)) << 22;
+      break;
+
+   case BI_OPCODE_ACMPXCHG_I64:
+   case BI_OPCODE_AXCHG_I64:
+   case BI_OPCODE_ATOM_I64:
+   case BI_OPCODE_ATOM_RETURN_I64:
+      /* 64-bit source */
+      va_validate_register_pair(I, 1);
+      hex |= (uint64_t)va_pack_src(I, 1) << 0;
+      hex |= va_pack_byte_offset_8(I);
+      hex |= ((uint64_t)va_pack_atom_opc(I)) << 22;
+
+      if (I->op == BI_OPCODE_ATOM_RETURN_I64)
+         hex |= (0xc0ull << 40); // flags
+
+      if (I->atom_opc == BI_ATOM_OPC_ACMPXCHG)
+         hex |= (1 << 26); /* .compare */
+
+      break;
+
    case BI_OPCODE_ATOM1_RETURN_I32:
       /* Permit omitting the destination for plain ATOM1 */
       if (!bi_count_write_registers(I, 0)) {
@@ -922,6 +953,8 @@ va_pack_instr(const bi_instr *I, unsigned arch)
       hex |= ((uint64_t)va_pack_atom_opc_1(I)) << 22;
       break;
 
+   case BI_OPCODE_ACMPXCHG_I32:
+   case BI_OPCODE_AXCHG_I32:
    case BI_OPCODE_ATOM_I32:
    case BI_OPCODE_ATOM_RETURN_I32:
       /* 64-bit source */

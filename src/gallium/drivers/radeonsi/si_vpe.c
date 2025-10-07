@@ -56,7 +56,7 @@
    }
 
 #define SIVPE_ERR(fmt, args...)                                                                     \
-   fprintf(stderr, "SIVPE ERROR %s:%d %s " fmt, __FILE__, __LINE__, __func__, ##args)
+   mesa_loge("SIVPE: %s:%d %s " fmt, __FILE__, __LINE__, __func__, ##args)
 
 #define SIVPE_PRINT(fmt, args...)                                                                   \
    printf("SIVPE %s: " fmt, __func__, ##args);
@@ -595,13 +595,13 @@ si_vpe_set_surface_info(struct vpe_video_processor *vpeproc,
       return VPE_STATUS_NOT_SUPPORTED;
 
    struct vpe_plane_dcc_param *dcc_param = &surface_info->dcc;
-   dcc_param->enable                   = false;
-   dcc_param->meta_pitch               = 0;
-   dcc_param->independent_64b_blks     = false;
-   dcc_param->dcc_ind_blk              = 0;
-   dcc_param->meta_pitch_c             = 0;
-   dcc_param->independent_64b_blks_c   = false;
-   dcc_param->dcc_ind_blk_c            = 0;
+   dcc_param->enable                     = false;
+   dcc_param->src.meta_pitch             = 0;
+   dcc_param->src.independent_64b_blks   = false;
+   dcc_param->src.dcc_ind_blk            = 0;
+   dcc_param->src.meta_pitch_c           = 0;
+   dcc_param->src.independent_64b_blks_c = false;
+   dcc_param->src.dcc_ind_blk_c          = 0;
 
    return VPE_STATUS_OK;
 }
@@ -1105,7 +1105,7 @@ si_vpe_processor_check_and_build_settins(struct vpe_video_processor *vpeproc,
                                     USE_SRC_SURFACE,
                                     &build_param->streams[0].surface_info);
    if (VPE_STATUS_OK != result) {
-      SIVPE_ERR("Set Src surface failed with result: %d\n", result);
+      SIVPE_WARN(vpeproc->log_level, "Set Src surface failed with result: %d\n", result);
       return result;
    }
 
@@ -1122,7 +1122,7 @@ si_vpe_processor_check_and_build_settins(struct vpe_video_processor *vpeproc,
                                     USE_DST_SURFACE,
                                     &build_param->dst_surface);
    if (VPE_STATUS_OK != result) {
-      SIVPE_ERR("Set Dst surface failed with result: %d\n", result);
+      SIVPE_WARN(vpeproc->log_level, "Set Dst surface failed with result: %d\n", result);
       return result;
    }
 
@@ -1186,7 +1186,6 @@ si_vpe_construct_blt(struct vpe_video_processor *vpeproc,
     */
    result = si_vpe_processor_check_and_build_settins(vpeproc, process_properties, src_surfaces, dst_surfaces);
    if (VPE_STATUS_OK != result) {
-      SIVPE_ERR("Failed in checking process operation and build settings(%d)\n", result);
       return result;
    }
 
@@ -1387,7 +1386,7 @@ si_vpe_processor_process_frame(struct pipe_video_codec *codec,
    /* Geometric Scaling #1: decide how many passes and scaling ratios in each pass */
    result = si_vpe_decide_substage_scal_ratios(vpeproc, scaling_ratio);
    if (VPE_STATUS_OK != result) {
-      SIVPE_ERR("Failed in deciding geometric scaling ratios\n");
+      SIVPE_WARN(vpeproc->log_level, "Failed in deciding geometric scaling ratios\n");
       return result;
    }
    pHrSr = vpeproc->geometric_scaling_ratios;
@@ -1552,7 +1551,7 @@ si_vpe_processor_end_frame(struct pipe_video_codec *codec,
    struct vpe_video_processor *vpeproc = (struct vpe_video_processor *)codec;
    assert(codec);
 
-   vpeproc->ws->cs_flush(&vpeproc->cs, picture->flush_flags, picture->fence);
+   vpeproc->ws->cs_flush(&vpeproc->cs, picture->flush_flags, picture->out_fence);
    next_buffer(vpeproc);
 
    return 0;

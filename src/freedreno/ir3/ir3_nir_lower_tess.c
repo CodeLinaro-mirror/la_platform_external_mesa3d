@@ -55,6 +55,18 @@ build_local_primitive_id(nir_builder *b, struct state *state)
                            63);
 }
 
+static nir_def *
+load_tess_param_base(nir_builder *b)
+{
+   return nir_pack_64_2x32(b, nir_load_tess_param_base_ir3(b));
+}
+
+static nir_def *
+load_tess_factor_base(nir_builder *b)
+{
+   return nir_pack_64_2x32(b, nir_load_tess_factor_base_ir3(b));
+}
+
 static bool
 is_tess_levels(gl_varying_slot slot)
 {
@@ -104,7 +116,7 @@ shader_io_get_unique_index(gl_varying_slot slot)
       return 13 + (slot - VARYING_SLOT_VAR0);
    }
    default:
-      unreachable("illegal slot in get unique index\n");
+      UNREACHABLE("illegal slot in get unique index\n");
    }
 }
 
@@ -132,7 +144,7 @@ build_local_offset(nir_builder *b, struct state *state, nir_def *vertex,
                                  comp * 4);
       break;
    default:
-      unreachable("bad shader stage");
+      UNREACHABLE("bad shader stage");
    }
 
    nir_def *vertex_offset = nir_imul24(b, vertex, vertex_stride);
@@ -242,7 +254,7 @@ lower_block_to_explicit_output(nir_block *block, nir_builder *b,
       case nir_intrinsic_store_output: {
          // src[] = { value, offset }.
 
-         /* nir_lower_io_to_temporaries replaces all access to output
+         /* nir_lower_io_vars_to_temporaries replaces all access to output
           * variables with temp variables and then emits a nir_copy_var at
           * the end of the shader.  Thus, we should always get a full wrmask
           * here.
@@ -425,7 +437,7 @@ build_per_vertex_offset(nir_builder *b, struct state *state,
                                     comp);
          break;
       default:
-         unreachable("bad shader state");
+         UNREACHABLE("bad shader state");
       }
 
       attr_offset = nir_iadd(b, attr_offset,
@@ -466,7 +478,7 @@ tess_level_components(struct state *state, uint32_t *inner, uint32_t *outer)
       *outer = 2;
       break;
    default:
-      unreachable("bad");
+      UNREACHABLE("bad");
    }
 }
 
@@ -496,7 +508,7 @@ build_tessfactor_base(nir_builder *b, gl_varying_slot slot, uint32_t comp,
       offset = 1 + outer_levels;
       break;
    default:
-      unreachable("bad");
+      UNREACHABLE("bad");
    }
 
    return nir_iadd_imm(b, patch_offset, offset + comp);
@@ -517,7 +529,7 @@ lower_tess_ctrl_block(nir_block *block, nir_builder *b, struct state *state)
 
          b->cursor = nir_before_instr(&intr->instr);
 
-         nir_def *address = nir_load_tess_param_base_ir3(b);
+         nir_def *address = load_tess_param_base(b);
          nir_def *offset = build_per_vertex_offset(
             b, state, intr->src[0].ssa,
             nir_intrinsic_io_semantics(intr).location,
@@ -538,7 +550,7 @@ lower_tess_ctrl_block(nir_block *block, nir_builder *b, struct state *state)
             util_is_power_of_two_nonzero(nir_intrinsic_write_mask(intr) + 1));
 
          nir_def *value = intr->src[0].ssa;
-         nir_def *address = nir_load_tess_param_base_ir3(b);
+         nir_def *address = load_tess_param_base(b);
          nir_def *offset = build_per_vertex_offset(
             b, state, intr->src[1].ssa,
             nir_intrinsic_io_semantics(intr).location,
@@ -565,11 +577,11 @@ lower_tess_ctrl_block(nir_block *block, nir_builder *b, struct state *state)
          gl_varying_slot location = nir_intrinsic_io_semantics(intr).location;
          if (is_tess_levels(location)) {
             assert(intr->def.num_components == 1);
-            address = nir_load_tess_factor_base_ir3(b);
+            address = load_tess_factor_base(b);
             offset = build_tessfactor_base(
                b, location, nir_intrinsic_component(intr), state);
          } else {
-            address = nir_load_tess_param_base_ir3(b);
+            address = load_tess_param_base(b);
             offset = build_patch_offset(b, state, location,
                                         nir_intrinsic_component(intr),
                                         intr->src[0].ssa);
@@ -620,14 +632,14 @@ lower_tess_ctrl_block(nir_block *block, nir_builder *b, struct state *state)
 
             replace_intrinsic(b, intr, nir_intrinsic_store_global_ir3,
                               intr->src[0].ssa,
-                              nir_load_tess_factor_base_ir3(b),
+                              load_tess_factor_base(b),
                               nir_iadd(b, intr->src[1].ssa, offset));
 
             if (location != VARYING_SLOT_PRIMITIVE_ID) {
                nir_pop_if(b, nif);
             }
          } else {
-            nir_def *address = nir_load_tess_param_base_ir3(b);
+            nir_def *address = load_tess_param_base(b);
             nir_def *offset = build_patch_offset(
                b, state, location, nir_intrinsic_component(intr),
                intr->src[1].ssa);
@@ -729,7 +741,7 @@ lower_tess_eval_block(nir_block *block, nir_builder *b, struct state *state)
 
          b->cursor = nir_before_instr(&intr->instr);
 
-         nir_def *address = nir_load_tess_param_base_ir3(b);
+         nir_def *address = load_tess_param_base(b);
          nir_def *offset = build_per_vertex_offset(
             b, state, intr->src[0].ssa,
             nir_intrinsic_io_semantics(intr).location,
@@ -755,11 +767,11 @@ lower_tess_eval_block(nir_block *block, nir_builder *b, struct state *state)
          gl_varying_slot location = nir_intrinsic_io_semantics(intr).location;
          if (is_tess_levels(location)) {
             assert(intr->def.num_components == 1);
-            address = nir_load_tess_factor_base_ir3(b);
+            address = load_tess_factor_base(b);
             offset = build_tessfactor_base(
                b, location, nir_intrinsic_component(intr), state);
          } else {
-            address = nir_load_tess_param_base_ir3(b);
+            address = load_tess_param_base(b);
             offset = build_patch_offset(b, state, location,
                                         nir_intrinsic_component(intr),
                                         intr->src[0].ssa);

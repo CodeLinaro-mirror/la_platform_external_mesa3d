@@ -392,7 +392,7 @@ split_block_cursor(nir_cursor cursor,
       break;
 
    default:
-      unreachable("not reached");
+      UNREACHABLE("not reached");
    }
 
    if (_before)
@@ -527,7 +527,7 @@ nir_handle_add_jump(nir_block *block)
       break;
 
    default:
-      unreachable("Invalid jump type");
+      UNREACHABLE("Invalid jump type");
    }
 }
 
@@ -701,7 +701,7 @@ cleanup_cf_node(nir_cf_node *node, nir_function_impl *impl)
       break;
    }
    default:
-      unreachable("Invalid CF node type");
+      UNREACHABLE("Invalid CF node type");
    }
 }
 
@@ -813,10 +813,10 @@ relink_jump_halt_cf_node(nir_cf_node *node, nir_block *end_block)
    }
 
    case nir_cf_node_function:
-      unreachable("Cannot insert a function in a function");
+      UNREACHABLE("Cannot insert a function in a function");
 
    default:
-      unreachable("Invalid CF node type");
+      UNREACHABLE("Invalid CF node type");
    }
 }
 
@@ -859,6 +859,28 @@ nir_cf_delete(nir_cf_list *cf_list)
    foreach_list_typed(nir_cf_node, node, node, &cf_list->list) {
       cleanup_cf_node(node, cf_list->impl);
    }
+}
+
+void
+nir_remove_after_cf_node(nir_cf_node *node)
+{
+   nir_cf_node *end = node;
+   while (!nir_cf_node_is_last(end))
+      end = nir_cf_node_next(end);
+
+   nir_cursor begin = nir_after_cf_node(node);
+   if (begin.option == nir_cursor_before_block) {
+      /* nir_cf_extract() would ignore these phis */
+      nir_function_impl *impl = nir_cf_node_get_function(node);
+      nir_foreach_phi_safe(phi, begin.block) {
+         replace_ssa_def_uses(&phi->def, impl);
+         nir_instr_remove_v(&phi->instr);
+      }
+   }
+
+   nir_cf_list list;
+   nir_cf_extract(&list, begin, nir_after_cf_node(end));
+   nir_cf_delete(&list);
 }
 
 struct block_index {

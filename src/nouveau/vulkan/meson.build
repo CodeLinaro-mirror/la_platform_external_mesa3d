@@ -132,7 +132,7 @@ nvk_deps = [
 nvk_flags = []
 
 if with_platform_android
-  nvk_deps += [dep_android, idep_u_gralloc]
+  nvk_deps += [dep_android]
   nvk_flags += '-DVK_USE_PLATFORM_ANDROID_KHR'
   nvk_files += files('nvk_android.c')
 endif
@@ -179,6 +179,7 @@ nouveau_icd = custom_target(
   command : [
     prog_python, '@INPUT0@',
     '--api-version', '1.4', '--xml', '@INPUT1@',
+    '--sizeof-pointer', sizeof_pointer,
     '--lib-path', join_paths(icd_lib_path, icd_file_name),
     '--out', '@OUTPUT@',
   ],
@@ -196,6 +197,7 @@ custom_target(
   command : [
     prog_python, '@INPUT0@',
     '--api-version', '1.4', '--xml', '@INPUT1@',
+    '--sizeof-pointer', sizeof_pointer,
     '--lib-path', meson.current_build_dir() / icd_file_name,
     '--out', '@OUTPUT@',
   ],

@@ -308,8 +308,10 @@ struct vk_pipeline_cache_header {
 
 #define typed_memcpy(dest, src, count) do { \
    STATIC_ASSERT(sizeof(*(src)) == sizeof(*(dest))); \
-   if ((dest) != NULL && (src) != NULL && (count) > 0) { \
-       memcpy((dest), (src), (count) * sizeof(*(src))); \
+   uint8_t *d = (uint8_t*)(dest); \
+   const uint8_t *s = (const uint8_t*)(src); \
+   if (d != NULL && s != NULL && (count) > 0) { \
+       memcpy(d, s, (count) * sizeof(*(src))); \
    } \
 } while (0)
 
@@ -371,7 +373,7 @@ vk_index_type_to_bytes(VkIndexType type)
    case VK_INDEX_TYPE_UINT8_KHR: return 1;
    case VK_INDEX_TYPE_UINT16:    return 2;
    case VK_INDEX_TYPE_UINT32:    return 4;
-   default:                      unreachable("Invalid index type");
+   default:                      UNREACHABLE("Invalid index type");
    }
 }
 
@@ -382,7 +384,7 @@ vk_index_to_restart(VkIndexType type)
    case VK_INDEX_TYPE_UINT8_KHR: return 0xff;
    case VK_INDEX_TYPE_UINT16:    return 0xffff;
    case VK_INDEX_TYPE_UINT32:    return 0xffffffff;
-   default:                      unreachable("unexpected index type");
+   default:                      UNREACHABLE("unexpected index type");
    }
 }
 

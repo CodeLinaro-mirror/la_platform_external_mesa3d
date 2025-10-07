@@ -8,6 +8,7 @@
 #include "nir.h"
 #include "nir_builder.h"
 #include "radv_descriptor_set.h"
+#include "radv_descriptors.h"
 #include "radv_device.h"
 #include "radv_nir.h"
 #include "radv_physical_device.h"
@@ -75,10 +76,10 @@ visit_vulkan_resource_index(nir_builder *b, apply_layout_state *state, nir_intri
    }
 
    nir_def *binding_ptr = nir_imul_imm(b, intrin->src[0].ssa, stride);
-   nir_instr_as_alu(binding_ptr->parent_instr)->no_unsigned_wrap = true;
+   nir_def_as_alu(binding_ptr)->no_unsigned_wrap = true;
 
    binding_ptr = nir_iadd_imm(b, binding_ptr, offset);
-   nir_instr_as_alu(binding_ptr->parent_instr)->no_unsigned_wrap = true;
+   nir_def_as_alu(binding_ptr)->no_unsigned_wrap = true;
 
    if (layout->binding[binding].type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR) {
       assert(stride == 16);
@@ -98,7 +99,7 @@ visit_vulkan_resource_reindex(nir_builder *b, apply_layout_state *state, nir_int
       nir_def *binding_ptr = nir_unpack_64_2x32_split_y(b, intrin->src[0].ssa);
 
       nir_def *index = nir_imul_imm(b, intrin->src[1].ssa, 16);
-      nir_instr_as_alu(index->parent_instr)->no_unsigned_wrap = true;
+      nir_def_as_alu(index)->no_unsigned_wrap = true;
 
       binding_ptr = nir_iadd_nuw(b, binding_ptr, index);
 
@@ -110,7 +111,7 @@ visit_vulkan_resource_reindex(nir_builder *b, apply_layout_state *state, nir_int
       nir_def *stride = nir_channel(b, intrin->src[0].ssa, 2);
 
       nir_def *index = nir_imul(b, intrin->src[1].ssa, stride);
-      nir_instr_as_alu(index->parent_instr)->no_unsigned_wrap = true;
+      nir_def_as_alu(index)->no_unsigned_wrap = true;
 
       binding_ptr = nir_iadd_nuw(b, binding_ptr, index);
 
@@ -231,20 +232,21 @@ get_sampler_desc(nir_builder *b, apply_layout_state *state, nir_deref_instr *der
    case AC_DESC_PLANE_0:
       break;
    case AC_DESC_FMASK:
-   case AC_DESC_PLANE_1:
       offset += 32;
+      break;
+   case AC_DESC_PLANE_1:
+      offset += RADV_COMBINED_IMAGE_SAMPLER_DESC_SIZE;
       break;
    case AC_DESC_SAMPLER:
       size = RADV_SAMPLER_DESC_SIZE / 4;
       if (binding->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-         offset += radv_combined_image_descriptor_sampler_offset(binding);
+         offset += RADV_COMBINED_IMAGE_SAMPLER_DESC_SAMPLER_OFFSET;
       break;
    case AC_DESC_BUFFER:
       size = RADV_BUFFER_DESC_SIZE / 4;
       break;
    case AC_DESC_PLANE_2:
-      size = 4;
-      offset += 64;
+      offset += 2 * RADV_COMBINED_IMAGE_SAMPLER_DESC_SIZE;
       break;
    }
 
@@ -256,11 +258,11 @@ get_sampler_desc(nir_builder *b, apply_layout_state *state, nir_deref_instr *der
 
       nir_def *tmp = nir_imul_imm(b, deref->arr.index.ssa, array_size);
       if (tmp != deref->arr.index.ssa)
-         nir_instr_as_alu(tmp->parent_instr)->no_unsigned_wrap = true;
+         nir_def_as_alu(tmp)->no_unsigned_wrap = true;
 
       if (index) {
          index = nir_iadd(b, tmp, index);
-         nir_instr_as_alu(index->parent_instr)->no_unsigned_wrap = true;
+         nir_def_as_alu(index)->no_unsigned_wrap = true;
       } else {
          index = tmp;
       }
@@ -270,7 +272,7 @@ get_sampler_desc(nir_builder *b, apply_layout_state *state, nir_deref_instr *der
 
    nir_def *index_offset = index ? nir_iadd_imm(b, index, offset) : nir_imm_int(b, offset);
    if (index && index_offset != index)
-      nir_instr_as_alu(index_offset->parent_instr)->no_unsigned_wrap = true;
+      nir_def_as_alu(index_offset)->no_unsigned_wrap = true;
 
    if (non_uniform)
       return nir_iadd(b, load_desc_ptr(b, state, desc_set), index_offset);
@@ -278,20 +280,7 @@ get_sampler_desc(nir_builder *b, apply_layout_state *state, nir_deref_instr *der
    nir_def *addr = convert_pointer_to_64_bit(b, state, load_desc_ptr(b, state, desc_set));
    nir_def *desc = nir_load_smem_amd(b, size, addr, index_offset, .align_mul = size * 4u);
 
-   /* 3 plane formats always have same size and format for plane 1 & 2, so
-    * use the tail from plane 1 so that we can store only the first 16 bytes
-    * of the last plane. */
-   if (desc_type == AC_DESC_PLANE_2) {
-      nir_def *desc2 = get_sampler_desc(b, state, deref, AC_DESC_PLANE_1, non_uniform, tex, write);
-
-      nir_def *comp[8];
-      for (unsigned i = 0; i < 4; i++)
-         comp[i] = nir_channel(b, desc, i);
-      for (unsigned i = 4; i < 8; i++)
-         comp[i] = nir_channel(b, desc2, i);
-
-      return nir_vec(b, comp, 8);
-   } else if (desc_type == AC_DESC_IMAGE && state->has_image_load_dcc_bug && !tex && !write) {
+   if (desc_type == AC_DESC_IMAGE && state->has_image_load_dcc_bug && !tex && !write) {
       nir_def *comp[8];
       for (unsigned i = 0; i < 8; i++)
          comp[i] = nir_channel(b, desc, i);

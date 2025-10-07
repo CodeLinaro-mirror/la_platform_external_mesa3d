@@ -369,6 +369,7 @@ v3d_init_screen_caps(struct v3d_screen *screen)
 
         caps->native_fence_fd = true;
 
+        caps->clip_planes = 0;
         caps->depth_clip_disable = screen->devinfo.ver >= 71;
 
         caps->min_line_width =
@@ -387,6 +388,9 @@ v3d_init_screen_caps(struct v3d_screen *screen)
 
         caps->max_texture_anisotropy = 16.0f;
         caps->max_texture_lod_bias = 16.0f;
+
+        caps->device_reset_status_query = screen->devinfo.has_reset_counter;
+        caps->robust_buffer_access_behavior = true;
 }
 
 static bool
@@ -531,9 +535,8 @@ v3d_screen_is_format_supported(struct pipe_screen *pscreen,
         return true;
 }
 
-static const void *
+static const struct nir_shader_compiler_options *
 v3d_screen_get_compiler_options(struct pipe_screen *pscreen,
-                                enum pipe_shader_ir ir,
                                 enum pipe_shader_type shader)
 {
         struct v3d_screen *screen = v3d_screen(pscreen);
@@ -545,13 +548,14 @@ v3d_screen_get_compiler_options(struct pipe_screen *pscreen,
                 .lower_uadd_sat = true,
                 .lower_usub_sat = true,
                 .lower_iadd_sat = true,
-                .lower_all_io_to_temps = true,
                 .lower_extract_byte = true,
                 .lower_extract_word = true,
                 .lower_insert_byte = true,
                 .lower_insert_word = true,
                 .lower_bitfield_insert = true,
                 .lower_bitfield_extract = true,
+                .lower_bitfield_extract16 = true,
+                .lower_bitfield_extract8 = true,
                 .lower_bitfield_reverse = true,
                 .lower_bit_count = true,
                 .lower_cs_local_id_to_index = true,
@@ -602,17 +606,6 @@ v3d_screen_get_compiler_options(struct pipe_screen *pscreen,
                 .has_uclz = true,
                 .divergence_analysis_options =
                        nir_divergence_multiple_workgroup_per_compute_subgroup,
-                /* We don't currently support this in the backend, but that is
-                 * okay because our NIR compiler sets the option
-                 * lower_all_io_to_temps, which will eliminate indirect
-                 * indexing on all input/output variables by translating it to
-                 * indirect indexing on temporary variables instead, which we
-                 * will then lower to scratch. We prefer this over setting this
-                 * to 0, which would cause if-ladder injection to eliminate
-                 * indirect indexing on inputs.
-                 */
-                .support_indirect_inputs = (uint8_t)BITFIELD_MASK(PIPE_SHADER_TYPES),
-                .support_indirect_outputs = (uint8_t)BITFIELD_MASK(PIPE_SHADER_TYPES),
                 /* This will enable loop unrolling in the state tracker so we won't
                  * be able to selectively disable it in backend if it leads to
                  * lower thread counts or TMU spills. Choose a conservative maximum to
@@ -837,11 +830,13 @@ v3d_screen_create(int fd, const struct pipe_screen_config *config,
         pscreen->get_name = v3d_screen_get_name;
         pscreen->get_vendor = v3d_screen_get_vendor;
         pscreen->get_device_vendor = v3d_screen_get_vendor;
-        pscreen->get_compiler_options = v3d_screen_get_compiler_options;
         pscreen->get_disk_shader_cache = v3d_screen_get_disk_shader_cache;
         pscreen->query_dmabuf_modifiers = v3d_screen_query_dmabuf_modifiers;
         pscreen->is_dmabuf_modifier_supported =
                 v3d_screen_is_dmabuf_modifier_supported;
+
+        for (unsigned i = 0; i <= MESA_SHADER_COMPUTE; i++)
+           pscreen->nir_options[i] = v3d_screen_get_compiler_options(pscreen, i);
 
         if (screen->has_perfmon) {
                 pscreen->get_driver_query_group_info = v3d_get_driver_query_group_info;

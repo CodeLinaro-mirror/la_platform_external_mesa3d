@@ -31,8 +31,7 @@
 #include "dev/intel_debug.h"
 #include "util/u_math.h"
 #include "util/bitscan.h"
-
-#include <vector>
+#include "compiler/glsl_types.h"
 
 struct brw_bind_info {
    bool valid;
@@ -205,14 +204,14 @@ emit_system_values_block(nir_to_brw_state &ntb, nir_block *block)
       switch (intrin->intrinsic) {
       case nir_intrinsic_load_vertex_id:
       case nir_intrinsic_load_base_vertex:
-         unreachable("should be lowered by nir_lower_system_values().");
+         UNREACHABLE("should be lowered by nir_lower_system_values().");
 
       case nir_intrinsic_load_vertex_id_zero_base:
       case nir_intrinsic_load_is_indexed_draw:
       case nir_intrinsic_load_first_vertex:
       case nir_intrinsic_load_instance_id:
       case nir_intrinsic_load_base_instance:
-         unreachable("should be lowered by brw_nir_lower_vs_inputs().");
+         UNREACHABLE("should be lowered by brw_nir_lower_vs_inputs().");
          break;
 
       case nir_intrinsic_load_draw_id:
@@ -220,7 +219,7 @@ emit_system_values_block(nir_to_brw_state &ntb, nir_block *block)
           * nir_emit_mesh_task_intrinsic().
           */
          if (!gl_shader_stage_is_mesh(s.stage))
-            unreachable("should be lowered by brw_nir_lower_vs_inputs().");
+            UNREACHABLE("should be lowered by brw_nir_lower_vs_inputs().");
          break;
 
       case nir_intrinsic_load_invocation_id:
@@ -257,7 +256,7 @@ emit_system_values_block(nir_to_brw_state &ntb, nir_block *block)
 
       case nir_intrinsic_load_workgroup_id:
          if (gl_shader_stage_is_mesh(s.stage))
-            unreachable("should be lowered by nir_lower_compute_system_values().");
+            UNREACHABLE("should be lowered by nir_lower_compute_system_values().");
          assert(gl_shader_stage_is_compute(s.stage));
          reg = &ntb.system_values[SYSTEM_VALUE_WORKGROUP_ID];
          if (reg->file == BAD_FILE)
@@ -375,7 +374,7 @@ brw_from_nir_emit_cf_list(nir_to_brw_state &ntb, exec_list *list)
          break;
 
       default:
-         unreachable("Invalid CFG node block");
+         UNREACHABLE("Invalid CFG node block");
       }
    }
 }
@@ -425,8 +424,8 @@ brw_from_nir_emit_if(nir_to_brw_state &ntb, nir_if *if_stmt)
            jump->opcode == BRW_OPCODE_CONTINUE)) {
          jump->predicate = iff->predicate;
          jump->predicate_inverse = iff->predicate_inverse;
-         iff->exec_node::remove();
-         endif->exec_node::remove();
+         iff->brw_exec_node::remove();
+         endif->brw_exec_node::remove();
       }
    }
 }
@@ -450,7 +449,7 @@ brw_from_nir_emit_loop(nir_to_brw_state &ntb, nir_loop *loop)
        peep_break->predicate != BRW_PREDICATE_NONE) {
       peep_while->predicate = peep_break->predicate;
       peep_while->predicate_inverse = !peep_break->predicate_inverse;
-      peep_break->exec_node::remove();
+      peep_break->brw_exec_node::remove();
    }
 }
 
@@ -486,7 +485,7 @@ optimize_extract_to_float(nir_to_brw_state &ntb, const brw_builder &bld,
       return false;
 
    nir_alu_instr *src0 =
-      nir_instr_as_alu(instr->src[0].src.ssa->parent_instr);
+      nir_def_as_alu(instr->src[0].src.ssa);
 
    unsigned bytes;
    bool is_signed;
@@ -713,7 +712,7 @@ brw_rnd_mode_from_nir_op (const nir_op op) {
    case nir_op_f2f16_rtne:
       return BRW_RND_MODE_RTNE;
    default:
-      unreachable("Operation doesn't support rounding mode");
+      UNREACHABLE("Operation doesn't support rounding mode");
    }
 }
 
@@ -1143,7 +1142,7 @@ brw_from_nir_emit_alu(nir_to_brw_state &ntb, nir_alu_instr *instr,
       break;
 
    case nir_op_fsign:
-      unreachable("Should have been lowered by brw_nir_lower_fsign.");
+      UNREACHABLE("Should have been lowered by brw_nir_lower_fsign.");
 
    case nir_op_frcp:
       bld.RCP(result, op[0]);
@@ -1274,10 +1273,10 @@ brw_from_nir_emit_alu(nir_to_brw_state &ntb, nir_alu_instr *instr,
       break;
 
    case nir_op_uadd_carry:
-      unreachable("Should have been lowered by carry_to_arith().");
+      UNREACHABLE("Should have been lowered by carry_to_arith().");
 
    case nir_op_usub_borrow:
-      unreachable("Should have been lowered by borrow_to_arith().");
+      UNREACHABLE("Should have been lowered by borrow_to_arith().");
 
    case nir_op_umod:
    case nir_op_irem:
@@ -1442,7 +1441,7 @@ brw_from_nir_emit_alu(nir_to_brw_state &ntb, nir_alu_instr *instr,
             return;
 
          default:
-            unreachable("impossible opcode");
+            UNREACHABLE("impossible opcode");
          }
       }
       op[0] = resolve_source_modifiers(bld, op[0]);
@@ -1478,10 +1477,10 @@ brw_from_nir_emit_alu(nir_to_brw_state &ntb, nir_alu_instr *instr,
    case nir_op_b32any_inequal3:
    case nir_op_b32any_fnequal4:
    case nir_op_b32any_inequal4:
-      unreachable("Lowered by nir_lower_alu_reductions");
+      UNREACHABLE("Lowered by nir_lower_alu_reductions");
 
    case nir_op_ldexp:
-      unreachable("not reached: should be handled by ldexp_to_arith()");
+      UNREACHABLE("not reached: should be handled by ldexp_to_arith()");
 
    case nir_op_fsqrt:
       bld.SQRT(result, op[0]);
@@ -1508,30 +1507,6 @@ brw_from_nir_emit_alu(nir_to_brw_state &ntb, nir_alu_instr *instr,
       bld.RNDE(result, op[0]);
       break;
 
-   case nir_op_fquantize2f16: {
-      brw_reg tmp16 = bld.vgrf(BRW_TYPE_D);
-      brw_reg tmp32 = bld.vgrf(BRW_TYPE_F);
-
-      /* The destination stride must be at least as big as the source stride. */
-      tmp16 = subscript(tmp16, BRW_TYPE_HF, 0);
-
-      /* Check for denormal */
-      brw_reg abs_src0 = op[0];
-      abs_src0.abs = true;
-      bld.CMP(bld.null_reg_f(), abs_src0, brw_imm_f(ldexpf(1.0, -14)),
-              BRW_CONDITIONAL_L);
-      /* Get the appropriately signed zero */
-      brw_reg zero = retype(bld.AND(retype(op[0], BRW_TYPE_UD),
-                                   brw_imm_ud(0x80000000)), BRW_TYPE_F);
-      /* Do the actual F32 -> F16 -> F32 conversion */
-      bld.MOV(tmp16, op[0]);
-      bld.MOV(tmp32, tmp16);
-      /* Select that or zero based on normal status */
-      inst = bld.SEL(result, zero, tmp32);
-      inst->predicate = BRW_PREDICATE_NORMAL;
-      break;
-   }
-
    case nir_op_imin:
    case nir_op_umin:
    case nir_op_fmin:
@@ -1554,7 +1529,7 @@ brw_from_nir_emit_alu(nir_to_brw_state &ntb, nir_alu_instr *instr,
    case nir_op_unpack_unorm_4x8:
    case nir_op_unpack_half_2x16:
    case nir_op_pack_half_2x16:
-      unreachable("not reached: should be handled by lower_packing_builtins");
+      UNREACHABLE("not reached: should be handled by lower_packing_builtins");
 
    case nir_op_unpack_half_2x16_split_x:
       bld.MOV(result, subscript(op[0], BRW_TYPE_HF, 0));
@@ -1643,7 +1618,7 @@ brw_from_nir_emit_alu(nir_to_brw_state &ntb, nir_alu_instr *instr,
 
    case nir_op_ubitfield_extract:
    case nir_op_ibitfield_extract:
-      unreachable("should have been lowered");
+      UNREACHABLE("should have been lowered");
    case nir_op_ubfe:
    case nir_op_ibfe:
       assert(instr->def.bit_size < 64);
@@ -1668,7 +1643,7 @@ brw_from_nir_emit_alu(nir_to_brw_state &ntb, nir_alu_instr *instr,
       break;
 
    case nir_op_bitfield_insert:
-      unreachable("not reached: should have been lowered");
+      UNREACHABLE("not reached: should have been lowered");
 
    /* With regards to implicit masking of the shift counts for 8- and 16-bit
     * types, the PRMs are **incorrect**. They falsely state that on Gen9+ only
@@ -1868,7 +1843,7 @@ brw_from_nir_emit_alu(nir_to_brw_state &ntb, nir_alu_instr *instr,
       break;
 
    default:
-      unreachable("unhandled instruction");
+      UNREACHABLE("unhandled instruction");
    }
 }
 
@@ -1915,7 +1890,7 @@ brw_from_nir_emit_load_const(nir_to_brw_state &ntb,
       break;
 
    default:
-      unreachable("Invalid bit size");
+      UNREACHABLE("Invalid bit size");
    }
 
    bld.VEC(reg, comps, instr->def.num_components);
@@ -2902,7 +2877,7 @@ brw_from_nir_emit_vs_intrinsic(nir_to_brw_state &ntb,
    switch (instr->intrinsic) {
    case nir_intrinsic_load_vertex_id:
    case nir_intrinsic_load_base_vertex:
-      unreachable("should be lowered by nir_lower_system_values()");
+      UNREACHABLE("should be lowered by nir_lower_system_values()");
 
    case nir_intrinsic_load_input: {
       assert(instr->def.bit_size == 32);
@@ -2920,7 +2895,7 @@ brw_from_nir_emit_vs_intrinsic(nir_to_brw_state &ntb,
    case nir_intrinsic_load_draw_id:
    case nir_intrinsic_load_first_vertex:
    case nir_intrinsic_load_is_indexed_draw:
-      unreachable("lowered by brw_nir_lower_vs_inputs");
+      UNREACHABLE("lowered by brw_nir_lower_vs_inputs");
 
    default:
       brw_from_nir_emit_intrinsic(ntb, bld, instr);
@@ -3158,7 +3133,7 @@ brw_from_nir_emit_tcs_intrinsic(nir_to_brw_state &ntb,
       break;
 
    case nir_intrinsic_load_input:
-      unreachable("nir_lower_io should never give us these.");
+      UNREACHABLE("nir_lower_io should never give us these.");
       break;
 
    case nir_intrinsic_load_per_vertex_input: {
@@ -3476,7 +3451,7 @@ brw_from_nir_emit_gs_intrinsic(nir_to_brw_state &ntb,
       break;
 
    case nir_intrinsic_load_input:
-      unreachable("load_input intrinsics are invalid for the GS stage");
+      UNREACHABLE("load_input intrinsics are invalid for the GS stage");
 
    case nir_intrinsic_load_per_vertex_input:
       emit_gs_input_load(ntb, dest, instr->src[0], nir_intrinsic_base(instr),
@@ -3813,7 +3788,7 @@ alloc_frag_output(nir_to_brw_state &ntb, unsigned location)
                              &s.outputs[l - FRAG_RESULT_DATA0], 1);
 
    else
-      unreachable("Invalid location");
+      UNREACHABLE("Invalid location");
 }
 
 static void
@@ -3836,11 +3811,11 @@ emit_is_helper_invocation(nir_to_brw_state &ntb, brw_reg result)
 
       brw_inst *mov = b.MOV(offset(result, b, i), brw_imm_ud(~0));
 
-      /* The at() ensures that any code emitted to get the predicate happens
+      /* The before() ensures that any code emitted to get the predicate happens
        * before the mov right above.  This is not an issue elsewhere because
        * lowering code already set up the builder this way.
        */
-      brw_emit_predicate_on_sample_mask(b.at(NULL, mov), mov);
+      brw_emit_predicate_on_sample_mask(b.before(mov), mov);
       mov->predicate_inverse = true;
    }
 }
@@ -4451,6 +4426,20 @@ brw_from_nir_emit_fs_intrinsic(nir_to_brw_state &ntb,
       break;
    }
 
+   case nir_intrinsic_store_per_primitive_payload_intel: {
+      const brw_builder ubld = bld.exec_all().group(1, 0);
+      brw_reg src = get_nir_src(ntb, instr->src[0], -1);
+      src = retype(bld.emit_uniformize(src), BRW_TYPE_UD);
+
+      ubld.MOV(retype(
+                  brw_per_primitive_reg(bld,
+                                        nir_intrinsic_base(instr),
+                                        nir_intrinsic_component(instr)),
+                  BRW_TYPE_UD),
+               component(src, 0));
+      break;
+   }
+
    case nir_intrinsic_load_fs_input_interp_deltas: {
       assert(s.stage == MESA_SHADER_FRAGMENT);
       assert(nir_src_as_uint(instr->src[0]) == 0);
@@ -4609,9 +4598,15 @@ brw_from_nir_emit_fs_intrinsic(nir_to_brw_state &ntb,
       bld.MOV(retype(dest, BRW_TYPE_UD), brw_imm_ud(s.max_polygons));
       break;
 
+   case nir_intrinsic_load_per_primitive_remap_intel:
+      bld.MOV(retype(dest, BRW_TYPE_UD),
+              brw_dynamic_per_primitive_remap(brw_wm_prog_data(s.prog_data)));
+      break;
+
    case nir_intrinsic_read_attribute_payload_intel: {
-      const brw_reg offset = retype(get_nir_src(ntb, instr->src[0], 0),
-                                    BRW_TYPE_UD);
+      const brw_reg offset = retype(
+         bld.emit_uniformize(get_nir_src(ntb, instr->src[0], 0)),
+         BRW_TYPE_UD);
       bld.emit(FS_OPCODE_READ_ATTRIBUTE_PAYLOAD, retype(dest, BRW_TYPE_UD), offset);
       break;
    }
@@ -4620,6 +4615,60 @@ brw_from_nir_emit_fs_intrinsic(nir_to_brw_state &ntb,
       brw_from_nir_emit_intrinsic(ntb, bld, instr);
       break;
    }
+}
+
+static bool
+can_use_instruction_offset(enum lsc_addr_surface_type binding_type, int32_t offset)
+{
+   const unsigned max_bits = brw_max_immediate_offset_bits(binding_type);
+   return offset >= u_intN_min(max_bits) && offset <= u_intN_max(max_bits);
+}
+
+static void
+set_memory_address(nir_to_brw_state &ntb,
+                   const brw_builder &bld,
+                   nir_intrinsic_instr *instr,
+                   brw_reg *srcs)
+{
+   const intel_device_info *devinfo = ntb.devinfo;
+   const nir_src *nir_src_offset = nir_get_io_offset_src(instr);
+   const brw_reg src_offset = get_nir_src_imm(ntb, *nir_src_offset);
+   const enum lsc_addr_surface_type binding_type =
+      (enum lsc_addr_surface_type) srcs[MEMORY_LOGICAL_BINDING_TYPE].ud;
+   const brw_builder ubld = src_offset.is_scalar ? bld.scalar_group() : bld;
+
+   if (devinfo->ver < 20 ||
+       (!nir_intrinsic_has_base(instr) && !nir_src_is_const(*nir_src_offset))) {
+      srcs[MEMORY_LOGICAL_ADDRESS] =
+         nir_intrinsic_has_base(instr) ?
+         ubld.ADD(src_offset,
+                  brw_imm_int(src_offset.type, nir_intrinsic_base(instr))) :
+         src_offset;
+      srcs[MEMORY_LOGICAL_ADDRESS_OFFSET] = brw_imm_d(0);
+   } else if (!nir_intrinsic_has_base(instr) && nir_src_is_const(*nir_src_offset)) {
+      const int32_t offset = nir_src_as_int(*nir_src_offset);
+      if (can_use_instruction_offset(binding_type, offset)) {
+         srcs[MEMORY_LOGICAL_ADDRESS] = brw_imm_ud(0);
+         srcs[MEMORY_LOGICAL_ADDRESS_OFFSET] = brw_imm_d(offset);
+      } else {
+         srcs[MEMORY_LOGICAL_ADDRESS] = src_offset;
+         srcs[MEMORY_LOGICAL_ADDRESS_OFFSET] = brw_imm_d(0);
+      }
+   } else {
+      assert(nir_intrinsic_has_base(instr));
+      const int32_t offset = nir_intrinsic_base(instr);
+      assert(can_use_instruction_offset(binding_type, offset));
+      srcs[MEMORY_LOGICAL_ADDRESS] = src_offset;
+      srcs[MEMORY_LOGICAL_ADDRESS_OFFSET] = brw_imm_d(offset);
+   }
+
+   /* If nir_src is_scalar, the MEMORY_LOGICAL_ADDRESS will be allocated at
+    * scalar_group() size and will have every component the same value. This
+    * is the definition of is_scalar. Much more importantly, setting is_scalar
+    * properly also ensures that emit_uniformize (below) will handle the value
+    * as scalar_group() size instead of full dispatch width.
+    */
+   srcs[MEMORY_LOGICAL_ADDRESS].is_scalar = src_offset.is_scalar;
 }
 
 static unsigned
@@ -4725,6 +4774,7 @@ brw_from_nir_emit_cs_intrinsic(nir_to_brw_state &ntb,
       srcs[MEMORY_LOGICAL_DATA_SIZE] = brw_imm_ud(LSC_DATA_SIZE_D32);
       srcs[MEMORY_LOGICAL_COMPONENTS] = brw_imm_ud(3);
       srcs[MEMORY_LOGICAL_FLAGS] = brw_imm_ud(0);
+      srcs[MEMORY_LOGICAL_ADDRESS_OFFSET] = brw_imm_d(0);
 
       brw_inst *inst =
          bld.emit(SHADER_OPCODE_MEMORY_LOAD_LOGICAL,
@@ -4737,7 +4787,7 @@ brw_from_nir_emit_cs_intrinsic(nir_to_brw_state &ntb,
       /* Should have been lowered by brw_nir_lower_cs_intrinsics() or
        * iris_setup_uniforms() for the variable group size case.
        */
-      unreachable("Should have been lowered");
+      UNREACHABLE("Should have been lowered");
       break;
    }
 
@@ -4808,6 +4858,67 @@ brw_from_nir_emit_cs_intrinsic(nir_to_brw_state &ntb,
          ->saturate = nir_intrinsic_saturate(instr);
 
       cs_prog_data->uses_systolic = true;
+      break;
+   }
+
+   case nir_intrinsic_convert_cmat_intel: {
+      struct glsl_cmat_description dst_cmat_desc =
+         nir_intrinsic_dst_cmat_desc(instr);
+      struct glsl_cmat_description src_cmat_desc =
+         nir_intrinsic_src_cmat_desc(instr);
+
+      brw_reg_type dst_type =
+         brw_type_for_base_type((enum glsl_base_type)dst_cmat_desc.element_type);
+      brw_reg_type src_type =
+         brw_type_for_base_type((enum glsl_base_type)src_cmat_desc.element_type);
+
+      const unsigned dst_element_bits =
+         brw_type_size_bits(dst_type);
+      const unsigned src_element_bits =
+         brw_type_size_bits(src_type);
+
+      const unsigned element_bits = 32;
+      const unsigned src_packing_factor = element_bits / src_element_bits;
+      const unsigned src_components = nir_src_num_components(instr->src[0]);
+      const unsigned elems = src_components * src_packing_factor;
+
+      brw_builder bldn = bld.exec_all();
+      brw_reg src = retype(get_nir_src(ntb, instr->src[0], 0), src_type);
+      const brw_reg dst = retype(dest, dst_type);
+
+      assert(dst_cmat_desc.use == src_cmat_desc.use);
+
+      const bool needs_intermediate =
+         (src.type == BRW_TYPE_BF && dst.type != BRW_TYPE_F) ||
+         (dst.type == BRW_TYPE_BF && src.type != BRW_TYPE_F);
+
+      switch (src_cmat_desc.use) {
+      case GLSL_CMAT_USE_B:
+         assert(dst_element_bits == src_element_bits);
+         FALLTHROUGH;
+
+      case GLSL_CMAT_USE_A:
+      case GLSL_CMAT_USE_ACCUMULATOR: {
+         const unsigned width = bldn.dispatch_width();
+
+         if (needs_intermediate) {
+            brw_reg tmp = bldn.vgrf(BRW_TYPE_F, elems);
+            for (unsigned c = 0; c < elems; c++) {
+               bldn.MOV(suboffset(tmp, c * width),
+                        suboffset(src, c * width));
+            }
+            src = tmp;
+         }
+
+         for (unsigned c = 0; c < elems; c++) {
+            bldn.MOV(suboffset(dst, c * width),
+                     suboffset(src, c * width));
+         }
+         break;
+      }
+      default:
+         UNREACHABLE("not reached");
+      }
       break;
    }
 
@@ -4895,7 +5006,7 @@ brw_reduce_op_for_nir_reduction_op(nir_op op)
    case nir_op_ior:  return BRW_REDUCE_OP_OR;
    case nir_op_ixor: return BRW_REDUCE_OP_XOR;
    default:
-      unreachable("Invalid reduction operation");
+      UNREACHABLE("Invalid reduction operation");
    }
 }
 
@@ -4917,6 +5028,7 @@ get_nir_buffer_intrinsic_index(nir_to_brw_state &ntb, const brw_builder &bld,
    /* SSBO stores are weird in that their index is in src[1] */
    const bool is_store =
       instr->intrinsic == nir_intrinsic_store_ssbo ||
+      instr->intrinsic == nir_intrinsic_store_ssbo_intel ||
       instr->intrinsic == nir_intrinsic_store_ssbo_block_intel;
    nir_src src = is_store ? instr->src[1] : instr->src[0];
 
@@ -5024,9 +5136,7 @@ increment_a64_address(const brw_builder &_bld, brw_reg address, uint32_t v, bool
    const brw_builder bld = use_no_mask ? _bld.exec_all().group(8, 0) : _bld;
 
    if (bld.shader->devinfo->has_64bit_int) {
-      struct brw_reg imm = brw_imm_reg(address.type);
-      imm.u64 = v;
-      return bld.ADD(address, imm);
+      return bld.ADD(address, brw_imm_int(address.type, v));
    } else {
       brw_reg dst = bld.vgrf(BRW_TYPE_UQ);
       brw_reg dst_low = subscript(dst, BRW_TYPE_UD, 0);
@@ -5721,7 +5831,7 @@ brw_from_nir_emit_task_mesh_intrinsic(nir_to_brw_state &ntb, const brw_builder &
       break;
 
    case nir_intrinsic_load_local_invocation_id:
-      unreachable("local invocation id should have been lowered earlier");
+      UNREACHABLE("local invocation id should have been lowered earlier");
       break;
 
    case nir_intrinsic_load_local_invocation_index:
@@ -5883,7 +5993,9 @@ brw_from_nir_emit_intrinsic(nir_to_brw_state &ntb,
    case nir_intrinsic_shared_atomic:
    case nir_intrinsic_shared_atomic_swap:
    case nir_intrinsic_load_ssbo:
+   case nir_intrinsic_load_ssbo_intel:
    case nir_intrinsic_store_ssbo:
+   case nir_intrinsic_store_ssbo_intel:
    case nir_intrinsic_ssbo_atomic:
    case nir_intrinsic_ssbo_atomic_swap:
    case nir_intrinsic_load_global:
@@ -6000,7 +6112,7 @@ brw_from_nir_emit_intrinsic(nir_to_brw_state &ntb,
          break;
 
       default:
-         unreachable("invalid intrinsic");
+         UNREACHABLE("invalid intrinsic");
       }
 
       if (opcode == BRW_OPCODE_NOP)
@@ -6298,6 +6410,11 @@ brw_from_nir_emit_intrinsic(nir_to_brw_state &ntb,
              */
             brw_reg base_offset = retype(get_nir_src(ntb, instr->src[1], 0),
                                         BRW_TYPE_UD);
+            if (nir_intrinsic_has_base(instr)) {
+               struct brw_reg imm = brw_imm_int(base_offset.type,
+                                                nir_intrinsic_base(instr));
+               base_offset = bld.ADD(base_offset, imm);
+            }
 
             const unsigned comps_per_load = brw_type_size_bytes(dest.type) == 8 ? 2 : 4;
 
@@ -6327,7 +6444,8 @@ brw_from_nir_emit_intrinsic(nir_to_brw_state &ntb,
           */
          const unsigned type_size = brw_type_size_bytes(dest.type);
          const unsigned load_offset =
-            nir_src_as_uint(instr->src[1]) + first_component * type_size;
+            nir_src_as_uint(instr->src[1]) + first_component * type_size +
+            (nir_intrinsic_has_base(instr) ? nir_intrinsic_base(instr) : 0);
          const unsigned end_offset = load_offset + num_components * type_size;
          const unsigned ubo_block =
             brw_nir_ubo_surface_index_get_push_block(instr->src[0]);
@@ -6485,7 +6603,7 @@ brw_from_nir_emit_intrinsic(nir_to_brw_state &ntb,
    case nir_intrinsic_load_subgroup_gt_mask:
    case nir_intrinsic_load_subgroup_le_mask:
    case nir_intrinsic_load_subgroup_lt_mask:
-      unreachable("not reached");
+      UNREACHABLE("not reached");
 
    case nir_intrinsic_ddx_fine:
       bld.emit(FS_OPCODE_DDX_FINE, retype(dest, BRW_TYPE_F),
@@ -6642,7 +6760,7 @@ brw_from_nir_emit_intrinsic(nir_to_brw_state &ntb,
       case nir_intrinsic_quad_swap_horizontal: dir = BRW_SWAP_HORIZONTAL; break;
       case nir_intrinsic_quad_swap_vertical:   dir = BRW_SWAP_VERTICAL;   break;
       case nir_intrinsic_quad_swap_diagonal:   dir = BRW_SWAP_DIAGONAL;   break;
-      default: unreachable("invalid quad swap");
+      default: UNREACHABLE("invalid quad swap");
       }
 
       bld.emit(SHADER_OPCODE_QUAD_SWAP, retype(dest, value.type),
@@ -6837,7 +6955,7 @@ brw_from_nir_emit_intrinsic(nir_to_brw_state &ntb,
          break;
       }
       default:
-         unreachable("Invalid topology id type");
+         UNREACHABLE("Invalid topology id type");
       }
       break;
    }
@@ -6932,7 +7050,7 @@ brw_from_nir_emit_intrinsic(nir_to_brw_state &ntb,
       assert(instr->intrinsic < nir_num_intrinsics);
       fprintf(stderr, "intrinsic: %s\n", nir_intrinsic_infos[instr->intrinsic].name);
 #endif
-      unreachable("unknown intrinsic");
+      UNREACHABLE("unknown intrinsic");
    }
 }
 
@@ -6945,7 +7063,7 @@ lsc_bits_to_data_size(unsigned bit_size)
    case 4:  return LSC_DATA_SIZE_D32;
    case 8:  return LSC_DATA_SIZE_D64;
    default:
-      unreachable("Unsupported data size.");
+      UNREACHABLE("Unsupported data size.");
    }
 }
 
@@ -6981,8 +7099,13 @@ brw_from_nir_emit_memory_access(nir_to_brw_state &ntb,
    const bool is_load = !is_store && !is_atomic;
    const bool include_helpers = nir_intrinsic_has_access(instr) &&
       (nir_intrinsic_access(instr) & ACCESS_INCLUDE_HELPERS);
+   const bool volatile_access = nir_intrinsic_has_access(instr) &&
+      (nir_intrinsic_access(instr) & ACCESS_VOLATILE);
    const unsigned align =
       nir_intrinsic_has_align(instr) ? nir_intrinsic_align(instr) : 0;
+   const unsigned logical_flags =
+      (include_helpers ? MEMORY_FLAG_INCLUDE_HELPERS : 0) |
+      (volatile_access ? MEMORY_FLAG_VOLATILE_ACCESS : 0);
    bool no_mask_handle = false;
    int data_src = -1;
 
@@ -6991,9 +7114,11 @@ brw_from_nir_emit_memory_access(nir_to_brw_state &ntb,
    srcs[MEMORY_LOGICAL_COORD_COMPONENTS] = brw_imm_ud(1);
    srcs[MEMORY_LOGICAL_ALIGNMENT] = brw_imm_ud(align);
    /* DATA_SIZE and CHANNELS are handled below the switch */
-   srcs[MEMORY_LOGICAL_FLAGS] =
-      brw_imm_ud(include_helpers ? MEMORY_FLAG_INCLUDE_HELPERS : 0);
+   srcs[MEMORY_LOGICAL_FLAGS] = brw_imm_ud(logical_flags);
    /* DATA0 and DATA1 are handled below */
+
+   /* Set the default address offset to 0 */
+   srcs[MEMORY_LOGICAL_ADDRESS_OFFSET] = brw_imm_d(0);
 
    switch (instr->intrinsic) {
    case nir_intrinsic_bindless_image_load:
@@ -7040,7 +7165,9 @@ brw_from_nir_emit_memory_access(nir_to_brw_state &ntb,
       srcs[MEMORY_LOGICAL_MODE] = brw_imm_ud(MEMORY_MODE_CONSTANT);
       FALLTHROUGH;
    case nir_intrinsic_load_ssbo:
+   case nir_intrinsic_load_ssbo_intel:
    case nir_intrinsic_store_ssbo:
+   case nir_intrinsic_store_ssbo_intel:
    case nir_intrinsic_ssbo_atomic:
    case nir_intrinsic_ssbo_atomic_swap:
    case nir_intrinsic_load_ssbo_block_intel:
@@ -7053,9 +7180,7 @@ brw_from_nir_emit_memory_access(nir_to_brw_state &ntb,
                     LSC_ADDR_SURFTYPE_BSS : LSC_ADDR_SURFTYPE_BTI);
       srcs[MEMORY_LOGICAL_BINDING] =
          get_nir_buffer_intrinsic_index(ntb, bld, instr, &no_mask_handle);
-      srcs[MEMORY_LOGICAL_ADDRESS] =
-         get_nir_src_imm(ntb, instr->src[is_store ? 2 : 1]);
-
+      set_memory_address(ntb, bld, instr, srcs);
       data_src = is_atomic ? 2 : 0;
       break;
    case nir_intrinsic_load_shared:
@@ -7067,26 +7192,7 @@ brw_from_nir_emit_memory_access(nir_to_brw_state &ntb,
    case nir_intrinsic_load_shared_uniform_block_intel: {
       srcs[MEMORY_LOGICAL_MODE] = brw_imm_ud(MEMORY_MODE_SHARED_LOCAL);
       srcs[MEMORY_LOGICAL_BINDING_TYPE] = brw_imm_ud(LSC_ADDR_SURFTYPE_FLAT);
-
-      const brw_reg nir_src = get_nir_src(ntb, instr->src[is_store ? 1 : 0], 0);
-      const brw_builder ubld = nir_src.is_scalar ? bld.scalar_group() : bld;
-
-      /* If the logical address is not uniform, a call to emit_uniformize
-       * below will fix it up.
-       */
-      srcs[MEMORY_LOGICAL_ADDRESS] =
-         ubld.ADD(retype(nir_src, BRW_TYPE_UD),
-                  brw_imm_ud(nir_intrinsic_base(instr)));
-
-      /* If nir_src is_scalar, the MEMORY_LOGICAL_ADDRESS will be allocated at
-       * scalar_group() size and will have every component the same
-       * value. This is the definition of is_scalar. Much more importantly,
-       * setting is_scalar properly also ensures that emit_uniformize (below)
-       * will handle the value as scalar_group() size instead of full dispatch
-       * width.
-       */
-      srcs[MEMORY_LOGICAL_ADDRESS].is_scalar = nir_src.is_scalar;
-
+      set_memory_address(ntb, bld, instr, srcs);
       data_src = is_atomic ? 1 : 0;
       no_mask_handle = true;
       break;
@@ -7145,15 +7251,13 @@ brw_from_nir_emit_memory_access(nir_to_brw_state &ntb,
    case nir_intrinsic_store_global_block_intel:
       srcs[MEMORY_LOGICAL_MODE] = brw_imm_ud(MEMORY_MODE_UNTYPED);
       srcs[MEMORY_LOGICAL_BINDING_TYPE] = brw_imm_ud(LSC_ADDR_SURFTYPE_FLAT);
-      srcs[MEMORY_LOGICAL_ADDRESS] =
-         get_nir_src(ntb, instr->src[is_store ? 1 : 0], 0);
-      no_mask_handle = srcs[MEMORY_LOGICAL_ADDRESS].is_scalar;
-
+      set_memory_address(ntb, bld, instr, srcs);
       data_src = is_atomic ? 1 : 0;
+      no_mask_handle = srcs[MEMORY_LOGICAL_ADDRESS].is_scalar;
       break;
 
    default:
-      unreachable("unknown memory intrinsic");
+      UNREACHABLE("unknown memory intrinsic");
    }
 
    unsigned components = is_store ? instr->src[data_src].ssa->num_components
@@ -7423,7 +7527,7 @@ brw_from_nir_emit_texture(nir_to_brw_state &ntb,
          break;
 
       case nir_tex_src_projector:
-         unreachable("should be lowered");
+         UNREACHABLE("should be lowered");
 
       case nir_tex_src_texture_offset: {
          assert(srcs[TEX_LOGICAL_SRC_SURFACE].file == BAD_FILE);
@@ -7493,7 +7597,7 @@ brw_from_nir_emit_texture(nir_to_brw_state &ntb,
          break;
 
       default:
-         unreachable("unknown texture source");
+         UNREACHABLE("unknown texture source");
       }
    }
 
@@ -7609,7 +7713,7 @@ brw_from_nir_emit_texture(nir_to_brw_state &ntb,
       return;
    }
    default:
-      unreachable("unknown texture opcode");
+      UNREACHABLE("unknown texture opcode");
    }
 
    if (instr->op == nir_texop_tg4) {
@@ -7743,7 +7847,7 @@ brw_from_nir_emit_jump(nir_to_brw_state &ntb, nir_jump_instr *instr)
       break;
    case nir_jump_return:
    default:
-      unreachable("unknown jump");
+      UNREACHABLE("unknown jump");
    }
 }
 
@@ -7763,7 +7867,7 @@ brw_from_nir_emit_instr(nir_to_brw_state &ntb, nir_instr *instr)
       break;
 
    case nir_instr_type_deref:
-      unreachable("All derefs should've been lowered");
+      UNREACHABLE("All derefs should've been lowered");
       break;
 
    case nir_instr_type_intrinsic:
@@ -7802,7 +7906,7 @@ brw_from_nir_emit_instr(nir_to_brw_state &ntb, nir_instr *instr)
          brw_from_nir_emit_mesh_intrinsic(ntb, nir_instr_as_intrinsic(instr));
          break;
       default:
-         unreachable("unsupported shader stage");
+         UNREACHABLE("unsupported shader stage");
       }
       break;
 
@@ -7826,7 +7930,7 @@ brw_from_nir_emit_instr(nir_to_brw_state &ntb, nir_instr *instr)
       break;
 
    default:
-      unreachable("unknown instruction type");
+      UNREACHABLE("unknown instruction type");
    }
 }
 

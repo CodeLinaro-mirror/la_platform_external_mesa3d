@@ -43,7 +43,7 @@ ail_get_max_tile_size(unsigned blocksize_B)
    case 16: return (struct ail_tile) {  32,  32 };
    case 32: return (struct ail_tile) {  32,  16 };
    case 64: return (struct ail_tile) {  16,  16 };
-   default: unreachable("Invalid blocksize");
+   default: UNREACHABLE("Invalid blocksize");
    }
    /* clang-format on */
 }
@@ -287,9 +287,9 @@ ail_initialize_compression(struct ail_layout *layout)
 
    unsigned compbuf_B = 0;
 
-   for (unsigned l = 0; l < layout->levels; ++l) {
-      if (!ail_is_level_compressed(layout, l))
-         break;
+   for (unsigned l = 0;
+        l < layout->levels && ail_is_level_allocated_compressed(layout, l);
+        ++l) {
 
       layout->level_offsets_compressed_B[l] = compbuf_B;
 
@@ -372,7 +372,7 @@ ail_make_miptree(struct ail_layout *layout)
       ail_initialize_twiddled(layout);
       break;
    default:
-      unreachable("Unsupported tiling");
+      UNREACHABLE("Unsupported tiling");
    }
 
    if (layout->compressed) {

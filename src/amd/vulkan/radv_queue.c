@@ -41,7 +41,7 @@ radv_get_queue_global_priority(const VkDeviceQueueGlobalPriorityCreateInfo *pObj
    case VK_QUEUE_GLOBAL_PRIORITY_LOW:
       return RADEON_CTX_PRIORITY_LOW;
    default:
-      unreachable("Illegal global priority value");
+      UNREACHABLE("Illegal global priority value");
       return RADEON_CTX_PRIORITY_INVALID;
    }
 }
@@ -334,7 +334,7 @@ radv_fill_shader_rings(struct radv_device *device, uint32_t *desc, struct radeon
    desc += 8;
 
    if (mesh_scratch_ring_bo) {
-      radv_set_ring_buffer(pdev, mesh_scratch_ring_bo, 0, RADV_MESH_SCRATCH_NUM_ENTRIES * RADV_MESH_SCRATCH_ENTRY_BYTES,
+      radv_set_ring_buffer(pdev, mesh_scratch_ring_bo, 0, AC_MESH_SCRATCH_NUM_ENTRIES * AC_MESH_SCRATCH_ENTRY_BYTES,
                            false, false, false, 0, 0, &desc[0]);
    }
 
@@ -705,8 +705,10 @@ radv_emit_ge_rings(struct radv_device *device, struct radeon_cmdbuf *cs, struct 
          /* Mitigate the HiZ GPU hang by increasing a timeout when BOTTOM_OF_PIPE_TS is used as the
           * workaround. This must be emitted when the gfx queue is idle.
           */
+         const uint32_t timeout = pdev->use_gfx12_hiz_his_event_wa ? 0xfff : 0;
+
          radeon_emit(PKT3(PKT3_UPDATE_DB_SUMMARIZER_TIMEOUT, 0, 0));
-         radeon_emit(S_EF1_SUMM_CNTL_EVICT_TIMEOUT(0xfff));
+         radeon_emit(S_EF1_SUMM_CNTL_EVICT_TIMEOUT(timeout));
       }
    }
 
@@ -1043,13 +1045,13 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    if (!queue->ring_info.mesh_scratch_ring && needs->mesh_scratch_ring) {
       assert(pdev->info.gfx_level >= GFX10_3);
       result =
-         radv_bo_create(device, NULL, RADV_MESH_SCRATCH_NUM_ENTRIES * RADV_MESH_SCRATCH_ENTRY_BYTES, 256,
+         radv_bo_create(device, NULL, AC_MESH_SCRATCH_NUM_ENTRIES * AC_MESH_SCRATCH_ENTRY_BYTES, 256,
                         RADEON_DOMAIN_VRAM, ring_bo_flags, RADV_BO_PRIORITY_SCRATCH, 0, true, &mesh_scratch_ring_bo);
 
       if (result != VK_SUCCESS)
          goto fail;
       radv_rmv_log_command_buffer_bo_create(device, mesh_scratch_ring_bo, 0, 0,
-                                            RADV_MESH_SCRATCH_NUM_ENTRIES * RADV_MESH_SCRATCH_ENTRY_BYTES);
+                                            AC_MESH_SCRATCH_NUM_ENTRIES * AC_MESH_SCRATCH_ENTRY_BYTES);
    }
 
    if (!queue->ring_info.ge_rings && needs->ge_rings) {
@@ -2144,6 +2146,6 @@ radv_queue_family_to_ring(const struct radv_physical_device *pdev, enum radv_que
    case RADV_QUEUE_VIDEO_ENC:
       return AMD_IP_VCN_ENC;
    default:
-      unreachable("Unknown queue family");
+      UNREACHABLE("Unknown queue family");
    }
 }

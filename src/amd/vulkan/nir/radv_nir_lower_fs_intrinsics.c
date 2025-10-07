@@ -69,7 +69,7 @@ pass(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
       frag_z = nir_bcsel(b, cond, adjusted_frag_z, frag_z);
 
       nir_def *new_dest = nir_vector_insert_imm(b, &intrin->def, frag_z, 2);
-      nir_def_rewrite_uses_after(&intrin->def, new_dest, new_dest->parent_instr);
+      nir_def_rewrite_uses_after(&intrin->def, new_dest);
       return true;
    }
    case nir_intrinsic_load_barycentric_at_sample: {
@@ -90,8 +90,7 @@ pass(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
             /* sample_pos -= 0.5 */
             sample_pos = nir_fadd_imm(b, sample_pos, -0.5f);
 
-            res2 = nir_load_barycentric_at_offset(b, 32, sample_pos,
-                                                  .interp_mode = nir_intrinsic_interp_mode(intrin));
+            res2 = nir_load_barycentric_at_offset(b, 32, sample_pos, .interp_mode = nir_intrinsic_interp_mode(intrin));
          }
          nir_pop_if(b, NULL);
 
@@ -105,8 +104,8 @@ pass(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
             /* sample_pos -= 0.5 */
             sample_pos = nir_fadd_imm(b, sample_pos, -0.5f);
 
-            new_dest = nir_load_barycentric_at_offset(b, 32, sample_pos,
-                                                      .interp_mode = nir_intrinsic_interp_mode(intrin));
+            new_dest =
+               nir_load_barycentric_at_offset(b, 32, sample_pos, .interp_mode = nir_intrinsic_interp_mode(intrin));
          }
       }
 
@@ -122,6 +121,34 @@ bool
 radv_nir_lower_fs_intrinsics(nir_shader *nir, const struct radv_shader_stage *fs_stage,
                              const struct radv_graphics_state_key *gfx_state)
 {
-   struct ctx ctx = { .fs_stage = fs_stage, .gfx_state = gfx_state };
+   struct ctx ctx = {.fs_stage = fs_stage, .gfx_state = gfx_state};
    return nir_shader_intrinsics_pass(nir, pass, nir_metadata_none, &ctx);
+}
+
+static bool
+lower_load_input_attachment(nir_builder *b, nir_intrinsic_instr *intrin, void *state)
+{
+   switch (intrin->intrinsic) {
+   case nir_intrinsic_load_input_attachment_coord: {
+      b->cursor = nir_before_instr(&intrin->instr);
+
+      nir_def *pos = nir_f2i32(b, nir_load_frag_coord(b));
+      nir_def *layer = nir_load_layer_id(b);
+      nir_def *coord = nir_vec3(b, nir_channel(b, pos, 0), nir_channel(b, pos, 1), layer);
+
+      nir_def_replace(&intrin->def, coord);
+      return true;
+   }
+   default:
+      return false;
+   }
+}
+
+bool
+radv_nir_lower_fs_input_attachment(nir_shader *nir)
+{
+   if (!nir->info.fs.uses_fbfetch_output)
+      return false;
+
+   return nir_shader_intrinsics_pass(nir, lower_load_input_attachment, nir_metadata_control_flow, NULL);
 }

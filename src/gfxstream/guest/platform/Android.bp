@@ -58,10 +58,10 @@ cc_library_static {
     target: {
         android: {
             srcs: [
-                "linux/LinuxVirtGpuBlob.cpp",
-                "linux/LinuxVirtGpuBlobMapping.cpp",
-                "linux/LinuxVirtGpuDevice.cpp",
-                "linux/LinuxSync.cpp",
+                "drm/DrmVirtGpuBlob.cpp",
+                "drm/DrmVirtGpuBlobMapping.cpp",
+                "drm/DrmVirtGpuDevice.cpp",
+                "drm/DrmSync.cpp",
                 "kumquat/VirtGpuKumquatStub.cpp",
             ],
             shared_libs: [
@@ -70,7 +70,7 @@ cc_library_static {
         },
         host: {
             header_libs: [
-                "virtgpu_kumquat_ffi_headers",
+                "virtgpu_kumquat_ffi_headers_mesa3d",
                 "mesa_vulkan_mapper_headers",
             ],
             generated_headers: [
@@ -78,17 +78,17 @@ cc_library_static {
                 "vk_extensions_header",
             ],
             srcs: [
-                "linux/LinuxVirtGpuBlob.cpp",
-                "linux/LinuxVirtGpuBlobMapping.cpp",
-                "linux/LinuxVirtGpuDevice.cpp",
-                "linux/LinuxSync.cpp",
+                "drm/DrmVirtGpuBlob.cpp",
+                "drm/DrmVirtGpuBlobMapping.cpp",
+                "drm/DrmVirtGpuDevice.cpp",
+                "drm/DrmSync.cpp",
                 "kumquat/VirtGpuKumquatBlob.cpp",
                 "kumquat/VirtGpuKumquatBlobMapping.cpp",
                 "kumquat/VirtGpuKumquatDevice.cpp",
                 "kumquat/VirtGpuKumquatSync.cpp",
             ],
             shared_libs: [
-                "libvirtgpu_kumquat_ffi",
+                "libvirtgpu_kumquat_ffi_mesa3d",
             ],
             static_libs: [
                 "mesa_vulkan_mapper",
@@ -116,7 +116,7 @@ cc_defaults {
                 "mesa_vulkan_mapper",
             ],
             shared_libs: [
-                "libvirtgpu_kumquat_ffi",
+                "libvirtgpu_kumquat_ffi_mesa3d",
                 "libcutils",
             ],
         },

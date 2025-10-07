@@ -63,7 +63,7 @@ nir_blend_func(
       return nir_fmax(b, src, dst);
    }
 
-   unreachable("Invalid blend function");
+   UNREACHABLE("Invalid blend function");
 }
 
 /* Does this blend function multiply by a blend factor? */
@@ -128,7 +128,7 @@ nir_blend_factor_value(
       return nir_alpha_saturate(b, src, dst, chan);
    default:
       assert(util_blendfactor_is_inverted(factor_without_invert));
-      unreachable("Unexpected inverted factor");
+      UNREACHABLE("Unexpected inverted factor");
    }
 }
 
@@ -148,47 +148,6 @@ nir_fsat_to_format(nir_builder *b, nir_def *x, enum pipe_format format)
       return nir_build_fsat_signed(b, x);
    else
       return x;
-}
-
-/*
- * The spec says we need to clamp blend factors. However, we don't want to clamp
- * unnecessarily, as the clamp might not be optimized out. Check whether
- * clamping a blend factor is needed.
- */
-static bool
-should_clamp_factor(enum pipe_blendfactor factor, bool snorm)
-{
-   switch (util_blendfactor_without_invert(factor)) {
-   case PIPE_BLENDFACTOR_ONE:
-      /* 0, 1 are in [0, 1] and [-1, 1] */
-      return false;
-
-   case PIPE_BLENDFACTOR_SRC_COLOR:
-   case PIPE_BLENDFACTOR_SRC1_COLOR:
-   case PIPE_BLENDFACTOR_DST_COLOR:
-   case PIPE_BLENDFACTOR_SRC_ALPHA:
-   case PIPE_BLENDFACTOR_SRC1_ALPHA:
-   case PIPE_BLENDFACTOR_DST_ALPHA:
-      /* Colours are already clamped. For unorm, the complement of something
-       * clamped is still clamped. But for snorm, this is not true. Clamp for
-       * snorm only.
-       */
-      return util_blendfactor_is_inverted(factor) && snorm;
-
-   case PIPE_BLENDFACTOR_CONST_COLOR:
-   case PIPE_BLENDFACTOR_CONST_ALPHA:
-      /* Constant colours are not yet clamped */
-      return true;
-
-   case PIPE_BLENDFACTOR_SRC_ALPHA_SATURATE:
-      /* For unorm, this is in bounds (and hence so is its complement). For
-       * snorm, it may not be.
-       */
-      return snorm;
-
-   default:
-      unreachable("invalid blend factor");
-   }
 }
 
 static bool
@@ -228,9 +187,6 @@ nir_blend_factor(
 
    if (util_blendfactor_is_inverted(factor))
       f = nir_fadd_imm(b, nir_fneg(b, f), 1.0);
-
-   if (should_clamp_factor(factor, util_format_is_snorm(format)))
-      f = nir_fsat_to_format(b, f, format);
 
    return nir_fmul(b, raw_scalar, f);
 }
@@ -279,7 +235,7 @@ nir_logicop_func(
    case PIPE_LOGICOP_EQUIV:
       return nir_ixor(b, nir_ixor(b, src, dst), bitmask);
    case PIPE_LOGICOP_NOOP:
-      unreachable("optimized out");
+      UNREACHABLE("optimized out");
    case PIPE_LOGICOP_OR_INVERTED:
       return nir_ior(b, nir_ixor(b, src, bitmask), dst);
    case PIPE_LOGICOP_COPY:
@@ -292,7 +248,7 @@ nir_logicop_func(
       return nir_imm_ivec4(b, ~0, ~0, ~0, ~0);
    }
 
-   unreachable("Invalid logciop function");
+   UNREACHABLE("Invalid logciop function");
 }
 
 static nir_def *
@@ -407,20 +363,12 @@ nir_blend(
    /* Fixed-point framebuffers require their inputs clamped. */
    enum pipe_format format = options->format[rt];
 
-   /* From section 17.3.6 "Blending" of the OpenGL 4.5 spec:
-    *
-    *     If the color buffer is fixed-point, the components of the source and
-    *     destination values and blend factors are each clamped to [0, 1] or
-    *     [-1, 1] respectively for an unsigned normalized or signed normalized
-    *     color buffer prior to evaluating the blend equation. If the color
-    *     buffer is floating-point, no clamping occurs.
-    *
-    * Blend factors are clamped at the time of their use to ensure we properly
-    * clamp negative constant colours with signed normalized formats and
-    * ONE_MINUS_CONSTANT_* factors. Notice that -1 is in [-1, 1] but 1 - (-1) =
-    * 2 is not in [-1, 1] and should be clamped to 1.
+   /* The input colours need to be clamped to the format. Contrary to the
+    * OpenGL/Vulkan specs, it really is the inputs that get clamped and not the
+    * intermediate blend factors. This matches the CTS and hardware behaviour.
     */
    src = nir_fsat_to_format(b, src, format);
+   bconst = nir_fsat_to_format(b, bconst, format);
 
    if (src1)
       src1 = nir_fsat_to_format(b, src1, format);

@@ -352,6 +352,19 @@ st_get_sampler_view_format(const struct st_context *st,
 
    /* Use R8_UNORM for video formats */
    switch (format) {
+   case PIPE_FORMAT_Y8U8V8_420_UNORM_PACKED:
+      /* This format is HW-defined, so we can't lower it to anything but its
+       * YUV-as-RGB variant. */
+      assert(texObj->pt->format == PIPE_FORMAT_R8G8B8_420_UNORM_PACKED);
+      format = PIPE_FORMAT_R8G8B8_420_UNORM_PACKED;
+      break;
+   case PIPE_FORMAT_Y10U10V10_420_UNORM_PACKED:
+      /* This format is HW-defined, so we can't lower it to anything but its
+       * YUV-as-RGB variant. */
+      assert(texObj->pt->format == PIPE_FORMAT_R10G10B10_420_UNORM_PACKED);
+      format = PIPE_FORMAT_R10G10B10_420_UNORM_PACKED;
+      break;
+
    case PIPE_FORMAT_NV12:
       if (texObj->pt->format == PIPE_FORMAT_R8_G8B8_420_UNORM) {
          format = PIPE_FORMAT_R8_G8B8_420_UNORM;
@@ -394,6 +407,15 @@ st_get_sampler_view_format(const struct st_context *st,
    case PIPE_FORMAT_P012:
    case PIPE_FORMAT_P016:
    case PIPE_FORMAT_P030:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_420_UNORM:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_422_UNORM:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_444_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_420_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_422_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_444_UNORM:
+   case PIPE_FORMAT_Y16_U16_V16_420_UNORM:
+   case PIPE_FORMAT_Y16_U16_V16_422_UNORM:
+   case PIPE_FORMAT_Y16_U16_V16_444_UNORM:
       format = PIPE_FORMAT_R16_UNORM;
       break;
    case PIPE_FORMAT_Y210:

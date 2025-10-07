@@ -74,12 +74,7 @@ droid_create_image_from_native_buffer(_EGLDisplay *disp,
 {
    struct dri2_egl_display *dri2_dpy = dri2_egl_display(disp);
    struct u_gralloc_buffer_basic_info buf_info;
-   struct u_gralloc_buffer_color_info color_info = {
-      .yuv_color_space = __DRI_YUV_COLOR_SPACE_ITU_REC601,
-      .sample_range = __DRI_YUV_NARROW_RANGE,
-      .horizontal_siting = __DRI_YUV_CHROMA_SITING_0,
-      .vertical_siting = __DRI_YUV_CHROMA_SITING_0,
-   };
+   struct u_gralloc_buffer_color_info color_info;
    struct u_gralloc_buffer_handle gr_handle = {
       .handle = buf->handle,
       .hal_format = buf->format,
@@ -89,10 +84,11 @@ droid_create_image_from_native_buffer(_EGLDisplay *disp,
 
    if (u_gralloc_get_buffer_basic_info(dri2_dpy->gralloc, &gr_handle,
                                        &buf_info))
-      return 0;
+      return NULL;
 
-   /* May fail in some cases, defaults will be used in that case */
-   u_gralloc_get_buffer_color_info(dri2_dpy->gralloc, &gr_handle, &color_info);
+   if (u_gralloc_get_buffer_color_info(dri2_dpy->gralloc, &gr_handle,
+                                       &color_info))
+      return NULL;
 
    img = droid_create_image_from_buffer_info(dri2_dpy, buf->width, buf->height,
                                              &buf_info, &color_info, priv);
@@ -1045,7 +1041,7 @@ droid_load_driver(_EGLDisplay *disp, bool swrast)
    }
 
    dri2_dpy->loader_extensions = droid_image_loader_extensions;
-   dri2_detect_swrast(disp);
+   dri2_detect_swrast_kopper(disp);
 
    return true;
 
@@ -1199,7 +1195,7 @@ dri2_initialize_android(_EGLDisplay *disp)
       dri2_dpy->loader_extensions = droid_swrast_image_loader_extensions;
       dri2_dpy->fd_render_gpu = -1;
       dri2_dpy->pure_swrast = true;
-      dri2_detect_swrast(disp);
+      dri2_detect_swrast_kopper(disp);
 
       if (!dri2_create_screen(disp)) {
          err = "DRI2: Failed to create swrast screen";

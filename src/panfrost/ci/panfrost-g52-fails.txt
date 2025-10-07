@@ -2,6 +2,8 @@ glx@glx_arb_sync_control@swapbuffersmsc-divisor-zero,Fail
 glx@glx-make-current,Fail
 glx@glx-multi-window-single-context,Fail
 glx@glx-swap-pixmap-bad,Fail
+shaders@glsl-max-varyings,Fail
+shaders@glsl-max-varyings >max_varying_components,Fail
 shaders@point-vertex-id divisor,Fail
 shaders@point-vertex-id gl_instanceid divisor,Fail
 shaders@point-vertex-id gl_instanceid,Fail
@@ -97,7 +99,6 @@ spec@ext_framebuffer_object@fbo-blending-formats@GL_LUMINANCE8_ALPHA8,Fail
 spec@ext_framebuffer_object@fbo-blending-formats@GL_LUMINANCE8,Fail
 spec@ext_framebuffer_object@fbo-blending-formats@GL_LUMINANCE_ALPHA,Fail
 spec@ext_framebuffer_object@fbo-blending-formats@GL_LUMINANCE,Fail
-spec@ext_framebuffer_object@fbo-blending-snorm,Fail
 spec@ext_framebuffer_object@getteximage-formats init-by-clear-and-render,Fail
 spec@ext_framebuffer_object@getteximage-formats init-by-rendering,Fail
 spec@ext_transform_feedback2@draw-auto,Fail
@@ -161,15 +162,7 @@ spec@ext_transform_feedback@tessellation triangle_strip smooth,Fail
 spec@ext_transform_feedback@tessellation triangle_strip wireframe,Fail
 spec@glsl-1.10@execution@varying-packing@simple float array,Fail
 spec@glsl-1.10@execution@varying-packing@simple float arrays_of_arrays,Fail
-spec@glsl-1.10@execution@varying-packing@simple int array,Fail
-spec@glsl-1.10@execution@varying-packing@simple int arrays_of_arrays,Fail
-spec@glsl-1.10@execution@varying-packing@simple ivec2 array,Fail
-spec@glsl-1.10@execution@varying-packing@simple ivec2 arrays_of_arrays,Fail
-spec@glsl-1.10@execution@varying-packing@simple ivec3 array,Fail
-spec@glsl-1.10@execution@varying-packing@simple ivec3 arrays_of_arrays,Fail
-spec@glsl-1.10@execution@varying-packing@simple ivec3 separate,Fail
-spec@glsl-1.10@execution@varying-packing@simple ivec4 array,Fail
-spec@glsl-1.10@execution@varying-packing@simple ivec4 arrays_of_arrays,Fail
+spec@glsl-1.10@execution@varying-packing@simple float separate,Fail
 spec@glsl-1.10@execution@varying-packing@simple mat2 array,Fail
 spec@glsl-1.10@execution@varying-packing@simple mat2 arrays_of_arrays,Fail
 spec@glsl-1.10@execution@varying-packing@simple mat2 separate,Fail
@@ -197,22 +190,15 @@ spec@glsl-1.10@execution@varying-packing@simple mat4x2 separate,Fail
 spec@glsl-1.10@execution@varying-packing@simple mat4x3 array,Fail
 spec@glsl-1.10@execution@varying-packing@simple mat4x3 arrays_of_arrays,Fail
 spec@glsl-1.10@execution@varying-packing@simple mat4x3 separate,Fail
-spec@glsl-1.10@execution@varying-packing@simple uint array,Fail
-spec@glsl-1.10@execution@varying-packing@simple uint arrays_of_arrays,Fail
-spec@glsl-1.10@execution@varying-packing@simple uvec2 array,Fail
-spec@glsl-1.10@execution@varying-packing@simple uvec2 arrays_of_arrays,Fail
-spec@glsl-1.10@execution@varying-packing@simple uvec3 array,Fail
-spec@glsl-1.10@execution@varying-packing@simple uvec3 arrays_of_arrays,Fail
-spec@glsl-1.10@execution@varying-packing@simple uvec3 separate,Fail
-spec@glsl-1.10@execution@varying-packing@simple uvec4 array,Fail
-spec@glsl-1.10@execution@varying-packing@simple uvec4 arrays_of_arrays,Fail
 spec@glsl-1.10@execution@varying-packing@simple vec2 array,Fail
 spec@glsl-1.10@execution@varying-packing@simple vec2 arrays_of_arrays,Fail
+spec@glsl-1.10@execution@varying-packing@simple vec2 separate,Fail
 spec@glsl-1.10@execution@varying-packing@simple vec3 array,Fail
 spec@glsl-1.10@execution@varying-packing@simple vec3 arrays_of_arrays,Fail
 spec@glsl-1.10@execution@varying-packing@simple vec3 separate,Fail
 spec@glsl-1.10@execution@varying-packing@simple vec4 array,Fail
 spec@glsl-1.10@execution@varying-packing@simple vec4 arrays_of_arrays,Fail
+spec@glsl-1.10@execution@varying-packing@simple vec4 separate,Fail
 spec@glsl-1.30@execution@tex-miplevel-selection texture() 2drect,Crash
 spec@glsl-1.30@execution@tex-miplevel-selection texture() 2drectshadow,Crash
 spec@khr_texture_compression_astc@miptree-gles srgb-fp,Fail
@@ -381,9 +367,11 @@ afbcp-spec@khr_texture_compression_astc@sliced-3d-miptree-gl srgb-fp@sRGB decode
 
 # uprev Piglit in Mesa
 afbcp-spec@ext_image_dma_buf_import@ext_image_dma_buf_import-refcount-multithread,Crash
-spec@!opengl 1.1@dlist-fdo31590,Crash
 spec@arb_texture_float@multisample-formats 6 gl_arb_texture_float,Crash
 spec@arb_texture_float@multisample-formats 8 gl_arb_texture_float,Crash
+spec@ext_image_dma_buf_import@ext_image_dma_buf_import-refcount-multithread,Crash
+
+# Piglit tests require too much precision in alpha-to-coverage higher sample-counts
 spec@ext_framebuffer_multisample@alpha-to-coverage-dual-src-blend 6,Fail
 spec@ext_framebuffer_multisample@alpha-to-coverage-dual-src-blend 8,Fail
 spec@ext_framebuffer_multisample@alpha-to-coverage-no-draw-buffer-zero 6,Fail
@@ -392,7 +380,6 @@ spec@ext_framebuffer_multisample@draw-buffers-alpha-to-coverage 6,Fail
 spec@ext_framebuffer_multisample@draw-buffers-alpha-to-coverage 8,Fail
 spec@ext_framebuffer_multisample@sample-alpha-to-coverage 6 color,Fail
 spec@ext_framebuffer_multisample@sample-alpha-to-coverage 8 color,Fail
-spec@ext_image_dma_buf_import@ext_image_dma_buf_import-refcount-multithread,Crash
 
 # CTS bug: https://gitlab.khronos.org/Tracker/vk-gl-cts/-/issues/5695
 KHR-GLES31.core.texture_storage_multisample.APIDependencies.renderbuffer_storage_multisample_invalid_samples_argument_for_integer_internalformats,Fail
@@ -545,6 +532,22 @@ dEQP-VK.draw.dynamic_rendering.primary_cmd_buff.indexed_draw.draw_instanced_inde
 dEQP-VK.draw.dynamic_rendering.primary_cmd_buff.indexed_draw.draw_instanced_indexed_triangle_strip_offset_negative_large_with_bind_offset_with_alloc_offset,Fail
 dEQP-VK.draw.dynamic_rendering.primary_cmd_buff.indexed_draw.draw_instanced_indexed_triangle_strip_with_alloc_offset,Fail
 dEQP-VK.draw.dynamic_rendering.primary_cmd_buff.indexed_draw.draw_instanced_indexed_triangle_strip_with_bind_offset_with_alloc_offset,Fail
+
+# CTS bug, see https://gitlab.khronos.org/Tracker/vk-gl-cts/-/issues/5700
+dEQP-VK.image.load_store.without_any_format.buffer.b8g8r8_srgb,Fail
+dEQP-VK.image.load_store.without_any_format.buffer.b8g8r8_srgb_linear,Fail
+dEQP-VK.image.load_store.without_any_format.buffer.b8g8r8_srgb_minalign,Fail
+dEQP-VK.image.load_store.without_any_format.buffer.b8g8r8_srgb_minalign_linear,Fail
+dEQP-VK.image.load_store.without_any_format.buffer.r8g8b8_srgb,Fail
+dEQP-VK.image.load_store.without_any_format.buffer.r8g8b8_srgb_linear,Fail
+dEQP-VK.image.load_store.without_any_format.buffer.r8g8b8_srgb_minalign,Fail
+dEQP-VK.image.load_store.without_any_format.buffer.r8g8b8_srgb_minalign_linear,Fail
+
+# CTS bug, see https://github.com/KhronosGroup/VK-GL-CTS/issues/523
+dEQP-VK.image.load_store.without_any_format.buffer.b8g8r8_srgb_minalign_uniform,Fail
+dEQP-VK.image.load_store.without_any_format.buffer.b8g8r8_srgb_minalign_uniform_linear,Fail
+dEQP-VK.image.load_store.without_any_format.buffer.r8g8b8_srgb_minalign_uniform,Fail
+dEQP-VK.image.load_store.without_any_format.buffer.r8g8b8_srgb_minalign_uniform_linear,Fail
 
 dEQP-VK.rasterization.rasterization_order_attachment_access.depth.samples_1.multi_draw_barriers,Crash
 dEQP-VK.rasterization.rasterization_order_attachment_access.depth.samples_4.multi_draw_barriers,Crash

@@ -377,7 +377,7 @@ v3d_gs_output_primitive(enum mesa_prim prim_type)
     case MESA_PRIM_TRIANGLE_STRIP:
         return GEOMETRY_SHADER_TRI_STRIP;
     default:
-        unreachable("Unsupported primitive type");
+        UNREACHABLE("Unsupported primitive type");
     }
 }
 
@@ -417,7 +417,7 @@ simd_width_to_gs_pack_mode(uint32_t width)
     case 1:
         return V3D_PACK_MODE_1_WAY;
     default:
-        unreachable("Invalid SIMD width");
+        UNREACHABLE("Invalid SIMD width");
     };
 }
 
@@ -1062,6 +1062,7 @@ v3d_update_job_tlb_load_store(struct v3d_job *job) {
 
         if (v3d->rasterizer->base.rasterizer_discard)
                return;
+        job->does_rasterization = true;
 
         uint32_t no_load_mask =
                 job->clear_tlb | job->clear_draw | job->invalidated_load;
@@ -1204,7 +1205,6 @@ v3d_draw_vbo(struct pipe_context *pctx, const struct pipe_draw_info *info,
                                                    v3d->ssbo[s].sb[i].buffer);
                         struct v3d_resource *rsc= v3d_resource(v3d->ssbo[s].sb[i].buffer);
                         rsc->graphics_written = true;
-                        job->tmu_dirty_rcl = true;
                 }
 
                 BITSET_FOREACH_SET(i, v3d->shaderimg[s].enabled_mask,
@@ -1213,7 +1213,6 @@ v3d_draw_vbo(struct pipe_context *pctx, const struct pipe_draw_info *info,
                                                    v3d->shaderimg[s].si[i].base.resource);
                         struct v3d_resource *rsc= v3d_resource(v3d->shaderimg[s].si[i].base.resource);
                         rsc->graphics_written = true;
-                        job->tmu_dirty_rcl = true;
                 }
         }
 
@@ -1798,6 +1797,12 @@ v3d_clear(struct pipe_context *pctx, unsigned buffers, const struct pipe_scissor
         struct v3d_context *v3d = v3d_context(pctx);
         struct v3d_job *job = v3d_get_job_for_fbo(v3d);
 
+        /* If the clear call reaches the drives implies that rasterizer
+         * discard is always disabled. The state tracker is already ignoring
+         * clear calls if rasterization discard is enabled.
+         */
+        job->does_rasterization = true;
+
         buffers &= ~v3d_tlb_clear(job, buffers, color, depth, stencil);
 
         if (!buffers || !v3d_render_condition_check(v3d))
@@ -1851,7 +1856,7 @@ v3d_set_global_binding(struct pipe_context *pctx,
         if (old_size < first + count) {
                 /* we are screwed no matter what */
                 if (!util_dynarray_grow(&v3d->global_buffers, *resources, (first + count) - old_size))
-                        unreachable("out of memory");
+                        UNREACHABLE("out of memory");
 
                 for (unsigned i = old_size; i < first + count; i++)
                         *util_dynarray_element(&v3d->global_buffers, struct pipe_resource *, i) = NULL;

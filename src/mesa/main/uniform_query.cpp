@@ -611,7 +611,7 @@ _mesa_get_uniform(struct gl_context *ctx, GLuint program, GLint location,
                   break;
                }
                default:
-                  unreachable("invalid uniform type");
+                  UNREACHABLE("invalid uniform type");
                }
                break;
 
@@ -1011,6 +1011,8 @@ associate_uniform_storage(struct gl_context *ctx,
          case GLSL_TYPE_ERROR:
          case GLSL_TYPE_INTERFACE:
          case GLSL_TYPE_COOPERATIVE_MATRIX:
+         case GLSL_TYPE_FLOAT_E4M3FN:
+         case GLSL_TYPE_FLOAT_E5M2:
             assert(!"Should not get here.");
             break;
          }

@@ -737,7 +737,7 @@ jm_emit_primitive(struct panfrost_batch *batch,
           * on Valhall, so we don't need to set that here
           */
       } else if (cfg.index_type) {
-         cfg.base_vertex_offset = draw->index_bias - ctx->offset_start;
+         cfg.base_vertex_offset = (int64_t)draw->index_bias - ctx->offset_start;
 
 #if PAN_ARCH <= 7
          cfg.indices = batch->indices;
@@ -970,7 +970,7 @@ GENX(jm_launch_draw)(struct panfrost_batch *batch,
 #elif PAN_ARCH >= 6
       tiler = pan_pool_alloc_desc(&batch->pool.base, INDEXED_VERTEX_JOB);
 #else
-      unreachable("IDVS is unsupported on Midgard");
+      UNREACHABLE("IDVS is unsupported on Midgard");
 #endif
    } else {
       vertex = pan_pool_alloc_desc(&batch->pool.base, COMPUTE_JOB);
@@ -1014,7 +1014,7 @@ GENX(jm_launch_draw_indirect)(struct panfrost_batch *batch,
                               unsigned drawid_offset,
                               const struct pipe_draw_indirect_info *indirect)
 {
-   unreachable("draw indirect not implemented for jm");
+   UNREACHABLE("draw indirect not implemented for jm");
 }
 
 void

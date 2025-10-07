@@ -13,12 +13,14 @@
 #include "nir_builder.h"
 #include "vk_pipeline.h"
 
+#include "clcb97.h"
 #include "nv_push.h"
 #include "nv_push_cl9097.h"
 #include "nv_push_cl906f.h"
 #include "nv_push_cla0c0.h"
 #include "nv_push_clb1c0.h"
 #include "nv_push_clc6c0.h"
+#include "nv_push_clc86f.h"
 
 struct nvk_indirect_commands_layout {
    struct vk_object_base base;
@@ -179,11 +181,7 @@ nvk_nir_push_copy_dws(nir_builder *b, struct nvk_nir_push *p,
 
    nir_push_loop(b);
    {
-      nir_push_if(b, nir_uge(b, nir_load_var(b, i), dw_count));
-      {
-         nir_jump(b, nir_jump_break);
-      }
-      nir_pop_if(b, NULL);
+      nir_break_if(b, nir_uge(b, nir_load_var(b, i), dw_count));
 
       nir_def *dw = load_global_dw(b, nir_load_var(b, src_dw_addr), 0);
       store_global_dw(b, nir_load_var(b, p->addr), 0, dw);
@@ -213,12 +211,8 @@ nvk_nir_build_pad_NOP(nir_builder *b, struct nvk_nir_push *p, uint32_t nop)
 {
    nir_push_loop(b);
    {
-      nir_push_if(b, nir_uge_imm(b, nir_load_var(b, p->dw_count),
-                                    p->max_dw_count));
-      {
-         nir_jump(b, nir_jump_break);
-      }
-      nir_pop_if(b, NULL);
+      nir_break_if(b, nir_uge_imm(b, nir_load_var(b, p->dw_count),
+                                  p->max_dw_count));
 
       store_global_dw(b, nir_load_var(b, p->addr), 0, nir_imm_int(b, nop));
       nir_iadd_to_var_imm(b, p->addr, 4);
@@ -421,7 +415,7 @@ build_process_cs_cmd_seq(nir_builder *b, struct nvk_nir_push *p,
       }
 
       default:
-         unreachable("Unsupported indirect token type");
+         UNREACHABLE("Unsupported indirect token type");
       }
    }
 }
@@ -485,7 +479,7 @@ build_gfx_set_exec(nir_builder *b, struct nvk_nir_push *p, nir_def *token_addr,
    }
 
    default:
-      unreachable("Unknown indirect execution set type");
+      UNREACHABLE("Unknown indirect execution set type");
    }
 }
 
@@ -687,7 +681,7 @@ build_process_gfx_cmd_seq(nir_builder *b, struct nvk_nir_push *p,
          break;
 
       default:
-         unreachable("Unsupported indirect token type");
+         UNREACHABLE("Unsupported indirect token type");
       }
    }
 }
@@ -792,7 +786,7 @@ build_process_shader(struct nvk_device *dev,
          build_process_gfx_cmd_seq(b, &push, in_seq_addr, seq_idx,
                                    &in, pdev, info);
       } else {
-         unreachable("Unknown shader stage");
+         UNREACHABLE("Unknown shader stage");
       }
    }
    nir_pop_if(b, NULL);
@@ -805,12 +799,12 @@ build_process_shader(struct nvk_device *dev,
    } else if (info->shaderStages & NVK_SHADER_STAGE_GRAPHICS_BITS) {
       nvk_nir_pad_NOP(b, &push, NV9097);
    } else {
-      unreachable("Unknown shader stage");
+      UNREACHABLE("Unknown shader stage");
    }
 
    /* Replace the out stride with the actual size of a command stream */
    nir_load_const_instr *out_stride_const =
-      nir_instr_as_load_const(out_stride->parent_instr);
+      nir_def_as_load_const(out_stride);
    out_stride_const->value[0].u32 = push.max_dw_count * 4;
 
    /* We also output this stride to go in the layout struct */
@@ -1035,7 +1029,7 @@ nvk_CmdExecuteGeneratedCommandsEXT(VkCommandBuffer commandBuffer,
       nvk_cmd_flush_process_state(cmd, info);
       nvk_cmd_process_cmds(cmd, info, &cmd->state);
 
-      struct nv_push *p = nvk_cmd_buffer_push(cmd, 5);
+      struct nv_push *p = nvk_cmd_buffer_push(cmd, 6);
       P_IMMD(p, NVA0C0, INVALIDATE_SHADER_CACHES, {
          .data = DATA_TRUE,
          .constant = CONSTANT_TRUE,
@@ -1043,7 +1037,10 @@ nvk_CmdExecuteGeneratedCommandsEXT(VkCommandBuffer commandBuffer,
       });
       if (pdev->info.cls_eng3d >= MAXWELL_COMPUTE_B)
          P_IMMD(p, NVB1C0, INVALIDATE_SKED_CACHES, 0);
-      __push_immd(p, SUBC_NV9097, NV906F_SET_REFERENCE, 0);
+      if (pdev->info.cls_eng3d >= HOPPER_A)
+         P_IMMD(p, NVC86F, WFI, 0);
+      else
+         __push_immd(p, SUBC_NV9097, NV906F_SET_REFERENCE, 0);
    }
 
    if (layout->stages & VK_SHADER_STAGE_COMPUTE_BIT) {

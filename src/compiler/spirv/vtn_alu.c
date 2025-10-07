@@ -149,7 +149,7 @@ vtn_mediump_downconvert(struct vtn_builder *b, enum glsl_base_type base_type, ni
    case GLSL_TYPE_BOOL:
       return def;
    default:
-      unreachable("bad relaxed precision input type");
+      UNREACHABLE("bad relaxed precision input type");
    }
 }
 
@@ -252,7 +252,7 @@ vtn_convert_op_src_type(SpvOp opcode)
    case SpvOpSatConvertUToS:
       return nir_type_uint;
    default:
-      unreachable("Unhandled conversion op");
+      UNREACHABLE("Unhandled conversion op");
    }
 }
 
@@ -273,7 +273,7 @@ vtn_convert_op_dst_type(SpvOp opcode)
    case SpvOpSatConvertSToU:
       return nir_type_uint;
    default:
-      unreachable("Unhandled conversion op");
+      UNREACHABLE("Unhandled conversion op");
    }
 }
 
@@ -608,7 +608,7 @@ vtn_mediump_upconvert(struct vtn_builder *b, enum glsl_base_type base_type, nir_
    case GLSL_TYPE_UINT:
       return nir_u2u32(&b->nb, def);
    default:
-      unreachable("bad relaxed precision output type");
+      UNREACHABLE("bad relaxed precision output type");
    }
 }
 
@@ -664,7 +664,7 @@ vtn_handle_deriv(struct vtn_builder *b, SpvOp opcode, nir_def *src)
       return nir_fadd(&b->nb,
                       nir_fabs(&b->nb, nir_ddx_coarse(&b->nb, src)),
                       nir_fabs(&b->nb, nir_ddy_coarse(&b->nb, src)));
-   default: unreachable("Not a derivative opcode");
+   default: UNREACHABLE("Not a derivative opcode");
    }
 }
 
@@ -683,6 +683,7 @@ vtn_handle_convert(struct vtn_builder *b, SpvOp opcode,
     *
     * For now we are limiting exposure of bfloat16 in NIR, so apply the
     * extra conversions directly here.
+    * The same applies to E4M3 and E5M2.
     */
    if (glsl_type_is_bfloat_16(glsl_src_type)) {
       nir_def *src_as_float = nir_bf2f(&b->nb, src);
@@ -699,6 +700,42 @@ vtn_handle_convert(struct vtn_builder *b, SpvOp opcode,
          src_as_float = vtn_handle_convert(b, opcode, dest_val, glsl_float_type(),
                                            glsl_src_type, src);
       return nir_f2bf(&b->nb, src_as_float);
+   } else if (glsl_type_is_e4m3fn(glsl_src_type)) {
+      nir_def *src_as_float = nir_e4m3fn2f(&b->nb, src);
+      if (glsl_type_is_float(glsl_dest_type))
+         return src_as_float;
+      return vtn_handle_convert(b, opcode, dest_val, glsl_dest_type,
+                                glsl_float_type(), src_as_float);
+
+   } else if (glsl_type_is_e4m3fn(glsl_dest_type)) {
+      nir_def *src_as_float;
+      if (glsl_type_is_float(glsl_src_type))
+         src_as_float = src;
+      else
+         src_as_float = vtn_handle_convert(b, opcode, dest_val, glsl_float_type(),
+                                           glsl_src_type, src);
+      if (vtn_has_decoration(b, dest_val, SpvDecorationSaturatedToLargestFloat8NormalConversionEXT))
+         return nir_f2e4m3fn_sat(&b->nb, src_as_float);
+      else
+         return nir_f2e4m3fn(&b->nb, src_as_float);
+   } else if (glsl_type_is_e5m2(glsl_src_type)) {
+      nir_def *src_as_float = nir_e5m22f(&b->nb, src);
+      if (glsl_type_is_float(glsl_dest_type))
+         return src_as_float;
+      return vtn_handle_convert(b, opcode, dest_val, glsl_dest_type,
+                                glsl_float_type(), src_as_float);
+
+   } else if (glsl_type_is_e5m2(glsl_dest_type)) {
+      nir_def *src_as_float;
+      if (glsl_type_is_float(glsl_src_type))
+         src_as_float = src;
+      else
+         src_as_float = vtn_handle_convert(b, opcode, dest_val, glsl_float_type(),
+                                           glsl_src_type, src);
+      if (vtn_has_decoration(b, dest_val, SpvDecorationSaturatedToLargestFloat8NormalConversionEXT))
+         return nir_f2e5m2_sat(&b->nb, src_as_float);
+      else
+         return nir_f2e5m2(&b->nb, src_as_float);
    }
 
    /* Use bit_size from NIR source instead of from the original src type,
@@ -953,7 +990,7 @@ vtn_handle_alu(struct vtn_builder *b, SpvOp opcode,
       switch (op) {
       case nir_op_fge: op = nir_op_flt; break;
       case nir_op_flt: op = nir_op_fge; break;
-      default: unreachable("Impossible opcode.");
+      default: UNREACHABLE("Impossible opcode.");
       }
 
       dest->def =
@@ -1066,7 +1103,7 @@ vtn_handle_alu(struct vtn_builder *b, SpvOp opcode,
    case SpvOpSDotAccSatKHR:
    case SpvOpUDotAccSatKHR:
    case SpvOpSUDotAccSatKHR:
-      unreachable("Should have called vtn_handle_integer_dot instead.");
+      UNREACHABLE("Should have called vtn_handle_integer_dot instead.");
 
    default: {
       bool swap;
@@ -1110,7 +1147,7 @@ vtn_handle_alu(struct vtn_builder *b, SpvOp opcode,
    case SpvOpISub:
    case SpvOpShiftLeftLogical:
    case SpvOpSNegate: {
-      nir_alu_instr *alu = nir_instr_as_alu(dest->def->parent_instr);
+      nir_alu_instr *alu = nir_def_as_alu(dest->def);
       vtn_foreach_decoration(b, dest_val, handle_no_wrap, alu);
       break;
    }
@@ -1252,7 +1289,7 @@ vtn_handle_integer_dot(struct vtn_builder *b, SpvOp opcode,
          break;
 
       default:
-         unreachable("Invalid opcode.");
+         UNREACHABLE("Invalid opcode.");
       }
 
       /* The SPV_KHR_integer_dot_product spec says:
@@ -1330,7 +1367,7 @@ vtn_handle_integer_dot(struct vtn_builder *b, SpvOp opcode,
                dest = nir_udot_2x16_uadd(&b->nb, src[0], src[1], zero);
             break;
          default:
-            unreachable("Invalid opcode.");
+            UNREACHABLE("Invalid opcode.");
          }
       } else {
          switch (opcode) {
@@ -1362,7 +1399,7 @@ vtn_handle_integer_dot(struct vtn_builder *b, SpvOp opcode,
                dest = nir_sudot_4x8_iadd(&b->nb, src[0], src[1], zero);
             break;
          default:
-            unreachable("Invalid opcode.");
+            UNREACHABLE("Invalid opcode.");
          }
       }
 

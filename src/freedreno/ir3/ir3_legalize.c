@@ -105,6 +105,9 @@ ir3_required_sync_flags(struct ir3_legalize_state *state,
       else
          reg = n->srcs[i - n->dsts_count];
 
+      if (reg->flags & IR3_REG_DUMMY)
+         continue;
+
       if (is_reg_gpr(reg)) {
 
          /* TODO: we probably only need (ss) for alu
@@ -160,7 +163,7 @@ ir3_required_sync_flags(struct ir3_legalize_state *state,
    }
 
    foreach_dst (reg, n) {
-      if (reg->flags & IR3_REG_RT)
+      if (reg->flags & (IR3_REG_RT | IR3_REG_DUMMY))
          continue;
       if (needs_sy_war(state, reg)) {
          flags |= IR3_INSTR_SY;
@@ -210,8 +213,6 @@ sync_update(struct ir3_legalize_state *state, struct ir3_compiler *compiler,
    if (is_barrier(n)) {
       state->force_ss = true;
       state->force_sy = true;
-   } else if (n->opc == OPC_PREDT) {
-      state->force_ss = true;
    } else {
       state->force_ss = false;
       state->force_sy = false;
@@ -237,9 +238,9 @@ sync_update(struct ir3_legalize_state *state, struct ir3_compiler *compiler,
       }
    }
 
-   if (is_tex_or_prefetch(n) && n->dsts_count > 0) {
+   if (is_tex_or_prefetch(n) && !has_dummy_dst(n)) {
       regmask_set(&state->needs_sy, n->dsts[0]);
-   } else if (n->opc == OPC_RESINFO && n->dsts_count > 0) {
+   } else if (n->opc == OPC_RESINFO && !has_dummy_dst(n)) {
       regmask_set(&state->needs_ss, n->dsts[0]);
    } else if (is_load(n)) {
       if (is_local_mem_load(n))
@@ -369,6 +370,8 @@ ir3_merge_pred_legalize_states(struct ir3_legalize_state *state,
       regmask_or(&state->needs_sy, &state->needs_sy, &pstate->needs_sy);
       state->needs_ss_for_const |= pstate->needs_ss_for_const;
       state->needs_sy_for_const |= pstate->needs_sy_for_const;
+      state->force_ss |= pstate->force_ss;
+      state->force_sy |= pstate->force_sy;
 
       /* Our nop state is the max of the predecessor blocks. The predecessor nop
        * state contains the cycle offset from the start of its block when each
@@ -423,6 +426,15 @@ ir3_merge_pred_legalize_states(struct ir3_legalize_state *state,
                         &state->needs_ss_or_sy_scalar_war,
                         &pstate->needs_ss_or_sy_scalar_war);
    }
+
+   gl_shader_stage stage = block->shader->type;
+
+   if (stage == MESA_SHADER_TESS_CTRL || stage == MESA_SHADER_GEOMETRY) {
+      if (block == ir3_start_block(block->shader)) {
+         state->force_ss = true;
+         state->force_sy = true;
+      }
+   }
 }
 
 static bool
@@ -455,13 +467,18 @@ get_ready_slot(struct ir3_legalize_state *state,
       consumer_alu ? &state->alu_nop : &state->non_alu_nop;
    assert(!(reg->flags & IR3_REG_SHARED));
    if (reg->flags & IR3_REG_HALF) {
-      if (matching_size)
+      if (matching_size) {
+         assert(num < ARRAY_SIZE(nop->half_ready));
          return &nop->half_ready[num];
-      else
+      } else {
+         assert(num / 2 < ARRAY_SIZE(nop->full_ready));
          return &nop->full_ready[num / 2];
+      }
    } else {
-      if (matching_size)
+      if (matching_size) {
+         assert(num < ARRAY_SIZE(nop->full_ready));
          return &nop->full_ready[num];
+      }
       /* If "num" is large enough, then it can't alias a half-reg because only
        * the first half of the full reg speace aliases half regs. Return NULL in
        * this case.
@@ -516,7 +533,7 @@ delay_update(struct ir3_compiler *compiler,
       return;
 
    foreach_dst_n (dst, n, instr) {
-      if (dst->flags & IR3_REG_RT)
+      if (dst->flags & (IR3_REG_RT | IR3_REG_DUMMY))
          continue;
 
       unsigned elems = post_ra_reg_elems(dst);
@@ -713,12 +730,25 @@ legalize_block(struct ir3_legalize_ctx *ctx, struct ir3_block *block)
        * this should be a pretty rare case:
        */
       if ((n->flags & IR3_INSTR_SS) && !supports_ss(n)) {
-         struct ir3_instruction *nop;
-         nop = ir3_NOP(&build);
-         nop->flags |= IR3_INSTR_SS;
+         if (last_n && last_n->opc == OPC_NOP) {
+            /* Note that reusing the previous nop isn't just an optimization
+             * but prevents infinitely adding nops when this block is in a loop
+             * and needs to be legalized more than once.
+             */
+            last_n->flags |= IR3_INSTR_SS;
+
+            /* If we reuse the last nop, we shouldn't do a full state update as
+             * its delay has already been taken into account.
+             */
+            sync_update(state, ctx->compiler, last_n);
+         } else {
+            struct ir3_instruction *nop = ir3_NOP(&build);
+            nop->flags |= IR3_INSTR_SS;
+            ir3_update_legalize_state(state, ctx->compiler, nop);
+            last_n = nop;
+         }
+
          n->flags &= ~IR3_INSTR_SS;
-         last_n = nop;
-         ir3_update_legalize_state(state, ctx->compiler, nop);
       }
 
       unsigned delay = ir3_required_delay(state, ctx->compiler, n);
@@ -776,7 +806,7 @@ legalize_block(struct ir3_legalize_ctx *ctx, struct ir3_block *block)
          ctx->has_tex_prefetch = true;
       }
 
-      if (n->opc == OPC_RESINFO && n->dsts_count > 0) {
+      if (n->opc == OPC_RESINFO && !has_dummy_dst(n)) {
          ir3_update_legalize_state(state, ctx->compiler, n);
 
          n = ir3_NOP(&build);
@@ -895,25 +925,6 @@ apply_fine_deriv_macro(struct ir3_legalize_ctx *ctx, struct ir3_block *block)
       }
    }
 
-   return true;
-}
-
-/* Some instructions can take a dummy destination of r63.x, which we model as it
- * not having a destination in the IR to avoid having special code to handle
- * this. Insert the dummy destination after everything else is done.
- */
-static bool
-expand_dummy_dests(struct ir3_block *block)
-{
-   foreach_instr (n, &block->instr_list) {
-      if ((n->opc == OPC_SAM || n->opc == OPC_LDC || n->opc == OPC_RESINFO) &&
-          n->dsts_count == 0) {
-         struct ir3_register *dst = ir3_dst_create(n, INVALID_REG, 0);
-         /* Copy the blob's writemask */
-         if (n->opc == OPC_SAM)
-            dst->wrmask = 0b1111;
-      }
-   }
    return true;
 }
 
@@ -1217,7 +1228,7 @@ invert_branch(struct ir3_instruction *branch)
       branch->opc = OPC_BRAA;
       break;
    default:
-      unreachable("can't get here");
+      UNREACHABLE("can't get here");
    }
 
    branch->cat0.inv1 = !branch->cat0.inv1;
@@ -1297,6 +1308,19 @@ block_sched(struct ir3 *ir)
    }
 }
 
+static void
+add_nop_before_block(struct ir3_block *block, unsigned repeat)
+{
+   struct ir3_instruction *nop = ir3_block_get_first_instr(block);
+
+   if (!nop || nop->opc != OPC_NOP) {
+      struct ir3_builder build = ir3_builder_at(ir3_before_block(block));
+      nop = ir3_NOP(&build);
+   }
+
+   nop->repeat = MAX2(nop->repeat, repeat);
+}
+
 /* Some gens have a hardware issue that needs to be worked around by 1)
  * inserting 4 nops after the second pred[tf] of a pred[tf]/pred[ft] pair and/or
  * inserting 6 nops after prede.
@@ -1310,17 +1334,11 @@ add_predication_workaround(struct ir3_compiler *compiler,
                            struct ir3_instruction *prede)
 {
    if (predtf && compiler->predtf_nop_quirk) {
-      struct ir3_builder build = ir3_builder_at(ir3_after_block(predtf->block));
-      struct ir3_instruction *nop = ir3_NOP(&build);
-      nop->repeat = 4;
-      ir3_instr_move_after(nop, predtf);
+      add_nop_before_block(predtf->block->predecessors[0]->successors[1], 4);
    }
 
    if (compiler->prede_nop_quirk) {
-      struct ir3_builder build = ir3_builder_at(ir3_after_block(prede->block));
-      struct ir3_instruction *nop = ir3_NOP(&build);
-      nop->repeat = 6;
-      ir3_instr_move_after(nop, prede);
+      add_nop_before_block(prede->block->successors[0], 6);
    }
 }
 
@@ -2006,10 +2024,6 @@ ir3_legalize(struct ir3 *ir, struct ir3_shader_variant *so, int *max_bary)
    if (so->type == MESA_SHADER_FRAGMENT && so->need_pixlod &&
        so->compiler->gen >= 6)
       helper_sched(ctx, ir, so);
-
-   foreach_block (block, &ir->block_list) {
-      progress |= expand_dummy_dests(block);
-   }
 
    /* Note: insert (last) before alias.tex to have the sources that are actually
     * read by instructions (as opposed to alias registers) more easily

@@ -75,6 +75,7 @@ static const struct debug_named_value agx_debug_options[] = {
    {"scratch",   AGX_DBG_SCRATCH,  "Debug scratch memory usage"},
    {"1queue",    AGX_DBG_1QUEUE,   "Force usage of a single queue for multiple contexts"},
    {"nosoft",    AGX_DBG_NOSOFT,   "Disable soft fault optimizations"},
+   {"nomerge",   AGX_DBG_NOMERGE,  "Disable control stream merging"},
    {"bodumpverbose", AGX_DBG_BODUMPVERBOSE,   "Include extra info with dumps"},
    DEBUG_NAMED_VALUE_END
 };
@@ -338,6 +339,13 @@ agx_bo_import(struct agx_device *dev, int fd)
          p_atomic_set(&bo->refcnt, 1);
       else
          agx_bo_reference(bo);
+
+      /* If this bo came back to us via import, it had better
+       * been marked shared to begin with.
+       */
+      assert(bo->flags & AGX_BO_SHAREABLE);
+      assert(bo->flags & AGX_BO_SHARED);
+      assert(bo->prime_fd != -1);
    }
    pthread_mutex_unlock(&dev->bo_map_lock);
 
@@ -356,40 +364,47 @@ error:
    return NULL;
 }
 
+void
+agx_bo_make_shared(struct agx_device *dev, struct agx_bo *bo)
+{
+   assert(bo->flags & AGX_BO_SHAREABLE);
+   if (bo->flags & AGX_BO_SHARED) {
+      assert(bo->prime_fd >= 0);
+      return;
+   }
+
+   bo->flags |= AGX_BO_SHARED;
+   assert(bo->prime_fd == -1);
+
+   int ret =
+      drmPrimeHandleToFD(dev->fd, bo->handle, DRM_CLOEXEC, &bo->prime_fd);
+   assert(ret == 0);
+   assert(bo->prime_fd >= 0);
+
+   /* If there is a pending writer to this BO, import it into the buffer
+    * for implicit sync.
+    */
+   uint64_t writer = p_atomic_read_relaxed(&bo->writer);
+   if (writer) {
+      int out_sync_fd = -1;
+      int ret = drmSyncobjExportSyncFile(dev->fd, agx_bo_writer_syncobj(writer),
+                                         &out_sync_fd);
+      assert(ret >= 0);
+      assert(out_sync_fd >= 0);
+
+      ret = agx_import_sync_file(dev, bo, out_sync_fd);
+      assert(ret >= 0);
+      close(out_sync_fd);
+   }
+}
+
 int
 agx_bo_export(struct agx_device *dev, struct agx_bo *bo)
 {
-   int fd;
-
-   assert(bo->flags & AGX_BO_SHAREABLE);
-
-   if (drmPrimeHandleToFD(dev->fd, bo->handle, DRM_CLOEXEC, &fd))
-      return -1;
-
-   if (!(bo->flags & AGX_BO_SHARED)) {
-      bo->flags |= AGX_BO_SHARED;
-      assert(bo->prime_fd == -1);
-      bo->prime_fd = os_dupfd_cloexec(fd);
-
-      /* If there is a pending writer to this BO, import it into the buffer
-       * for implicit sync.
-       */
-      uint64_t writer = p_atomic_read_relaxed(&bo->writer);
-      if (writer) {
-         int out_sync_fd = -1;
-         int ret = drmSyncobjExportSyncFile(
-            dev->fd, agx_bo_writer_syncobj(writer), &out_sync_fd);
-         assert(ret >= 0);
-         assert(out_sync_fd >= 0);
-
-         ret = agx_import_sync_file(dev, bo, out_sync_fd);
-         assert(ret >= 0);
-         close(out_sync_fd);
-      }
-   }
+   agx_bo_make_shared(dev, bo);
 
    assert(bo->prime_fd >= 0);
-   return fd;
+   return os_dupfd_cloexec(bo->prime_fd);
 }
 
 static int
@@ -675,6 +690,23 @@ agx_open_device(void *memctx, struct agx_device *dev)
       dev->zero_bo = bo;
    }
 
+   {
+      void *bo = agx_bo_create(dev, AIL_PAGESIZE, 0, 0, "Scratch page");
+      int ret = agx_bo_bind(dev, bo, AGX_SCRATCH_PAGE_ADDRESS, AIL_PAGESIZE, 0,
+                            DRM_ASAHI_BIND_READ | DRM_ASAHI_BIND_WRITE);
+      if (ret) {
+         fprintf(stderr, "Failed to bind zero page");
+         return false;
+      }
+
+      dev->scratch_bo = bo;
+
+      /* The contents of the scratch page are undefined, but making them nonzero
+       * helps fuzz for bugs where we incorrectly read from the write section.
+       */
+      memset(agx_bo_map(dev->scratch_bo), 0xCA, AIL_PAGESIZE);
+   }
+
    void *bo = agx_bo_create(dev, LIBAGX_PRINTF_BUFFER_SIZE, 0, AGX_BO_WRITEBACK,
                             "Printf/abort");
 
@@ -695,6 +727,7 @@ agx_close_device(struct agx_device *dev)
 {
    agx_bo_unreference(dev, dev->printf.bo);
    agx_bo_unreference(dev, dev->zero_bo);
+   agx_bo_unreference(dev, dev->scratch_bo);
    u_printf_destroy(&dev->printf);
    agx_bo_cache_evict_all(dev);
    util_sparse_array_finish(&dev->bo_map);

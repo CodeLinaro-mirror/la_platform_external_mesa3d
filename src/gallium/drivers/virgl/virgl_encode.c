@@ -485,6 +485,32 @@ static const enum virgl_formats virgl_formats_conv_table[PIPE_FORMAT_COUNT] = {
    CONV_FORMAT(X4R12_UNORM)
    CONV_FORMAT(X4R12X4G12_UNORM)
    CONV_FORMAT(R8_G8B8_422_UNORM)
+   CONV_FORMAT(R8_B8G8_422_UNORM)
+   CONV_FORMAT(G8_B8R8_422_UNORM)
+   CONV_FORMAT(ASTC_4x4_FLOAT)
+   CONV_FORMAT(ASTC_5x4_FLOAT)
+   CONV_FORMAT(ASTC_5x5_FLOAT)
+   CONV_FORMAT(ASTC_6x5_FLOAT)
+   CONV_FORMAT(ASTC_6x6_FLOAT)
+   CONV_FORMAT(ASTC_8x5_FLOAT)
+   CONV_FORMAT(ASTC_8x6_FLOAT)
+   CONV_FORMAT(ASTC_8x8_FLOAT)
+   CONV_FORMAT(ASTC_10x5_FLOAT)
+   CONV_FORMAT(ASTC_10x6_FLOAT)
+   CONV_FORMAT(ASTC_10x8_FLOAT)
+   CONV_FORMAT(ASTC_10x10_FLOAT)
+   CONV_FORMAT(ASTC_12x10_FLOAT)
+   CONV_FORMAT(ASTC_12x12_FLOAT)
+   CONV_FORMAT(Y8U8V8_420_UNORM_PACKED)
+   CONV_FORMAT(Y10U10V10_420_UNORM_PACKED)
+   CONV_FORMAT(R8G8B8_420_UNORM_PACKED)
+   CONV_FORMAT(R10G10B10_420_UNORM_PACKED)
+   CONV_FORMAT(Y10X6_U10X6_V10X6_420_UNORM)
+   CONV_FORMAT(Y10X6_U10X6_V10X6_422_UNORM)
+   CONV_FORMAT(Y10X6_U10X6_V10X6_444_UNORM)
+   CONV_FORMAT(Y12X4_U12X4_V12X4_420_UNORM)
+   CONV_FORMAT(Y12X4_U12X4_V12X4_422_UNORM)
+   CONV_FORMAT(Y12X4_U12X4_V12X4_444_UNORM)
 };
 #undef CONV_FORMAT
 
@@ -867,15 +893,13 @@ int virgl_encode_clear_texture(struct virgl_context *ctx,
 int virgl_encoder_set_framebuffer_state(struct virgl_context *ctx,
                                        const struct pipe_framebuffer_state *state)
 {
-   struct virgl_surface *zsurf = virgl_surface(ctx->fb_zsbuf);
    int i;
 
    virgl_encoder_write_cmd_dword(ctx, VIRGL_CMD0(VIRGL_CCMD_SET_FRAMEBUFFER_STATE, 0, VIRGL_SET_FRAMEBUFFER_STATE_SIZE(state->nr_cbufs)));
    virgl_encoder_write_dword(ctx->cbuf, state->nr_cbufs);
-   virgl_encoder_write_dword(ctx->cbuf, zsurf ? zsurf->handle : 0);
+   virgl_encoder_write_dword(ctx->cbuf, ctx->framebuffer.zsbuf_handle);
    for (i = 0; i < state->nr_cbufs; i++) {
-      struct virgl_surface *surf = virgl_surface(ctx->fb_cbufs[i]);
-      virgl_encoder_write_dword(ctx->cbuf, surf ? surf->handle : 0);
+      virgl_encoder_write_dword(ctx->cbuf, ctx->framebuffer.cbufs_handles[i]);
    }
 
    struct virgl_screen *rs = virgl_screen(ctx->base.screen);
@@ -1839,7 +1863,7 @@ void virgl_encode_end_frame(struct virgl_context *ctx,
 }
 
 int virgl_encode_clear_surface(struct virgl_context *ctx,
-                               struct pipe_surface *surf,
+                               uint32_t surface_handle,
                                unsigned buffers,
                                const union pipe_color_union *color,
                                unsigned dstx, unsigned dsty,
@@ -1854,7 +1878,7 @@ int virgl_encode_clear_surface(struct virgl_context *ctx,
          VIRGL_CLEAR_SURFACE_S0_BUFFERS(buffers);
 
    virgl_encoder_write_dword(ctx->cbuf, tmp);
-   virgl_encoder_write_dword(ctx->cbuf, virgl_surface(surf)->handle);
+   virgl_encoder_write_dword(ctx->cbuf, surface_handle);
 
    for (i = 0; i < 4; i++)
       virgl_encoder_write_dword(ctx->cbuf, color->ui[i]);

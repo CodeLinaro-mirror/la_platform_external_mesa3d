@@ -164,13 +164,15 @@ copy_constant_to_storage(union gl_constant_value *storage,
          case GLSL_TYPE_INT8:
          case GLSL_TYPE_FLOAT16:
          case GLSL_TYPE_BFLOAT16:
+         case GLSL_TYPE_FLOAT_E4M3FN:
+         case GLSL_TYPE_FLOAT_E5M2:
             /* All other types should have already been filtered by other
              * paths in the caller.
              */
             assert(!"Should not get here.");
             break;
          case GLSL_TYPE_COOPERATIVE_MATRIX:
-            unreachable("unsupported base type cooperative matrix");
+            UNREACHABLE("unsupported base type cooperative matrix");
          }
          i += dmul;
       }

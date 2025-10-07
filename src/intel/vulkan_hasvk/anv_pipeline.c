@@ -89,7 +89,7 @@ anv_shader_stage_to_nir(struct anv_device *device,
       nir_print_shader(nir, stderr);
    }
 
-   NIR_PASS_V(nir, nir_lower_io_to_temporaries,
+   NIR_PASS(_, nir, nir_lower_io_vars_to_temporaries,
               nir_shader_get_entrypoint(nir), true, false);
 
    const struct nir_lower_sysvals_to_varyings_options sysvals_to_varyings = {
@@ -194,7 +194,7 @@ void anv_DestroyPipeline(
    }
 
    default:
-      unreachable("invalid pipeline type");
+      UNREACHABLE("invalid pipeline type");
    }
 
    anv_pipeline_finish(pipeline, device, pAllocator);
@@ -511,7 +511,7 @@ anv_pipeline_lower_nir(struct anv_pipeline *pipeline,
             nir_address_format_32bit_offset);
 
    /* Apply the actual pipeline layout to UBOs, SSBOs, and textures */
-   NIR_PASS_V(nir, anv_nir_apply_pipeline_layout,
+   NIR_PASS(_, nir, anv_nir_apply_pipeline_layout,
               pdevice, stage->key.base.robust_flags,
               layout, &stage->bind_map);
 
@@ -550,7 +550,7 @@ anv_pipeline_lower_nir(struct anv_pipeline *pipeline,
                });
    }
 
-   NIR_PASS_V(nir, anv_nir_compute_push_layout,
+   NIR_PASS(_, nir, anv_nir_compute_push_layout,
               pdevice, stage->key.base.robust_flags,
               prog_data, &stage->bind_map, mem_ctx);
 
@@ -948,7 +948,7 @@ anv_pipeline_add_executable(struct anv_pipeline *pipeline,
                break;
 
             case ANV_DESCRIPTOR_SET_NUM_WORK_GROUPS:
-               unreachable("gl_NumWorkgroups is never pushed");
+               UNREACHABLE("gl_NumWorkgroups is never pushed");
 
             case ANV_DESCRIPTOR_SET_SHADER_CONSTANTS:
                fprintf(stream, "Inline shader constant data (start=%dB)",
@@ -956,7 +956,7 @@ anv_pipeline_add_executable(struct anv_pipeline *pipeline,
                break;
 
             case ANV_DESCRIPTOR_SET_COLOR_ATTACHMENTS:
-               unreachable("Color attachments can't be pushed");
+               UNREACHABLE("Color attachments can't be pushed");
 
             default:
                fprintf(stream, "UBO (set=%d binding=%d start=%dB)",
@@ -1081,7 +1081,7 @@ anv_graphics_pipeline_init_keys(struct anv_graphics_pipeline *pipeline,
          break;
       }
       default:
-         unreachable("Invalid graphics shader stage");
+         UNREACHABLE("Invalid graphics shader stage");
       }
 
       stages[s].feedback.duration += os_time_get_nano() - stage_start;
@@ -1292,7 +1292,7 @@ anv_graphics_pipeline_compile(struct anv_graphics_pipeline *pipeline,
          anv_pipeline_link_fs(compiler, &stages[s], state->rp);
          break;
       default:
-         unreachable("Invalid graphics shader stage");
+         UNREACHABLE("Invalid graphics shader stage");
       }
 
       next_stage = &stages[s];
@@ -1358,7 +1358,7 @@ anv_graphics_pipeline_compile(struct anv_graphics_pipeline *pipeline,
                                  &stages[s], prev_stage);
          break;
       default:
-         unreachable("Invalid graphics shader stage");
+         UNREACHABLE("Invalid graphics shader stage");
       }
       if (stages[s].code == NULL) {
          ralloc_free(stage_ctx);
@@ -1971,7 +1971,7 @@ VkResult anv_GetPipelineExecutableStatisticsKHR(
       break;
    }
    default:
-      unreachable("invalid pipeline type");
+      UNREACHABLE("invalid pipeline type");
    }
 
    vk_outarray_append_typed(VkPipelineExecutableStatisticKHR, &out, stat) {

@@ -579,6 +579,9 @@ v3d_setup_shared_key(struct v3d_context *v3d, struct v3d_key *key,
                 if (return_size == 32)
                         key->sampler_is_32b |= (1 << i);
         }
+
+        key->robust_uniform_access = v3d->robust_buffer;
+        key->robust_storage_access = v3d->robust_buffer;
 }
 
 static void
@@ -603,7 +606,7 @@ v3d_update_compiled_fs(struct v3d_context *v3d, uint8_t prim_mode)
 
         memset(key, 0, sizeof(*key));
         v3d_setup_shared_key(v3d, &key->base, &v3d->tex[PIPE_SHADER_FRAGMENT]);
-        key->base.ucp_enables = v3d->rasterizer->base.clip_plane_enable;
+        key->ucp_enables = v3d->rasterizer->base.clip_plane_enable;
         key->is_points = (prim_mode == MESA_PRIM_POINTS);
         key->is_lines = (prim_mode >= MESA_PRIM_LINES &&
                          prim_mode <= MESA_PRIM_LINE_STRIP);
@@ -720,6 +723,10 @@ v3d_update_compiled_fs(struct v3d_context *v3d, uint8_t prim_mode)
                     old_fs->prog_data.fs->centroid_flags) {
                         v3d->dirty |= V3D_DIRTY_CENTROID_FLAGS;
                 }
+                if (v3d->prog.fs->prog_data.fs->disable_ez !=
+                    old_fs->prog_data.fs->disable_ez) {
+                   v3d->dirty |= V3D_DIRTY_ZSA;
+                }
         }
 
         if (old_fs && memcmp(v3d->prog.fs->prog_data.fs->input_slots,
@@ -751,7 +758,6 @@ v3d_update_compiled_gs(struct v3d_context *v3d, uint8_t prim_mode)
 
         memset(key, 0, sizeof(*key));
         v3d_setup_shared_key(v3d, &key->base, &v3d->tex[PIPE_SHADER_GEOMETRY]);
-        key->base.ucp_enables = v3d->rasterizer->base.clip_plane_enable;
         key->base.is_last_geometry_stage = true;
         key->num_used_outputs = v3d->prog.fs->prog_data.fs->num_inputs;
         STATIC_ASSERT(sizeof(key->used_outputs) ==
@@ -824,7 +830,6 @@ v3d_update_compiled_vs(struct v3d_context *v3d, uint8_t prim_mode)
 
         memset(key, 0, sizeof(*key));
         v3d_setup_shared_key(v3d, &key->base, &v3d->tex[PIPE_SHADER_VERTEX]);
-        key->base.ucp_enables = v3d->rasterizer->base.clip_plane_enable;
         key->base.is_last_geometry_stage = !v3d->prog.bind_gs;
 
         if (!v3d->prog.bind_gs) {

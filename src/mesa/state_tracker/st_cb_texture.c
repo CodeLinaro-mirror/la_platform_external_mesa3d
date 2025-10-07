@@ -156,7 +156,7 @@ st_from_pipe_compression_rate(uint32_t rate)
    case 11: return GL_SURFACE_COMPRESSION_FIXED_RATE_11BPC_EXT;
    case 12: return GL_SURFACE_COMPRESSION_FIXED_RATE_12BPC_EXT;
    default:
-      unreachable("Unexpected value in st_from_pipe_compression_rate");
+      UNREACHABLE("Unexpected value in st_from_pipe_compression_rate");
    }
 }
 
@@ -181,7 +181,7 @@ st_gl_compression_rate_to_pipe(GLint rate)
    case GL_SURFACE_COMPRESSION_FIXED_RATE_11BPC_EXT: return 11;
    case GL_SURFACE_COMPRESSION_FIXED_RATE_12BPC_EXT: return 12;
    default:
-      unreachable("Unexpected value in st_gl_compression_rate_to_pipe()");
+      UNREACHABLE("Unexpected value in st_gl_compression_rate_to_pipe()");
    }
 }
 
@@ -799,7 +799,7 @@ st_UnmapTextureImage(struct gl_context *ctx,
                                         transfer->box.height,
                                         texImage->TexFormat);
             } else {
-               unreachable("unexpected format for a compressed format fallback");
+               UNREACHABLE("unexpected format for a compressed format fallback");
             }
 
             /* Compress it to the target format. */
@@ -855,7 +855,7 @@ st_UnmapTextureImage(struct gl_context *ctx,
                                  transfer->box.width, transfer->box.height,
                                  texImage->TexFormat);
             } else {
-               unreachable("unexpected format for a compressed format fallback");
+               UNREACHABLE("unexpected format for a compressed format fallback");
             }
          }
 
@@ -2559,26 +2559,28 @@ st_CompressedTexSubImage(struct gl_context *ctx, GLuint dims,
    templ.first_layer = MIN2(layer, max_layer);
    templ.last_layer = MIN2(layer + d - 1, max_layer);
 
-   if (st_try_pbo_compressed_texsubimage(ctx, buf, buf_offset, &addr,
-                                         &templ))
-      return;
-
-   /* Some drivers can re-interpret surfaces but only one layer at a time.
-    * Fall back to doing a single try_pbo_upload_common per layer.
-    */
-   while (layer <= max_layer) {
-      templ.first_layer = MIN2(layer, max_layer);
-      templ.last_layer = templ.first_layer;
-      if (!st_try_pbo_compressed_texsubimage(ctx, buf, buf_offset, &addr,
-                                             &templ))
-         goto fallback;
-
-      /* By incrementing layer here, we ensure the fallback only uploads
-       * layers we failed to upload.
+   if (templ.first_layer != templ.last_layer &&
+       !screen->caps.compressed_surface_reinterpret_blocks_layered) {
+      /* Some drivers can re-interpret surfaces but only one layer at a time.
+       * Fall back to doing a single try_pbo_upload_common per layer.
        */
-      buf_offset += addr.pixels_per_row * addr.image_height;
-      layer++;
-      addr.depth--;
+      while (layer <= max_layer) {
+         templ.first_layer = MIN2(layer, max_layer);
+         templ.last_layer = templ.first_layer;
+         if (!st_try_pbo_compressed_texsubimage(ctx, buf, buf_offset, &addr,
+                                                &templ))
+            goto fallback;
+
+         /* By incrementing layer here, we ensure the fallback only uploads
+         * layers we failed to upload.
+         */
+         buf_offset += addr.pixels_per_row * addr.image_height;
+         layer++;
+         addr.depth--;
+      }
+      success = true;
+   } else {
+      success = st_try_pbo_compressed_texsubimage(ctx, buf, buf_offset, &addr, &templ);
    }
 
    if (success)

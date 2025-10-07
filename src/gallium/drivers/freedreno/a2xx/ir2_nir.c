@@ -23,7 +23,6 @@ static const nir_shader_compiler_options options = {
    .fuse_ffma32 = true,
    .fuse_ffma64 = true,
    /* .fdot_replicates = true, it is replicated, but it makes things worse */
-   .lower_all_io_to_temps = true,
    .vertex_id_zero_based = true, /* its not implemented anyway */
    .lower_bitops = true,
    .lower_vector_cmp = true,
@@ -671,7 +670,7 @@ emit_intrinsic(struct ir2_context *ctx, nir_intrinsic_instr *intr)
          ir2_src(ctx->f->inputs_count, IR2_SWIZZLE_ZW, IR2_SRC_INPUT);
       break;
    default:
-      compile_error(ctx, "unimplemented intr %d\n", intr->intrinsic);
+      compile_error(ctx, "unimplemented intr %s\n", nir_intrinsic_infos[intr->intrinsic].name);
       break;
    }
 }

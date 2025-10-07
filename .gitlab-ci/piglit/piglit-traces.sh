@@ -97,8 +97,7 @@ else
       export DISPLAY=:0
       mkdir -p /tmp/.X11-unix
 
-      env \
-        weston -Bheadless-backend.so --use-gl -Swayland-0 --xwayland --idle-time=0 &
+      env weston --config="/install/common/weston.ini" -Swayland-0 --use-gl &
 
       while [ ! -S "$WESTON_X11_SOCK" ]; do sleep 1; done
     }
@@ -122,7 +121,7 @@ replay_s3_upload_images() {
             fi
             __S3_PATH="$PIGLIT_REPLAY_REFERENCE_IMAGES_BASE"
             __DESTINATION_FILE_PATH="${line##*-}"
-            if curl --fail -L -s -I "https://${__S3_PATH}/${__DESTINATION_FILE_PATH}" | grep -q "content-type: application/octet-stream" 2>/dev/null; then
+            if curl --fail -L -s -I "https://${__S3_PATH}/${__DESTINATION_FILE_PATH}" | grep -Eq "^content-type: (binary|application)\/octet-stream" 2>/dev/null; then
                 continue
             fi
         else

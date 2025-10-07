@@ -86,7 +86,7 @@ get_blend_shader(struct panvk_device *dev,
 
    /* Compile the NIR shader */
    struct pan_compile_inputs inputs = {
-      .gpu_id = pdev->kmod.props.gpu_prod_id,
+      .gpu_id = pdev->kmod.props.gpu_id,
       .is_blend = true,
       .blend = {
          .nr_samples = key.info.nr_samples,
@@ -152,7 +152,7 @@ emit_blend_desc(const struct pan_shader_info *fs_info, uint64_t fs_code,
          cfg.internal.mode = MALI_BLEND_MODE_SHADER;
          cfg.internal.shader.pc = (uint32_t)blend_shader;
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
          uint32_t ret_offset = fs_info->bifrost.blend[blend_idx].return_offset;
 
          /* If ret_offset is zero, we assume the BLEND is a terminal
@@ -192,7 +192,7 @@ emit_blend_desc(const struct pan_shader_info *fs_info, uint64_t fs_code,
 
          cfg.internal.fixed_function.rt = rt_idx;
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
          if (fs_info->fs.untyped_color_outputs) {
             nir_alu_type type = fs_info->bifrost.blend[blend_idx].type;
 
@@ -300,9 +300,10 @@ panvk_per_arch(blend_emit_descs)(struct panvk_cmd_buffer *cmdbuf,
       &cmdbuf->vk.dynamic_graphics_state;
    const struct vk_color_blend_state *cb = &dyns->cb;
    const struct vk_color_attachment_location_state *cal = &dyns->cal;
-   const struct panvk_shader *fs = cmdbuf->state.gfx.fs.shader;
+   const struct panvk_shader_variant *fs =
+      panvk_shader_only_variant(cmdbuf->state.gfx.fs.shader);
    const struct pan_shader_info *fs_info = fs ? &fs->info : NULL;
-   uint64_t fs_code = panvk_shader_get_dev_addr(fs);
+   uint64_t fs_code = panvk_shader_variant_get_dev_addr(fs);
    const struct panvk_rendering_state *render = &cmdbuf->state.gfx.render;
    const VkFormat *color_attachment_formats = render->color_attachments.fmts;
    const uint8_t *color_attachment_samples = render->color_attachments.samples;

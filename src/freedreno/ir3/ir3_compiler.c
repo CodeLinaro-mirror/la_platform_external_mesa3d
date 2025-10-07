@@ -88,6 +88,8 @@ static const nir_shader_compiler_options ir3_base_options = {
    .lower_helper_invocation = true,
    .lower_bitfield_insert = true,
    .lower_bitfield_extract = true,
+   .lower_bitfield_extract8 = true,
+   .lower_bitfield_extract16 = true,
    .lower_pack_half_2x16 = true,
    .lower_pack_snorm_4x8 = true,
    .lower_pack_snorm_2x16 = true,
@@ -214,6 +216,8 @@ ir3_compiler_create(struct fd_device *dev, const struct fd_dev_id *dev_id,
       compiler->tess_use_shared = dev_info->a6xx.tess_use_shared;
 
       compiler->has_getfiberid = dev_info->a6xx.has_getfiberid;
+      compiler->mov_half_shared_quirk = dev_info->a6xx.mov_half_shared_quirk;
+      compiler->has_movs = dev_info->a6xx.has_movs;
 
       compiler->has_dp2acc = dev_info->a6xx.has_dp2acc;
       compiler->has_dp4acc = dev_info->a6xx.has_dp4acc;
@@ -326,6 +330,7 @@ ir3_compiler_create(struct fd_device *dev, const struct fd_dev_id *dev_id,
    compiler->bool_type = (compiler->gen >= 5) ? TYPE_U16 : TYPE_U32;
    compiler->has_shared_regfile = compiler->gen >= 5;
    compiler->has_bitwise_triops = compiler->gen >= 5;
+   compiler->cat3_rel_offset_0_quirk = compiler->gen <= 5;
 
    /* The driver can't request this unless preambles are supported. */
    if (options->push_ubo_with_preamble)
@@ -368,7 +373,9 @@ ir3_compiler_create(struct fd_device *dev, const struct fd_dev_id *dev_id,
    if (compiler->gen >= 5 && !(ir3_shader_debug & IR3_DBG_NOFP16))
       compiler->nir_options.support_16bit_alu = true;
 
-   compiler->nir_options.support_indirect_inputs = (uint8_t)BITFIELD_MASK(PIPE_SHADER_TYPES);
+   compiler->nir_options.support_indirect_inputs =
+      BITFIELD_BIT(MESA_SHADER_TESS_CTRL) |
+      BITFIELD_BIT(MESA_SHADER_TESS_EVAL) | BITFIELD_BIT(MESA_SHADER_FRAGMENT);
    compiler->nir_options.support_indirect_outputs = (uint8_t)BITFIELD_MASK(PIPE_SHADER_TYPES);
 
    if (!options->disable_cache)

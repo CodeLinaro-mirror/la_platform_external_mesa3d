@@ -2,6 +2,8 @@
  * Copyright 2024 Valve Corporation
  * Copyright 2024 Alyssa Rosenzweig
  * Copyright 2022-2023 Collabora Ltd. and Red Hat Inc.
+ * Copyright 2023 Advanced Micro Devices, Inc.
+ * Copyright 2018 Intel Corporation
  * SPDX-License-Identifier: MIT
  */
 #include "hk_shader.h"
@@ -10,6 +12,7 @@
 #include "agx_device.h"
 #include "agx_helpers.h"
 #include "agx_nir_lower_gs.h"
+#include "agx_nir_lower_vbo.h"
 #include "glsl_types.h"
 #include "libagx.h"
 #include "nir.h"
@@ -29,6 +32,7 @@
 #include "nir_intrinsics_indices.h"
 #include "nir_xfb_info.h"
 #include "shader_enums.h"
+#include "vk_graphics_state.h"
 #include "vk_nir_convert_ycbcr.h"
 #include "vk_physical_device_features.h"
 #include "vk_pipeline.h"
@@ -65,6 +69,19 @@ struct hk_fs_key {
    uint8_t pad[2];
 };
 static_assert(sizeof(struct hk_fs_key) == 4, "packed");
+
+struct hk_vs_key {
+   struct agx_velem_key attribs[32];
+   bool skip_prolog;
+   bool static_strides;
+   bool pad[2];
+};
+static_assert(sizeof(struct hk_vs_key) == 260, "packed");
+
+union hk_key {
+   struct hk_vs_key vs;
+   struct hk_fs_key fs;
+};
 
 static void
 shared_var_info(const struct glsl_type *type, unsigned *size, unsigned *align)
@@ -106,33 +123,18 @@ hk_get_spirv_options(struct vk_physical_device *vk_pdev,
    };
 }
 
-static bool
-lower_halt_to_return(nir_builder *b, nir_instr *instr, UNUSED void *_data)
-{
-   if (instr->type != nir_instr_type_jump)
-      return false;
-
-   nir_jump_instr *jump = nir_instr_as_jump(instr);
-   if (jump->type != nir_jump_halt)
-      return false;
-
-   assert(b->impl == nir_shader_get_entrypoint(b->shader));
-   jump->type = nir_jump_return;
-   return true;
-}
-
 void
 hk_preprocess_nir_internal(struct vk_physical_device *vk_pdev, nir_shader *nir)
 {
    /* Must lower before io to temps */
    if (nir->info.stage == MESA_SHADER_FRAGMENT) {
       NIR_PASS(_, nir, nir_lower_terminate_to_demote);
-      NIR_PASS(_, nir, nir_shader_instructions_pass, lower_halt_to_return,
-               nir_metadata_all, NULL);
+      NIR_PASS(_, nir, nir_lower_halt_to_return);
       NIR_PASS(_, nir, nir_lower_returns);
    }
 
-   /* Unroll loops before lowering indirects via nir_lower_io_to_temporaries */
+   /* Unroll loops before lowering indirects via
+    * nir_lower_io_vars_to_temporaries */
    UNUSED bool progress = false;
    NIR_PASS(_, nir, nir_lower_global_vars_to_local);
 
@@ -161,8 +163,8 @@ hk_preprocess_nir_internal(struct vk_physical_device *vk_pdev, nir_shader *nir)
     */
    nir_shader_gather_info(nir, nir_shader_get_entrypoint(nir));
 
-   NIR_PASS(_, nir, nir_lower_io_to_temporaries, nir_shader_get_entrypoint(nir),
-            true, false);
+   NIR_PASS(_, nir, nir_lower_io_vars_to_temporaries,
+            nir_shader_get_entrypoint(nir), true, false);
 
    NIR_PASS(_, nir, nir_lower_global_vars_to_local);
 
@@ -185,6 +187,29 @@ hk_preprocess_nir(struct vk_physical_device *vk_pdev, nir_shader *nir,
       .has_base_workgroup_id = true,
    };
    NIR_PASS(_, nir, nir_lower_compute_system_values, &csv_options);
+}
+
+static void
+hk_populate_vs_key(struct hk_vs_key *key,
+                   const struct vk_graphics_pipeline_state *state)
+{
+   memset(key, 0, sizeof(*key));
+
+   if (state == NULL || !state->vi ||
+       BITSET_TEST(state->dynamic, MESA_VK_DYNAMIC_VI) ||
+       BITSET_TEST(state->dynamic, MESA_VK_DYNAMIC_VI_BINDINGS_VALID))
+      return;
+
+   agx_fill_velem_keys(state->vi, ~0 /* compacted on use */, key->attribs);
+   key->skip_prolog = true;
+   key->static_strides =
+      !BITSET_TEST(state->dynamic, MESA_VK_DYNAMIC_VI_BINDING_STRIDES);
+
+   if (!key->static_strides) {
+      for (unsigned i = 0; i < ARRAY_SIZE(key->attribs); ++i) {
+         key->attribs[i].stride = 0;
+      }
+   }
 }
 
 static void
@@ -225,6 +250,7 @@ hk_populate_fs_key(struct hk_fs_key *key,
 enum hk_feature_key {
    HK_FEAT_MIN_LOD = BITFIELD_BIT(0),
    HK_FEAT_CUSTOM_BORDER = BITFIELD_BIT(1),
+   HK_FEAT_LARGE_POINTS = BITFIELD_BIT(2),
 };
 
 static enum hk_feature_key
@@ -234,7 +260,8 @@ hk_make_feature_key(const struct vk_features *features)
       return ~0U;
 
    return (features->minLod ? HK_FEAT_MIN_LOD : 0) |
-          (features->customBorderColors ? HK_FEAT_CUSTOM_BORDER : 0);
+          (features->customBorderColors ? HK_FEAT_CUSTOM_BORDER : 0) |
+          (features->largePoints ? HK_FEAT_LARGE_POINTS : 0);
 }
 
 static void
@@ -245,7 +272,11 @@ hk_hash_graphics_state(struct vk_physical_device *device,
 {
    struct mesa_blake3 blake3_ctx;
    _mesa_blake3_init(&blake3_ctx);
-   if (state && (stages & VK_SHADER_STAGE_FRAGMENT_BIT)) {
+   if (state && (stages & VK_SHADER_STAGE_VERTEX_BIT)) {
+      struct hk_vs_key key;
+      hk_populate_vs_key(&key, state);
+      _mesa_blake3_update(&blake3_ctx, &key, sizeof(key));
+   } else if (state && (stages & VK_SHADER_STAGE_FRAGMENT_BIT)) {
       struct hk_fs_key key;
       hk_populate_fs_key(&key, state);
       _mesa_blake3_update(&blake3_ctx, &key, sizeof(key));
@@ -273,20 +304,133 @@ bounds_check(nir_builder *b, nir_def *data, nir_def *offs, nir_def *bound)
 }
 
 static bool
+is_op(nir_scalar s, nir_op op)
+{
+   return nir_scalar_is_alu(s) && nir_scalar_alu_op(s) == op;
+}
+
+static nir_def *
+check_in_bounds(nir_builder *b, nir_intrinsic_instr *intr)
+{
+   nir_def *offset = intr->src[1].ssa;
+   nir_def *bound = intr->src[2].ssa;
+
+   unsigned bit_size = intr->def.bit_size;
+   assert(bit_size >= 8 && bit_size % 8 == 0);
+   unsigned byte_size = bit_size / 8;
+   unsigned load_size = byte_size * intr->num_components;
+
+   /* Try to bounds check in terms of elements */
+   nir_scalar offset_s = nir_scalar_resolved(offset, 0);
+   if (is_op(offset_s, nir_op_amul)) {
+      nir_scalar srcs[] = {nir_scalar_chase_alu_src(offset_s, 0),
+                           nir_scalar_chase_alu_src(offset_s, 1)};
+      unsigned i = nir_scalar_is_const(srcs[0]) ? 1 : 0;
+      if (nir_scalar_is_const(srcs[1 - i]) &&
+          nir_scalar_as_uint(srcs[1 - i]) == load_size) {
+
+         nir_def *index = nir_mov_scalar(b, srcs[i]);
+         return nir_ult(b, index, nir_udiv_imm(b, bound, load_size));
+      }
+   }
+
+   /* TODO: handle also the iadd(amul) pattern, this is important */
+
+   /* Otherwise bounds check in bytes */
+   nir_def *sat_offset = nir_umin_imm(b, offset, UINT32_MAX - (load_size - 1));
+   return nir_ult(b, nir_iadd_imm(b, sat_offset, load_size - 1), bound);
+}
+
+static nir_def *
+bound_offset(nir_builder *b, nir_def *valid, nir_scalar offset)
+{
+   /* If we can, clamp the source of an amul instead of the result, to remain
+    * compatible with the hardware address mode.
+    */
+   if (is_op(offset, nir_op_amul)) {
+      nir_scalar srcs[] = {
+         nir_scalar_chase_alu_src(offset, 0),
+         nir_scalar_chase_alu_src(offset, 1),
+      };
+      unsigned i = nir_scalar_is_const(srcs[0]) ? 1 : 0;
+      nir_def *x = nir_mov_scalar(b, srcs[i]);
+      nir_def *y = nir_mov_scalar(b, srcs[1 - i]);
+
+      return nir_amul(b, nir_bcsel(b, valid, x, nir_imm_int(b, 0)), y);
+   }
+
+   /* Similar case for when there's an addition (chain) in the way */
+   if (is_op(offset, nir_op_iadd)) {
+      nir_scalar x = nir_scalar_chase_alu_src(offset, 0);
+      nir_scalar y = nir_scalar_chase_alu_src(offset, 1);
+
+      if (is_op(x, nir_op_amul) || is_op(y, nir_op_amul)) {
+         return nir_iadd(b, bound_offset(b, valid, x),
+                         bound_offset(b, valid, y));
+      }
+   }
+
+   nir_def *def = nir_mov_scalar(b, offset);
+
+   /* If the offset fits within the zero page, clamping is pointless */
+   if (nir_scalar_is_const(offset) &&
+       (nir_scalar_as_uint(offset) + 16) < AGX_ZERO_PAGE_SIZE)
+      return def;
+
+   /* Otherwise, fallback on clamping the offset */
+   return nir_bcsel(b, valid, def, nir_imm_int(b, 0));
+}
+
+static void
+lower_load_global_bounded(nir_builder *b, nir_intrinsic_instr *intr)
+{
+   b->cursor = nir_before_instr(&intr->instr);
+   nir_def *base = intr->src[0].ssa;
+   nir_def *offset = intr->src[1].ssa;
+
+   /* Bounds check compatibly with the hardware address mode */
+   nir_def *valid = check_in_bounds(b, intr);
+   base = nir_bcsel(b, valid, base, nir_imm_int64(b, AGX_ZERO_PAGE_ADDRESS));
+   offset = bound_offset(b, valid, nir_scalar_resolved(offset, 0));
+
+   enum gl_access_qualifier access = nir_intrinsic_access(intr);
+
+   if (intr->intrinsic == nir_intrinsic_load_global_constant_bounded) {
+      access |= ACCESS_NON_WRITEABLE | ACCESS_CAN_REORDER;
+   }
+
+   nir_def *val = nir_build_load_global(
+      b, intr->def.num_components, intr->def.bit_size,
+      nir_iadd(b, base, nir_u2u64(b, offset)),
+      .align_mul = nir_intrinsic_align_mul(intr),
+      .align_offset = nir_intrinsic_align_offset(intr), .access = access);
+
+   nir_def_replace(&intr->def, val);
+}
+
+static bool
 lower_load_global_constant_offset_instr(nir_builder *b,
                                         nir_intrinsic_instr *intrin, void *data)
 {
+   bool *has_soft_fault = data;
+
+   if (intrin->intrinsic == nir_intrinsic_load_global_bounded ||
+       (intrin->intrinsic == nir_intrinsic_load_global_constant_bounded &&
+        !(*has_soft_fault))) {
+
+      lower_load_global_bounded(b, intrin);
+      return true;
+   }
+
    if (intrin->intrinsic != nir_intrinsic_load_global_constant_offset &&
        intrin->intrinsic != nir_intrinsic_load_global_constant_bounded)
       return false;
 
    b->cursor = nir_before_instr(&intrin->instr);
-   bool *has_soft_fault = data;
 
    nir_def *base_addr = intrin->src[0].ssa;
    nir_def *offset = intrin->src[1].ssa;
    nir_def *bound = NULL;
-   nir_def *zero = NULL;
 
    unsigned bit_size = intrin->def.bit_size;
    assert(bit_size >= 8 && bit_size % 8 == 0);
@@ -295,20 +439,6 @@ lower_load_global_constant_offset_instr(nir_builder *b,
 
    if (intrin->intrinsic == nir_intrinsic_load_global_constant_bounded) {
       bound = intrin->src[2].ssa;
-      zero = nir_imm_zero(b, intrin->num_components, bit_size);
-
-      nir_def *sat_offset =
-         nir_umin(b, offset, nir_imm_int(b, UINT32_MAX - (load_size - 1)));
-      nir_def *in_bounds =
-         nir_ilt(b, nir_iadd_imm(b, sat_offset, load_size - 1), bound);
-
-      /* If we do not have soft fault, we branch to bounds check. This is slow,
-       * fortunately we always have soft fault for release drivers.
-       *
-       * With soft fault, we speculatively load and smash to zero at the end.
-       */
-      if (!(*has_soft_fault))
-         nir_push_if(b, in_bounds);
    }
 
    unsigned align_mul = nir_intrinsic_align_mul(intrin);
@@ -320,47 +450,41 @@ lower_load_global_constant_offset_instr(nir_builder *b,
       .align_offset = align_offset, .access = nir_intrinsic_access(intrin));
 
    if (intrin->intrinsic == nir_intrinsic_load_global_constant_bounded) {
-      if (*has_soft_fault) {
-         nir_scalar offs = nir_scalar_resolved(offset, 0);
-         if (nir_scalar_is_const(offs)) {
-            /* Calculate last byte loaded */
-            unsigned offs_imm = nir_scalar_as_uint(offs) + load_size;
+      nir_scalar offs = nir_scalar_resolved(offset, 0);
+      if (nir_scalar_is_const(offs)) {
+         /* Calculate last byte loaded */
+         unsigned offs_imm = nir_scalar_as_uint(offs) + load_size;
 
-            /* Simplify the bounds check. Uniform buffers are bounds checked at
-             * 64B granularity, so `bound` is a multiple of K = 64. Then
-             *
-             * offs_imm < bound <==> round_down(offs_imm, K) < bound. Proof:
-             *
-             * "=>" round_down(offs_imm, K) <= offs_imm < bound.
-             *
-             * "<=" Let a, b be integer s.t. offs_imm = K a + b with b < K.
-             *      Note round_down(offs_imm, K) = Ka.
-             *
-             *      Let c be integer s.t. bound = Kc.
-             *      We have Ka < Kc => a < c.
-             *      b < K => Ka + b < K(a + 1).
-             *
-             *      a < c with integers => a + 1 <= c.
-             *      offs_imm < K(a + 1) <= Kc = bound.
-             *      Hence offs_imm < bound.
-             */
-            assert(align_mul == 64);
-            offs_imm &= ~(align_mul - 1);
+         /* Simplify the bounds check. Uniform buffers are bounds checked at
+          * 64B granularity, so `bound` is a multiple of K = 64. Then
+          *
+          * offs_imm < bound <==> round_down(offs_imm, K) < bound. Proof:
+          *
+          * "=>" round_down(offs_imm, K) <= offs_imm < bound.
+          *
+          * "<=" Let a, b be integer s.t. offs_imm = K a + b with b < K.
+          *      Note round_down(offs_imm, K) = Ka.
+          *
+          *      Let c be integer s.t. bound = Kc.
+          *      We have Ka < Kc => a < c.
+          *      b < K => Ka + b < K(a + 1).
+          *
+          *      a < c with integers => a + 1 <= c.
+          *      offs_imm < K(a + 1) <= Kc = bound.
+          *      Hence offs_imm < bound.
+          */
+         assert(align_mul == 64);
+         offs_imm &= ~(align_mul - 1);
 
-            /* Bounds checks are `offset > bound ? 0 : val` so if offset = 0,
-             * the bounds check is useless.
-             */
-            if (offs_imm) {
-               val = bounds_check(b, val, nir_imm_int(b, offs_imm), bound);
-            }
-         } else {
-            offset = nir_iadd_imm(b, offset, load_size);
-            val = bounds_check(b, val, offset, bound);
+         /* Bounds checks are `offset > bound ? 0 : val` so if offset = 0,
+          * the bounds check is useless.
+          */
+         if (offs_imm) {
+            val = bounds_check(b, val, nir_imm_int(b, offs_imm), bound);
          }
-
       } else {
-         nir_pop_if(b, NULL);
-         val = nir_if_phi(b, val, zero);
+         offset = nir_iadd_imm(b, offset, load_size);
+         val = bounds_check(b, val, offset, bound);
       }
    }
 
@@ -573,7 +697,7 @@ lower_min_lod(nir_builder *b, nir_tex_instr *tex, UNUSED void *_data)
       nir_def *oob = nir_ine_imm(b, min_lod, 0);
       nir_def *zero = nir_imm_zero(b, old->num_components, old->bit_size);
       nir_def *new_ = nir_bcsel(b, oob, zero, old);
-      nir_def_rewrite_uses_after(old, new_, new_->parent_instr);
+      nir_def_rewrite_uses_after(old, new_);
    } else if (tex->op == nir_texop_txl) {
       assert(other_min_lod == NULL && "txl doesn't have an API min lod");
 
@@ -623,7 +747,7 @@ lower_viewport_fs(nir_builder *b, nir_intrinsic_instr *intr, UNUSED void *data)
    nir_def *uvs = nir_load_uvs_index_agx(b, .io_semantics = sem);
    nir_def *def = nir_bcsel(b, nir_ine_imm(b, uvs, 0), orig, nir_imm_int(b, 0));
 
-   nir_def_rewrite_uses_after(orig, def, def->parent_instr);
+   nir_def_rewrite_uses_after(orig, def);
    return true;
 }
 
@@ -744,6 +868,10 @@ hk_lower_nir(struct hk_device *dev, nir_shader *nir,
       NIR_PASS(progress, nir, nir_opt_dce);
    } while (progress);
 
+   nir_move_options opts = nir_move_load_ssbo | nir_move_load_ubo;
+   NIR_PASS(progress, nir, nir_opt_sink, opts);
+   NIR_PASS(progress, nir, nir_opt_move, opts);
+
    bool soft_fault = agx_has_soft_fault(&dev->dev);
    NIR_PASS(_, nir, nir_shader_intrinsics_pass,
             lower_load_global_constant_offset_instr, nir_metadata_none,
@@ -831,8 +959,8 @@ hk_upload_shader(struct hk_device *dev, struct hk_shader *shader)
       cfg.uniform_register_count = shader->b.info.push_count;
       cfg.preshader_register_count = shader->b.info.nr_preamble_gprs;
       cfg.sampler_state_register_count = agx_translate_sampler_state_count(
-         shader->b.info.uses_txf ? 1 : 0, false);
-      cfg.texture_state_register_count = 0;
+         shader->b.info.sampler_state_count, false);
+      cfg.texture_state_register_count = shader->b.info.texture_state_count;
    }
 }
 
@@ -859,20 +987,86 @@ hk_init_link_ht(struct hk_shader *shader, gl_shader_stage sw_stage)
                                       : VK_SUCCESS;
 }
 
+static bool
+lower_uniforms(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+{
+   /* Root is first, descriptor sets follow immediately. */
+   unsigned *root_ = data;
+   unsigned root = *root_;
+   unsigned sets = root + 4;
+
+   if (intr->intrinsic == nir_intrinsic_bindless_image_agx ||
+       intr->intrinsic == nir_intrinsic_bindless_sampler_agx) {
+      /* Change of units from sets to uniforms */
+      nir_intrinsic_set_desc_set(intr,
+                                 sets + (nir_intrinsic_desc_set(intr) * 4));
+      return true;
+   }
+
+   if (intr->intrinsic != nir_intrinsic_load_root_agx &&
+       intr->intrinsic != nir_intrinsic_load_descriptor_set_agx)
+      return false;
+
+   b->cursor = nir_before_instr(&intr->instr);
+   nir_def *rep;
+
+   if (intr->intrinsic == nir_intrinsic_load_descriptor_set_agx) {
+      unsigned s = nir_intrinsic_desc_set(intr);
+      rep = nir_load_preamble(b, 1, 64, .base = sets + (4 * s));
+   } else {
+      rep = nir_load_preamble(b, 1, 64, .base = root);
+   }
+
+   nir_def_replace(&intr->def, rep);
+   return true;
+}
+
+static bool
+kill_psiz(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+{
+   if (intr->intrinsic != nir_intrinsic_store_output ||
+       nir_intrinsic_io_semantics(intr).location != VARYING_SLOT_PSIZ)
+      return false;
+
+   return nir_remove_sysval_output(intr, MESA_SHADER_FRAGMENT);
+}
+
+static void
+hk_lower_hw_vs(nir_shader *nir, struct hk_shader *shader,
+               enum hk_feature_key features)
+{
+   /* Point size must be clamped, excessively large points don't render
+    * properly on G13.
+    *
+    * Must be synced with pointSizeRange.
+    */
+   NIR_PASS(_, nir, nir_lower_point_size, 1.0f, 511.95f);
+
+   if (!(features & HK_FEAT_LARGE_POINTS)) {
+      NIR_PASS(_, nir, nir_shader_intrinsics_pass, kill_psiz,
+               nir_metadata_control_flow, NULL);
+   }
+
+   NIR_PASS(_, nir, nir_lower_io_to_scalar, nir_var_shader_out, NULL, NULL);
+   NIR_PASS(_, nir, agx_nir_lower_cull_distance_vs);
+
+   NIR_PASS(_, nir, agx_nir_lower_uvs, &shader->info.uvs);
+}
+
 static VkResult
 hk_compile_nir(struct hk_device *dev, const VkAllocationCallbacks *pAllocator,
                nir_shader *nir, VkShaderCreateFlagsEXT shader_flags,
                const struct vk_pipeline_robustness_state *rs,
-               const struct hk_fs_key *fs_key, struct hk_shader *shader,
-               gl_shader_stage sw_stage, bool hw, nir_xfb_info *xfb_info)
+               const union hk_key *key, enum hk_feature_key features,
+               struct hk_shader *shader, gl_shader_stage sw_stage, bool hw,
+               nir_xfb_info *xfb_info, unsigned set_count)
 {
-   unsigned vs_uniform_base = 0;
+   unsigned nr_vbos = 0;
 
    /* For now, only shader objects are supported */
    if (sw_stage == MESA_SHADER_VERTEX) {
-      vs_uniform_base =
-         6 * DIV_ROUND_UP(
-                BITSET_LAST_BIT(shader->info.vs.attrib_components_read), 4);
+      nr_vbos = DIV_ROUND_UP(
+         BITSET_LAST_BIT(shader->info.vs.attrib_components_read), 4);
    } else if (sw_stage == MESA_SHADER_FRAGMENT) {
       shader->info.fs.interp = agx_gather_interp_info(nir);
       shader->info.fs.writes_memory = nir->info.writes_memory;
@@ -920,16 +1114,41 @@ hk_compile_nir(struct hk_device *dev, const VkAllocationCallbacks *pAllocator,
       }
    }
 
-   uint64_t outputs = nir->info.outputs_written;
-   if (!hw &&
-       (sw_stage == MESA_SHADER_VERTEX || sw_stage == MESA_SHADER_TESS_EVAL)) {
-      nir->info.stage = MESA_SHADER_COMPUTE;
-      memset(&nir->info.cs, 0, sizeof(nir->info.cs));
-      nir->xfb_info = NULL;
+   /* Normally, vertex shaders need to write a default point size. However, if
+    * we have a geometry/tessellation shader, the hardware vertex (software
+    * GS/TES) will handle this itself instead.
+    *
+    * TODO: Optimize out for monolithic?
+    */
+   if (sw_stage == MESA_SHADER_VERTEX && hw &&
+       (features & HK_FEAT_LARGE_POINTS)) {
+      NIR_PASS(_, nir, nir_lower_default_point_size);
    }
 
+   uint64_t outputs = nir->info.outputs_written;
+   if (sw_stage == MESA_SHADER_VERTEX || sw_stage == MESA_SHADER_TESS_EVAL) {
+      if (hw) {
+         hk_lower_hw_vs(nir, shader, features);
+      } else {
+         NIR_PASS(_, nir, agx_nir_lower_vs_before_gs);
+         nir->info.stage = MESA_SHADER_COMPUTE;
+         memset(&nir->info.cs, 0, sizeof(nir->info.cs));
+         nir->xfb_info = NULL;
+      }
+   }
+
+   unsigned root = 0;
+   if (sw_stage == MESA_SHADER_FRAGMENT)
+      root = AGX_ABI_FUNI_ROOT;
+   else if (sw_stage == MESA_SHADER_VERTEX)
+      root = AGX_ABI_VUNI_COUNT_VK(nr_vbos);
+
+   shader->info.set_count = set_count;
+
    /* XXX: rename */
-   NIR_PASS(_, nir, hk_lower_uvs_index, vs_uniform_base);
+   NIR_PASS(_, nir, hk_lower_uvs_index, nr_vbos);
+   NIR_PASS(_, nir, nir_shader_intrinsics_pass, lower_uniforms,
+            nir_metadata_control_flow, &root);
 
 #if 0
    /* TODO */
@@ -941,11 +1160,12 @@ hk_compile_nir(struct hk_device *dev, const VkAllocationCallbacks *pAllocator,
 #endif
 
    struct agx_shader_key backend_key = {
+      .reserved_preamble = root + (4 * (1 + set_count)),
       .dev = agx_gather_device_key(&dev->dev),
-      .reserved_preamble = 128 /* TODO */,
       .no_stop = nir->info.stage == MESA_SHADER_FRAGMENT,
       .has_scratch = !nir->info.internal,
       .promote_constants = true,
+      .promote_textures = true,
    };
 
    /* For now, sample shading is always dynamic. Indicate that. */
@@ -960,6 +1180,7 @@ hk_compile_nir(struct hk_device *dev, const VkAllocationCallbacks *pAllocator,
    if (lock)
       simple_mtx_lock(lock);
 
+   assert(nir->info.io_lowered);
    agx_compile_shader_nir(nir, &backend_key, &shader->b);
 
    if (lock)
@@ -1055,25 +1276,6 @@ hk_api_shader_destroy(struct vk_device *vk_dev, struct vk_shader *vk_shader,
    vk_shader_free(&dev->vk, pAllocator, &obj->vk);
 }
 
-static void
-hk_lower_hw_vs(nir_shader *nir, struct hk_shader *shader)
-{
-   /* Point size must be clamped, excessively large points don't render
-    * properly on G13.
-    *
-    * Must be synced with pointSizeRange.
-    */
-   NIR_PASS(_, nir, nir_lower_point_size, 1.0f, 511.95f);
-
-   /* TODO: Optimize out for monolithic? */
-   NIR_PASS(_, nir, nir_lower_default_point_size);
-
-   NIR_PASS(_, nir, nir_lower_io_to_scalar, nir_var_shader_out, NULL, NULL);
-   NIR_PASS(_, nir, agx_nir_lower_cull_distance_vs);
-
-   NIR_PASS(_, nir, agx_nir_lower_uvs, &shader->info.uvs);
-}
-
 VkResult
 hk_compile_shader(struct hk_device *dev, struct vk_shader_compile_info *info,
                   const struct vk_graphics_pipeline_state *state,
@@ -1097,25 +1299,24 @@ hk_compile_shader(struct hk_device *dev, struct vk_shader_compile_info *info,
       return vk_error(dev, VK_ERROR_OUT_OF_HOST_MEMORY);
    }
 
-   /* TODO: Multiview with ESO */
-   const bool is_multiview = state && state->rp->view_mask != 0;
-
-   hk_lower_nir(dev, nir, info->robustness, is_multiview,
-                info->set_layout_count, info->set_layouts, features);
+   if (!nir->info.io_lowered) {
+      hk_lower_nir(dev, nir, info->robustness, false, info->set_layout_count,
+                   info->set_layouts, features);
+   }
 
    gl_shader_stage sw_stage = nir->info.stage;
 
-   struct hk_fs_key fs_key_tmp, *fs_key = NULL;
+   union hk_key key_tmp, *key = NULL;
    if (sw_stage == MESA_SHADER_FRAGMENT) {
-      hk_populate_fs_key(&fs_key_tmp, state);
-      fs_key = &fs_key_tmp;
+      hk_populate_fs_key(&key_tmp.fs, state);
+      key = &key_tmp;
 
-      nir->info.fs.uses_sample_shading |= fs_key->force_sample_shading;
+      nir->info.fs.uses_sample_shading |= key->fs.force_sample_shading;
 
       /* Force late-Z for Z/S self-deps. TODO: There's probably a less silly way
        * to do this.
        */
-      if (fs_key->zs_self_dep) {
+      if (key->fs.zs_self_dep) {
          nir_builder b =
             nir_builder_at(nir_before_impl(nir_shader_get_entrypoint(nir)));
          nir_discard_if(&b, nir_imm_false(&b));
@@ -1123,71 +1324,53 @@ hk_compile_shader(struct hk_device *dev, struct vk_shader_compile_info *info,
       }
 
       NIR_PASS(_, nir, agx_nir_lower_sample_intrinsics, false);
+   } else if (sw_stage == MESA_SHADER_VERTEX) {
+      hk_populate_vs_key(&key_tmp.vs, state);
+      key = &key_tmp;
    } else if (sw_stage == MESA_SHADER_TESS_CTRL) {
       NIR_PASS(_, nir, agx_nir_lower_tcs);
    }
 
    /* Compile all variants up front */
    if (sw_stage == MESA_SHADER_GEOMETRY) {
-      for (unsigned rast_disc = 0; rast_disc < 2; ++rast_disc) {
-         struct hk_shader *main_variant = hk_main_gs_variant(obj, rast_disc);
-         struct hk_shader *count_variant = hk_count_gs_variant(obj, rast_disc);
-         bool last = (rast_disc + 1) == 2;
+      struct hk_shader *main_variant = hk_main_gs_variant(obj);
+      struct hk_shader *count_variant = hk_count_gs_variant(obj);
 
-         /* Each variant gets its own NIR. To save an extra clone, we use the
-          * original NIR for the last stage.
-          */
-         nir_shader *clone = last ? nir : nir_shader_clone(NULL, nir);
-         nir_shader *count = NULL, *rast = NULL, *pre_gs = NULL;
+      nir_shader *count = NULL, *rast = NULL, *pre_gs = NULL;
 
-         NIR_PASS(_, clone, agx_nir_lower_gs, rast_disc, &count, &rast, &pre_gs,
-                  &count_variant->info.gs);
+      NIR_PASS(_, nir, agx_nir_lower_gs, &count, &rast, &pre_gs,
+               &count_variant->info.gs);
 
-         if (!rast_disc) {
-            struct hk_shader *shader = &obj->variants[HK_GS_VARIANT_RAST];
+      struct hk_shader *shader = &obj->variants[HK_GS_VARIANT_RAST];
+      hk_lower_hw_vs(rast, shader, features);
+      shader->info.gs = count_variant->info.gs;
+      main_variant->info.gs = count_variant->info.gs;
 
-            hk_lower_hw_vs(rast, shader);
-            shader->info.gs = count_variant->info.gs;
-         }
+      struct {
+         nir_shader *in;
+         struct hk_shader *out;
+      } variants[] = {
+         {nir, hk_main_gs_variant(obj)},
+         {pre_gs, hk_pre_gs_variant(obj)},
+         {count, count_variant},
+         {rast, &obj->variants[HK_GS_VARIANT_RAST]},
+      };
 
-         main_variant->info.gs = count_variant->info.gs;
+      for (unsigned v = 0; v < ARRAY_SIZE(variants); ++v) {
+         if (variants[v].in) {
+            result =
+               hk_compile_nir(dev, pAllocator, variants[v].in, info->flags,
+                              info->robustness, NULL, features, variants[v].out,
+                              sw_stage, true, NULL, info->set_layout_count);
 
-         struct {
-            nir_shader *in;
-            struct hk_shader *out;
-         } variants[] = {
-            {clone, hk_main_gs_variant(obj, rast_disc)},
-            {pre_gs, hk_pre_gs_variant(obj, rast_disc)},
-            {count, count_variant},
-            {rast_disc ? NULL : rast, &obj->variants[HK_GS_VARIANT_RAST]},
-         };
-
-         for (unsigned v = 0; v < ARRAY_SIZE(variants); ++v) {
-            if (variants[v].in) {
-               result = hk_compile_nir(dev, pAllocator, variants[v].in,
-                                       info->flags, info->robustness, NULL,
-                                       variants[v].out, sw_stage, true, NULL);
-               if (result != VK_SUCCESS) {
-                  hk_api_shader_destroy(&dev->vk, &obj->vk, pAllocator);
-                  if (clone != nir) {
-                     ralloc_free(nir);
-                  }
-
-                  ralloc_free(clone);
-                  ralloc_free(pre_gs);
-                  ralloc_free(count);
-                  ralloc_free(rast);
-                  return result;
-               }
+            if (result != VK_SUCCESS) {
+               hk_api_shader_destroy(&dev->vk, &obj->vk, pAllocator);
+               ralloc_free(nir);
+               ralloc_free(pre_gs);
+               ralloc_free(count);
+               ralloc_free(rast);
+               return result;
             }
-         }
-
-         /* Nothing consumes this otherwise throw it away.
-          *
-          * TODO: We should just not generate it.
-          */
-         if (rast_disc) {
-            ralloc_free(rast);
          }
       }
    } else if (sw_stage == MESA_SHADER_VERTEX ||
@@ -1235,24 +1418,50 @@ hk_compile_shader(struct hk_device *dev, struct vk_shader_compile_info *info,
           */
          nir_shader *clone = last ? nir : nir_shader_clone(NULL, nir);
 
-         if (sw_stage == MESA_SHADER_VERTEX) {
-            NIR_PASS(_, clone, agx_nir_lower_vs_input_to_prolog,
-                     shader->info.vs.attrib_components_read);
+         NIR_PASS(_, clone, agx_nir_gather_vs_inputs,
+                  shader->info.vs.attrib_components_read);
 
+         if (sw_stage == MESA_SHADER_VERTEX) {
+            shader->info.vs.use_prolog = !(key && key->vs.skip_prolog);
             shader->info.vs.attribs_read =
                nir->info.inputs_read >> VERT_ATTRIB_GENERIC0;
-         }
 
-         if (hw) {
-            hk_lower_hw_vs(clone, shader);
-         } else {
-            NIR_PASS(_, clone, agx_nir_lower_vs_before_gs);
+            if (shader->info.vs.use_prolog) {
+               NIR_PASS(_, clone, agx_nir_lower_vs_input_to_prolog);
+            } else {
+               struct agx_velem_key attribs[AGX_MAX_ATTRIBS];
+               for (unsigned a = 0; a < AGX_MAX_ATTRIBS; ++a) {
+                  if (key->vs.attribs[a].format) {
+                     unsigned slot = util_bitcount64(
+                        shader->info.vs.attribs_read & BITFIELD_MASK(a));
+
+                     attribs[slot] = key->vs.attribs[a];
+                  }
+               }
+
+               struct agx_robustness agx_rs = {
+                  .soft_fault = agx_has_soft_fault(&dev->dev),
+
+                  /* Correctly handling GPL + pipeline-robustness requires
+                   * runtime changes, and I don't care enough to optimize this.
+                   */
+                  .level = AGX_ROBUSTNESS_D3D,
+               };
+
+               agx_nir_lower_vbo(clone, attribs, agx_rs,
+                                 !key->vs.static_strides);
+
+               unsigned nr = DIV_ROUND_UP(
+                  BITSET_LAST_BIT(shader->info.vs.attrib_components_read), 4);
+               agx_nir_lower_non_monolithic_uniforms(clone, nr);
+            }
          }
 
          /* hk_compile_nir takes ownership of the clone */
-         result = hk_compile_nir(dev, pAllocator, clone, info->flags,
-                                 info->robustness, fs_key, shader, sw_stage, hw,
-                                 nir->xfb_info);
+         result =
+            hk_compile_nir(dev, pAllocator, clone, info->flags,
+                           info->robustness, key, features, shader, sw_stage,
+                           hw, nir->xfb_info, info->set_layout_count);
          if (result != VK_SUCCESS) {
             hk_api_shader_destroy(&dev->vk, &obj->vk, pAllocator);
             ralloc_free(nir);
@@ -1263,9 +1472,9 @@ hk_compile_shader(struct hk_device *dev, struct vk_shader_compile_info *info,
       struct hk_shader *shader = hk_only_variant(obj);
 
       /* hk_compile_nir takes ownership of nir */
-      result =
-         hk_compile_nir(dev, pAllocator, nir, info->flags, info->robustness,
-                        fs_key, shader, sw_stage, true, NULL);
+      result = hk_compile_nir(dev, pAllocator, nir, info->flags,
+                              info->robustness, key, features, shader, sw_stage,
+                              true, NULL, info->set_layout_count);
       if (result != VK_SUCCESS) {
          hk_api_shader_destroy(&dev->vk, &obj->vk, pAllocator);
          return result;
@@ -1274,6 +1483,41 @@ hk_compile_shader(struct hk_device *dev, struct vk_shader_compile_info *info,
 
    *shader_out = obj;
    return VK_SUCCESS;
+}
+
+static void
+nir_opts(nir_shader *nir)
+{
+   bool progress;
+
+   do {
+      progress = false;
+
+      NIR_PASS(progress, nir, nir_opt_loop);
+      NIR_PASS(progress, nir, nir_copy_prop);
+      NIR_PASS(progress, nir, nir_opt_remove_phis);
+      NIR_PASS(progress, nir, nir_opt_dce);
+
+      NIR_PASS(progress, nir, nir_opt_if, 0);
+      NIR_PASS(progress, nir, nir_opt_dead_cf);
+      NIR_PASS(progress, nir, nir_opt_cse);
+
+      NIR_PASS(progress, nir, nir_opt_peephole_select,
+               &(nir_opt_peephole_select_options){
+                  .limit = 8,
+                  .expensive_alu_ok = true,
+                  .discard_ok = true,
+               });
+
+      NIR_PASS(progress, nir, nir_opt_phi_precision);
+      NIR_PASS(progress, nir, nir_opt_algebraic);
+      NIR_PASS(progress, nir, nir_opt_constant_folding);
+      NIR_PASS(progress, nir, nir_io_add_const_offset_to_base,
+               nir_var_shader_in | nir_var_shader_out);
+
+      NIR_PASS(progress, nir, nir_opt_undef);
+      NIR_PASS(progress, nir, nir_opt_loop_unroll);
+   } while (progress);
 }
 
 static VkResult
@@ -1285,8 +1529,38 @@ hk_compile_shaders(struct vk_device *vk_dev, uint32_t shader_count,
                    struct vk_shader **shaders_out)
 {
    struct hk_device *dev = container_of(vk_dev, struct hk_device, vk);
+   nir_shader *shaders[shader_count];
+
+   /* Lower shaders, notably lowering I/O. This is a prerequisite for
+    * intershader optimization.
+    */
+   for (uint32_t i = 0; i < shader_count; i++) {
+      const struct vk_shader_compile_info *info = &infos[i];
+      /* TODO: Multiview with ESO */
+      const bool is_multiview = state && state->rp->view_mask != 0;
+      enum hk_feature_key hk_features = hk_make_feature_key(features);
+      nir_shader *nir = info->nir;
+
+      hk_lower_nir(dev, nir, info->robustness, is_multiview,
+                   info->set_layout_count, info->set_layouts, hk_features);
+
+      if (nir->xfb_info) {
+         nir_io_add_const_offset_to_base(
+            nir, nir_var_shader_in | nir_var_shader_out);
+
+         nir_io_add_intrinsic_xfb_info(nir);
+      }
+
+      shaders[i] = nir;
+   }
+
+   nir_opt_varyings_bulk(shaders, shader_count, true, UINT32_MAX, UINT32_MAX,
+                         nir_opts);
 
    for (uint32_t i = 0; i < shader_count; i++) {
+      nir_shader_gather_info(infos[i].nir,
+                             nir_shader_get_entrypoint(infos[i].nir));
+
       VkResult result =
          hk_compile_shader(dev, &infos[i], state, features, pAllocator,
                            (struct hk_api_shader **)&shaders_out[i]);
@@ -1539,12 +1813,17 @@ hk_fast_link(struct hk_device *dev, bool fragment, struct hk_shader *main,
                  nr_samples_shaded);
 
    if (fragment) {
+      unsigned samplers = main->b.info.sampler_state_count;
+      if (s->b.uses_txf)
+         samplers = MAX2(samplers, 1);
+
       agx_pack(&s->fs_counts, FRAGMENT_SHADER_WORD_0, cfg) {
          cfg.cf_binding_count = s->b.cf.nr_bindings;
          cfg.uniform_register_count = main->b.info.push_count;
          cfg.preshader_register_count = main->b.info.nr_preamble_gprs;
+         cfg.texture_state_register_count = main->b.info.texture_state_count;
          cfg.sampler_state_register_count =
-            agx_translate_sampler_state_count(s->b.uses_txf ? 1 : 0, false);
+            agx_translate_sampler_state_count(samplers, false);
       }
    }
 
@@ -1554,8 +1833,6 @@ hk_fast_link(struct hk_device *dev, bool fragment, struct hk_shader *main,
    if (main && main->b.info.rodata.size_16) {
       agx_usc_immediates(&b, &main->b.info.rodata, main->bo->va->addr);
    }
-
-   agx_usc_push_packed(&b, UNIFORM, dev->rodata.image_heap);
 
    if (s->b.uses_txf)
       agx_usc_push_packed(&b, SAMPLER, dev->dev.txf_sampler);

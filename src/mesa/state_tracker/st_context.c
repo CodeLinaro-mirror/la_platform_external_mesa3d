@@ -71,8 +71,6 @@
 #include "compiler/glsl/glsl_parser_extras.h"
 #include "nir.h"
 
-DEBUG_GET_ONCE_BOOL_OPTION(mesa_mvp_dp4, "MESA_MVP_DP4", false)
-
 void
 st_invalidate_buffers(struct st_context *st)
 {
@@ -309,7 +307,7 @@ free_zombie_shaders(struct st_context *st)
          st->pipe->delete_compute_state(st->pipe, entry->shader);
          break;
       default:
-         unreachable("invalid shader type in free_zombie_shaders()");
+         UNREACHABLE("invalid shader type in free_zombie_shaders()");
       }
       free(entry);
    }
@@ -833,12 +831,6 @@ st_create_context(gl_api api, struct pipe_context *pipe,
    if (pipe->screen->get_disk_shader_cache)
       ctx->Cache = pipe->screen->get_disk_shader_cache(pipe->screen);
 
-   /* XXX: need a capability bit in gallium to query if the pipe
-    * driver prefers DP4 or MUL/MAD for vertex transformation.
-    */
-   if (debug_get_option_mesa_mvp_dp4())
-      ctx->Const.ShaderCompilerOptions[MESA_SHADER_VERTEX].OptimizeForAOS = GL_TRUE;
-
    if (pipe->screen->caps.invalidate_buffer)
       ctx->has_invalidate_buffer = true;
 
@@ -986,10 +978,4 @@ st_destroy_context(struct st_context *st)
       /* Restore the current context and draw/read buffers (may be NULL) */
       _mesa_make_current(save_ctx, save_drawbuffer, save_readbuffer);
    }
-}
-
-const struct nir_shader_compiler_options *
-st_get_nir_compiler_options(struct st_context *st, gl_shader_stage stage)
-{
-   return st->ctx->Const.ShaderCompilerOptions[stage].NirOptions;
 }

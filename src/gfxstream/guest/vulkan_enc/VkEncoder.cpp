@@ -605,7 +605,6 @@ void VkEncoder::vkGetPhysicalDeviceProperties(VkPhysicalDevice physicalDevice,
         transform_fromhost_VkPhysicalDeviceProperties(sResourceTracker,
                                                       (VkPhysicalDeviceProperties*)(pProperties));
     }
-    sResourceTracker->on_vkGetPhysicalDeviceProperties(this, physicalDevice, pProperties);
     ++encodeCount;
     if (0 == encodeCount % POOL_CLEAR_INTERVAL) {
         pool->freeAll();
@@ -1678,7 +1677,6 @@ void VkEncoder::vkGetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uin
     stream->read((uint64_t*)&cgen_var_2, 8);
     stream->handleMapping()->mapHandles_u64_VkQueue(&cgen_var_2, (VkQueue*)pQueue, 1);
     stream->unsetHandleMapping();
-    sResourceTracker->on_vkGetDeviceQueue(this, device, queueFamilyIndex, queueIndex, pQueue);
     ++encodeCount;
     if (0 == encodeCount % POOL_CLEAR_INTERVAL) {
         pool->freeAll();
@@ -12748,7 +12746,6 @@ void VkEncoder::vkGetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQu
     stream->read((uint64_t*)&cgen_var_2, 8);
     stream->handleMapping()->mapHandles_u64_VkQueue(&cgen_var_2, (VkQueue*)pQueue, 1);
     stream->unsetHandleMapping();
-    sResourceTracker->on_vkGetDeviceQueue2(this, device, pQueueInfo, pQueue);
     ++encodeCount;
     if (0 == encodeCount % POOL_CLEAR_INTERVAL) {
         pool->freeAll();
@@ -27706,6 +27703,47 @@ VkResult VkEncoder::vkGetSemaphoreGOOGLE(VkDevice device, VkSemaphore semaphore,
     }
     if (!queueSubmitWithCommandsEnabled && doLock) this->unlock();
     return vkGetSemaphoreGOOGLE_VkResult_return;
+}
+
+void VkEncoder::vkTraceAsyncGOOGLE(uint64_t id, uint32_t doLock) {
+    (void)doLock;
+    bool queueSubmitWithCommandsEnabled =
+        sFeatureBits & VULKAN_STREAM_FEATURE_QUEUE_SUBMIT_WITH_COMMANDS_BIT;
+    if (!queueSubmitWithCommandsEnabled && doLock) this->lock();
+    auto stream = mImpl->stream();
+    auto pool = mImpl->pool();
+    uint64_t local_id;
+    local_id = id;
+    size_t count = 0;
+    size_t* countPtr = &count;
+    {
+        *countPtr += sizeof(uint64_t);
+    }
+    uint32_t packetSize_vkTraceAsyncGOOGLE =
+        4 + 4 + (queueSubmitWithCommandsEnabled ? 4 : 0) + count;
+    uint8_t* streamPtr = stream->reserve(packetSize_vkTraceAsyncGOOGLE);
+    uint8_t* packetBeginPtr = streamPtr;
+    uint8_t** streamPtrPtr = &streamPtr;
+    uint32_t opcode_vkTraceAsyncGOOGLE = OP_vkTraceAsyncGOOGLE;
+    uint32_t seqno;
+    if (queueSubmitWithCommandsEnabled) seqno = ResourceTracker::nextSeqno();
+    memcpy(streamPtr, &opcode_vkTraceAsyncGOOGLE, sizeof(uint32_t));
+    streamPtr += sizeof(uint32_t);
+    memcpy(streamPtr, &packetSize_vkTraceAsyncGOOGLE, sizeof(uint32_t));
+    streamPtr += sizeof(uint32_t);
+    if (queueSubmitWithCommandsEnabled) {
+        memcpy(streamPtr, &seqno, sizeof(uint32_t));
+        streamPtr += sizeof(uint32_t);
+    }
+    memcpy(*streamPtrPtr, (uint64_t*)&local_id, sizeof(uint64_t));
+    *streamPtrPtr += sizeof(uint64_t);
+    stream->flush();
+    ++encodeCount;
+    if (0 == encodeCount % POOL_CLEAR_INTERVAL) {
+        pool->freeAll();
+        stream->clearPool();
+    }
+    if (!queueSubmitWithCommandsEnabled && doLock) this->unlock();
 }
 
 #endif

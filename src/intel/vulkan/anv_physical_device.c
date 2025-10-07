@@ -1263,16 +1263,6 @@ get_properties(const struct anv_physical_device *pdevice,
    VkSampleCountFlags sample_counts =
       isl_device_get_sample_counts(&pdevice->isl_dev);
 
-#if DETECT_OS_ANDROID
-   /* Used to fill struct VkPhysicalDevicePresentationPropertiesANDROID */
-   uint64_t front_rendering_usage = 0;
-   struct u_gralloc *gralloc = u_gralloc_create(U_GRALLOC_TYPE_AUTO);
-   if (gralloc != NULL) {
-      u_gralloc_get_front_rendering_usage(gralloc, &front_rendering_usage);
-      u_gralloc_destroy(&gralloc);
-   }
-#endif /* DETECT_OS_ANDROID */
-
    struct anv_descriptor_limits desc_limits;
    get_device_descriptor_limits(pdevice, &desc_limits);
 
@@ -1964,7 +1954,7 @@ get_properties(const struct anv_physical_device *pdevice,
    /* VK_EXT_sample_locations */
    {
       props->sampleLocationSampleCounts =
-         isl_device_get_sample_counts(&pdevice->isl_dev);
+         ~VK_SAMPLE_COUNT_1_BIT & isl_device_get_sample_counts(&pdevice->isl_dev);
 
       /* See also anv_GetPhysicalDeviceMultisamplePropertiesEXT */
       props->maxSampleLocationGridSize.width = 1;
@@ -2003,7 +1993,7 @@ get_properties(const struct anv_physical_device *pdevice,
    /* VK_ANDROID_native_buffer */
 #if DETECT_OS_ANDROID
    {
-      props->sharedImage = front_rendering_usage ? VK_TRUE : VK_FALSE;
+      props->sharedImage = !!vk_android_get_front_buffer_usage();
    }
 #endif /* DETECT_OS_ANDROID */
 
@@ -2525,7 +2515,7 @@ anv_physical_device_get_parameters(struct anv_physical_device *device)
    case INTEL_KMD_TYPE_XE:
       return anv_xe_physical_device_get_parameters(device);
    default:
-      unreachable("Missing");
+      UNREACHABLE("Missing");
       return VK_ERROR_UNKNOWN;
    }
 }
@@ -2575,11 +2565,19 @@ anv_physical_device_try_create(struct vk_instance *vk_instance,
       /* If INTEL_FORCE_PROBE was used, then the user has opted-in for
        * unsupported device support. No need to print a warning message.
        */
-   } else if (devinfo.ver > 20) {
+   } else if (devinfo.ver > 30) {
       result = vk_errorf(instance, VK_ERROR_INCOMPATIBLE_DRIVER,
                          "Vulkan not yet supported on %s", devinfo.name);
       goto fail_fd;
    }
+
+   /* Disable Wa_16013994831 on Gfx12.0 because we found other cases where we
+    * need to always disable preemption :
+    *    - https://gitlab.freedesktop.org/mesa/mesa/-/issues/5963
+    *    - https://gitlab.freedesktop.org/mesa/mesa/-/issues/5662
+    */
+   if (devinfo.verx10 == 120)
+      BITSET_CLEAR(devinfo.workarounds, INTEL_WA_16013994831);
 
    if (!devinfo.has_context_isolation) {
       result = vk_errorf(instance, VK_ERROR_INCOMPATIBLE_DRIVER,
@@ -3088,8 +3086,11 @@ void anv_GetPhysicalDeviceMultisamplePropertiesEXT(
    assert(pMultisampleProperties->sType ==
           VK_STRUCTURE_TYPE_MULTISAMPLE_PROPERTIES_EXT);
 
+   VkSampleCountFlags sample_counts =
+      ~VK_SAMPLE_COUNT_1_BIT & isl_device_get_sample_counts(&physical_device->isl_dev);
+
    VkExtent2D grid_size;
-   if (samples & isl_device_get_sample_counts(&physical_device->isl_dev)) {
+   if (samples & sample_counts) {
       grid_size.width = 1;
       grid_size.height = 1;
    } else {
@@ -3183,7 +3184,7 @@ convert_component_type(enum intel_cooperative_matrix_component_type t)
    case INTEL_CMAT_UINT8:    return VK_COMPONENT_TYPE_UINT8_KHR;
    case INTEL_CMAT_BFLOAT16: return VK_COMPONENT_TYPE_BFLOAT16_KHR;
    }
-   unreachable("invalid cooperative matrix component type in configuration");
+   UNREACHABLE("invalid cooperative matrix component type in configuration");
 }
 
 static VkScopeKHR
@@ -3192,7 +3193,7 @@ convert_scope(enum intel_cmat_scope scope)
    switch (scope) {
    case INTEL_CMAT_SCOPE_SUBGROUP: return VK_SCOPE_SUBGROUP_KHR;
    default:
-      unreachable("invalid cooperative matrix scope in configuration");
+      UNREACHABLE("invalid cooperative matrix scope in configuration");
    }
 }
 

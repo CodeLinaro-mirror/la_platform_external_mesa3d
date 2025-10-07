@@ -36,32 +36,8 @@ reset_obj(struct zink_screen *screen, struct zink_batch_state *bs, struct zink_r
       obj->unordered_access_stage = 0;
       obj->copies_need_reset = true;
       obj->unsync_access = true;
-      /* also prune dead view objects */
-      simple_mtx_lock(&obj->view_lock);
-      if (obj->is_buffer) {
-         while (util_dynarray_contains(&obj->views, VkBufferView))
-            VKSCR(DestroyBufferView)(screen->dev, util_dynarray_pop(&obj->views, VkBufferView), NULL);
-      } else {
-         while (util_dynarray_contains(&obj->views, VkImageView))
-            VKSCR(DestroyImageView)(screen->dev, util_dynarray_pop(&obj->views, VkImageView), NULL);
-      }
-      obj->view_prune_count = 0;
-      obj->view_prune_timeline = 0;
-      simple_mtx_unlock(&obj->view_lock);
       if (obj->dt)
          zink_kopper_prune_batch_usage(obj->dt, &bs->usage);
-   } else if (util_dynarray_num_elements(&obj->views, VkBufferView) > MAX_VIEW_COUNT && !zink_bo_has_unflushed_usage(obj->bo)) {
-      /* avoid ballooning from too many views on always-used resources: */
-      simple_mtx_lock(&obj->view_lock);
-      /* ensure no existing view pruning is queued, double check elements in case pruning just finished */
-      if (!obj->view_prune_timeline && util_dynarray_num_elements(&obj->views, VkBufferView) > MAX_VIEW_COUNT) {
-         /* prune all existing views */
-         obj->view_prune_count = util_dynarray_num_elements(&obj->views, VkBufferView);
-         /* prune them when the views will definitely not be in use */
-         obj->view_prune_timeline = MAX2(obj->bo->reads.u ? obj->bo->reads.u->usage : 0,
-                                         obj->bo->writes.u ? obj->bo->writes.u->usage : 0);
-      }
-      simple_mtx_unlock(&obj->view_lock);
    }
    /* resource objects are not unrefed here;
     * this is typically the last ref on a resource object, and destruction will
@@ -151,7 +127,10 @@ zink_reset_batch_state(struct zink_context *ctx, struct zink_batch_state *bs)
    bs->signal_semaphore = VK_NULL_HANDLE;
    bs->sparse_semaphore = VK_NULL_HANDLE;
    util_dynarray_clear(&bs->wait_semaphore_stages);
+   util_dynarray_clear(&bs->wait_semaphore_values);
    util_dynarray_clear(&bs->wait_semaphores);
+   util_dynarray_clear(&bs->user_signal_semaphores);
+   util_dynarray_clear(&bs->user_signal_semaphore_values);
 
    bs->present = VK_NULL_HANDLE;
    /* check the arrays first to avoid locking unnecessarily */
@@ -205,32 +184,6 @@ unref_resources(struct zink_screen *screen, struct zink_batch_state *bs)
 {
    while (util_dynarray_contains(&bs->unref_resources, struct zink_resource_object*)) {
       struct zink_resource_object *obj = util_dynarray_pop(&bs->unref_resources, struct zink_resource_object*);
-      /* view pruning may be deferred to avoid ballooning */
-      if (obj->view_prune_timeline && zink_screen_check_last_finished(screen, obj->view_prune_timeline)) {
-         simple_mtx_lock(&obj->view_lock);
-         /* check again under lock in case multi-context use is in the same place */
-         if (obj->view_prune_timeline && zink_screen_check_last_finished(screen, obj->view_prune_timeline)) {
-            /* prune `view_prune_count` views */
-            if (obj->is_buffer) {
-               VkBufferView *views = obj->views.data;
-               for (unsigned i = 0; i < obj->view_prune_count; i++)
-                  VKSCR(DestroyBufferView)(screen->dev, views[i], NULL);
-            } else {
-               VkImageView *views = obj->views.data;
-               for (unsigned i = 0; i < obj->view_prune_count; i++)
-                  VKSCR(DestroyImageView)(screen->dev, views[i], NULL);
-            }
-            size_t offset = obj->view_prune_count * sizeof(VkBufferView);
-            uint8_t *data = obj->views.data;
-            /* shift the view array to the start */
-            memcpy(data, data + offset, obj->views.size - offset);
-            /* adjust the array size */
-            obj->views.size -= offset;
-            obj->view_prune_count = 0;
-            obj->view_prune_timeline = 0;
-         }
-         simple_mtx_unlock(&obj->view_lock);
-      }
       /* this is typically where resource objects get destroyed */
       zink_resource_object_reference(screen, &obj, NULL);
    }
@@ -311,8 +264,11 @@ zink_batch_state_destroy(struct zink_screen *screen, struct zink_batch_state *bs
    util_dynarray_fini(&bs->bindless_releases[1]);
    util_dynarray_fini(&bs->acquires);
    util_dynarray_fini(&bs->signal_semaphores);
+   util_dynarray_fini(&bs->user_signal_semaphores);
+   util_dynarray_fini(&bs->user_signal_semaphore_values);
    util_dynarray_fini(&bs->wait_semaphores);
    util_dynarray_fini(&bs->wait_semaphore_stages);
+   util_dynarray_fini(&bs->wait_semaphore_values);
    util_dynarray_fini(&bs->fd_wait_semaphores);
    util_dynarray_fini(&bs->fd_wait_semaphore_stages);
    util_dynarray_fini(&bs->tracked_semaphores);
@@ -413,12 +369,15 @@ create_batch_state(struct zink_context *ctx)
    SET_CREATE_OR_FAIL(&bs->active_queries);
    SET_CREATE_OR_FAIL(&bs->dmabuf_exports);
    util_dynarray_init(&bs->signal_semaphores, NULL);
+   util_dynarray_init(&bs->user_signal_semaphores, NULL);
+   util_dynarray_init(&bs->user_signal_semaphore_values, NULL);
    util_dynarray_init(&bs->wait_semaphores, NULL);
    util_dynarray_init(&bs->tracked_semaphores, NULL);
    util_dynarray_init(&bs->fd_wait_semaphores, NULL);
    util_dynarray_init(&bs->fences, NULL);
    util_dynarray_init(&bs->dead_querypools, NULL);
    util_dynarray_init(&bs->wait_semaphore_stages, NULL);
+   util_dynarray_init(&bs->wait_semaphore_values, NULL);
    util_dynarray_init(&bs->fd_wait_semaphore_stages, NULL);
    util_dynarray_init(&bs->zombie_samplers, NULL);
    util_dynarray_init(&bs->freed_sparse_backing_bos, NULL);
@@ -639,7 +598,8 @@ typedef enum {
    ZINK_SUBMIT_WAIT_ACQUIRE,
    ZINK_SUBMIT_WAIT_FD,
    ZINK_SUBMIT_CMDBUF,
-   ZINK_SUBMIT_SIGNAL,
+   ZINK_SUBMIT_SIGNAL_INTERNAL,
+   ZINK_SUBMIT_SIGNAL_USER,
    ZINK_SUBMIT_MAX
 } zink_submit;
 
@@ -657,6 +617,7 @@ submit_queue(void *data, void *gdata, int thread_index)
    while (!bs->fence.batch_id)
       bs->fence.batch_id = (uint32_t)p_atomic_inc_return(&screen->curr_batch);
    bs->usage.usage = bs->fence.batch_id;
+   assert(bs->usage.usage);
    bs->usage.unflushed = false;
 
    uint64_t batch_id = bs->fence.batch_id;
@@ -696,6 +657,14 @@ submit_queue(void *data, void *gdata, int thread_index)
    si[ZINK_SUBMIT_CMDBUF].waitSemaphoreCount = util_dynarray_num_elements(&bs->wait_semaphores, VkSemaphore);
    si[ZINK_SUBMIT_CMDBUF].pWaitSemaphores = bs->wait_semaphores.data;
    si[ZINK_SUBMIT_CMDBUF].pWaitDstStageMask = bs->wait_semaphore_stages.data;
+   VkTimelineSemaphoreSubmitInfo sem_submit = {
+      VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+      NULL,
+      si[ZINK_SUBMIT_CMDBUF].waitSemaphoreCount,
+      bs->wait_semaphore_values.data
+   };
+   if (si[ZINK_SUBMIT_CMDBUF].waitSemaphoreCount)
+      si[ZINK_SUBMIT_CMDBUF].pNext = &sem_submit;
    VkCommandBuffer cmdbufs[3];
    unsigned c = 0;
    if (bs->has_unsync)
@@ -712,24 +681,42 @@ submit_queue(void *data, void *gdata, int thread_index)
 
    /* then the signal submit with the timeline (fence) semaphore */
    VkSemaphore signals[ZINK_MAX_SIGNALS];
-   si[ZINK_SUBMIT_SIGNAL].signalSemaphoreCount = !!bs->signal_semaphore;
+   si[ZINK_SUBMIT_SIGNAL_INTERNAL].signalSemaphoreCount = !!bs->signal_semaphore;
    signals[0] = bs->signal_semaphore;
-   si[ZINK_SUBMIT_SIGNAL].pSignalSemaphores = signals;
+   si[ZINK_SUBMIT_SIGNAL_INTERNAL].pSignalSemaphores = signals;
    VkTimelineSemaphoreSubmitInfo tsi = {0};
    uint64_t signal_values[ZINK_MAX_SIGNALS] = {0};
    tsi.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-   si[ZINK_SUBMIT_SIGNAL].pNext = &tsi;
+   si[ZINK_SUBMIT_SIGNAL_INTERNAL].pNext = &tsi;
    tsi.pSignalSemaphoreValues = signal_values;
-   signal_values[si[ZINK_SUBMIT_SIGNAL].signalSemaphoreCount] = batch_id;
-   signals[si[ZINK_SUBMIT_SIGNAL].signalSemaphoreCount++] = screen->sem;
-   tsi.signalSemaphoreValueCount = si[ZINK_SUBMIT_SIGNAL].signalSemaphoreCount;
+   signal_values[si[ZINK_SUBMIT_SIGNAL_INTERNAL].signalSemaphoreCount] = batch_id;
+   signals[si[ZINK_SUBMIT_SIGNAL_INTERNAL].signalSemaphoreCount++] = screen->sem;
+   tsi.signalSemaphoreValueCount = si[ZINK_SUBMIT_SIGNAL_INTERNAL].signalSemaphoreCount;
 
    if (bs->present)
-      signals[si[ZINK_SUBMIT_SIGNAL].signalSemaphoreCount++] = bs->present;
-   tsi.signalSemaphoreValueCount = si[ZINK_SUBMIT_SIGNAL].signalSemaphoreCount;
+      signals[si[ZINK_SUBMIT_SIGNAL_INTERNAL].signalSemaphoreCount++] = bs->present;
+   tsi.signalSemaphoreValueCount = si[ZINK_SUBMIT_SIGNAL_INTERNAL].signalSemaphoreCount;
 
-   assert(si[ZINK_SUBMIT_SIGNAL].signalSemaphoreCount <= ZINK_MAX_SIGNALS);
+   assert(si[ZINK_SUBMIT_SIGNAL_INTERNAL].signalSemaphoreCount <= ZINK_MAX_SIGNALS);
    assert(tsi.signalSemaphoreValueCount <= ZINK_MAX_SIGNALS);
+
+   si[ZINK_SUBMIT_SIGNAL_USER].signalSemaphoreCount = util_dynarray_num_elements(&bs->user_signal_semaphores, VkSemaphore);
+   si[ZINK_SUBMIT_SIGNAL_USER].pSignalSemaphores = bs->user_signal_semaphores.data;
+   VkTimelineSemaphoreSubmitInfo user_sem_submit = {
+      VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+      NULL,
+      0,
+      NULL,
+      si[ZINK_SUBMIT_SIGNAL_USER].signalSemaphoreCount,
+      bs->user_signal_semaphore_values.data
+   };
+   if (si[ZINK_SUBMIT_SIGNAL_USER].signalSemaphoreCount) {
+      si[ZINK_SUBMIT_SIGNAL_USER].pNext = &user_sem_submit;
+   } else {
+      num_si--;
+      if (!si[ZINK_SUBMIT_SIGNAL_INTERNAL].signalSemaphoreCount)
+         num_si--;
+   }
 
    VkResult result;
    if (bs->has_work) {
@@ -773,9 +760,6 @@ submit_queue(void *data, void *gdata, int thread_index)
          }
       );
    }
-
-   if (!si[ZINK_SUBMIT_SIGNAL].signalSemaphoreCount)
-      num_si--;
 
    simple_mtx_lock(&screen->queue_lock);
    VRAM_ALLOC_LOOP(result,

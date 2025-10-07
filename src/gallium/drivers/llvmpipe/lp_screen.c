@@ -135,10 +135,6 @@ llvmpipe_init_shader_caps(struct pipe_screen *screen)
          break;
       case PIPE_SHADER_TESS_CTRL:
       case PIPE_SHADER_TESS_EVAL:
-         /* Tessellation shader needs llvm coroutines support */
-         if (!GALLIVM_COROUTINES)
-            continue;
-         FALLTHROUGH;
       case PIPE_SHADER_VERTEX:
       case PIPE_SHADER_GEOMETRY:
          draw_init_shader_caps(caps);
@@ -273,7 +269,7 @@ llvmpipe_init_screen_caps(struct pipe_screen *screen)
    caps->vertex_color_clamped = true;
    caps->glsl_feature_level_compatibility =
    caps->glsl_feature_level = 450;
-   caps->compute = GALLIVM_COROUTINES;
+   caps->compute = true;
    caps->user_vertex_buffers = true;
    caps->tgsi_texcoord = true;
    caps->draw_indirect = true;
@@ -425,6 +421,8 @@ static const struct nir_shader_compiler_options gallivm_nir_options = {
    .lower_flrp64 = true,
    .lower_fsat = true,
    .lower_bitfield_insert = true,
+   .lower_bitfield_extract8 = true,
+   .lower_bitfield_extract16 = true,
    .lower_bitfield_extract = true,
    .lower_fdph = true,
    .lower_ffma16 = true,
@@ -457,7 +455,7 @@ static const struct nir_shader_compiler_options gallivm_nir_options = {
    .lower_usub_borrow = true,
    .lower_mul_2x32_64 = true,
    .lower_ifind_msb = true,
-   .lower_int64_options = nir_lower_imul_2x32_64,
+   .lower_int64_options = nir_lower_imul_2x32_64 | nir_lower_bitfield_extract64,
    .lower_doubles_options = nir_lower_dround_even,
    .max_unroll_iterations = 32,
    .lower_to_scalar = true,
@@ -475,22 +473,11 @@ static const struct nir_shader_compiler_options gallivm_nir_options = {
 };
 
 
-static char *
+static void
 llvmpipe_finalize_nir(struct pipe_screen *screen,
                       struct nir_shader *nir)
 {
    lp_build_opt_nir(nir);
-   return NULL;
-}
-
-
-static inline const void *
-llvmpipe_get_compiler_options(struct pipe_screen *screen,
-                              enum pipe_shader_ir ir,
-                              enum pipe_shader_type shader)
-{
-   assert(ir == PIPE_SHADER_IR_NIR);
-   return &gallivm_nir_options;
 }
 
 
@@ -971,7 +958,6 @@ llvmpipe_create_screen(struct sw_winsys *winsys)
    screen->base.get_vendor = llvmpipe_get_vendor;
    screen->base.get_device_vendor = llvmpipe_get_vendor; // TODO should be the CPU vendor
    screen->base.get_screen_fd = llvmpipe_screen_get_fd;
-   screen->base.get_compiler_options = llvmpipe_get_compiler_options;
    screen->base.is_format_supported = llvmpipe_is_format_supported;
 
    screen->base.context_create = llvmpipe_create_context;
@@ -996,6 +982,9 @@ llvmpipe_create_screen(struct sw_winsys *winsys)
    screen->num_threads = debug_get_num_option("LP_NUM_THREADS",
                                               screen->num_threads);
    screen->num_threads = MIN2(screen->num_threads, LP_MAX_THREADS);
+
+   for (unsigned i = 0; i < PIPE_SHADER_MESH_TYPES; i++)
+      screen->base.nir_options[i] = &gallivm_nir_options;
 
 #if defined(HAVE_LIBDRM) && defined(HAVE_LINUX_UDMABUF_H)
    screen->udmabuf_fd = open("/dev/udmabuf", O_RDWR);

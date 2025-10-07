@@ -49,7 +49,7 @@ brw_inst::init(enum opcode opcode, uint8_t exec_size, const brw_reg &dst,
       break;
    case IMM:
    case UNIFORM:
-      unreachable("Invalid destination register file");
+      UNREACHABLE("Invalid destination register file");
    }
 
    this->writes_accumulator = false;
@@ -509,7 +509,7 @@ brw_inst::components_read(unsigned i) const
          return 1;
 
    case BRW_OPCODE_DPAS:
-      unreachable("Do not use components_read() for DPAS.");
+      UNREACHABLE("Do not use components_read() for DPAS.");
 
    default:
       return 1;
@@ -564,26 +564,25 @@ brw_inst::size_read(const struct intel_device_info *devinfo, int arg) const
        * coincidence, so this isn't so bad.
        */
       const unsigned reg_unit = this->exec_size / 8;
+      const unsigned type_size = brw_type_size_bytes(src[arg].type);
 
       switch (arg) {
       case 0:
-         if (src[0].type == BRW_TYPE_HF) {
-            return rcount * reg_unit * REG_SIZE / 2;
-         } else {
-            return rcount * reg_unit * REG_SIZE;
-         }
+         assert(type_size == 4 || type_size == 2);
+         return rcount * reg_unit * 8 * type_size;
       case 1:
          return sdepth * reg_unit * REG_SIZE;
       case 2:
          /* This is simpler than the formula described in the Bspec, but it
           * covers all of the cases that we support. Each inner sdepth
-          * iteration of the DPAS consumes a single dword for int8, uint8, or
-          * float16 types. These are the one source types currently
-          * supportable through Vulkan. This is independent of reg_unit.
+          * iteration of the DPAS consumes a single dword for int8, uint8,
+          * float16, or bfloat16 types. These are the one source types
+          * currently supportable through Vulkan. This is independent of
+          * reg_unit.
           */
          return rcount * sdepth * 4;
       default:
-         unreachable("Invalid source number.");
+         UNREACHABLE("Invalid source number.");
       }
       break;
    }
@@ -634,7 +633,7 @@ namespace {
          case BRW_PREDICATE_ALIGN1_ALL16H:   return 16;
          case BRW_PREDICATE_ALIGN1_ANY32H:   return 32;
          case BRW_PREDICATE_ALIGN1_ALL32H:   return 32;
-         default: unreachable("Unsupported predicate");
+         default: UNREACHABLE("Unsupported predicate");
          }
       }
    }
@@ -957,49 +956,26 @@ brw_inst::has_side_effects() const
 bool
 brw_inst::is_volatile() const
 {
-   return opcode == SHADER_OPCODE_MEMORY_LOAD_LOGICAL ||
-          opcode == SHADER_OPCODE_LOAD_REG ||
-          ((opcode == SHADER_OPCODE_SEND ||
-            opcode == SHADER_OPCODE_SEND_GATHER) && send_is_volatile);
-}
-
-void
-brw_inst::insert_before(bblock_t *block, brw_inst *inst)
-{
-   assert(this != inst);
-
-   assert(!inst->block || inst->block == block);
-
-   exec_node::insert_before(inst);
-
-   inst->block = block;
-   inst->block->num_instructions++;
-   inst->block->cfg->total_instructions++;
+   switch (opcode) {
+   case SHADER_OPCODE_MEMORY_LOAD_LOGICAL:
+   case SHADER_OPCODE_LOAD_REG:
+      return true;
+   case SHADER_OPCODE_MEMORY_STORE_LOGICAL:
+      assert(sources > MEMORY_LOGICAL_FLAGS);
+      return src[MEMORY_LOGICAL_FLAGS].ud & MEMORY_FLAG_VOLATILE_ACCESS;
+   case SHADER_OPCODE_SEND:
+   case SHADER_OPCODE_SEND_GATHER:
+      return send_is_volatile;
+   default:
+      return false;
+   }
 }
 
 void
 brw_inst::remove()
 {
    assert(block);
-
-   if (exec_list_is_singular(&block->instructions)) {
-      this->opcode = BRW_OPCODE_NOP;
-      this->resize_sources(0);
-      this->dst = brw_reg();
-      this->size_written = 0;
-      return;
-   }
-
-   assert(block->num_instructions > 0);
-   assert(block->cfg->total_instructions > 0);
-   block->num_instructions--;
-   block->cfg->total_instructions--;
-
-   if (block->num_instructions == 0)
-      block->cfg->remove_block(block);
-
-   exec_node::remove();
-   block = NULL;
+   block->remove(this);
 }
 
 enum brw_reg_type

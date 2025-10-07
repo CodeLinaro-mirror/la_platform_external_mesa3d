@@ -73,8 +73,8 @@ struct brw_insn_state {
 
    bool pred_inv:1;
 
-   /* Flag subreg.  Bottom bit is subreg, top bit is reg */
-   unsigned flag_subreg:2;
+   /* Flag subreg.  Bottom bit is subreg, top bits are reg */
+   unsigned flag_subreg:3;
 
    bool acc_wr_control:1;
 };
@@ -247,12 +247,14 @@ ALU2(SUBB)
 #undef ALU2
 #undef ALU3
 
+/* In Xe2+ each register is 64bytes/512bits long while older platforms it is
+ * 32bytes/256bits long.
+ */
 static inline unsigned
 reg_unit(const struct intel_device_info *devinfo)
 {
    return devinfo->ver >= 20 ? 2 : 1;
 }
-
 
 /* Helpers for SEND instruction:
  */
@@ -284,14 +286,6 @@ static inline unsigned
 brw_message_desc_rlen(const struct intel_device_info *devinfo, uint32_t desc)
 {
    return GET_BITS(desc, 24, 20) * reg_unit(devinfo);
-}
-
-static inline bool
-brw_message_desc_header_present(ASSERTED
-                                const struct intel_device_info *devinfo,
-                                uint32_t desc)
-{
-   return GET_BITS(desc, 19, 19);
 }
 
 static inline unsigned
@@ -606,7 +600,7 @@ brw_mdc_ds(unsigned bit_size)
    case 32:
       return GFX7_BYTE_SCATTERED_DATA_ELEMENT_DWORD;
    default:
-      unreachable("Unsupported bit_size for byte scattered messages");
+      UNREACHABLE("Unsupported bit_size for byte scattered messages");
    }
 }
 
@@ -726,7 +720,7 @@ brw_mdc_a64_ds(unsigned elems)
    case 4:  return 2;
    case 8:  return 3;
    default:
-      unreachable("Unsupported elmeent count for A64 scattered message");
+      UNREACHABLE("Unsupported elmeent count for A64 scattered message");
    }
 }
 
@@ -1060,7 +1054,7 @@ lsc_op_to_legacy_atomic(unsigned _op)
    /* No LSC op maps to BRW_AOP_PREDEC */
    case LSC_OP_ATOMIC_LOAD:
    case LSC_OP_ATOMIC_FSUB:
-      unreachable("no corresponding legacy atomic operation");
+      UNREACHABLE("no corresponding legacy atomic operation");
    case LSC_OP_LOAD:
    case LSC_OP_LOAD_CMASK:
    case LSC_OP_STORE:
@@ -1068,10 +1062,10 @@ lsc_op_to_legacy_atomic(unsigned _op)
    case LSC_OP_FENCE:
    case LSC_OP_LOAD_CMASK_MSRT:
    case LSC_OP_STORE_CMASK_MSRT:
-      unreachable("not an atomic op");
+      UNREACHABLE("not an atomic op");
    }
 
-   unreachable("invalid LSC op");
+   UNREACHABLE("invalid LSC op");
 }
 
 static inline uint32_t
@@ -1090,7 +1084,7 @@ lsc_data_size_bytes(enum lsc_data_size data_size)
    case LSC_DATA_SIZE_D64:
       return 8;
    default:
-      unreachable("Unsupported data payload size.");
+      UNREACHABLE("Unsupported data payload size.");
    }
 }
 
@@ -1102,7 +1096,7 @@ lsc_addr_size_bytes(enum lsc_addr_size addr_size)
    case LSC_ADDR_SIZE_A32: return 4;
    case LSC_ADDR_SIZE_A64: return 8;
    default:
-      unreachable("Unsupported address size.");
+      UNREACHABLE("Unsupported address size.");
    }
 }
 
@@ -1119,7 +1113,7 @@ lsc_vector_length(enum lsc_vect_size vect_size)
    case LSC_VECT_SIZE_V32: return 32;
    case LSC_VECT_SIZE_V64: return 64;
    default:
-      unreachable("Unsupported size of vector");
+      UNREACHABLE("Unsupported size of vector");
    }
 }
 
@@ -1136,7 +1130,7 @@ lsc_vect_size(unsigned vect_size)
    case 32: return LSC_VECT_SIZE_V32;
    case 64: return LSC_VECT_SIZE_V64;
    default:
-      unreachable("Unsupported vector size for dataport");
+      UNREACHABLE("Unsupported vector size for dataport");
    }
 }
 
@@ -1295,11 +1289,12 @@ lsc_fence_msg_desc_backup_routing(UNUSED const struct intel_device_info *devinfo
 }
 
 static inline uint32_t
-lsc_bti_ex_desc(const struct intel_device_info *devinfo, unsigned bti)
+lsc_bti_ex_desc(const struct intel_device_info *devinfo, unsigned bti,
+                unsigned base_offset)
 {
    assert(devinfo->has_lsc);
    return SET_BITS(bti, 31, 24) |
-          SET_BITS(0, 23, 12);  /* base offset */
+          SET_BITS(base_offset, 23, 12);  /* base offset */
 }
 
 static inline unsigned
@@ -1316,6 +1311,14 @@ lsc_bti_ex_desc_index(const struct intel_device_info *devinfo,
 {
    assert(devinfo->has_lsc);
    return GET_BITS(ex_desc, 31, 24);
+}
+
+static inline unsigned
+lsc_flat_ex_desc(const struct intel_device_info *devinfo,
+                 uint32_t base_offset)
+{
+   assert(devinfo->has_lsc);
+   return SET_BITS(base_offset, 31, 12);
 }
 
 static inline unsigned
@@ -1434,7 +1437,7 @@ translate_systolic_depth(unsigned d)
    case 4:  return BRW_SYSTOLIC_DEPTH_4;
    case 8:  return BRW_SYSTOLIC_DEPTH_8;
    case 16: return BRW_SYSTOLIC_DEPTH_16;
-   default: unreachable("Invalid systolic depth.");
+   default: UNREACHABLE("Invalid systolic depth.");
    }
 }
 
@@ -1460,6 +1463,7 @@ brw_send_indirect_split_message(struct brw_codegen *p,
                                 struct brw_reg payload1,
                                 struct brw_reg desc,
                                 struct brw_reg ex_desc,
+                                uint32_t ex_desc_imm_inst,
                                 unsigned ex_mlen,
                                 bool ex_bso,
                                 bool eot,
@@ -1611,6 +1615,24 @@ next_offset(struct brw_codegen *p, void *store, int offset)
 
 /** Maximum SEND message length */
 #define BRW_MAX_MSG_LENGTH 15
+
+/** Offset encoding signed size limits (top bit is the sign) */
+#define LSC_ADDRESS_OFFSET_FLAT_BITS 20
+#define LSC_ADDRESS_OFFSET_SS_BITS   17
+#define LSC_ADDRESS_OFFSET_BTI_BITS  12
+
+static inline unsigned
+brw_max_immediate_offset_bits(enum lsc_addr_surface_type binding_type)
+{
+   static const unsigned max_bits[] = {
+      [LSC_ADDR_SURFTYPE_FLAT] = LSC_ADDRESS_OFFSET_FLAT_BITS,
+      [LSC_ADDR_SURFTYPE_BSS]  = LSC_ADDRESS_OFFSET_SS_BITS,
+      [LSC_ADDR_SURFTYPE_SS]   = LSC_ADDRESS_OFFSET_SS_BITS,
+      [LSC_ADDR_SURFTYPE_BTI]  = LSC_ADDRESS_OFFSET_BTI_BITS,
+   };
+   assert(binding_type <= LSC_ADDR_SURFTYPE_BTI);
+   return max_bits[binding_type];
+}
 
 #ifdef __cplusplus
 }

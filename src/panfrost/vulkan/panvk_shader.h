@@ -28,7 +28,7 @@ extern const struct vk_device_shader_ops panvk_per_arch(device_shader_ops);
 
 #define MAX_VS_ATTRIBS 16
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
 
 /* We could theoretically use the MAX_PER_SET values here (except for UBOs
  * where we're really limited to 256 on the shader side), but on Bifrost we
@@ -70,7 +70,7 @@ enum panvk_varying_buf_id {
    PANVK_VARY_BUF_MAX,
 };
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
 enum panvk_desc_table_id {
    PANVK_DESC_TABLE_USER = 0,
    PANVK_DESC_TABLE_CS_DYN_SSBOS = MAX_SETS,
@@ -109,7 +109,7 @@ struct panvk_graphics_sysvals {
    } viewport;
 
    struct {
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
       int32_t raw_vertex_offset;
 #endif
       int32_t first_vertex;
@@ -123,7 +123,7 @@ struct panvk_graphics_sysvals {
 
    struct panvk_input_attachment_info iam[INPUT_ATTACHMENT_MAP_SIZE];
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
    /* gl_Layer on Bifrost is a bit of hack. We have to issue one draw per
     * layer, and filter primitives at the VS level.
     */
@@ -140,7 +140,7 @@ static_assert((sizeof(struct panvk_graphics_sysvals) % FAU_WORD_SIZE) == 0,
 static_assert((offsetof(struct panvk_graphics_sysvals, push_uniforms) %
                FAU_WORD_SIZE) == 0,
               "panvk_graphics_sysvals::push_uniforms must be 8-byte aligned");
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
 static_assert((offsetof(struct panvk_graphics_sysvals, desc) % FAU_WORD_SIZE) ==
                  0,
               "panvk_graphics_sysvals::desc must be 8-byte aligned");
@@ -161,7 +161,7 @@ struct panvk_compute_sysvals {
    aligned_u64 push_uniforms;
    aligned_u64 printf_buffer_address;
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
    struct {
       aligned_u64 sets[PANVK_DESC_TABLE_COMPUTE_COUNT];
    } desc;
@@ -173,7 +173,7 @@ static_assert((sizeof(struct panvk_compute_sysvals) % FAU_WORD_SIZE) == 0,
 static_assert((offsetof(struct panvk_compute_sysvals, push_uniforms) %
                FAU_WORD_SIZE) == 0,
               "panvk_compute_sysvals::push_uniforms must be 8-byte aligned");
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
 static_assert((offsetof(struct panvk_compute_sysvals, desc) % FAU_WORD_SIZE) ==
                  0,
               "panvk_compute_sysvals::desc must be 8-byte aligned");
@@ -260,7 +260,7 @@ static_assert((offsetof(struct panvk_compute_sysvals, desc) % FAU_WORD_SIZE) ==
       .base = SYSVALS_PUSH_CONST_BASE + sysval_offset(__ptype, __name),        \
       .range = sysval_size(__ptype, __name))
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
 enum panvk_bifrost_desc_table_type {
    PANVK_BIFROST_DESC_TABLE_INVALID = -1,
 
@@ -297,8 +297,7 @@ struct panvk_shader_fau_info {
    uint32_t total_count;
 };
 
-struct panvk_shader {
-   struct vk_shader vk;
+struct panvk_shader_variant {
    struct pan_shader_info info;
 
    union {
@@ -315,7 +314,7 @@ struct panvk_shader {
    struct {
       uint32_t used_set_mask;
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
       struct {
          uint32_t map[MAX_DYNAMIC_UNIFORM_BUFFERS];
          uint32_t count;
@@ -345,7 +344,7 @@ struct panvk_shader {
 
    struct panvk_priv_mem code_mem;
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
    struct panvk_priv_mem rsd;
 #else
    union {
@@ -367,13 +366,81 @@ struct panvk_shader {
    const char *asm_str;
 };
 
+enum panvk_vs_variant {
+   /* Hardware vertex shader, when next stage is fragment */
+   PANVK_VS_VARIANT_HW,
+
+   PANVK_VS_VARIANTS,
+};
+
+struct panvk_shader {
+   struct vk_shader vk;
+
+   struct panvk_shader_variant variants[];
+};
+
+static inline unsigned
+panvk_shader_num_variants(gl_shader_stage stage)
+{
+   if (stage == MESA_SHADER_VERTEX)
+      return PANVK_VS_VARIANTS;
+
+   return 1;
+}
+
+static const char *panvk_vs_shader_variant_name[] = {
+   [PANVK_VS_VARIANT_HW] = NULL,
+};
+
+static const char *
+panvk_shader_variant_name(const struct panvk_shader *shader,
+                          struct panvk_shader_variant *variant)
+{
+   unsigned i = variant - shader->variants;
+   assert(i < panvk_shader_num_variants(shader->vk.stage));
+
+   if (shader->vk.stage == MESA_SHADER_VERTEX) {
+      assert(i < ARRAY_SIZE(panvk_vs_shader_variant_name));
+      return panvk_vs_shader_variant_name[i];
+   }
+
+   assert(panvk_shader_num_variants(shader->vk.stage) == 1);
+
+   return NULL;
+}
+
+static const struct panvk_shader_variant *
+panvk_shader_only_variant(const struct panvk_shader *shader)
+{
+   if (!shader)
+      return NULL;
+
+   assert(panvk_shader_num_variants(shader->vk.stage) == 1);
+   return &shader->variants[0];
+}
+
+static const struct panvk_shader_variant *
+panvk_shader_hw_variant(const struct panvk_shader *shader)
+{
+   if (!shader)
+      return NULL;
+
+   return &shader->variants[0];
+}
+
 static inline uint64_t
-panvk_shader_get_dev_addr(const struct panvk_shader *shader)
+panvk_shader_variant_get_dev_addr(const struct panvk_shader_variant *shader)
 {
    return shader != NULL ? panvk_priv_mem_dev_addr(shader->code_mem) : 0;
 }
 
-#if PAN_ARCH <= 7
+#define panvk_shader_foreach_variant(__shader, __var)                          \
+   for (struct panvk_shader_variant *__var = (__shader)->variants;             \
+        __var < (__shader)->variants +                                         \
+                   panvk_shader_num_variants((__shader)->vk.stage);            \
+        ++__var)
+
+#if PAN_ARCH < 9
 struct panvk_shader_link {
    struct {
       struct panvk_priv_mem attribs;
@@ -382,8 +449,8 @@ struct panvk_shader_link {
 };
 
 VkResult panvk_per_arch(link_shaders)(struct panvk_pool *desc_pool,
-                                      const struct panvk_shader *vs,
-                                      const struct panvk_shader *fs,
+                                      const struct panvk_shader_variant *vs,
+                                      const struct panvk_shader_variant *fs,
                                       struct panvk_shader_link *link);
 
 static inline void
@@ -398,7 +465,8 @@ void panvk_per_arch(nir_lower_descriptors)(
    nir_shader *nir, struct panvk_device *dev,
    const struct vk_pipeline_robustness_state *rs, uint32_t set_layout_count,
    struct vk_descriptor_set_layout *const *set_layouts,
-   const struct vk_graphics_pipeline_state *state, struct panvk_shader *shader);
+   const struct vk_graphics_pipeline_state *state,
+   struct panvk_shader_variant *shader);
 
 /* This a stripped-down version of panvk_shader for internal shaders that
  * are managed by vk_meta (blend and preload shaders). Those don't need the
@@ -408,7 +476,7 @@ struct panvk_internal_shader {
    struct pan_shader_info info;
    struct panvk_priv_mem code_mem;
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
    struct panvk_priv_mem rsd;
 #else
    struct panvk_priv_mem spd;
@@ -417,7 +485,7 @@ struct panvk_internal_shader {
 
 #if PAN_ARCH >= 9
 static inline bool
-panvk_use_ld_var_buf(const struct panvk_shader *shader)
+panvk_use_ld_var_buf(const struct panvk_shader_variant *shader)
 {
    /* LD_VAR_BUF[_IMM] takes an 8-bit offset, limiting its use to 16 or less
     * varyings, assuming highp vec4. */

@@ -405,7 +405,8 @@ v3d_tlb_blit_fast(struct pipe_context *pctx, struct pipe_blit_info *info)
         if (info->dst.box.x != 0 || info->dst.box.width != dst_width ||
             info->dst.box.y != 0 || info->dst.box.height != dst_height ||
             job->draw_min_x != 0 || job->draw_min_y != 0 ||
-            job->draw_max_x != dst_width || job->draw_max_y != dst_height) {
+            job->draw_max_x != dst_width || job->draw_max_y != dst_height ||
+            !job->does_rasterization) {
                 return;
         }
 
@@ -428,6 +429,10 @@ v3d_tlb_blit_fast(struct pipe_context *pctx, struct pipe_blit_info *info)
         }
 
         if (idx < 0)
+                return;
+
+        /* We can't use this blit path if the color buffer is not stored */
+        if (!(job->store & (PIPE_CLEAR_COLOR0 << idx)))
                 return;
 
         struct pipe_surface dbuf;
@@ -547,6 +552,7 @@ v3d_tlb_blit(struct pipe_context *pctx, struct pipe_blit_info *info)
         job->draw_max_x = info->dst.box.x + info->dst.box.width;
         job->draw_max_y = info->dst.box.y + info->dst.box.height;
         job->scissor.disabled = false;
+        job->does_rasterization = true;
 
         /* The simulator complains if we do a TLB load from a source with a
          * stride that is smaller than the destination's, so we program the
@@ -608,9 +614,7 @@ v3d_get_sand8_vs(struct pipe_context *pctx)
                 return v3d->sand8_blit_vs;
 
         const struct nir_shader_compiler_options *options =
-                pscreen->get_compiler_options(pscreen,
-                                              PIPE_SHADER_IR_NIR,
-                                              PIPE_SHADER_VERTEX);
+                pscreen->nir_options[PIPE_SHADER_VERTEX];
 
         nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_VERTEX,
                                                        options,
@@ -657,9 +661,7 @@ v3d_get_sand8_fs(struct pipe_context *pctx, int cpp)
                 return *cached_shader;
 
         const struct nir_shader_compiler_options *options =
-                pscreen->get_compiler_options(pscreen,
-                                              PIPE_SHADER_IR_NIR,
-                                              PIPE_SHADER_FRAGMENT);
+                pscreen->nir_options[PIPE_SHADER_FRAGMENT];
 
         nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_FRAGMENT,
                                                        options, "%s", name);
@@ -889,9 +891,7 @@ v3d_get_sand30_vs(struct pipe_context *pctx)
                 return v3d->sand30_blit_vs;
 
         const struct nir_shader_compiler_options *options =
-                pscreen->get_compiler_options(pscreen,
-                                              PIPE_SHADER_IR_NIR,
-                                              PIPE_SHADER_VERTEX);
+                pscreen->nir_options[PIPE_SHADER_VERTEX];
 
         nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_VERTEX,
                                                        options,
@@ -966,9 +966,7 @@ v3d_get_sand30_fs(struct pipe_context *pctx)
                 return  v3d->sand30_blit_fs;
 
         const struct nir_shader_compiler_options *options =
-                pscreen->get_compiler_options(pscreen,
-                                              PIPE_SHADER_IR_NIR,
-                                              PIPE_SHADER_FRAGMENT);
+                pscreen->nir_options[PIPE_SHADER_FRAGMENT];
 
         nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_FRAGMENT,
                                                        options,

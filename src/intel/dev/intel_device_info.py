@@ -135,6 +135,7 @@ Enum("intel_platform",
       "INTEL_PLATFORM_LNL",
       "INTEL_PLATFORM_BMG",
       "INTEL_PLATFORM_PTL",
+      "INTEL_PLATFORM_WCL",
       ])
 
 Struct("intel_memory_class_instance",
@@ -479,5 +480,5 @@ Struct("intel_device_info",
         Member("intel_device_info_mem_desc", "mem"),
         Member("intel_device_info_pat_desc", "pat"),
         Member("intel_cooperative_matrix_configuration",
-               "cooperative_matrix_configurations", array=4)]
+               "cooperative_matrix_configurations", array=16)]
        )

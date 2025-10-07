@@ -22,6 +22,9 @@
 
 #include "pan_kmod_backend.h"
 
+/* Maximum kmod BO label length, including NUL-terminator */
+#define PANTHOR_BO_LABEL_MAXLEN 4096
+
 const struct pan_kmod_ops panthor_kmod_ops;
 
 /* Objects used to track VAs returned through async unmaps. */
@@ -150,6 +153,18 @@ panthor_kmod_dev_create(int fd, uint32_t flags, drmVersionPtr version,
    }
 
    /* Map the LATEST_FLUSH_ID register at device creation time. */
+   if (version->version_major > 1 || version->version_minor >= 5) {
+      struct drm_panthor_set_user_mmio_offset user_mmio_offset = {
+         .offset = DRM_PANTHOR_USER_MMIO_OFFSET,
+      };
+
+      ret = drmIoctl(fd, DRM_IOCTL_PANTHOR_SET_USER_MMIO_OFFSET, &user_mmio_offset);
+      if (ret) {
+         mesa_loge("DRM_IOCTL_PANTHOR_SET_USER_MMIO_OFFSET, failed (err=%d)", errno);
+         goto err_free_dev;
+      }
+   }
+
    panthor_dev->flush_id = os_mmap(0, getpagesize(), PROT_READ, MAP_SHARED, fd,
                                    DRM_PANTHOR_USER_FLUSH_ID_MMIO_OFFSET);
    if (panthor_dev->flush_id == MAP_FAILED) {
@@ -251,8 +266,7 @@ panthor_dev_query_props(const struct pan_kmod_dev *dev,
       container_of(dev, struct panthor_kmod_dev, base);
 
    *props = (struct pan_kmod_dev_props){
-      .gpu_prod_id = panthor_dev->props.gpu.gpu_id >> 16,
-      .gpu_revision = panthor_dev->props.gpu.gpu_id & 0xffff,
+      .gpu_id = panthor_dev->props.gpu.gpu_id,
       .gpu_variant = panthor_dev->props.gpu.core_features & 0xff,
       .shader_present = panthor_dev->props.gpu.shader_present,
       .tiler_features = panthor_dev->props.gpu.tiler_features,
@@ -1190,6 +1204,30 @@ panthor_kmod_query_timestamp(const struct pan_kmod_dev *dev)
    return timestamp_info.current_timestamp;
 }
 
+static void
+panthor_kmod_bo_label(struct pan_kmod_dev *dev, struct pan_kmod_bo *bo, const char *label)
+{
+   char truncated_label[PANTHOR_BO_LABEL_MAXLEN];
+
+   if (!(dev->driver.version.major > 1 || dev->driver.version.minor >= 4))
+      return;
+
+    if (strnlen(label, PANTHOR_BO_LABEL_MAXLEN) == PANTHOR_BO_LABEL_MAXLEN) {
+      strncpy(truncated_label, label, PANTHOR_BO_LABEL_MAXLEN - 1);
+      truncated_label[PANTHOR_BO_LABEL_MAXLEN - 1] = '\0';
+      label = truncated_label;
+   }
+
+   struct drm_panthor_bo_set_label set_label = (struct drm_panthor_bo_set_label) {
+      .handle = bo->handle,
+      .label = (uint64_t)(uintptr_t)label,
+   };
+
+   int ret = pan_kmod_ioctl(dev->fd, DRM_IOCTL_PANTHOR_BO_SET_LABEL, &set_label);
+   if (ret)
+      mesa_loge("DRM_IOCTL_PANTHOR_BO_SET_LABEL failed (err=%d)", errno);
+}
+
 const struct pan_kmod_ops panthor_kmod_ops = {
    .dev_create = panthor_kmod_dev_create,
    .dev_destroy = panthor_kmod_dev_destroy,
@@ -1206,4 +1244,5 @@ const struct pan_kmod_ops panthor_kmod_ops = {
    .vm_bind = panthor_kmod_vm_bind,
    .vm_query_state = panthor_kmod_vm_query_state,
    .query_timestamp = panthor_kmod_query_timestamp,
+   .bo_set_label = panthor_kmod_bo_label,
 };

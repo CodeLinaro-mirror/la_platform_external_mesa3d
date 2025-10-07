@@ -752,6 +752,10 @@ custom_decodes = {
     "vkDestroyRenderPass" : emit_global_state_wrapped_decoding,
     "vkCreateFramebuffer" : emit_global_state_wrapped_decoding,
     "vkDestroyFramebuffer" : emit_global_state_wrapped_decoding,
+    "vkCreateEvent" : emit_global_state_wrapped_decoding,
+    "vkDestroyEvent" : emit_global_state_wrapped_decoding,
+    "vkSetEvent" : emit_global_state_wrapped_decoding,
+    "vkResetEvent" : emit_global_state_wrapped_decoding,
     "vkDestroyFramebuffer" : emit_global_state_wrapped_decoding,
     "vkCmdBeginRenderPass" : emit_global_state_wrapped_decoding,
     "vkCmdBeginRenderPass2" : emit_global_state_wrapped_decoding,
@@ -787,6 +791,7 @@ custom_decodes = {
     "vkGetMemoryHostAddressInfoGOOGLE" : emit_global_state_wrapped_decoding,
     "vkGetBlobGOOGLE" : emit_global_state_wrapped_decoding,
     "vkGetSemaphoreGOOGLE" : emit_global_state_wrapped_decoding,
+    "vkTraceAsyncGOOGLE" : emit_global_state_wrapped_decoding,
 
     # Descriptor update templates
     "vkCreateDescriptorUpdateTemplate" : emit_global_state_wrapped_decoding,

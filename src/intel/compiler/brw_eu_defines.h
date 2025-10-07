@@ -686,6 +686,9 @@ enum memory_logical_srcs {
    /** Coordinate/address/offset for where to access memory */
    MEMORY_LOGICAL_ADDRESS,
 
+   /** Xe2+: offset for where to access memory (as UD immediate) */
+   MEMORY_LOGICAL_ADDRESS_OFFSET,
+
    /** Dimensionality of the "address" source (as UD immediate) */
    MEMORY_LOGICAL_COORD_COMPONENTS,
 
@@ -715,6 +718,8 @@ enum memory_flags {
    MEMORY_FLAG_TRANSPOSE = 1 << 0,
    /** Whether this operation should fire for helper invocations */
    MEMORY_FLAG_INCLUDE_HELPERS = 1 << 1,
+   /** Whether memory access is marked volatile by GLSL/SPIR-V. */
+   MEMORY_FLAG_VOLATILE_ACCESS = 1 << 2,
 };
 
 enum rt_logical_srcs {
@@ -1554,13 +1559,11 @@ enum ENUM_PACKED brw_rnd_mode {
 #define GEN_RT_BTD_SHADER_TYPE_MISS           2
 #define GEN_RT_BTD_SHADER_TYPE_INTERSECTION   3
 
-/* Starting with Xe-HPG, the old dataport was massively reworked dataport.
+/* Starting with Xe-HPG, the old dataport was massively reworked.
  * The new thing, called Load/Store Cache or LSC, has a significantly improved
  * interface.  Instead of bespoke messages for every case, there's basically
  * one or two messages with different bits to control things like address
- * size, how much data is read/written, etc.  It's way nicer but also means we
- * get to rewrite all our dataport encoding/decoding code.  This patch kicks
- * off the party with all of the new enums.
+ * size, how much data is read/written, etc.
  */
 enum lsc_opcode {
    LSC_OP_LOAD            = 0,

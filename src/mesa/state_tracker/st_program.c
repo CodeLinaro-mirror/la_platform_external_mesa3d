@@ -208,7 +208,7 @@ st_set_prog_affected_state_flags(struct gl_program *prog)
       break;
 
    default:
-      unreachable("unhandled shader stage");
+      UNREACHABLE("unhandled shader stage");
    }
 }
 
@@ -218,10 +218,10 @@ st_set_prog_affected_state_flags(struct gl_program *prog)
  * the linked list.
  */
 static void
-delete_variant(struct st_context *st, struct st_variant *v, GLenum target)
+delete_variant(struct st_context *st, struct st_variant *v, unsigned stage)
 {
    if (v->driver_shader) {
-      if (target == GL_VERTEX_PROGRAM_ARB &&
+      if (stage == MESA_SHADER_VERTEX &&
           ((struct st_common_variant*)v)->key.is_draw_shader) {
          /* Draw shader. */
          draw_delete_vertex_shader(st->draw, v->driver_shader);
@@ -229,36 +229,33 @@ delete_variant(struct st_context *st, struct st_variant *v, GLenum target)
          /* The shader's context matches the calling context, or we
           * don't care.
           */
-         switch (target) {
-         case GL_VERTEX_PROGRAM_ARB:
+         switch (stage) {
+         case MESA_SHADER_VERTEX:
             st->pipe->delete_vs_state(st->pipe, v->driver_shader);
             break;
-         case GL_TESS_CONTROL_PROGRAM_NV:
+         case MESA_SHADER_TESS_CTRL:
             st->pipe->delete_tcs_state(st->pipe, v->driver_shader);
             break;
-         case GL_TESS_EVALUATION_PROGRAM_NV:
+         case MESA_SHADER_TESS_EVAL:
             st->pipe->delete_tes_state(st->pipe, v->driver_shader);
             break;
-         case GL_GEOMETRY_PROGRAM_NV:
+         case MESA_SHADER_GEOMETRY:
             st->pipe->delete_gs_state(st->pipe, v->driver_shader);
             break;
-         case GL_FRAGMENT_PROGRAM_ARB:
+         case MESA_SHADER_FRAGMENT:
             st->pipe->delete_fs_state(st->pipe, v->driver_shader);
             break;
-         case GL_COMPUTE_PROGRAM_NV:
+         case MESA_SHADER_COMPUTE:
             st->pipe->delete_compute_state(st->pipe, v->driver_shader);
             break;
          default:
-            unreachable("bad shader type in delete_basic_variant");
+            UNREACHABLE("bad shader type in delete_basic_variant");
          }
       } else {
          /* We can't delete a shader with a context different from the one
           * that created it.  Add it to the creating context's zombie list.
           */
-         enum pipe_shader_type type =
-            pipe_shader_type_from_mesa(_mesa_program_enum_to_shader_stage(target));
-
-         st_save_zombie_shader(v->st, type, v->driver_shader);
+         st_save_zombie_shader(v->st, stage, v->driver_shader);
       }
    }
 
@@ -297,7 +294,7 @@ st_unbind_program(struct st_context *st, struct gl_program *p)
       ctx->NewDriverState |= ST_NEW_CS_STATE;
       break;
    default:
-      unreachable("invalid shader type");
+      UNREACHABLE("invalid shader type");
    }
 }
 
@@ -317,7 +314,7 @@ st_release_variants(struct st_context *st, struct gl_program *p)
 
    for (v = p->variants; v; ) {
       struct st_variant *next = v->next;
-      delete_variant(st, v, p->Target);
+      delete_variant(st, v, p->info.stage);
       v = next;
    }
 
@@ -376,10 +373,8 @@ st_prog_to_nir_postprocess(struct st_context *st, nir_shader *nir,
       st_serialize_base_nir(prog, nir);
       st_finalize_nir(st, prog, NULL, nir, true, false);
 
-      if (screen->finalize_nir) {
-         char *msg = screen->finalize_nir(screen, nir);
-         free(msg);
-      }
+      if (screen->finalize_nir)
+         screen->finalize_nir(screen, nir);
    }
 
    nir_validate_shader(nir, "after st/glsl finalize_nir");
@@ -540,7 +535,7 @@ st_create_nir_shader(struct st_context *st, struct pipe_shader_state *state)
       break;
    }
    default:
-      unreachable("unsupported shader stage");
+      UNREACHABLE("unsupported shader stage");
       return NULL;
    }
 
@@ -650,7 +645,7 @@ get_nir_shader(struct st_context *st, struct gl_program *prog, bool is_draw)
 
    struct blob_reader blob_reader;
    const struct nir_shader_compiler_options *options =
-      is_draw ? &draw_nir_options : st_get_nir_compiler_options(st, prog->info.stage);
+      is_draw ? &draw_nir_options : st->screen->nir_options[prog->info.stage];
 
    if (is_draw && st->ctx->Const.PackedDriverUniformStorage &&
        (!prog->shader_program || prog->shader_program->data->LinkStatus != LINKING_SKIPPED)) {
@@ -841,7 +836,7 @@ st_create_common_variant(struct st_context *st,
       if (state.ir.nir->info.stage == MESA_SHADER_TESS_CTRL &&
           state.ir.nir->options->compact_arrays &&
           state.ir.nir->options->vectorize_tess_levels)
-         NIR_PASS(_, state.ir.nir, nir_vectorize_tess_levels);
+         NIR_PASS(_, state.ir.nir, nir_lower_tess_level_array_vars_to_vec);
 
       gl_nir_opts(state.ir.nir);
       finalize = true;
@@ -849,10 +844,8 @@ st_create_common_variant(struct st_context *st,
 
    if (finalize || !st->allow_st_finalize_nir_twice || key->is_draw_shader) {
       struct pipe_screen *screen = st->screen;
-      if (!key->is_draw_shader && screen->finalize_nir) {
-         char *msg = screen->finalize_nir(screen, state.ir.nir);
-         free(msg);
-      }
+      if (!key->is_draw_shader && screen->finalize_nir)
+         screen->finalize_nir(screen, state.ir.nir);
 
       /* Clip lowering and edgeflags may have introduced new varyings, so
        * update the inputs_read/outputs_written. However, with
@@ -877,6 +870,7 @@ st_create_common_variant(struct st_context *st,
 
    if (report_compile_error && state.error_message) {
       *error = state.error_message;
+      FREE(v);
       return NULL;
    }
 
@@ -995,7 +989,7 @@ st_translate_fragment_program(struct st_context *st,
       prog->nir = prog_to_nir(st->ctx, prog);
    } else if (prog->ati_fs) {
       const struct nir_shader_compiler_options *options =
-         st_get_nir_compiler_options(st, MESA_SHADER_FRAGMENT);
+         st->screen->nir_options[MESA_SHADER_FRAGMENT];
 
       assert(!prog->nir);
       prog->nir = st_translate_atifs_program(prog->ati_fs, prog, options);
@@ -1179,6 +1173,8 @@ st_create_fp_variant(struct st_context *st,
       options.lower_yu_yv_external = key->external.lower_yu_yv;
       options.lower_yv_yu_external = key->external.lower_yv_yu;
       options.lower_y41x_external = key->external.lower_y41x;
+      options.lower_sx10_external = key->external.lower_sx10;
+      options.lower_sx12_external = key->external.lower_sx12;
       options.bt709_external = key->external.bt709;
       options.bt2020_external = key->external.bt2020;
       options.yuv_full_range_external = key->external.yuv_full_range;
@@ -1232,15 +1228,14 @@ st_create_fp_variant(struct st_context *st,
                               nir_shader_get_entrypoint(state.ir.nir));
 
       struct pipe_screen *screen = st->screen;
-      if (screen->finalize_nir) {
-         char *msg = screen->finalize_nir(screen, state.ir.nir);
-         free(msg);
-      }
+      if (screen->finalize_nir)
+         screen->finalize_nir(screen, state.ir.nir);
    }
 
    variant->base.driver_shader = st_create_nir_shader(st, &state);
    if (report_compile_error && state.error_message) {
       *error = state.error_message;
+      FREE(variant);
       return NULL;
    }
 
@@ -1326,7 +1321,7 @@ destroy_program_variants(struct st_context *st, struct gl_program *p)
          /* unlink from list */
          *prevPtr = next;
          /* destroy this variant */
-         delete_variant(st, v, p->Target);
+         delete_variant(st, v, p->info.stage);
       }
       else {
          prevPtr = &v->next;
@@ -1417,12 +1412,12 @@ st_precompile_shader_variant(struct st_context *st,
 {
    char *error = NULL;
 
-   switch (prog->Target) {
-   case GL_VERTEX_PROGRAM_ARB:
-   case GL_TESS_CONTROL_PROGRAM_NV:
-   case GL_TESS_EVALUATION_PROGRAM_NV:
-   case GL_GEOMETRY_PROGRAM_NV:
-   case GL_COMPUTE_PROGRAM_NV: {
+   switch (prog->info.stage) {
+   case MESA_SHADER_VERTEX:
+   case MESA_SHADER_TESS_CTRL:
+   case MESA_SHADER_TESS_EVAL:
+   case MESA_SHADER_GEOMETRY:
+   case MESA_SHADER_COMPUTE: {
       struct st_common_variant_key key;
 
       memset(&key, 0, sizeof(key));
@@ -1441,7 +1436,7 @@ st_precompile_shader_variant(struct st_context *st,
       return error;
    }
 
-   case GL_FRAGMENT_PROGRAM_ARB: {
+   case MESA_SHADER_FRAGMENT: {
       struct st_fp_variant_key key;
 
       memset(&key, 0, sizeof(key));
@@ -1464,7 +1459,7 @@ st_precompile_shader_variant(struct st_context *st,
    }
 
    default:
-      unreachable("invalid shader stage");
+      UNREACHABLE("invalid shader stage");
    }
 }
 

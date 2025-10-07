@@ -347,6 +347,8 @@ insn("p_boolean_phi")
 insn("p_as_uniform")
 insn("p_unit_test")
 
+insn("p_callee_stack_ptr")
+
 insn("p_create_vector")
 insn("p_extract_vector")
 insn("p_split_vector")
@@ -425,6 +427,11 @@ insn("p_bpermute_shared_vgpr")
 # definitions: result VGPR, temp EXEC, clobbered SCC
 # operands: linear VGPR, index * 4, input data, same half (bool)
 insn("p_bpermute_permlane")
+
+# simulates v_permlane64_b32 behavior using shared vgprs (for GFX10/10.3)
+# definitions result VGPR
+# operands: input data
+insn("p_permlane64_shared_vgpr")
 
 # creates a lane mask where only the first active lane is selected
 insn("p_elect")
@@ -1448,6 +1455,7 @@ VOP3 = {
    ("v_permlane16_var_b32",    dst(U32), src(U32, U32), op(gfx12=0x30f)),
    ("v_permlanex16_var_b32",   dst(U32), src(U32, U32), op(gfx12=0x310)),
    ("v_cvt_pk_fp8_f32",        dst(PkF8), src(F32, F32), op(gfx12=0x369)),
+   ("p_v_cvt_pk_fp8_f32_ovfl", dst(PkF8), src(F32, F32), op(-1)),
    ("v_cvt_pk_bf8_f32",        dst(PkBF8), src(F32, F32), op(gfx12=0x36a)),
    ("v_cvt_sr_fp8_f32",        dst(F8), src(F32, U32), op(gfx12=0x36b)),
    ("v_cvt_sr_bf8_f32",        dst(BF8), src(F32, U32), op(gfx12=0x36c)),
@@ -1646,6 +1654,9 @@ DS = {
    ("ds_pk_add_rtn_f16",       op(gfx12=0xaa)),
    ("ds_pk_add_bf16",          op(gfx12=0x9b)),
    ("ds_pk_add_rtn_bf16",      op(gfx12=0xab)),
+   ("ds_bvh_stack_push4_pop1_rtn_b32", op(gfx11=0xad, gfx12=0xe0)), #ds_bvh_stack_rtn in GFX11
+   ("ds_bvh_stack_push8_pop1_rtn_b32", op(gfx12=0xe1)),
+   ("ds_bvh_stack_push8_pop2_rtn_b64", op(gfx12=0xe2)),
 }
 for (name, num) in DS:
     insn(name, num, Format.DS, InstrClass.DS)

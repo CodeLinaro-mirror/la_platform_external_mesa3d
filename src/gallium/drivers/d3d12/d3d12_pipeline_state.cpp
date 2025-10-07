@@ -43,6 +43,7 @@
 #include "util/u_prim.h"
 
 #include <dxguids/dxguids.h>
+#include <cstdlib>
 
 struct d3d12_gfx_pso_entry {
    struct d3d12_gfx_pipeline_state key;
@@ -190,7 +191,7 @@ depth_bias(struct d3d12_rasterizer_state *state, enum mesa_prim reduced_prim)
       return state->base.offset_point;
 
    default:
-      unreachable("unexpected fill mode");
+      UNREACHABLE("unexpected fill mode");
    }
 }
 
@@ -212,7 +213,7 @@ topology_type(enum mesa_prim reduced_prim)
 
    default:
       debug_printf("mesa_prim: %s\n", u_prim_name(reduced_prim));
-      unreachable("unexpected enum mesa_prim");
+      UNREACHABLE("unexpected enum mesa_prim");
    }
 }
 
@@ -230,7 +231,7 @@ d3d12_rtv_format(struct d3d12_context *ctx, unsigned index)
       case DXGI_FORMAT_B8G8R8X8_UNORM:
          return DXGI_FORMAT_R8G8B8A8_UINT;
       default:
-         unreachable("unsupported logic-op format");
+         UNREACHABLE("unsupported logic-op format");
       }
    }
 
@@ -388,23 +389,24 @@ create_gfx_pipeline_state(struct d3d12_context *ctx)
 
    ID3D12PipelineState *ret;
 
+   HRESULT hr;
    if (screen->opts14.IndependentFrontAndBackStencilRefMaskSupported) {
       D3D12_PIPELINE_STATE_STREAM_DESC pso_stream_desc{
           sizeof(pso_desc),
           &pso_desc
       };
 
-      if (FAILED(screen->dev->CreatePipelineState(&pso_stream_desc,
-                                                  IID_PPV_ARGS(&ret)))) {
-         debug_printf("D3D12: CreateGraphicsPipelineState failed!\n");
+      if (FAILED(hr = screen->dev->CreatePipelineState(&pso_stream_desc,
+                                                       IID_PPV_ARGS(&ret)))) {
+         std::_Exit(hr);
          return NULL;
       }
    } 
    else {
       D3D12_GRAPHICS_PIPELINE_STATE_DESC v0desc = pso_desc.GraphicsDescV0();
-      if (FAILED(screen->dev->CreateGraphicsPipelineState(&v0desc,
-                                                       IID_PPV_ARGS(&ret)))) {
-         debug_printf("D3D12: CreateGraphicsPipelineState failed!\n");
+      if (FAILED(hr = screen->dev->CreateGraphicsPipelineState(&v0desc,
+                                                               IID_PPV_ARGS(&ret)))) {
+         std::_Exit(hr);
          return NULL;
       }
    }

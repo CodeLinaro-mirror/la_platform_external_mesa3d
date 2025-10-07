@@ -1,14 +1,16 @@
 # Copyright © 2022 Collabora, Ltd.
 # SPDX-License-Identifier: MIT
 
+subdir('latencies')
+
 dep_paste = dependency('paste',
   version : '>= 1.0.14',
-  fallback : ['paste', 'dep_paste'],
+  fallback : ['paste-1-rs', 'dep_paste'],
   required : true,
 )
 
 dep_rustc_hash = dependency('rustc-hash',
-  fallback: ['rustc-hash', 'dep_rustc_hash'],
+  fallback: ['rustc-hash-2-rs', 'dep_rustc_hash'],
   required: true,
 )
 
@@ -16,6 +18,7 @@ libnak_c_files = files(
   'nak.h',
   'nak_nir.c',
   'nak_nir_lower_cf.c',
+  'nak_nir_lower_cmat.c',
   'nak_nir_lower_fs_inputs.c',
   'nak_nir_lower_gs_intrinsics.c',
   'nak_nir_lower_image_addrs.c',
@@ -65,6 +68,8 @@ _nak_bindings_rs = rust.bindgen(
     '--allowlist-function', 'drm.*',
     '--allowlist-function', 'nak_.*',
     '--allowlist-function', 'nouveau_ws_.*',
+    # provided through compiler::bindings::*
+    '--blocklist-type', 'glsl_.*',
     '--no-prepend-enum-name',
     '--with-derive-default',
   ],
@@ -111,6 +116,7 @@ _libnak_rs = static_library(
   link_with : [
     _libnak_bindings_rs,
     _libnak_ir_proc_rs,
+    libnak_latencies_rs,
   ],
 )
 

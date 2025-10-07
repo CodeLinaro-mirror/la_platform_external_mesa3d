@@ -61,6 +61,7 @@ void v3d_job_add_bo(struct v3d_job *job, struct v3d_bo *bo);
 #define V3D_DIRTY_VERTTEX             (1ull <<  4)
 #define V3D_DIRTY_GEOMTEX             (1ull <<  5)
 #define V3D_DIRTY_FRAGTEX             (1ull <<  6)
+#define V3D_DIRTY_RASTERIZER_SCISSOR  (1ull <<  7)
 
 #define V3D_DIRTY_SHADER_IMAGE        (1ull <<  9)
 #define V3D_DIRTY_BLEND_COLOR         (1ull << 10)
@@ -75,7 +76,7 @@ void v3d_job_add_bo(struct v3d_job *job, struct v3d_bo *bo);
 #define V3D_DIRTY_SCISSOR             (1ull << 19)
 #define V3D_DIRTY_FLAT_SHADE_FLAGS    (1ull << 20)
 #define V3D_DIRTY_PRIM_MODE           (1ull << 21)
-#define V3D_DIRTY_CLIP                (1ull << 22)
+
 #define V3D_DIRTY_UNCOMPILED_CS       (1ull << 23)
 #define V3D_DIRTY_UNCOMPILED_VS       (1ull << 24)
 #define V3D_DIRTY_UNCOMPILED_GS       (1ull << 25)
@@ -538,6 +539,12 @@ struct v3d_job {
         bool early_zs_clear;
 
         /**
+         * Tracks if at least one of the draws/clears submitted to the
+         * job was submitted with GL_RASTERIZER_DISCARD disabled.
+         */
+        bool does_rasterization;
+
+        /**
          * Number of draw calls (not counting full buffer clears) queued in
          * the current job.
          */
@@ -662,6 +669,16 @@ struct v3d_context {
 
         bool active_queries;
 
+        /* Whether a context with robust buffer access should be created.
+         */
+        bool robust_buffer;
+
+        /* How many GPU resets happened since the driver was proved, and how
+         * many were caused by this context.
+         */
+        uint32_t global_reset_count;
+        uint32_t context_reset_count;
+
         /**
          * If a compute job writes a resource read by a non-compute stage we
          * should sync on the last compute job.
@@ -675,7 +692,6 @@ struct v3d_context {
         uint32_t n_primitives_generated_queries_in_flight;
 
         struct pipe_poly_stipple stipple;
-        struct pipe_clip_state clip;
         struct pipe_viewport_state viewport;
         struct v3d_ssbo_stateobj ssbo[PIPE_SHADER_TYPES];
         struct v3d_shaderimg_stateobj shaderimg[PIPE_SHADER_TYPES];

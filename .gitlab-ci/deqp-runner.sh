@@ -22,13 +22,21 @@ INSTALL=$(realpath -s "$PWD"/install)
 export LD_LIBRARY_PATH="$INSTALL"/lib/:$LD_LIBRARY_PATH
 export EGL_PLATFORM=surfaceless
 ARCH=$(uname -m)
-export VK_DRIVER_FILES="$PWD"/install/share/vulkan/icd.d/"$VK_DRIVER"_icd."$ARCH".json
-export OCL_ICD_VENDORS="$PWD"/install/etc/OpenCL/vendors/
+export VK_DRIVER_FILES="$INSTALL"/share/vulkan/icd.d/"$VK_DRIVER"_icd."$ARCH".json
+export OCL_ICD_VENDORS="$INSTALL"/etc/OpenCL/vendors/
 
 if [ -n "${ANGLE_TAG:-}" ]; then
   # Are we using the right ANGLE version?
   ci_tag_test_time_check "ANGLE_TAG"
   export LD_LIBRARY_PATH=/angle:$LD_LIBRARY_PATH
+fi
+
+if [ -n "${FLUSTER_TAG:-}" ]; then
+  # Are we using the right Fluster version?
+  ci_tag_test_time_check "FLUSTER_TAG"
+  export LIBVA_DRIVERS_PATH=$INSTALL/lib/dri/
+  # libva spams driver open info by default, and that happens per testcase.
+  export LIBVA_MESSAGING_LEVEL=1
 fi
 
 if [ -n "$PIGLIT_TAG" ]; then

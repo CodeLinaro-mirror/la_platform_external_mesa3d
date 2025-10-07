@@ -66,7 +66,7 @@ bool ir3_nir_opt_triops_bitwise(nir_shader *nir);
 bool ir3_optimize_loop(struct ir3_compiler *compiler,
                        const struct ir3_shader_nir_options *options,
                        nir_shader *s);
-void ir3_nir_lower_io_to_temporaries(nir_shader *s);
+void ir3_nir_lower_io_vars_to_temporaries(nir_shader *s);
 void ir3_finalize_nir(struct ir3_compiler *compiler,
                       const struct ir3_shader_nir_options *options,
                       nir_shader *s);
@@ -153,7 +153,7 @@ ir3_bindless_resource(nir_src src)
    if (src.ssa->parent_instr->type != nir_instr_type_intrinsic)
       return NULL;
 
-   nir_intrinsic_instr *intrin = nir_instr_as_intrinsic(src.ssa->parent_instr);
+   nir_intrinsic_instr *intrin = nir_def_as_intrinsic(src.ssa);
    if (intrin->intrinsic != nir_intrinsic_bindless_resource_ir3)
       return NULL;
 

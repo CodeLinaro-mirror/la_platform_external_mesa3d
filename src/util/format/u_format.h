@@ -822,6 +822,10 @@ util_format_is_snorm8(enum pipe_format format) ATTRIBUTE_CONST;
 
 bool
 util_format_is_scaled(enum pipe_format format) ATTRIBUTE_CONST;
+
+bool
+util_format_is_float16(enum pipe_format format) ATTRIBUTE_CONST;
+
 /**
  * Check if the src format can be blitted to the destination format with
  * a simple memcpy.  For example, blitting from RGBA to RGBx is OK, but not
@@ -1319,6 +1323,12 @@ util_format_get_plane_format(enum pipe_format format, unsigned plane)
    case PIPE_FORMAT_R8_B8G8_420_UNORM:
    case PIPE_FORMAT_R8_B8G8_422_UNORM:
       return !plane ? PIPE_FORMAT_R8_UNORM : PIPE_FORMAT_GR88_UNORM;
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_420_UNORM:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_422_UNORM:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_444_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_420_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_422_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_444_UNORM:
    case PIPE_FORMAT_Y16_U16_V16_420_UNORM:
    case PIPE_FORMAT_Y16_U16_V16_422_UNORM:
    case PIPE_FORMAT_Y16_U16_V16_444_UNORM:
@@ -1348,10 +1358,17 @@ util_format_get_plane_width(enum pipe_format format, unsigned plane,
    case PIPE_FORMAT_P012:
    case PIPE_FORMAT_P016:
    case PIPE_FORMAT_P030:
-   case PIPE_FORMAT_Y8_U8_V8_422_UNORM:
-   case PIPE_FORMAT_NV16:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_420_UNORM:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_422_UNORM:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_444_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_420_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_422_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_444_UNORM:
    case PIPE_FORMAT_Y16_U16_V16_420_UNORM:
    case PIPE_FORMAT_Y16_U16_V16_422_UNORM:
+   case PIPE_FORMAT_Y16_U16_V16_444_UNORM:
+   case PIPE_FORMAT_Y8_U8_V8_422_UNORM:
+   case PIPE_FORMAT_NV16:
    case PIPE_FORMAT_Y16_U16V16_422_UNORM:
    case PIPE_FORMAT_R8_G8B8_420_UNORM:
    case PIPE_FORMAT_R8_B8G8_420_UNORM:
@@ -1385,7 +1402,15 @@ util_format_get_plane_height(enum pipe_format format, unsigned plane,
    case PIPE_FORMAT_P012:
    case PIPE_FORMAT_P016:
    case PIPE_FORMAT_P030:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_420_UNORM:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_422_UNORM:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_444_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_420_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_422_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_444_UNORM:
    case PIPE_FORMAT_Y16_U16_V16_420_UNORM:
+   case PIPE_FORMAT_Y16_U16_V16_422_UNORM:
+   case PIPE_FORMAT_Y16_U16_V16_444_UNORM:
    case PIPE_FORMAT_Y8_U8_V8_440_UNORM:
    case PIPE_FORMAT_R8_G8B8_420_UNORM:
    case PIPE_FORMAT_R8_B8G8_420_UNORM:

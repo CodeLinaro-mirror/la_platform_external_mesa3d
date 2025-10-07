@@ -147,7 +147,16 @@ descriptor_util_layout_get(struct zink_screen *screen, enum zink_descriptor_type
    struct zink_descriptor_layout *layout = create_layout(screen, type, bindings, num_bindings, layout_key);
    if (layout && type != ZINK_DESCRIPTOR_TYPE_UNIFORMS) {
       simple_mtx_lock(&screen->desc_set_layouts_lock);
-      _mesa_hash_table_insert_pre_hashed(&screen->desc_set_layouts[type], hash, *layout_key, layout);
+      struct hash_entry *he = _mesa_hash_table_search_pre_hashed(&screen->desc_set_layouts[type], hash, &key);
+      if (he) {
+         VKSCR(DestroyDescriptorSetLayout)(screen->dev, layout->layout, NULL);
+         ralloc_free(layout);
+         *layout_key = (void*)he->key;
+         simple_mtx_unlock(&screen->desc_set_layouts_lock);
+         return he->data;
+      } else {
+         _mesa_hash_table_insert_pre_hashed(&screen->desc_set_layouts[type], hash, *layout_key, layout);
+      }
       simple_mtx_unlock(&screen->desc_set_layouts_lock);
    }
    return layout;
@@ -360,7 +369,7 @@ init_db_template_entry(struct zink_screen *screen, struct zink_shader *shader, e
        entry->db_size = screen->info.db_props.robustStorageTexelBufferDescriptorSize;
        break;
     default:
-       unreachable("unknown type");
+       UNREACHABLE("unknown type");
     }
     (*entry_idx)++;
 }
@@ -408,7 +417,7 @@ init_template_entry(struct zink_shader *shader, enum zink_descriptor_type type,
        entry->stride = sizeof(VkBufferView);
        break;
     default:
-       unreachable("unknown type");
+       UNREACHABLE("unknown type");
     }
     (*entry_idx)++;
 }
@@ -443,7 +452,7 @@ descriptor_program_num_sizes(VkDescriptorPoolSize *sizes, enum zink_descriptor_t
              !!sizes[ZDS_INDEX_STORAGE_TEXELS].descriptorCount;
    default: break;
    }
-   unreachable("unknown type");
+   UNREACHABLE("unknown type");
 }
 
 static uint16_t
@@ -462,7 +471,7 @@ descriptor_program_num_sizes_compact(VkDescriptorPoolSize *sizes, unsigned desc_
    case ZINK_DESCRIPTOR_TYPE_IMAGE:
    default: break;
    }
-   unreachable("unknown type");
+   UNREACHABLE("unknown type");
 }
 
 /* create all the descriptor objects for a program:
@@ -933,7 +942,7 @@ check_pool_alloc(struct zink_context *ctx, struct zink_descriptor_pool_multi *mp
          }
       }
       if (!mpool->pool)
-         unreachable("out of descriptor memory!");
+         UNREACHABLE("out of descriptor memory!");
    }
    struct zink_descriptor_pool *pool = mpool->pool;
    /* allocate up to $current * 10, e.g., 10 -> 100;

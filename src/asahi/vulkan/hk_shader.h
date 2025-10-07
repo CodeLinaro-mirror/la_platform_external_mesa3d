@@ -37,10 +37,6 @@ struct vk_pipeline_layout;
 struct vk_pipeline_robustness_state;
 struct vk_shader_module;
 
-/* TODO: Make dynamic */
-#define HK_ROOT_UNIFORM       104
-#define HK_IMAGE_HEAP_UNIFORM 108
-
 struct hk_tess_info {
    enum tess_primitive_mode mode : 8;
    enum gl_tess_spacing spacing  : 8;
@@ -72,7 +68,8 @@ struct hk_shader_info {
       struct {
          uint32_t attribs_read;
          BITSET_DECLARE(attrib_components_read, AGX_MAX_ATTRIBS * 4);
-         uint8_t _pad[8];
+         bool use_prolog;
+         uint8_t _pad[7];
       } vs;
 
       struct {
@@ -111,7 +108,7 @@ struct hk_shader_info {
    gl_shader_stage stage : 8;
    uint8_t clip_distance_array_size;
    uint8_t cull_distance_array_size;
-   uint8_t _pad0[1];
+   uint8_t set_count;
 
    /* XXX: is there a less goofy way to do this? I really don't want dynamic
     * allocation here.
@@ -187,15 +184,12 @@ enum hk_gs_variant {
 
    /* Main compute shader */
    HK_GS_VARIANT_MAIN,
-   HK_GS_VARIANT_MAIN_NO_RAST,
 
    /* Count compute shader */
    HK_GS_VARIANT_COUNT,
-   HK_GS_VARIANT_COUNT_NO_RAST,
 
    /* Pre-GS compute shader */
    HK_GS_VARIANT_PRE,
-   HK_GS_VARIANT_PRE_NO_RAST,
 
    HK_GS_VARIANTS,
 };
@@ -204,11 +198,8 @@ enum hk_gs_variant {
 static const char *hk_gs_variant_name[] = {
    [HK_GS_VARIANT_RAST] = "Rasterization",
    [HK_GS_VARIANT_MAIN] = "Main",
-   [HK_GS_VARIANT_MAIN_NO_RAST] = "Main (rast. discard)",
    [HK_GS_VARIANT_COUNT] = "Count",
-   [HK_GS_VARIANT_COUNT_NO_RAST] = "Count (rast. discard)",
    [HK_GS_VARIANT_PRE] = "Pre-GS",
-   [HK_GS_VARIANT_PRE_NO_RAST] = "Pre-GS (rast. discard)",
 };
 /* clang-format on */
 
@@ -284,21 +275,21 @@ hk_any_variant(struct hk_api_shader *obj)
 }
 
 static struct hk_shader *
-hk_main_gs_variant(struct hk_api_shader *obj, bool rast_disc)
+hk_main_gs_variant(struct hk_api_shader *obj)
 {
-   return &obj->variants[HK_GS_VARIANT_MAIN + rast_disc];
+   return &obj->variants[HK_GS_VARIANT_MAIN];
 }
 
 static struct hk_shader *
-hk_count_gs_variant(struct hk_api_shader *obj, bool rast_disc)
+hk_count_gs_variant(struct hk_api_shader *obj)
 {
-   return &obj->variants[HK_GS_VARIANT_COUNT + rast_disc];
+   return &obj->variants[HK_GS_VARIANT_COUNT];
 }
 
 static struct hk_shader *
-hk_pre_gs_variant(struct hk_api_shader *obj, bool rast_disc)
+hk_pre_gs_variant(struct hk_api_shader *obj)
 {
-   return &obj->variants[HK_GS_VARIANT_PRE + rast_disc];
+   return &obj->variants[HK_GS_VARIANT_PRE];
 }
 
 #define HK_MAX_LINKED_USC_SIZE                                                 \
@@ -347,7 +338,7 @@ hk_buffer_addr_format(VkPipelineRobustnessBufferBehaviorEXT robustness)
    case VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_2_EXT:
       return nir_address_format_64bit_bounded_global;
    default:
-      unreachable("Invalid robust buffer access behavior");
+      UNREACHABLE("Invalid robust buffer access behavior");
    }
 }
 

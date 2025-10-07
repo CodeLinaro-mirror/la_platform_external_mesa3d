@@ -94,12 +94,6 @@ struct radv_meta_state {
       struct radix_sort_vk *radix_sort;
       struct vk_acceleration_structure_build_ops build_ops;
       struct vk_acceleration_structure_build_args build_args;
-
-      struct {
-         VkBuffer buffer;
-         VkDeviceMemory memory;
-         VkAccelerationStructureKHR accel_struct;
-      } null;
    } accel_struct_build;
 
    struct vk_texcompress_etc2_state etc_decode;
@@ -365,7 +359,6 @@ void radv_initialise_color_surface(struct radv_device *device, struct radv_color
 
 void radv_initialise_vrs_surface(struct radv_image *image, struct radv_buffer *htile_buffer,
                                  struct radv_ds_buffer_info *ds);
-
 
 void radv_initialise_ds_surface(const struct radv_device *device, struct radv_ds_buffer_info *ds,
                                 struct radv_image_view *iview, VkImageAspectFlags ds_aspects);

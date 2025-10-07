@@ -12,6 +12,9 @@
 
 #include "c11/threads.h"
 
+#include "ac_descriptors.h"
+#include "amdgfxregs.h"
+
 namespace aco {
 
 thread_local aco::monotonic_buffer_resource* instruction_buffer = nullptr;
@@ -230,6 +233,7 @@ init_program(Program* program, Stage stage, const struct aco_shader_info* info,
    program->next_fp_mode.denorm32 = 0;
    program->next_fp_mode.round16_64 = fp_round_ne;
    program->next_fp_mode.round32 = fp_round_ne;
+   program->needs_fp_mode_insertion = false;
 }
 
 bool
@@ -583,6 +587,9 @@ can_use_opsel(amd_gfx_level gfx_level, aco_opcode op, int idx)
    case aco_opcode::v_interp_p10_rtz_f16_f32_inreg: return idx == 0 || idx == 2;
    case aco_opcode::v_interp_p2_f16_f32_inreg:
    case aco_opcode::v_interp_p2_rtz_f16_f32_inreg: return idx == -1 || idx == 0;
+   case aco_opcode::v_cvt_pk_fp8_f32:
+   case aco_opcode::p_v_cvt_pk_fp8_f32_ovfl:
+   case aco_opcode::v_cvt_pk_bf8_f32: return idx == -1;
    default:
       return gfx_level >= GFX11 && (get_gfx11_true16_mask(op) & BITFIELD_BIT(idx == -1 ? 3 : idx));
    }
@@ -714,6 +721,8 @@ get_gfx11_true16_mask(aco_opcode op)
    case aco_opcode::v_and_b16:
    case aco_opcode::v_or_b16:
    case aco_opcode::v_xor_b16: return 0x3 | 0x8;
+   case aco_opcode::v_cvt_pk_f32_fp8:
+   case aco_opcode::v_cvt_pk_f32_bf8:
    case aco_opcode::v_cvt_f32_f16:
    case aco_opcode::v_cvt_i32_i16:
    case aco_opcode::v_cvt_u32_u16: return 0x1;
@@ -829,7 +838,7 @@ get_reduction_identity(ReduceOp op, unsigned idx)
    case fmax16: return 0xfc00u;                /* negative infinity */
    case fmax32: return 0xff800000u;            /* negative infinity */
    case fmax64: return idx ? 0xfff00000u : 0u; /* negative infinity */
-   default: unreachable("Invalid reduction operation"); break;
+   default: UNREACHABLE("Invalid reduction operation"); break;
    }
    return 0;
 }
@@ -1435,7 +1444,10 @@ get_tied_defs(Instruction* instr)
        instr->opcode == aco_opcode::s_fmac_f16) {
       ops.push_back(2);
    } else if (instr->opcode == aco_opcode::s_addk_i32 || instr->opcode == aco_opcode::s_mulk_i32 ||
-              instr->opcode == aco_opcode::s_cmovk_i32) {
+              instr->opcode == aco_opcode::s_cmovk_i32 ||
+              instr->opcode == aco_opcode::ds_bvh_stack_push4_pop1_rtn_b32 ||
+              instr->opcode == aco_opcode::ds_bvh_stack_push8_pop1_rtn_b32 ||
+              instr->opcode == aco_opcode::ds_bvh_stack_push8_pop2_rtn_b64) {
       ops.push_back(0);
    } else if (instr->isMUBUF() && instr->definitions.size() == 1 && instr->operands.size() == 4) {
       ops.push_back(3);
@@ -1444,8 +1456,8 @@ get_tied_defs(Instruction* instr)
       ops.push_back(2);
    } else if (instr->opcode == aco_opcode::image_bvh8_intersect_ray) {
       /* VADDR starts at 3. */
-      ops.push_back(3 + 2);
-      ops.push_back(3 + 3);
+      ops.push_back(3 + 4);
+      ops.push_back(3 + 7);
    }
    return ops;
 }
@@ -1654,6 +1666,66 @@ create_instruction(aco_opcode opcode, Format format, uint32_t num_operands,
    inst->definitions = aco::span<Definition>(definitions_offset, num_definitions);
 
    return inst;
+}
+
+Temp
+load_scratch_resource(Program* program, Builder& bld, unsigned resume_idx,
+                      bool apply_scratch_offset)
+{
+   if (program->static_scratch_rsrc != Temp()) {
+      /* We can't apply any offsets when using a static resource. */
+      assert(!apply_scratch_offset || program->scratch_offsets.empty());
+      return program->static_scratch_rsrc;
+   }
+   Temp private_segment_buffer;
+   if (!program->private_segment_buffers.empty())
+      private_segment_buffer = program->private_segment_buffers[resume_idx];
+   if (!private_segment_buffer.bytes()) {
+      Temp addr_lo =
+         bld.sop1(aco_opcode::p_load_symbol, bld.def(s1), Operand::c32(aco_symbol_scratch_addr_lo));
+      Temp addr_hi =
+         bld.sop1(aco_opcode::p_load_symbol, bld.def(s1), Operand::c32(aco_symbol_scratch_addr_hi));
+      private_segment_buffer =
+         bld.pseudo(aco_opcode::p_create_vector, bld.def(s2), addr_lo, addr_hi);
+   } else if (program->stage.hw != AC_HW_COMPUTE_SHADER) {
+      private_segment_buffer =
+         bld.smem(aco_opcode::s_load_dwordx2, bld.def(s2), private_segment_buffer, Operand::zero());
+   }
+
+   if (apply_scratch_offset && !program->scratch_offsets.empty()) {
+      Temp addr_lo = bld.tmp(s1);
+      Temp addr_hi = bld.tmp(s1);
+      bld.pseudo(aco_opcode::p_split_vector, Definition(addr_lo), Definition(addr_hi),
+                 private_segment_buffer);
+
+      Temp carry = bld.tmp(s1);
+      Temp scratch_offset = program->scratch_offsets[resume_idx];
+      addr_lo = bld.sop2(aco_opcode::s_add_u32, bld.def(s1), bld.scc(Definition(carry)), addr_lo,
+                         scratch_offset);
+      addr_hi = bld.sop2(aco_opcode::s_addc_u32, bld.def(s1), bld.def(s1, scc), addr_hi,
+                         Operand::c32(0), bld.scc(carry));
+
+      private_segment_buffer =
+         bld.pseudo(aco_opcode::p_create_vector, bld.def(s2), addr_lo, addr_hi);
+   }
+
+   struct ac_buffer_state ac_state = {0};
+   uint32_t desc[4];
+
+   ac_state.size = 0xffffffff;
+   ac_state.format = PIPE_FORMAT_R32_FLOAT;
+   for (int i = 0; i < 4; i++)
+      ac_state.swizzle[i] = PIPE_SWIZZLE_0;
+   /* older generations need element size = 4 bytes. element size removed in GFX9 */
+   ac_state.element_size = program->gfx_level <= GFX8 ? 1u : 0u;
+   ac_state.index_stride = program->wave_size == 64 ? 3u : 2u;
+   ac_state.add_tid = true;
+   ac_state.gfx10_oob_select = V_008F0C_OOB_SELECT_RAW;
+
+   ac_build_buffer_descriptor(program->gfx_level, &ac_state, desc);
+
+   return bld.pseudo(aco_opcode::p_create_vector, bld.def(s4), private_segment_buffer,
+                     Operand::c32(desc[2]), Operand::c32(desc[3]));
 }
 
 } // namespace aco

@@ -25,16 +25,6 @@ endif
 gfxstream_guest_args += '-DVK_GFXSTREAM_STRUCTURE_TYPE_EXT'
 
 #===============#
-# Dependencies  #
-#===============#
-
-with_kumquat = false
-virtgpu_kumquat_dep = dependency('virtgpu_kumquat_ffi', required: false)
-if virtgpu_kumquat_dep.found()
-  with_kumquat = true
-endif
-
-#===============#
 # Includes      #
 #===============#
 
@@ -45,7 +35,6 @@ inc_vulkan_enc = include_directories('vulkan_enc')
 # Subdirectories #
 #================#
 subdir('iostream')
-subdir('vulkan-mapper')
 subdir('platform')
 subdir('GoldfishAddressSpace')
 subdir('connection-manager')

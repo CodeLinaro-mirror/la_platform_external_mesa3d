@@ -84,12 +84,12 @@
       gfx8_##func(__VA_ARGS__);                   \
       break;                                      \
    default:                                       \
-      unreachable("Unknown hardware generation"); \
+      UNREACHABLE("Unknown hardware generation"); \
    }
 
 #ifndef INTEL_USE_ELK
-static inline void gfx8_init_screen_state(struct iris_screen *screen) { unreachable("no elk support"); }
-static inline void gfx8_init_screen_gen_state(struct iris_screen *screen) { unreachable("no elk support"); }
+static inline void gfx8_init_screen_state(struct iris_screen *screen) { UNREACHABLE("no elk support"); }
+static inline void gfx8_init_screen_gen_state(struct iris_screen *screen) { UNREACHABLE("no elk support"); }
 #endif
 
 static const char *
@@ -369,6 +369,7 @@ iris_init_screen_caps(struct iris_screen *screen)
    caps->compute_shader_derivatives = true;
    caps->invalidate_buffer = true;
    caps->surface_reinterpret_blocks = true;
+   caps->compressed_surface_reinterpret_blocks_layered = devinfo->ver >= 9;
    caps->texture_shadow_lod = true;
    caps->shader_samples_identical = true;
    caps->gl_spirv = true;
@@ -771,7 +772,6 @@ iris_screen_create(int fd, const struct pipe_screen_config *config)
    pscreen->get_device_vendor = iris_get_device_vendor;
    pscreen->get_cl_cts_version = iris_get_cl_cts_version;
    pscreen->get_screen_fd = iris_screen_get_fd;
-   pscreen->get_compiler_options = iris_get_compiler_options;
    pscreen->get_device_uuid = iris_get_device_uuid;
    pscreen->get_driver_uuid = iris_get_driver_uuid;
    pscreen->get_disk_shader_cache = iris_get_disk_shader_cache;
@@ -783,6 +783,9 @@ iris_screen_create(int fd, const struct pipe_screen_config *config)
    pscreen->get_driver_query_info = iris_get_monitor_info;
    pscreen->set_damage_region = iris_set_damage_region;
    iris_init_screen_program_functions(pscreen);
+
+   for (unsigned i = 0; i <= MESA_SHADER_COMPUTE; i++)
+      pscreen->nir_options[i] = iris_get_compiler_options(pscreen, i);
 
    iris_init_shader_caps(screen);
    iris_init_compute_caps(screen);

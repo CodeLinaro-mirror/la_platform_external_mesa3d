@@ -8,6 +8,7 @@
 #include "panvk_buffer.h"
 #include "panvk_cmd_buffer.h"
 #include "panvk_cmd_meta.h"
+#include "panvk_device_memory.h"
 #include "panvk_entrypoints.h"
 
 #include "pan_desc.h"
@@ -43,7 +44,7 @@ att_set_clear_preload(const VkRenderingAttachmentInfo *att, bool *clear, bool *p
       *preload |= att->storeOp == VK_ATTACHMENT_STORE_OP_NONE;
       break;
    default:
-      unreachable("Unsupported loadOp");
+      UNREACHABLE("Unsupported loadOp");
    }
 }
 
@@ -65,8 +66,8 @@ render_state_set_color_attachment(struct panvk_cmd_buffer *cmdbuf,
    state->render.color_attachments.fmts[index] = iview->vk.format;
    state->render.color_attachments.samples[index] = img->vk.samples;
 
-#if PAN_ARCH <= 7
-   state->render.fb.bos[state->render.fb.bo_count++] = img->bo;
+#if PAN_ARCH < 9
+   state->render.fb.bos[state->render.fb.bo_count++] = img->mem->bo;
 #endif
 
    fbinfo->rts[index].view = &iview->pview;
@@ -106,8 +107,8 @@ render_state_set_z_attachment(struct panvk_cmd_buffer *cmdbuf,
    struct panvk_image *img =
       container_of(iview->vk.image, struct panvk_image, vk);
 
-#if PAN_ARCH <= 7
-   state->render.fb.bos[state->render.fb.bo_count++] = img->bo;
+#if PAN_ARCH < 9
+   state->render.fb.bos[state->render.fb.bo_count++] = img->mem->bo;
 #endif
 
    state->render.z_attachment.fmt = iview->vk.format;
@@ -170,8 +171,8 @@ render_state_set_s_attachment(struct panvk_cmd_buffer *cmdbuf,
    struct panvk_image *img =
       container_of(iview->vk.image, struct panvk_image, vk);
 
-#if PAN_ARCH <= 7
-   state->render.fb.bos[state->render.fb.bo_count++] = img->bo;
+#if PAN_ARCH < 9
+   state->render.fb.bos[state->render.fb.bo_count++] = img->mem->bo;
 #endif
 
    state->render.s_attachment.fmt = iview->vk.format;
@@ -251,13 +252,13 @@ panvk_per_arch(cmd_init_render_state)(struct panvk_cmd_buffer *cmdbuf,
          to_panvk_physical_device(cmdbuf->vk.base.device->physical);
    struct panvk_cmd_graphics_state *state = &cmdbuf->state.gfx;
    struct pan_fb_info *fbinfo = &state->render.fb.info;
-   uint32_t att_width = 0, att_height = 0;
+   uint32_t att_width = UINT32_MAX, att_height = UINT32_MAX;
 
    state->render.flags = pRenderingInfo->flags;
 
    BITSET_SET(state->dirty, PANVK_CMD_GRAPHICS_DIRTY_RENDER_STATE);
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
    state->render.fb.bo_count = 0;
    memset(state->render.fb.bos, 0, sizeof(state->render.fb.bos));
 #endif
@@ -297,8 +298,8 @@ panvk_per_arch(cmd_init_render_state)(struct panvk_cmd_buffer *cmdbuf,
          continue;
 
       render_state_set_color_attachment(cmdbuf, att, i);
-      att_width = MAX2(iview->vk.extent.width, att_width);
-      att_height = MAX2(iview->vk.extent.height, att_height);
+      att_width = MIN2(iview->vk.extent.width, att_width);
+      att_height = MIN2(iview->vk.extent.height, att_height);
    }
 
    if (pRenderingInfo->pDepthAttachment &&
@@ -309,8 +310,8 @@ panvk_per_arch(cmd_init_render_state)(struct panvk_cmd_buffer *cmdbuf,
       if (iview) {
          assert(iview->vk.image->aspects & VK_IMAGE_ASPECT_DEPTH_BIT);
          render_state_set_z_attachment(cmdbuf, att);
-         att_width = MAX2(iview->vk.extent.width, att_width);
-         att_height = MAX2(iview->vk.extent.height, att_height);
+         att_width = MIN2(iview->vk.extent.width, att_width);
+         att_height = MIN2(iview->vk.extent.height, att_height);
       }
    }
 
@@ -322,8 +323,8 @@ panvk_per_arch(cmd_init_render_state)(struct panvk_cmd_buffer *cmdbuf,
       if (iview) {
          assert(iview->vk.image->aspects & VK_IMAGE_ASPECT_STENCIL_BIT);
          render_state_set_s_attachment(cmdbuf, att);
-         att_width = MAX2(iview->vk.extent.width, att_width);
-         att_height = MAX2(iview->vk.extent.height, att_height);
+         att_width = MIN2(iview->vk.extent.width, att_width);
+         att_height = MIN2(iview->vk.extent.height, att_height);
       }
    }
 
@@ -644,7 +645,7 @@ prepare_iam_sysvals(struct panvk_cmd_buffer *cmdbuf, BITSET_WORD *dirty_sysvals)
       pan_pack(&conv, INTERNAL_CONVERSION, cfg) {
          cfg.memory_format =
             GENX(pan_dithered_format_from_pipe_format)(pfmt, false);
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
          cfg.register_format =
             vk_format_is_uint(fmt)   ? MALI_REGISTER_FILE_FORMAT_U32
             : vk_format_is_sint(fmt) ? MALI_REGISTER_FILE_FORMAT_I32
@@ -662,7 +663,7 @@ prepare_iam_sysvals(struct panvk_cmd_buffer *cmdbuf, BITSET_WORD *dirty_sysvals)
       assert(ia_idx < ARRAY_SIZE(iam));
       iam[ia_idx].target = PANVK_ZS_ATTACHMENT;
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
       /* On v7, we need to pass the depth format around. If we use a conversion
        * of zero, like we do on v9+, the GPU reports an INVALID_INSTR_ENC. */
       VkFormat fmt = cmdbuf->state.gfx.render.z_attachment.fmt;
@@ -701,7 +702,8 @@ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
 {
    const struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
    struct vk_color_blend_state *cb = &cmdbuf->vk.dynamic_graphics_state.cb;
-   const struct panvk_shader *fs = get_fs(cmdbuf);
+   const struct panvk_shader_variant *fs =
+      panvk_shader_only_variant(get_fs(cmdbuf));
    uint32_t noperspective_varyings = fs ? fs->info.varyings.noperspective : 0;
    BITSET_DECLARE(dirty_sysvals, MAX_SYSVAL_FAUS) = {0};
 
@@ -712,7 +714,7 @@ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
    set_gfx_sysval(cmdbuf, dirty_sysvals, vs.first_vertex, info->vertex.base);
    set_gfx_sysval(cmdbuf, dirty_sysvals, vs.base_instance, info->instance.base);
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
    set_gfx_sysval(cmdbuf, dirty_sysvals, vs.raw_vertex_offset,
                   info->vertex.raw_offset);
    set_gfx_sysval(cmdbuf, dirty_sysvals, layer_id, info->layer_id);
@@ -800,9 +802,10 @@ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
    if (dyn_gfx_state_dirty(cmdbuf, INPUT_ATTACHMENT_MAP))
       prepare_iam_sysvals(cmdbuf, dirty_sysvals);
 
-   const struct panvk_shader *vs = cmdbuf->state.gfx.vs.shader;
+   const struct panvk_shader_variant *vs =
+      panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
    struct panvk_descriptor_state *desc_state = &cmdbuf->state.gfx.desc_state;
    struct panvk_shader_desc_state *vs_desc_state = &cmdbuf->state.gfx.vs.desc;
    struct panvk_shader_desc_state *fs_desc_state = &cmdbuf->state.gfx.fs.desc;
@@ -872,10 +875,15 @@ panvk_per_arch(CmdBindVertexBuffers2)(VkCommandBuffer commandBuffer,
    for (uint32_t i = 0; i < bindingCount; i++) {
       VK_FROM_HANDLE(panvk_buffer, buffer, pBuffers[i]);
 
-      cmdbuf->state.gfx.vb.bufs[firstBinding + i].address =
-         panvk_buffer_gpu_ptr(buffer, pOffsets[i]);
-      cmdbuf->state.gfx.vb.bufs[firstBinding + i].size = panvk_buffer_range(
-         buffer, pOffsets[i], pSizes ? pSizes[i] : VK_WHOLE_SIZE);
+      if (buffer) {
+         cmdbuf->state.gfx.vb.bufs[firstBinding + i].address =
+            panvk_buffer_gpu_ptr(buffer, pOffsets[i]);
+         cmdbuf->state.gfx.vb.bufs[firstBinding + i].size = panvk_buffer_range(
+            buffer, pOffsets[i], pSizes ? pSizes[i] : VK_WHOLE_SIZE);
+      } else {
+         cmdbuf->state.gfx.vb.bufs[firstBinding + i].address = 0;
+         cmdbuf->state.gfx.vb.bufs[firstBinding + i].size = 0;
+      }
    }
 
    cmdbuf->state.gfx.vb.count =
@@ -895,19 +903,22 @@ panvk_per_arch(CmdBindIndexBuffer2)(VkCommandBuffer commandBuffer,
       cmdbuf->state.gfx.ib.size = panvk_buffer_range(buf, offset, size);
       assert(cmdbuf->state.gfx.ib.size <= UINT32_MAX);
       cmdbuf->state.gfx.ib.dev_addr = panvk_buffer_gpu_ptr(buf, offset);
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
       cmdbuf->state.gfx.ib.host_addr =
          buf && buf->host_ptr ? buf->host_ptr + offset : NULL;
 #endif
-      cmdbuf->state.gfx.ib.index_size = vk_index_type_to_bytes(indexType);
    } else {
       cmdbuf->state.gfx.ib.size = 0;
-      cmdbuf->state.gfx.ib.dev_addr = 0;
-#if PAN_ARCH <= 7
+      /* In case of NullDescriptors, we need to set a non-NULL address and rely
+       * on out-of-bounds behavior against the zero size of the buffer. Note
+       * that this only works for v10+, as v9 does not have a way to specify the
+       * index buffer size. */
+      cmdbuf->state.gfx.ib.dev_addr = PAN_ARCH >= 10 ? 0x1000 : 0;
+#if PAN_ARCH < 9
       cmdbuf->state.gfx.ib.host_addr = 0;
 #endif
-      cmdbuf->state.gfx.ib.index_size = 0;
    }
+   cmdbuf->state.gfx.ib.index_size = vk_index_type_to_bytes(indexType);
 
    gfx_state_set_dirty(cmdbuf, IB);
 }

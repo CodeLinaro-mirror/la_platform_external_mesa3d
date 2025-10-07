@@ -113,7 +113,7 @@ public:
    void *mem_ctx;
 
    /** List of brw_inst. */
-   exec_list instructions;
+   brw_exec_list instructions;
 
    cfg_t *cfg;
 
@@ -252,6 +252,12 @@ inline brw_reg
 brw_dynamic_msaa_flags(const struct brw_wm_prog_data *wm_prog_data)
 {
    return brw_uniform_reg(wm_prog_data->msaa_flags_param, BRW_TYPE_UD);
+}
+
+inline brw_reg
+brw_dynamic_per_primitive_remap(const struct brw_wm_prog_data *wm_prog_data)
+{
+   return brw_uniform_reg(wm_prog_data->per_primitive_remap_param, BRW_TYPE_UD);
 }
 
 enum intel_barycentric_mode brw_barycentric_mode(const struct brw_wm_prog_key *key,

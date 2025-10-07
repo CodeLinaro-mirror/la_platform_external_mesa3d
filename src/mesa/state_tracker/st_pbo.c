@@ -285,7 +285,7 @@ void *
 st_pbo_create_vs(struct st_context *st)
 {
    const nir_shader_compiler_options *options =
-      st_get_nir_compiler_options(st, MESA_SHADER_VERTEX);
+      st->screen->nir_options[MESA_SHADER_VERTEX];
 
    nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_VERTEX, options,
                                                   "st/pbo VS");
@@ -325,7 +325,7 @@ void *
 st_pbo_create_gs(struct st_context *st)
 {
    const nir_shader_compiler_options *options =
-      st_get_nir_compiler_options(st, MESA_SHADER_GEOMETRY);
+      st->screen->nir_options[MESA_SHADER_GEOMETRY];
 
    nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_GEOMETRY, options,
                                                   "st/pbo GS");
@@ -396,7 +396,7 @@ create_fs(struct st_context *st, bool download,
           bool need_layer)
 {
    const nir_shader_compiler_options *options =
-      st_get_nir_compiler_options(st, MESA_SHADER_FRAGMENT);
+      st->screen->nir_options[MESA_SHADER_FRAGMENT];
 
    nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_FRAGMENT, options,
                                                   download ?
@@ -513,6 +513,7 @@ create_fs(struct st_context *st, bool download,
    tex->coord_components =
       glsl_get_sampler_coordinate_components(tex_var->type);
    tex->is_array = target >= PIPE_TEXTURE_1D_ARRAY;
+   tex->can_speculate = true;
 
    tex->dest_type = nir_get_nir_type_for_glsl_base_type(glsl_get_sampler_result_type(tex_var->type));
    tex->src[0].src_type = nir_tex_src_texture_deref;
@@ -531,24 +532,21 @@ create_fs(struct st_context *st, bool download,
       result = nir_umin(&b, result, nir_imm_int(&b, (1u << 31) - 1));
 
    if (download) {
-      static const enum glsl_base_type type[] = {
+      static const enum glsl_base_type types[] = {
          [ST_PBO_CONVERT_FLOAT] = GLSL_TYPE_FLOAT,
          [ST_PBO_CONVERT_UINT] = GLSL_TYPE_UINT,
          [ST_PBO_CONVERT_UINT_TO_SINT] = GLSL_TYPE_INT,
          [ST_PBO_CONVERT_SINT] = GLSL_TYPE_INT,
          [ST_PBO_CONVERT_SINT_TO_UINT] = GLSL_TYPE_UINT,
       };
-      static const nir_alu_type nir_types[] = {
-         [ST_PBO_CONVERT_FLOAT] = nir_type_float,
-         [ST_PBO_CONVERT_UINT] = nir_type_uint,
-         [ST_PBO_CONVERT_UINT_TO_SINT] = nir_type_int,
-         [ST_PBO_CONVERT_SINT] = nir_type_int,
-         [ST_PBO_CONVERT_SINT_TO_UINT] = nir_type_uint,
-      };
+
+      enum glsl_base_type glsl_type = types[conversion];
+      nir_alu_type nir_type = nir_get_nir_type_for_glsl_base_type(glsl_type);
+
       nir_variable *img_var =
          nir_variable_create(b.shader, nir_var_image,
                              glsl_image_type(GLSL_SAMPLER_DIM_BUF, false,
-                                             type[conversion]), "img");
+                                             glsl_type), "img");
       img_var->data.access = ACCESS_NON_READABLE;
       img_var->data.explicit_binding = true;
       img_var->data.binding = 0;
@@ -560,7 +558,7 @@ create_fs(struct st_context *st, bool download,
                             zero,
                             result,
                             nir_imm_int(&b, 0),
-                            .src_type = nir_types[conversion],
+                            .src_type = nir_type,
                             .image_dim = GLSL_SAMPLER_DIM_BUF);
    } else {
       nir_store_output(&b, result, nir_imm_int(&b, 0),

@@ -225,7 +225,7 @@ lower_query_size(nir_builder *b, nir_def *desc, nir_src *lod,
       result = nir_vec3(b, width, height, depth);
       break;
    default:
-      unreachable("invalid sampler dim");
+      UNREACHABLE("invalid sampler dim");
    }
 
    return handle_null_desc(b, desc, result);
@@ -322,6 +322,7 @@ static bool lower_resinfo(nir_builder *b, nir_instr *instr, void *data)
                new_tex->is_array = tex->is_array;
                new_tex->texture_index = tex->texture_index;
                new_tex->sampler_index = tex->sampler_index;
+               new_tex->can_speculate = tex->can_speculate;
                new_tex->dest_type = nir_type_int32;
                new_tex->src[0].src = nir_src_for_ssa(tex->src[i].src.ssa);
                new_tex->src[0].src_type = tex->src[i].src_type;
@@ -351,7 +352,7 @@ static bool lower_resinfo(nir_builder *b, nir_instr *instr, void *data)
             result = query_samples(b, desc, tex->sampler_dim, gfx_level);
             break;
          default:
-            unreachable("shouldn't get here");
+            UNREACHABLE("shouldn't get here");
          }
          break;
 
@@ -367,7 +368,7 @@ static bool lower_resinfo(nir_builder *b, nir_instr *instr, void *data)
    if (dst->bit_size == 16)
       result = nir_u2u16(b, result);
 
-   nir_def_rewrite_uses_after(dst, result, instr);
+   nir_def_rewrite_uses_after_instr(dst, result, instr);
    nir_instr_remove(instr);
    return true;
 }

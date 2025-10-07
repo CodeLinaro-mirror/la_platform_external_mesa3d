@@ -50,6 +50,7 @@ struct ir3_info {
    int8_t max_reg; /* highest GPR # used by shader */
    int8_t max_half_reg;
    int16_t max_const;
+   unsigned constlen;
    /* This is the maximum # of waves that can executed at once in one core,
     * assuming that they are all executing this shader.
     */
@@ -185,6 +186,11 @@ typedef enum ir3_register_flags {
     * IR3_REG_FIRST_ALIAS set.
     */
    IR3_REG_FIRST_ALIAS = BIT(22),
+
+   /* Set for registers that should be ignored by all passes. For example, the
+    * dummy src and dst of prefetch sam/ldc/resinfo.
+    */
+   IR3_REG_DUMMY = BIT(23),
 } ir3_register_flags;
 
 struct ir3_register {
@@ -802,6 +808,7 @@ struct ir3_instruction *
 ir3_block_get_last_non_terminator(struct ir3_block *block);
 
 struct ir3_instruction *ir3_block_get_last_phi(struct ir3_block *block);
+struct ir3_instruction *ir3_block_get_first_instr(struct ir3_block *block);
 
 static inline struct ir3_block *
 ir3_after_preamble(struct ir3 *ir)
@@ -1143,6 +1150,14 @@ is_subgroup_cond_mov_macro(struct ir3_instruction *instr)
    }
 }
 
+enum ir3_subreg_move {
+   IR3_SUBREG_MOVE_NONE,
+   IR3_SUBREG_MOVE_LOWER,
+   IR3_SUBREG_MOVE_UPPER,
+};
+
+enum ir3_subreg_move ir3_is_subreg_move(struct ir3_instruction *instr);
+
 static inline bool
 is_alu(struct ir3_instruction *instr)
 {
@@ -1207,6 +1222,12 @@ is_shared(struct ir3_instruction *instr)
 }
 
 static inline bool
+has_dummy_dst(struct ir3_instruction *instr)
+{
+   return !!(instr->dsts[0]->flags & IR3_REG_DUMMY);
+}
+
+static inline bool
 is_store(struct ir3_instruction *instr)
 {
    /* these instructions, the "destination" register is
@@ -1245,7 +1266,7 @@ is_load(struct ir3_instruction *instr)
       /* probably some others too.. */
       return true;
    case OPC_LDC:
-      return instr->dsts_count > 0;
+      return !has_dummy_dst(instr);
    default:
       return false;
    }
@@ -1293,7 +1314,7 @@ uses_helpers(struct ir3_instruction *instr)
 
    /* sam requires helper invocations except for dummy prefetch instructions */
    case OPC_SAM:
-      return instr->dsts_count != 0;
+      return !has_dummy_dst(instr);
 
    /* Subgroup operations don't require helper invocations to be present, but
     * will use helper invocations if they are present.
@@ -1861,6 +1882,9 @@ ir3_output_conv_type(struct ir3_instruction *instr, bool *can_fold)
    case OPC_MAD_S24:
       return TYPE_S32;
 
+   case OPC_MOVS:
+      return full_type(instr->cat1.src_type);
+
    /* We assume that any move->move folding that could be done was done by
     * NIR.
     */
@@ -2259,7 +2283,7 @@ soft_sy_delay(struct ir3_instruction *instr, struct ir3 *shader)
          case 2: return 60 / 2;
          case 3: return 77 / 2;
          case 4: return 79 / 2;
-         default: unreachable("bad number of components");
+         default: UNREACHABLE("bad number of components");
          }
       } else {
          switch (components) {
@@ -2267,7 +2291,7 @@ soft_sy_delay(struct ir3_instruction *instr, struct ir3 *shader)
          case 2: return 53;
          case 3: return 62;
          case 4: return 64;
-         default: unreachable("bad number of components");
+         default: UNREACHABLE("bad number of components");
          }
       }
    } else {
@@ -2310,7 +2334,7 @@ struct ir3_shader_variant;
 bool ir3_dce(struct ir3 *ir, struct ir3_shader_variant *so);
 
 /* fp16 conversion folding */
-bool ir3_cf(struct ir3 *ir);
+bool ir3_cf(struct ir3 *ir, struct ir3_shader_variant *so);
 
 /* shared mov folding */
 bool ir3_shared_fold(struct ir3 *ir);
@@ -2403,7 +2427,7 @@ ir3_cursor_current_block(struct ir3_cursor cursor)
       return cursor.instr->block;
    }
 
-   unreachable("illegal cursor option");
+   UNREACHABLE("illegal cursor option");
 }
 
 static inline struct ir3_cursor
@@ -2658,6 +2682,29 @@ ir3_COV_rpt(struct ir3_builder *build, unsigned nrpt,
 }
 
 static inline struct ir3_instruction *
+ir3_MOVS(struct ir3_builder *build, struct ir3_instruction *src,
+         struct ir3_instruction *invocation, type_t type)
+{
+   bool use_a0 = writes_addr0(invocation);
+   struct ir3_instruction *instr =
+      ir3_build_instr(build, OPC_MOVS, 1, use_a0 ? 1 : 2);
+   ir3_register_flags flags = type_flags(type);
+
+   __ssa_dst(instr)->flags |= flags | IR3_REG_SHARED;
+   __ssa_src(instr, src, 0);
+
+   if (use_a0) {
+      ir3_instr_set_address(instr, invocation);
+   } else {
+      __ssa_src(instr, invocation, 0);
+   }
+
+   instr->cat1.src_type = type;
+   instr->cat1.dst_type = type;
+   return instr;
+}
+
+static inline struct ir3_instruction *
 ir3_MOVMSK(struct ir3_builder *build, unsigned components)
 {
    struct ir3_instruction *instr = ir3_build_instr(build, OPC_MOVMSK, 1, 0);
@@ -2683,6 +2730,52 @@ ir3_BALLOT_MACRO(struct ir3_builder *build, struct ir3_instruction *src,
    __ssa_src(instr, src, 0);
 
    return instr;
+}
+
+struct ir3_instruction *ir3_create_collect(struct ir3_builder *build,
+                                           struct ir3_instruction *const *arr,
+                                           unsigned arrsz);
+
+#define ir3_collect(build, ...)                                                \
+   ({                                                                          \
+      struct ir3_instruction *__arr[] = {__VA_ARGS__};                         \
+      ir3_create_collect(build, __arr, ARRAY_SIZE(__arr));                     \
+   })
+
+void ir3_split_dest(struct ir3_builder *build, struct ir3_instruction **dst,
+                    struct ir3_instruction *src, unsigned base, unsigned n);
+struct ir3_instruction *ir3_split_off_scalar(struct ir3_builder *build,
+                                             struct ir3_instruction *src,
+                                             unsigned bit_size);
+
+static inline struct ir3_instruction *
+ir3_64b(struct ir3_builder *build, struct ir3_instruction *lo,
+        struct ir3_instruction *hi)
+{
+   assert((lo->dsts[0]->flags & IR3_REG_SHARED) ==
+          (hi->dsts[0]->flags & IR3_REG_SHARED));
+   return ir3_collect(build, lo, hi);
+}
+
+static inline struct ir3_instruction *
+ir3_64b_immed(struct ir3_builder *build, uint64_t val)
+{
+   return ir3_64b(build, create_immed(build, (uint32_t)val),
+                  create_immed(build, val >> 32));
+}
+
+static inline struct ir3_instruction *
+ir3_64b_get_lo(struct ir3_instruction *instr)
+{
+   assert(instr->opc == OPC_META_COLLECT && instr->srcs_count == 2);
+   return instr->srcs[0]->def->instr;
+}
+
+static inline struct ir3_instruction *
+ir3_64b_get_hi(struct ir3_instruction *instr)
+{
+   assert(instr->opc == OPC_META_COLLECT && instr->srcs_count == 2);
+   return instr->srcs[1]->def->instr;
 }
 
 struct ir3_instruction *ir3_store_const(struct ir3_shader_variant *so,
@@ -3057,7 +3150,7 @@ ir3_SAM(struct ir3_builder *build, opc_t opc, type_t type, unsigned wrmask,
        * case. It needs to be shared so that we don't accidentally disable early
        * preamble, and this is what the blob does.
        */
-      ir3_src_create(sam, regid(48, 0), IR3_REG_SHARED);
+      ir3_src_create(sam, regid(48, 0), IR3_REG_SHARED | IR3_REG_DUMMY);
    }
    if (src1) {
       __ssa_src(sam, src1, 0);
@@ -3206,7 +3299,7 @@ __regmask_file(regmask_t *regmask, enum ir3_reg_file file)
    case IR3_FILE_NONGPR:
       return regmask->nongpr;
    }
-   unreachable("bad file");
+   UNREACHABLE("bad file");
 }
 
 static inline bool

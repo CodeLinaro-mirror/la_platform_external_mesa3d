@@ -19,6 +19,9 @@
 
 #include "pan_props.h"
 
+/* Maximum kmod BO label length, including NUL-terminator */
+#define PANFROST_BO_LABEL_MAXLEN 4096
+
 const struct pan_kmod_ops panfrost_kmod_ops;
 
 struct panfrost_kmod_vm {
@@ -102,7 +105,7 @@ panfrost_dev_query_thread_props(const struct pan_kmod_dev *dev,
    props->max_threads_per_core =
       panfrost_query_raw(fd, DRM_PANFROST_PARAM_MAX_THREADS, true, 0);
    if (!props->max_threads_per_core) {
-      switch (pan_arch(props->gpu_prod_id)) {
+      switch (pan_arch(props->gpu_id)) {
       case 4:
       case 5:
          props->max_threads_per_core = 256;
@@ -138,7 +141,7 @@ panfrost_dev_query_thread_props(const struct pan_kmod_dev *dev,
    props->max_tasks_per_core = MAX2(thread_features >> 24, 1);
    props->num_registers_per_core = thread_features & 0xffff;
    if (!props->num_registers_per_core) {
-      switch (pan_arch(props->gpu_prod_id)) {
+      switch (pan_arch(props->gpu_id)) {
       case 4:
       case 5:
          /* Assume we can always schedule max_threads_per_core when using 4
@@ -180,9 +183,8 @@ panfrost_dev_query_props(const struct pan_kmod_dev *dev,
    int fd = dev->fd;
 
    memset(props, 0, sizeof(*props));
-   props->gpu_prod_id =
-      panfrost_query_raw(fd, DRM_PANFROST_PARAM_GPU_PROD_ID, true, 0);
-   props->gpu_revision =
+   props->gpu_id =
+      (panfrost_query_raw(fd, DRM_PANFROST_PARAM_GPU_PROD_ID, true, 0) << 16) |
       panfrost_query_raw(fd, DRM_PANFROST_PARAM_GPU_REVISION, true, 0);
    props->shader_present =
       panfrost_query_raw(fd, DRM_PANFROST_PARAM_SHADER_PRESENT, true, 0);
@@ -480,6 +482,33 @@ panfrost_kmod_query_timestamp(const struct pan_kmod_dev *dev)
                              false, 0);
 }
 
+static void
+panfrost_kmod_bo_label(struct pan_kmod_dev *dev, struct pan_kmod_bo *bo, const char *label)
+{
+   char truncated_label[PANFROST_BO_LABEL_MAXLEN];
+
+   if (!(dev->driver.version.major > 1 || dev->driver.version.minor >= 4))
+      return;
+
+   if (strnlen(label, PANFROST_BO_LABEL_MAXLEN) == PANFROST_BO_LABEL_MAXLEN) {
+      strncpy(truncated_label, label, PANFROST_BO_LABEL_MAXLEN - 1);
+      truncated_label[PANFROST_BO_LABEL_MAXLEN - 1] = '\0';
+      label = truncated_label;
+   }
+
+   struct drm_panfrost_set_label_bo set_label =
+      (struct drm_panfrost_set_label_bo) {
+      .handle = bo->handle,
+      .label = (uint64_t)(uintptr_t)label,
+   };
+
+   int ret =
+      pan_kmod_ioctl(dev->fd, DRM_IOCTL_PANFROST_SET_LABEL_BO,
+                     &set_label);
+   if (ret)
+      mesa_loge("DRM_IOCTL_PANFROST_SET_LABEL_BO failed (err=%d)", errno);
+}
+
 const struct pan_kmod_ops panfrost_kmod_ops = {
    .dev_create = panfrost_kmod_dev_create,
    .dev_destroy = panfrost_kmod_dev_destroy,
@@ -496,4 +525,5 @@ const struct pan_kmod_ops panfrost_kmod_ops = {
    .vm_destroy = panfrost_kmod_vm_destroy,
    .vm_bind = panfrost_kmod_vm_bind,
    .query_timestamp = panfrost_kmod_query_timestamp,
+   .bo_set_label = panfrost_kmod_bo_label,
 };

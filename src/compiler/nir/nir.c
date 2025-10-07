@@ -351,7 +351,7 @@ nir_create_variable_with_location(nir_shader *shader, nir_variable_mode mode, in
       break;
 
    default:
-      unreachable("Unsupported variable mode");
+      UNREACHABLE("Unsupported variable mode");
    }
 
    nir_variable *var = nir_variable_create(shader, mode, type, name);
@@ -370,7 +370,7 @@ nir_create_variable_with_location(nir_shader *shader, nir_variable_mode mode, in
       break;
 
    default:
-      unreachable("Unsupported variable mode");
+      UNREACHABLE("Unsupported variable mode");
    }
 
    return var;
@@ -816,6 +816,7 @@ nir_tex_instr_create(nir_shader *shader, unsigned num_srcs)
    instr->texture_index = 0;
    instr->sampler_index = 0;
    memcpy(instr->tg4_offsets, default_tg4_offsets, sizeof(instr->tg4_offsets));
+   instr->can_speculate = false;
 
    return instr;
 }
@@ -943,7 +944,7 @@ const_value_float(double d, unsigned bit_size)
    case 32: v.f32 = d;                       break;
    case 64: v.f64 = d;                       break;
    default:
-      unreachable("Invalid bit size");
+      UNREACHABLE("Invalid bit size");
    }
    /* clang-format on */
 
@@ -964,7 +965,7 @@ const_value_int(int64_t i, unsigned bit_size)
    case 32: v.i32 = i;     break;
    case 64: v.i64 = i;     break;
    default:
-      unreachable("Invalid bit size");
+      UNREACHABLE("Invalid bit size");
    }
    /* clang-format on */
 
@@ -1004,7 +1005,7 @@ nir_alu_binop_identity(nir_op binop, unsigned bit_size)
    case nir_op_ixor:
       return const_value_int(0, bit_size);
    default:
-      unreachable("Invalid reduction operation");
+      UNREACHABLE("Invalid reduction operation");
    }
 }
 
@@ -1058,7 +1059,7 @@ reduce_cursor(nir_cursor cursor)
       return cursor;
 
    default:
-      unreachable("Inavlid cursor option");
+      UNREACHABLE("Inavlid cursor option");
    }
 }
 
@@ -1373,7 +1374,7 @@ nir_instr_def(nir_instr *instr)
       return &nir_instr_as_phi(instr)->def;
 
    case nir_instr_type_parallel_copy:
-      unreachable("Parallel copies are unsupported by this function");
+      UNREACHABLE("Parallel copies are unsupported by this function");
 
    case nir_instr_type_load_const:
       return &nir_instr_as_load_const(instr)->def;
@@ -1386,7 +1387,7 @@ nir_instr_def(nir_instr *instr)
       return NULL;
    }
 
-   unreachable("Invalid instruction type");
+   UNREACHABLE("Invalid instruction type");
 }
 
 bool
@@ -1422,7 +1423,7 @@ nir_const_value_for_float(double f, unsigned bit_size)
    case 16: v.u16 = _mesa_float_to_half(f);  break;
    case 32: v.f32 = f;                       break;
    case 64: v.f64 = f;                       break;
-   default: unreachable("Invalid bit size");
+   default: UNREACHABLE("Invalid bit size");
    }
    /* clang-format on */
 
@@ -1437,7 +1438,7 @@ nir_const_value_as_float(nir_const_value value, unsigned bit_size)
    case 16: return _mesa_half_to_float(value.u16);
    case 32: return value.f32;
    case 64: return value.f64;
-   default: unreachable("Invalid bit size");
+   default: UNREACHABLE("Invalid bit size");
    }
    /* clang-format on */
 }
@@ -1448,7 +1449,7 @@ nir_src_as_const_value(nir_src src)
    if (src.ssa->parent_instr->type != nir_instr_type_load_const)
       return NULL;
 
-   nir_load_const_instr *load = nir_instr_as_load_const(src.ssa->parent_instr);
+   nir_load_const_instr *load = nir_def_as_load_const(src.ssa);
 
    return load->value;
 }
@@ -1468,7 +1469,7 @@ nir_src_is_always_uniform(nir_src src)
       return true;
 
    if (src.ssa->parent_instr->type == nir_instr_type_intrinsic) {
-      nir_intrinsic_instr *intr = nir_instr_as_intrinsic(src.ssa->parent_instr);
+      nir_intrinsic_instr *intr = nir_def_as_intrinsic(src.ssa);
       /* As are uniform variables */
       if (intr->intrinsic == nir_intrinsic_load_uniform &&
           nir_src_is_always_uniform(intr->src[0]))
@@ -1486,7 +1487,7 @@ nir_src_is_always_uniform(nir_src src)
 
    /* Operating together uniform expressions produces a uniform result */
    if (src.ssa->parent_instr->type == nir_instr_type_alu) {
-      nir_alu_instr *alu = nir_instr_as_alu(src.ssa->parent_instr);
+      nir_alu_instr *alu = nir_def_as_alu(src.ssa);
       for (int i = 0; i < nir_op_infos[alu->op].num_inputs; i++) {
          if (!nir_src_is_always_uniform(alu->src[i].src))
             return false;
@@ -1652,7 +1653,7 @@ is_instr_between(nir_instr *start, nir_instr *end, nir_instr *between)
  * def->parent_instr and that after_me comes after def->parent_instr.
  */
 void
-nir_def_rewrite_uses_after(nir_def *def, nir_def *new_ssa,
+nir_def_rewrite_uses_after_instr(nir_def *def, nir_def *new_ssa,
                            nir_instr *after_me)
 {
    if (def == new_ssa)
@@ -1839,7 +1840,7 @@ nir_block_cf_tree_next(nir_block *block)
    }
 
    default:
-      unreachable("unknown cf node type");
+      UNREACHABLE("unknown cf node type");
    }
 }
 
@@ -1881,7 +1882,7 @@ nir_block_cf_tree_prev(nir_block *block)
    }
 
    default:
-      unreachable("unknown cf node type");
+      UNREACHABLE("unknown cf node type");
    }
 }
 
@@ -1909,7 +1910,7 @@ nir_cf_node_cf_tree_first(nir_cf_node *node)
    }
 
    default:
-      unreachable("unknown node type");
+      UNREACHABLE("unknown node type");
    }
 }
 
@@ -1940,7 +1941,7 @@ nir_cf_node_cf_tree_last(nir_cf_node *node)
    }
 
    default:
-      unreachable("unknown node type");
+      UNREACHABLE("unknown node type");
    }
 }
 
@@ -2156,7 +2157,7 @@ cursor_next_instr(nir_cursor cursor)
       return cursor_next_instr(cursor);
    }
 
-   unreachable("Inavlid cursor option");
+   UNREACHABLE("Inavlid cursor option");
 }
 
 bool
@@ -2202,7 +2203,7 @@ nir_function_impl_lower_instructions(nir_function_impl *impl,
       if (new_def && new_def != NIR_LOWER_INSTR_PROGRESS &&
           new_def != NIR_LOWER_INSTR_PROGRESS_REPLACE) {
          assert(old_def != NULL);
-         if (new_def->parent_instr->block != instr->block)
+         if (nir_def_block(new_def) != instr->block)
             preserved = nir_metadata_none;
 
          list_for_each_entry_safe(nir_src, use_src, &old_uses, use_link)
@@ -2455,6 +2456,8 @@ nir_system_value_from_intrinsic(nir_intrinsic_op intrin)
    case nir_intrinsic_load_invocation_id:
       return SYSTEM_VALUE_INVOCATION_ID;
    case nir_intrinsic_load_frag_coord:
+   case nir_intrinsic_load_frag_coord_z:
+   case nir_intrinsic_load_frag_coord_w:
       return SYSTEM_VALUE_FRAG_COORD;
    case nir_intrinsic_load_pixel_coord:
       return SYSTEM_VALUE_PIXEL_COORD;
@@ -2604,7 +2607,7 @@ nir_system_value_from_intrinsic(nir_intrinsic_op intrin)
    case nir_intrinsic_load_sm_id_nv:
       return SYSTEM_VALUE_SM_ID_NV;
    default:
-      unreachable("intrinsic doesn't produce a system value");
+      UNREACHABLE("intrinsic doesn't produce a system value");
    }
 }
 
@@ -2628,9 +2631,15 @@ nir_rewrite_image_intrinsic(nir_intrinsic_instr *intrin, nir_def *src,
    if (nir_intrinsic_has_atomic_op(intrin))
       atomic_op = nir_intrinsic_atomic_op(intrin);
 
+   bool explicit_coord = false;
+   if (nir_intrinsic_has_explicit_coord(intrin))
+      explicit_coord = nir_intrinsic_explicit_coord(intrin);
+
    switch (intrin->intrinsic) {
 #define CASE(op)                                                       \
    case nir_intrinsic_image_deref_##op:                                \
+   case nir_intrinsic_image_##op:                                      \
+   case nir_intrinsic_bindless_image_##op:                             \
       intrin->intrinsic = bindless ? nir_intrinsic_bindless_image_##op \
                                    : nir_intrinsic_image_##op;         \
       break;
@@ -2647,16 +2656,19 @@ nir_rewrite_image_intrinsic(nir_intrinsic_instr *intrin, nir_def *src,
       CASE(store_block_agx)
 #undef CASE
    default:
-      unreachable("Unhanded image intrinsic");
+      UNREACHABLE("Unhanded image intrinsic");
    }
 
-   nir_variable *var = nir_intrinsic_get_var(intrin, 0);
+   if (nir_src_as_deref(intrin->src[0])) {
+      nir_variable *var = nir_intrinsic_get_var(intrin, 0);
 
-   /* Only update the format if the intrinsic doesn't have one set */
-   if (nir_intrinsic_format(intrin) == PIPE_FORMAT_NONE)
-      nir_intrinsic_set_format(intrin, var->data.image.format);
+      /* Only update the format if the intrinsic doesn't have one set */
+      if (nir_intrinsic_format(intrin) == PIPE_FORMAT_NONE)
+         nir_intrinsic_set_format(intrin, var->data.image.format);
 
-   nir_intrinsic_set_access(intrin, access | var->data.access);
+      nir_intrinsic_set_access(intrin, access | var->data.access);
+   }
+
    if (nir_intrinsic_has_src_type(intrin))
       nir_intrinsic_set_src_type(intrin, data_type);
    if (nir_intrinsic_has_dest_type(intrin))
@@ -2664,6 +2676,8 @@ nir_rewrite_image_intrinsic(nir_intrinsic_instr *intrin, nir_def *src,
 
    if (nir_intrinsic_has_atomic_op(intrin))
       nir_intrinsic_set_atomic_op(intrin, atomic_op);
+   if (nir_intrinsic_has_explicit_coord(intrin))
+      nir_intrinsic_set_explicit_coord(intrin, explicit_coord);
 
    nir_src_rewrite(&intrin->src[0], src);
 }
@@ -2715,6 +2729,47 @@ nir_intrinsic_can_reorder(nir_intrinsic_instr *instr)
           (info->flags & NIR_INTRINSIC_CAN_REORDER);
 }
 
+/* Return whether an instruction returns the same result regardless of where
+ * it's executed in the shader and regardless of whether it's executed multiple
+ * times.
+ */
+bool
+nir_instr_can_speculate(nir_instr *instr)
+{
+   nir_intrinsic_instr *intr;
+
+   switch (instr->type) {
+   case nir_instr_type_undef:
+   case nir_instr_type_load_const:
+   case nir_instr_type_alu:
+   case nir_instr_type_deref:
+      return true;
+
+   case nir_instr_type_tex:
+      return nir_instr_as_tex(instr)->can_speculate;
+
+   case nir_instr_type_intrinsic:
+      intr = nir_instr_as_intrinsic(instr);
+
+      if (!nir_intrinsic_can_reorder(intr))
+         return false;
+
+      if (nir_intrinsic_has_access(intr))
+         return nir_intrinsic_access(intr) & ACCESS_CAN_SPECULATE;
+
+      /* Intrinsics without ACCESS are speculatable if they can be reordered. */
+      return true;
+
+   case nir_instr_type_call:
+   case nir_instr_type_jump:
+   case nir_instr_type_phi:
+   case nir_instr_type_parallel_copy:
+      return false;
+   }
+
+   return false;
+}
+
 nir_src *
 nir_get_shader_call_payload_src(nir_intrinsic_instr *call)
 {
@@ -2726,7 +2781,7 @@ nir_get_shader_call_payload_src(nir_intrinsic_instr *call)
    case nir_intrinsic_rt_execute_callable:
       return &call->src[1];
    default:
-      unreachable("Not a call intrinsic");
+      UNREACHABLE("Not a call intrinsic");
       return NULL;
    }
 }
@@ -2873,7 +2928,7 @@ nir_scalar
 nir_scalar_chase_movs(nir_scalar s)
 {
    while (nir_scalar_is_alu(s)) {
-      nir_alu_instr *alu = nir_instr_as_alu(s.def->parent_instr);
+      nir_alu_instr *alu = nir_def_as_alu(s.def);
       if (alu->op == nir_op_mov) {
          s.def = alu->src[0].src.ssa;
          s.comp = alu->src[0].swizzle[s.comp];
@@ -2905,6 +2960,8 @@ nir_get_nir_type_for_glsl_base_type(enum glsl_base_type base_type)
    case GLSL_TYPE_FLOAT:   return nir_type_float32;
    case GLSL_TYPE_FLOAT16: return nir_type_float16;
    case GLSL_TYPE_BFLOAT16: return nir_type_uint16;
+   case GLSL_TYPE_FLOAT_E4M3FN: return nir_type_uint8;
+   case GLSL_TYPE_FLOAT_E5M2: return nir_type_uint8;
    case GLSL_TYPE_DOUBLE:  return nir_type_float64;
       /* clang-format on */
 
@@ -2922,7 +2979,7 @@ nir_get_nir_type_for_glsl_base_type(enum glsl_base_type base_type)
       return nir_type_invalid;
    }
 
-   unreachable("unknown type");
+   UNREACHABLE("unknown type");
 }
 
 enum glsl_base_type
@@ -2942,7 +2999,7 @@ nir_get_glsl_base_type_for_nir_type(nir_alu_type base_type)
    case nir_type_float32:  return GLSL_TYPE_FLOAT;
    case nir_type_float16:  return GLSL_TYPE_FLOAT16;
    case nir_type_float64:  return GLSL_TYPE_DOUBLE;
-   default: unreachable("Not a sized nir_alu_type");
+   default: UNREACHABLE("Not a sized nir_alu_type");
    }
    /* clang-format on */
 }
@@ -2959,7 +3016,7 @@ nir_op_vec(unsigned num_components)
    case  5: return nir_op_vec5;
    case  8: return nir_op_vec8;
    case 16: return nir_op_vec16;
-   default: unreachable("bad component count");
+   default: UNREACHABLE("bad component count");
    }
    /* clang-format on */
 }
@@ -3197,7 +3254,7 @@ nir_tex_instr_result_size(const nir_tex_instr *instr)
          ret = 3;
          break;
       default:
-         unreachable("not reached");
+         UNREACHABLE("not reached");
       }
       if (instr->is_array)
          ret++;
@@ -3224,6 +3281,7 @@ nir_tex_instr_result_size(const nir_tex_instr *instr)
 
    case nir_texop_hdr_dim_nv:
    case nir_texop_tex_type_nv:
+   case nir_texop_sample_pos_nv:
       return 4;
 
    case nir_texop_custom_border_color_agx:
@@ -3253,6 +3311,7 @@ nir_tex_instr_is_query(const nir_tex_instr *instr)
    case nir_texop_has_custom_border_color_agx:
    case nir_texop_hdr_dim_nv:
    case nir_texop_tex_type_nv:
+   case nir_texop_sample_pos_nv:
       return true;
    case nir_texop_tex:
    case nir_texop_txb:
@@ -3268,7 +3327,7 @@ nir_tex_instr_is_query(const nir_tex_instr *instr)
    case nir_texop_fragment_fetch_amd:
       return false;
    default:
-      unreachable("Invalid texture opcode");
+      UNREACHABLE("Invalid texture opcode");
    }
 }
 
@@ -3347,10 +3406,10 @@ nir_tex_instr_src_type(const nir_tex_instr *instr, unsigned src)
       return nir_type_uint;
 
    case nir_num_tex_src_types:
-      unreachable("nir_num_tex_src_types is not a valid source type");
+      UNREACHABLE("nir_num_tex_src_types is not a valid source type");
    }
 
-   unreachable("Invalid texture source type");
+   UNREACHABLE("Invalid texture source type");
 }
 
 unsigned
@@ -3494,7 +3553,10 @@ nir_slot_is_varying(gl_varying_slot slot, gl_shader_stage next_shader)
           slot == VARYING_SLOT_LAYER ||
           slot == VARYING_SLOT_VIEWPORT ||
           slot == VARYING_SLOT_TESS_LEVEL_OUTER ||
-          slot == VARYING_SLOT_TESS_LEVEL_INNER ||
+          /* VARYING_SLOT_PRIMITIVE_INDICES = VARYING_SLOT_TESS_LEVEL_INNER,
+           * VARYING_SLOT_PRIMITIVE_INDICES is sysval in mesh shader.
+           */
+          (slot == VARYING_SLOT_TESS_LEVEL_INNER && at_most_before_gs) ||
           (slot == VARYING_SLOT_VIEW_INDEX && exactly_before_fs);
 }
 
@@ -3642,5 +3704,5 @@ nir_atomic_op_to_alu(nir_atomic_op op)
       return nir_num_opcodes;
    }
 
-   unreachable("Invalid nir_atomic_op");
+   UNREACHABLE("Invalid nir_atomic_op");
 }

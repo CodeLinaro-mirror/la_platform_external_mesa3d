@@ -26,183 +26,45 @@
 #include "vk_alloc.h"
 #include "vk_common_entrypoints.h"
 #include "vk_device.h"
-#include "vk_physical_device.h"
+#include "vk_enum_defines.h"
 #include "vk_image.h"
 #include "vk_log.h"
+#include "vk_physical_device.h"
 #include "vk_queue.h"
 #include "vk_util.h"
 
-#include "vk_enum_defines.h"
-
+#include "c11/threads.h"
 #include "drm-uapi/drm_fourcc.h"
 #include "util/libsync.h"
+#include "util/log.h"
 #include "util/os_file.h"
 #include "util/u_gralloc/u_gralloc.h"
-#include "util/log.h"
 
 #include <hardware/gralloc.h>
+#include <hardware/hardware.h>
+#include <hardware/hwvulkan.h>
 
 #if ANDROID_API_LEVEL >= 26
 #include <hardware/gralloc1.h>
+#include <vndk/hardware_buffer.h>
 #endif
 
 #include <unistd.h>
 
-static struct u_gralloc *u_gralloc;
+static struct u_gralloc *_gralloc;
+
+static void
+vk_android_init_ugralloc_once(void)
+{
+   _gralloc = u_gralloc_create(U_GRALLOC_TYPE_AUTO);
+}
 
 struct u_gralloc *
 vk_android_get_ugralloc(void)
 {
-   return u_gralloc;
-}
-
-struct u_gralloc *
-vk_android_init_ugralloc(void)
-{
-   u_gralloc = u_gralloc_create(U_GRALLOC_TYPE_AUTO);
-
-   return u_gralloc;
-}
-
-void
-vk_android_destroy_ugralloc(void)
-{
-   u_gralloc_destroy(&u_gralloc);
-}
-
-/* If any bits in test_mask are set, then unset them and return true. */
-static inline bool
-unmask32(uint32_t *inout_mask, uint32_t test_mask)
-{
-   uint32_t orig_mask = *inout_mask;
-   *inout_mask &= ~test_mask;
-   return *inout_mask != orig_mask;
-}
-
-static VkResult
-format_supported_with_usage(struct vk_device *device, VkFormat format,
-                            VkImageUsageFlags imageUsage)
-{
-   struct vk_physical_device *physical = device->physical;
-   VkResult result;
-
-   const VkPhysicalDeviceImageFormatInfo2 image_format_info = {
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
-      .format = format,
-      .type = VK_IMAGE_TYPE_2D,
-      .tiling = VK_IMAGE_TILING_OPTIMAL,
-      .usage = imageUsage,
-   };
-
-   VkImageFormatProperties2 image_format_props = {
-      .sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2,
-   };
-
-   /* Check that requested format and usage are supported. */
-   result = physical->dispatch_table.GetPhysicalDeviceImageFormatProperties2(
-      (VkPhysicalDevice)physical, &image_format_info, &image_format_props);
-   if (result != VK_SUCCESS)
-      return result;
-
-   return VK_SUCCESS;
-}
-
-static VkResult
-setup_gralloc0_usage(struct vk_device *device, VkFormat format,
-                     VkImageUsageFlags imageUsage, int *grallocUsage)
-{
-   if (unmask32(&imageUsage, VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT))
-      *grallocUsage |= GRALLOC_USAGE_HW_RENDER;
-
-   if (unmask32(&imageUsage, VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                                VK_IMAGE_USAGE_SAMPLED_BIT |
-                                VK_IMAGE_USAGE_STORAGE_BIT |
-                                VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT))
-      *grallocUsage |= GRALLOC_USAGE_HW_TEXTURE;
-
-   /* All VkImageUsageFlags not explicitly checked here are unsupported for
-    * gralloc swapchains.
-    */
-   if (imageUsage != 0) {
-      return vk_errorf(device, VK_ERROR_FORMAT_NOT_SUPPORTED,
-                       "unsupported VkImageUsageFlags(0x%x) for gralloc "
-                       "swapchain",
-                       imageUsage);
-   }
-
-   *grallocUsage |= GRALLOC_USAGE_HW_COMPOSER;
-
-   if (*grallocUsage == 0)
-      return VK_ERROR_FORMAT_NOT_SUPPORTED;
-
-   return VK_SUCCESS;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL
-vk_common_GetSwapchainGrallocUsageANDROID(VkDevice device_h, VkFormat format,
-                                          VkImageUsageFlags imageUsage,
-                                          int *grallocUsage)
-{
-   VK_FROM_HANDLE(vk_device, device, device_h);
-   VkResult result;
-
-   result = format_supported_with_usage(device, format, imageUsage);
-   if (result != VK_SUCCESS)
-      return result;
-
-   *grallocUsage = 0;
-   return setup_gralloc0_usage(device, format, imageUsage, grallocUsage);
-}
-
-#if ANDROID_API_LEVEL >= 26
-#include <vndk/hardware_buffer.h>
-
-VKAPI_ATTR VkResult VKAPI_CALL
-vk_common_GetSwapchainGrallocUsage2ANDROID(
-   VkDevice device_h, VkFormat format, VkImageUsageFlags imageUsage,
-   VkSwapchainImageUsageFlagsANDROID swapchainImageUsage,
-   uint64_t *grallocConsumerUsage, uint64_t *grallocProducerUsage)
-{
-   VK_FROM_HANDLE(vk_device, device, device_h);
-   VkResult result;
-
-   *grallocConsumerUsage = 0;
-   *grallocProducerUsage = 0;
-
-   result = format_supported_with_usage(device, format, imageUsage);
-   if (result != VK_SUCCESS)
-      return result;
-
-   int32_t grallocUsage = 0;
-   result = setup_gralloc0_usage(device, format, imageUsage, &grallocUsage);
-   if (result != VK_SUCCESS)
-      return result;
-
-   /* Setup gralloc1 usage flags from gralloc0 flags. */
-
-   if (grallocUsage & GRALLOC_USAGE_HW_RENDER)
-      *grallocProducerUsage |= GRALLOC1_PRODUCER_USAGE_GPU_RENDER_TARGET;
-
-   if (grallocUsage & GRALLOC_USAGE_HW_TEXTURE)
-      *grallocConsumerUsage |= GRALLOC1_CONSUMER_USAGE_GPU_TEXTURE;
-
-   if (grallocUsage & GRALLOC_USAGE_HW_COMPOSER) {
-      /* GPU composing case */
-      *grallocConsumerUsage |= GRALLOC1_CONSUMER_USAGE_GPU_TEXTURE;
-      /* Hardware composing case */
-      *grallocConsumerUsage |= GRALLOC1_CONSUMER_USAGE_HWCOMPOSER;
-   }
-
-   if ((swapchainImageUsage & VK_SWAPCHAIN_IMAGE_USAGE_SHARED_BIT_ANDROID) &&
-       vk_android_get_ugralloc() != NULL) {
-      uint64_t front_rendering_usage = 0;
-      u_gralloc_get_front_rendering_usage(vk_android_get_ugralloc(),
-                                          &front_rendering_usage);
-      *grallocProducerUsage |= front_rendering_usage;
-   }
-
-   return VK_SUCCESS;
+   static once_flag once = ONCE_FLAG_INIT;
+   call_once(&once, vk_android_init_ugralloc_once);
+   return _gralloc;
 }
 
 static VkResult
@@ -329,6 +191,223 @@ vk_android_get_anb_layout(
 
    return vk_gralloc_to_drm_explicit_layout(&gr_handle, out,
                                             out_layouts, max_planes);
+}
+
+static VkResult
+setup_gralloc0_usage(VkFormat format, VkImageUsageFlags image_usage,
+                     int *out_gralloc_usage)
+{
+   const VkImageUsageFlags render_usage =
+      VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+   const VkImageUsageFlags texture_usage =
+      VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+      VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+   int gralloc_usage = 0;
+
+   if (image_usage & ~(render_usage | texture_usage))
+      return VK_ERROR_FORMAT_NOT_SUPPORTED;
+
+   if (image_usage & render_usage)
+      gralloc_usage |= GRALLOC_USAGE_HW_RENDER;
+   if (image_usage & texture_usage)
+      gralloc_usage |= GRALLOC_USAGE_HW_TEXTURE;
+
+   if (!gralloc_usage)
+      return VK_ERROR_FORMAT_NOT_SUPPORTED;
+
+   *out_gralloc_usage = gralloc_usage;
+
+   return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL
+vk_common_GetSwapchainGrallocUsageANDROID(VkDevice device, VkFormat format,
+                                          VkImageUsageFlags imageUsage,
+                                          int *grallocUsage)
+{
+   return setup_gralloc0_usage(format, imageUsage, grallocUsage);
+}
+
+
+VKAPI_ATTR VkResult VKAPI_CALL
+vk_common_AcquireImageANDROID(VkDevice _device,
+                              VkImage image,
+                              int nativeFenceFd,
+                              VkSemaphore semaphore,
+                              VkFence fence)
+{
+   VK_FROM_HANDLE(vk_device, device, _device);
+   VkResult result = VK_SUCCESS;
+
+   /* From https://source.android.com/devices/graphics/implement-vulkan :
+    *
+    *    "The driver takes ownership of the fence file descriptor and closes
+    *    the fence file descriptor when no longer needed. The driver must do
+    *    so even if neither a semaphore or fence object is provided, or even
+    *    if vkAcquireImageANDROID fails and returns an error."
+    *
+    * The Vulkan spec for VkImportFence/SemaphoreFdKHR(), however, requires
+    * the file descriptor to be left alone on failure.
+    */
+   int semaphore_fd = -1, fence_fd = -1;
+   if (nativeFenceFd >= 0) {
+      if (semaphore != VK_NULL_HANDLE && fence != VK_NULL_HANDLE) {
+         /* We have both so we have to import the sync file twice. One of
+          * them needs to be a dup.
+          */
+         semaphore_fd = nativeFenceFd;
+         fence_fd = dup(nativeFenceFd);
+         if (fence_fd < 0) {
+            VkResult err = (errno == EMFILE) ? VK_ERROR_TOO_MANY_OBJECTS :
+                                               VK_ERROR_OUT_OF_HOST_MEMORY;
+            close(nativeFenceFd);
+            return vk_error(device, err);
+         }
+      } else if (semaphore != VK_NULL_HANDLE) {
+         semaphore_fd = nativeFenceFd;
+      } else if (fence != VK_NULL_HANDLE) {
+         fence_fd = nativeFenceFd;
+      } else {
+         /* Nothing to import into so we have to close the file */
+         close(nativeFenceFd);
+      }
+   }
+
+   if (semaphore != VK_NULL_HANDLE) {
+      const VkImportSemaphoreFdInfoKHR info = {
+         .sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR,
+         .semaphore = semaphore,
+         .flags = VK_SEMAPHORE_IMPORT_TEMPORARY_BIT,
+         .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT,
+         .fd = semaphore_fd,
+      };
+      result = device->dispatch_table.ImportSemaphoreFdKHR(_device, &info);
+      if (result == VK_SUCCESS)
+         semaphore_fd = -1; /* The driver took ownership */
+   }
+
+   if (result == VK_SUCCESS && fence != VK_NULL_HANDLE) {
+      const VkImportFenceFdInfoKHR info = {
+         .sType = VK_STRUCTURE_TYPE_IMPORT_FENCE_FD_INFO_KHR,
+         .fence = fence,
+         .flags = VK_FENCE_IMPORT_TEMPORARY_BIT,
+         .handleType = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT,
+         .fd = fence_fd,
+      };
+      result = device->dispatch_table.ImportFenceFdKHR(_device, &info);
+      if (result == VK_SUCCESS)
+         fence_fd = -1; /* The driver took ownership */
+   }
+
+   if (semaphore_fd >= 0)
+      close(semaphore_fd);
+   if (fence_fd >= 0)
+      close(fence_fd);
+
+   return result;
+}
+
+static VkResult
+vk_anb_semaphore_init_once(struct vk_queue *queue, struct vk_device *device)
+{
+   if (queue->anb_semaphore != VK_NULL_HANDLE)
+      return VK_SUCCESS;
+
+   const VkExportSemaphoreCreateInfo export_info = {
+      .sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO,
+      .handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT,
+   };
+   const VkSemaphoreCreateInfo create_info = {
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+      .pNext = &export_info,
+   };
+   return device->dispatch_table.CreateSemaphore(vk_device_to_handle(device),
+                                                 &create_info, NULL,
+                                                 &queue->anb_semaphore);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL
+vk_common_QueueSignalReleaseImageANDROID(VkQueue _queue,
+                                         uint32_t waitSemaphoreCount,
+                                         const VkSemaphore *pWaitSemaphores,
+                                         VkImage image,
+                                         int *pNativeFenceFd)
+{
+   VK_FROM_HANDLE(vk_queue, queue, _queue);
+   struct vk_device *device = queue->base.device;
+   VkResult result = VK_SUCCESS;
+
+   STACK_ARRAY(VkPipelineStageFlags, stage_flags, MAX2(1, waitSemaphoreCount));
+   for (uint32_t i = 0; i < MAX2(1, waitSemaphoreCount); i++)
+      stage_flags[i] = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+   result = vk_anb_semaphore_init_once(queue, device);
+   if (result != VK_SUCCESS) {
+      STACK_ARRAY_FINISH(stage_flags);
+      return result;
+   }
+
+   const VkSubmitInfo submit_info = {
+      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .waitSemaphoreCount = waitSemaphoreCount,
+      .pWaitSemaphores = pWaitSemaphores,
+      .pWaitDstStageMask = stage_flags,
+      .signalSemaphoreCount = 1,
+      .pSignalSemaphores = &queue->anb_semaphore,
+   };
+   result = device->dispatch_table.QueueSubmit(_queue, 1, &submit_info,
+                                               VK_NULL_HANDLE);
+   STACK_ARRAY_FINISH(stage_flags);
+   if (result != VK_SUCCESS)
+      return result;
+
+   const VkSemaphoreGetFdInfoKHR get_fd = {
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR,
+      .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT,
+      .semaphore = queue->anb_semaphore,
+   };
+   return device->dispatch_table.GetSemaphoreFdKHR(vk_device_to_handle(device),
+                                                   &get_fd, pNativeFenceFd);
+}
+
+#if ANDROID_API_LEVEL >= 26
+
+uint64_t
+vk_android_get_front_buffer_usage(void)
+{
+   struct u_gralloc *gralloc = vk_android_get_ugralloc();
+   if (gralloc) {
+      uint64_t usage = 0;
+      int ret = u_gralloc_get_front_rendering_usage(gralloc, &usage);
+      if (!ret)
+         return usage;
+   }
+   return 0;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL
+vk_common_GetSwapchainGrallocUsage2ANDROID(
+   VkDevice device, VkFormat format, VkImageUsageFlags imageUsage,
+   VkSwapchainImageUsageFlagsANDROID swapchainImageUsage,
+   uint64_t *grallocConsumerUsage, uint64_t *grallocProducerUsage)
+{
+   int gralloc_usage;
+   VkResult result = setup_gralloc0_usage(format, imageUsage, &gralloc_usage);
+   if (result != VK_SUCCESS)
+      return result;
+
+   /* Setup gralloc1 usage flags from gralloc0 flags. */
+   *grallocConsumerUsage = *grallocProducerUsage = 0;
+   if (gralloc_usage & GRALLOC_USAGE_HW_RENDER)
+      *grallocProducerUsage |= GRALLOC1_PRODUCER_USAGE_GPU_RENDER_TARGET;
+   if (gralloc_usage & GRALLOC_USAGE_HW_TEXTURE)
+      *grallocConsumerUsage |= GRALLOC1_CONSUMER_USAGE_GPU_TEXTURE;
+
+   /* for front buffer rendering */
+   if (swapchainImageUsage & VK_SWAPCHAIN_IMAGE_USAGE_SHARED_BIT_ANDROID)
+      *grallocProducerUsage |= vk_android_get_front_buffer_usage();
+
+   return VK_SUCCESS;
 }
 
 VkResult
@@ -489,21 +568,20 @@ vk_image_usage_to_ahb_usage(const VkImageCreateFlags vk_create,
    return ahb_usage;
 }
 
-/* Probe gralloc implementation to test whether it can allocate a buffer
- * for the given format and usage.  Vk drivers must not advertise support
- * for AHB backed VkImage's if the gralloc implementation is not able to
- * perform the allocation.
- */
-bool
+static bool
 vk_ahb_probe_format(VkFormat vk_format,
                     VkImageCreateFlags vk_create,
                     VkImageUsageFlags vk_usage)
 {
+   const uint32_t ahb_format = vk_image_format_to_ahb_format(vk_format);
+   if (!ahb_format)
+      return false;
+
    AHardwareBuffer_Desc desc = {
       .width = 16,
       .height = 16,
       .layers = 1,
-      .format = vk_image_format_to_ahb_format(vk_format),
+      .format = ahb_format,
       .usage = vk_image_usage_to_ahb_usage(vk_create, vk_usage),
    };
 #if ANDROID_API_LEVEL >= 29
@@ -635,9 +713,11 @@ get_ahb_buffer_format_properties2(
    };
 
    struct u_gralloc_buffer_basic_info info;
-
-   if (u_gralloc_get_buffer_basic_info(vk_android_get_ugralloc(), &gr_handle, &info) != 0)
+   if (u_gralloc_get_buffer_basic_info(vk_android_get_ugralloc(), &gr_handle,
+                                       &info) != 0) {
+      mesa_loge("Failed to get u_gralloc_buffer_basic_info");
       return VK_ERROR_INVALID_EXTERNAL_HANDLE;
+   }
 
    switch (info.drm_fourcc) {
    case DRM_FORMAT_YVU420:
@@ -647,37 +727,43 @@ get_ahb_buffer_format_properties2(
    case DRM_FORMAT_NV12:
       external_format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
       break;
-   default:;
+   default:
       mesa_loge("Unsupported external DRM format: %d", info.drm_fourcc);
       return VK_ERROR_INVALID_EXTERNAL_HANDLE;
    }
 
    struct u_gralloc_buffer_color_info color_info;
-   if (u_gralloc_get_buffer_color_info(vk_android_get_ugralloc(), &gr_handle, &color_info) == 0) {
-      switch (color_info.yuv_color_space) {
-      case __DRI_YUV_COLOR_SPACE_ITU_REC601:
-         p->suggestedYcbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_601;
-         break;
-      case __DRI_YUV_COLOR_SPACE_ITU_REC709:
-         p->suggestedYcbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_709;
-         break;
-      case __DRI_YUV_COLOR_SPACE_ITU_REC2020:
-         p->suggestedYcbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_2020;
-         break;
-      default:
-         break;
-      }
-
-      p->suggestedYcbcrRange = (color_info.sample_range == __DRI_YUV_NARROW_RANGE) ?
-         VK_SAMPLER_YCBCR_RANGE_ITU_NARROW : VK_SAMPLER_YCBCR_RANGE_ITU_FULL;
-      p->suggestedXChromaOffset = (color_info.horizontal_siting == __DRI_YUV_CHROMA_SITING_0_5) ?
-         VK_CHROMA_LOCATION_MIDPOINT : VK_CHROMA_LOCATION_COSITED_EVEN;
-      p->suggestedYChromaOffset = (color_info.vertical_siting == __DRI_YUV_CHROMA_SITING_0_5) ?
-         VK_CHROMA_LOCATION_MIDPOINT : VK_CHROMA_LOCATION_COSITED_EVEN;
-   } else {
-      p->suggestedYcbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_601;
-      p->suggestedYcbcrRange = VK_SAMPLER_YCBCR_RANGE_ITU_NARROW;
+   if (u_gralloc_get_buffer_color_info(vk_android_get_ugralloc(), &gr_handle,
+                                       &color_info) != 0) {
+      mesa_loge("Failed to get u_gralloc_buffer_color_info");
+      return VK_ERROR_INVALID_EXTERNAL_HANDLE;
    }
+
+   switch (color_info.yuv_color_space) {
+   case __DRI_YUV_COLOR_SPACE_ITU_REC601:
+      p->suggestedYcbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_601;
+      break;
+   case __DRI_YUV_COLOR_SPACE_ITU_REC709:
+      p->suggestedYcbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_709;
+      break;
+   case __DRI_YUV_COLOR_SPACE_ITU_REC2020:
+      p->suggestedYcbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_2020;
+      break;
+   default:
+      break;
+   }
+
+   p->suggestedYcbcrRange = (color_info.sample_range == __DRI_YUV_NARROW_RANGE)
+                               ? VK_SAMPLER_YCBCR_RANGE_ITU_NARROW
+                               : VK_SAMPLER_YCBCR_RANGE_ITU_FULL;
+   p->suggestedXChromaOffset =
+      (color_info.horizontal_siting == __DRI_YUV_CHROMA_SITING_0_5)
+         ? VK_CHROMA_LOCATION_MIDPOINT
+         : VK_CHROMA_LOCATION_COSITED_EVEN;
+   p->suggestedYChromaOffset =
+      (color_info.vertical_siting == __DRI_YUV_CHROMA_SITING_0_5)
+         ? VK_CHROMA_LOCATION_MIDPOINT
+         : VK_CHROMA_LOCATION_COSITED_EVEN;
 
 finish:
 
@@ -704,8 +790,6 @@ vk_common_GetAndroidHardwareBufferPropertiesANDROID(
    VkAndroidHardwareBufferPropertiesANDROID *pProperties)
 {
    VK_FROM_HANDLE(vk_device, device, device_h);
-   struct vk_physical_device *pdevice = device->physical;
-
    VkResult result;
 
    VkAndroidHardwareBufferFormatPropertiesANDROID *format_prop =
@@ -744,155 +828,110 @@ vk_common_GetAndroidHardwareBufferPropertiesANDROID(
    assert(handle && handle->numFds > 0);
    pProperties->allocationSize = lseek(handle->data[0], 0, SEEK_END);
 
-   VkPhysicalDeviceMemoryProperties mem_props;
-
-   device->physical->dispatch_table.GetPhysicalDeviceMemoryProperties(
-      (VkPhysicalDevice)pdevice, &mem_props);
-
-   /* All memory types. (Should we be smarter than this?) */
-   pProperties->memoryTypeBits = (1u << mem_props.memoryTypeCount) - 1;
-
-   return VK_SUCCESS;
-}
-#endif /* ANDROID_API_LEVEL >= 26 */
-
-VKAPI_ATTR VkResult VKAPI_CALL
-vk_common_AcquireImageANDROID(VkDevice _device,
-                              VkImage image,
-                              int nativeFenceFd,
-                              VkSemaphore semaphore,
-                              VkFence fence)
-{
-   VK_FROM_HANDLE(vk_device, device, _device);
-   VkResult result = VK_SUCCESS;
-
-   /* From https://source.android.com/devices/graphics/implement-vulkan :
-    *
-    *    "The driver takes ownership of the fence file descriptor and closes
-    *    the fence file descriptor when no longer needed. The driver must do
-    *    so even if neither a semaphore or fence object is provided, or even
-    *    if vkAcquireImageANDROID fails and returns an error."
-    *
-    * The Vulkan spec for VkImportFence/SemaphoreFdKHR(), however, requires
-    * the file descriptor to be left alone on failure.
-    */
-   int semaphore_fd = -1, fence_fd = -1;
-   if (nativeFenceFd >= 0) {
-      if (semaphore != VK_NULL_HANDLE && fence != VK_NULL_HANDLE) {
-         /* We have both so we have to import the sync file twice. One of
-          * them needs to be a dup.
-          */
-         semaphore_fd = nativeFenceFd;
-         fence_fd = dup(nativeFenceFd);
-         if (fence_fd < 0) {
-            VkResult err = (errno == EMFILE) ? VK_ERROR_TOO_MANY_OBJECTS :
-                                               VK_ERROR_OUT_OF_HOST_MEMORY;
-            close(nativeFenceFd);
-            return vk_error(device, err);
-         }
-      } else if (semaphore != VK_NULL_HANDLE) {
-         semaphore_fd = nativeFenceFd;
-      } else if (fence != VK_NULL_HANDLE) {
-         fence_fd = nativeFenceFd;
-      } else {
-         /* Nothing to import into so we have to close the file */
-         close(nativeFenceFd);
-      }
-   }
-
-   if (semaphore != VK_NULL_HANDLE) {
-      const VkImportSemaphoreFdInfoKHR info = {
-         .sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR,
-         .semaphore = semaphore,
-         .flags = VK_SEMAPHORE_IMPORT_TEMPORARY_BIT,
-         .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT,
-         .fd = semaphore_fd,
-      };
-      result = device->dispatch_table.ImportSemaphoreFdKHR(_device, &info);
-      if (result == VK_SUCCESS)
-         semaphore_fd = -1; /* The driver took ownership */
-   }
-
-   if (result == VK_SUCCESS && fence != VK_NULL_HANDLE) {
-      const VkImportFenceFdInfoKHR info = {
-         .sType = VK_STRUCTURE_TYPE_IMPORT_FENCE_FD_INFO_KHR,
-         .fence = fence,
-         .flags = VK_FENCE_IMPORT_TEMPORARY_BIT,
-         .handleType = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT,
-         .fd = fence_fd,
-      };
-      result = device->dispatch_table.ImportFenceFdKHR(_device, &info);
-      if (result == VK_SUCCESS)
-         fence_fd = -1; /* The driver took ownership */
-   }
-
-   if (semaphore_fd >= 0)
-      close(semaphore_fd);
-   if (fence_fd >= 0)
-      close(fence_fd);
-
-   return result;
-}
-
-static VkResult
-vk_anb_semaphore_init_once(struct vk_queue *queue, struct vk_device *device)
-{
-   if (queue->anb_semaphore != VK_NULL_HANDLE)
-      return VK_SUCCESS;
-
-   const VkExportSemaphoreCreateInfo export_info = {
-      .sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO,
-      .handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT,
+   VkMemoryFdPropertiesKHR fd_props = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR,
    };
-   const VkSemaphoreCreateInfo create_info = {
-      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-      .pNext = &export_info,
-   };
-   return device->dispatch_table.CreateSemaphore(vk_device_to_handle(device),
-                                                 &create_info, NULL,
-                                                 &queue->anb_semaphore);
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL
-vk_common_QueueSignalReleaseImageANDROID(VkQueue _queue,
-                                         uint32_t waitSemaphoreCount,
-                                         const VkSemaphore *pWaitSemaphores,
-                                         VkImage image,
-                                         int *pNativeFenceFd)
-{
-   VK_FROM_HANDLE(vk_queue, queue, _queue);
-   struct vk_device *device = queue->base.device;
-   VkResult result = VK_SUCCESS;
-
-   STACK_ARRAY(VkPipelineStageFlags, stage_flags, MAX2(1, waitSemaphoreCount));
-   for (uint32_t i = 0; i < MAX2(1, waitSemaphoreCount); i++)
-      stage_flags[i] = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-
-   result = vk_anb_semaphore_init_once(queue, device);
-   if (result != VK_SUCCESS) {
-      STACK_ARRAY_FINISH(stage_flags);
-      return result;
-   }
-
-   const VkSubmitInfo submit_info = {
-      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .waitSemaphoreCount = waitSemaphoreCount,
-      .pWaitSemaphores = pWaitSemaphores,
-      .pWaitDstStageMask = stage_flags,
-      .signalSemaphoreCount = 1,
-      .pSignalSemaphores = &queue->anb_semaphore,
-   };
-   result = device->dispatch_table.QueueSubmit(_queue, 1, &submit_info,
-                                               VK_NULL_HANDLE);
-   STACK_ARRAY_FINISH(stage_flags);
+   result = device->dispatch_table.GetMemoryFdPropertiesKHR(
+      device_h, VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT, handle->data[0],
+      &fd_props);
    if (result != VK_SUCCESS)
       return result;
 
-   const VkSemaphoreGetFdInfoKHR get_fd = {
-      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR,
-      .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT,
-      .semaphore = queue->anb_semaphore,
-   };
-   return device->dispatch_table.GetSemaphoreFdKHR(vk_device_to_handle(device),
-                                                   &get_fd, pNativeFenceFd);
+   pProperties->memoryTypeBits = fd_props.memoryTypeBits;
+
+   return VK_SUCCESS;
 }
+
+/* AHB image support per spec:
+ *
+ * - Any Android hardware buffer successfully allocated outside Vulkan with
+ *   usage that includes AHARDWAREBUFFER_USAGE_GPU_* must be supported when
+ *   using equivalent Vulkan image parameters.
+ *
+ * - If a given choice of image parameters are supported for import, they can
+ *   also be used to create an image and memory that will be exported to an
+ *   Android hardware buffer.
+ *
+ * An additional constraint derived from above is:
+ *
+ * - If that AHB cannot get allocated out, then the Vulkan driver must not
+ *   advertise support for the AHB backed image.
+ *
+ * Based on all above, this helper implements the AHB validation as well as
+ * the AHB external and usage props filling.
+ */
+VkResult
+vk_android_get_ahb_image_properties(
+   VkPhysicalDevice pdev_handle,
+   const VkPhysicalDeviceImageFormatInfo2 *info,
+   VkImageFormatProperties2 *props)
+{
+   VK_FROM_HANDLE(vk_physical_device, pdevice, pdev_handle);
+   VkExternalImageFormatProperties *external_props;
+   VkAndroidHardwareBufferUsageANDROID *ahb_usage;
+
+   ASSERTED const VkPhysicalDeviceExternalImageFormatInfo *external_info =
+      vk_find_struct_const(info->pNext,
+                           PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO);
+   assert(
+      external_info &&
+      external_info->handleType ==
+         VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID);
+
+   if (info->type != VK_IMAGE_TYPE_2D) {
+      return vk_errorf(pdevice, VK_ERROR_FORMAT_NOT_SUPPORTED,
+                       "type (%u) unsupported for AHB", info->type);
+   }
+
+   if (!vk_ahb_probe_format(info->format, info->flags, info->usage)) {
+      return vk_errorf(
+         pdevice, VK_ERROR_FORMAT_NOT_SUPPORTED,
+         "format (%u) flags (0x%x) usage (0x%x) unsupported for AHB",
+         info->format, info->flags, info->usage);
+   }
+
+   external_props =
+      vk_find_struct(props->pNext, EXTERNAL_IMAGE_FORMAT_PROPERTIES);
+   if (external_props) {
+      external_props->externalMemoryProperties = (VkExternalMemoryProperties){
+         .externalMemoryFeatures =
+            VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT |
+            VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT |
+            VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT,
+         .exportFromImportedHandleTypes =
+            VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
+         .compatibleHandleTypes =
+            VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
+      };
+   }
+
+   ahb_usage =
+      vk_find_struct(props->pNext, ANDROID_HARDWARE_BUFFER_USAGE_ANDROID);
+   if (ahb_usage) {
+      ahb_usage->androidHardwareBufferUsage =
+         vk_image_usage_to_ahb_usage(info->flags, info->usage);
+   }
+
+   return VK_SUCCESS;
+}
+
+void
+vk_android_get_ahb_buffer_properties(
+   VkPhysicalDevice pdev_handle,
+   const VkPhysicalDeviceExternalBufferInfo *info,
+   VkExternalBufferProperties *props)
+{
+   assert(info->handleType ==
+          VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID);
+   props->externalMemoryProperties = (VkExternalMemoryProperties){
+      .externalMemoryFeatures =
+         VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT |
+         VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT,
+      .exportFromImportedHandleTypes =
+         VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
+      .compatibleHandleTypes =
+         VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
+   };
+}
+
+#endif /* ANDROID_API_LEVEL >= 26 */

@@ -149,7 +149,9 @@ get_bool_cap(struct svga_winsys_screen *sws, SVGA3dDevCapIndex cap,
    .lower_doubles_options = nir_lower_dfloor | nir_lower_dsign | nir_lower_dceil | nir_lower_dtrunc | nir_lower_dround_even, \
    .lower_fmod = true,                                                        \
    .lower_fpow = true,                                                        \
-   .support_indirect_inputs = (uint8_t)BITFIELD_MASK(PIPE_SHADER_TYPES),      \
+   .support_indirect_inputs = BITFIELD_BIT(MESA_SHADER_TESS_CTRL) |           \
+                              BITFIELD_BIT(MESA_SHADER_TESS_EVAL) |           \
+                              BITFIELD_BIT(MESA_SHADER_FRAGMENT),             \
    .support_indirect_outputs = (uint8_t)BITFIELD_MASK(PIPE_SHADER_TYPES)
 
 static const nir_shader_compiler_options svga_vgpu9_fragment_compiler_options = {
@@ -181,15 +183,12 @@ static const nir_shader_compiler_options svga_gl4_compiler_options = {
    VGPU10_OPTIONS,
 };
 
-static const void *
+static const struct nir_shader_compiler_options *
 svga_get_compiler_options(struct pipe_screen *pscreen,
-                          enum pipe_shader_ir ir,
                           enum pipe_shader_type shader)
 {
    struct svga_screen *svgascreen = svga_screen(pscreen);
    struct svga_winsys_screen *sws = svgascreen->sws;
-
-   assert(ir == PIPE_SHADER_IR_NIR);
 
    if (sws->have_gl43 || sws->have_sm5)
       return &svga_gl4_compiler_options;
@@ -790,7 +789,6 @@ svga_screen_create(struct svga_winsys_screen *sws)
    screen->get_vendor = svga_get_vendor;
    screen->get_device_vendor = svga_get_vendor; // TODO actual device vendor
    screen->get_screen_fd = svga_screen_get_fd;
-   screen->get_compiler_options = svga_get_compiler_options;
    screen->get_timestamp = NULL;
    screen->is_format_supported = svga_is_format_supported;
    screen->context_create = svga_context_create;
@@ -837,6 +835,9 @@ svga_screen_create(struct svga_winsys_screen *sws)
        */
       svgascreen->debug.sampler_state_mapping = false;
    }
+
+   for (unsigned i = 0; i <= MESA_SHADER_COMPUTE; i++)
+      screen->nir_options[i] = svga_get_compiler_options(screen, i);
 
    debug_printf("%s enabled\n",
                 sws->have_gl43 ? "SM5+" :

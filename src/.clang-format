@@ -169,6 +169,8 @@ ForEachMacros:
   - nir_precomp_foreach_arg
   - nir_precomp_foreach_variant_param
 
+  - foreach_pair
+
 # egl
   - egl_relax
 
@@ -229,6 +231,7 @@ ForEachMacros:
   - agx_foreach_ssa_src_rev
   - agx_foreach_successor
   - foreach_next_use
+  - libagx_foreach_xfb
 
 # radv
   - PHASE

@@ -170,7 +170,7 @@ anv_blorp_batch_init(struct anv_cmd_buffer *cmd_buffer,
    } else if (queue_flags & VK_QUEUE_TRANSFER_BIT) {
       flags |= BLORP_BATCH_USE_BLITTER;
    } else {
-      unreachable("unknown queue family");
+      UNREACHABLE("unknown queue family");
    }
 
    /* Can't have both flags at the same time. */
@@ -223,7 +223,7 @@ get_usage_flag_for_cmd_buffer(const struct anv_cmd_buffer *cmd_buffer,
                         ISL_SURF_USAGE_BLITTER_SRC_BIT;
       break;
    default:
-      unreachable("Unhandled engine class");
+      UNREACHABLE("Unhandled engine class");
    }
 
    if (protected)
@@ -1003,7 +1003,7 @@ blit_image(struct anv_cmd_buffer *cmd_buffer,
       blorp_filter = BLORP_FILTER_BILINEAR;
       break;
    default:
-      unreachable("Invalid filter");
+      UNREACHABLE("Invalid filter");
    }
 
    assert(anv_image_aspects_compatible(src_res->aspectMask,
@@ -1451,7 +1451,7 @@ exec_ccs_op(struct anv_cmd_buffer *cmd_buffer,
       }
       break;
    default:
-      unreachable("Unsupported CCS operation");
+      UNREACHABLE("Unsupported CCS operation");
    }
 }
 
@@ -1500,7 +1500,7 @@ exec_mcs_op(struct anv_cmd_buffer *cmd_buffer,
       break;
    case ISL_AUX_OP_FULL_RESOLVE:
    default:
-      unreachable("Unsupported MCS operation");
+      UNREACHABLE("Unsupported MCS operation");
    }
 }
 
@@ -1573,7 +1573,9 @@ void anv_CmdClearColorImage(
                                           clear_rect.rect.extent.height,
                                           false /* depth clear */, 0 /* depth value */,
                                           true /* stencil_clear */, clear_color.u32[0] /* stencil_value */);
-         } else if (anv_can_fast_clear_color(cmd_buffer, image, level, &clear_rect,
+         } else if (anv_can_fast_clear_color(cmd_buffer, image,
+                                             pRanges[r].aspectMask,
+                                             level, &clear_rect,
                                              imageLayout, src_format.isl_format,
                                              clear_color)) {
             assert(level == 0);
@@ -1793,6 +1795,7 @@ can_fast_clear_color_att(struct anv_cmd_buffer *cmd_buffer,
       return false;
 
    return anv_can_fast_clear_color(cmd_buffer, att->iview->image,
+                                   att->iview->vk.aspects,
                                    att->iview->vk.base_mip_level,
                                    pRects, att->layout,
                                    att->iview->planes[0].isl.format,
@@ -2418,10 +2421,11 @@ anv_image_clear_color(struct anv_cmd_buffer *cmd_buffer,
                       uint32_t level, uint32_t base_layer, uint32_t layer_count,
                       VkRect2D area, union isl_color_value clear_color)
 {
-   assert(image->vk.aspects == VK_IMAGE_ASPECT_COLOR_BIT);
+   assert((aspect & ~VK_IMAGE_ASPECT_ANY_COLOR_BIT_ANV) == 0);
+   assert(util_bitcount(aspect) == 1);
 
    /* We don't support planar images with multisampling yet */
-   assert(image->n_planes == 1);
+   assert(image->vk.samples == 1 || image->n_planes == 1);
 
    struct blorp_batch batch;
    anv_blorp_batch_init(cmd_buffer, &batch, 0);

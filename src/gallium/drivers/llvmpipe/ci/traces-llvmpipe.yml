@@ -1,7 +1,7 @@
 %YAML 1.2
 ---
 traces-db:
-  download-url: "https://s3.freedesktop.org/mesa-tracie-public/"
+  download-url: https://s3.freedesktop.org/mesa-tracie-public/
 
 traces:
   0ad/0ad-v2.trace:
@@ -81,7 +81,7 @@ traces:
       checksum: 018418bdd7f60a186cce532613b0c7ab
   bgfx/33-pom.rdc:
     gl-vmware-llvmpipe:
-      checksum: 03b5c80c5e22ce9aabeb47de2a7f7fff
+      checksum: aa3b4f5ea12edf6eb56cbd411fd4d5ac
   bgfx/34-mvs.rdc:
     gl-vmware-llvmpipe:
       checksum: 6ad9c7d97debb7bf495b0bfca921ba9c
@@ -158,4 +158,4 @@ traces:
       label: [unsupported]
   warzone2100/warzone2100-default.trace:
     gl-vmware-llvmpipe:
-      checksum: 6defaef6e95be34f9ba891c80e7c3e89
+      checksum: 098aeff0e3dc5a70adfb9d9c9854a7d7

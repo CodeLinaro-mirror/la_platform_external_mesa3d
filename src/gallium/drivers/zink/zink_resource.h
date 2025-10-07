@@ -38,6 +38,9 @@
 extern "C" {
 #endif
 
+void
+zink_resource_image_hic_transition(struct zink_screen *screen, struct zink_resource *res, VkImageLayout layout);
+
 bool
 zink_screen_resource_init(struct pipe_screen *pscreen);
 
@@ -180,6 +183,15 @@ zink_batch_resource_usage_set(struct zink_batch_state *bs, struct zink_resource 
          VkSemaphore acquire = zink_kopper_acquire_submit(zink_screen(bs->ctx->base.screen), res);
          if (acquire)
             util_dynarray_append(&bs->acquires, VkSemaphore, acquire);
+      } else if (res->obj->exportable) {
+         struct pipe_resource *pres = NULL;
+         bool found = false;
+         simple_mtx_lock(&bs->exportable_lock);
+         _mesa_set_search_or_add(&bs->dmabuf_exports, res, &found);
+         simple_mtx_unlock(&bs->exportable_lock);
+         if (!found) {
+            pipe_resource_reference(&pres, &res->base.b);
+         }
       }
       if (write) {
          if (!res->valid && res->fb_bind_count)
@@ -201,6 +213,9 @@ zink_resource_reference(struct zink_resource **d, struct zink_resource *s)
    pipe_resource_reference(&dst, src);
    *d = zink_resource(dst);
 }
+
+void
+zink_destroy_resource_surface_cache(struct zink_screen *screen, struct set *ht, bool is_buffer);
 
 #ifdef __cplusplus
 }

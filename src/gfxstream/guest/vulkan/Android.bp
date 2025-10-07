@@ -27,6 +27,7 @@ cc_library_shared {
         "mesa_platform_virtgpu_defaults",
     ],
     generated_headers: [
+        "git_sha1_header",
         "vk_cmd_queue_header",
         "vk_physical_device_features_header",
         "vk_physical_device_properties_header",
@@ -91,6 +92,18 @@ cc_library_shared {
     target: {
         android: {
             relative_install_path: "hw",
+            // It has been observed that the linker is stripping the hardware module info (HMI)
+            // symbol in the "android surfaceless" build.  A few have workarounds been observed:
+            //
+            // - adding vk_android_hal.c directly to srcs of vulkan.ranchu works.
+            // - adding some code that references the HMI symbol, like printing its address, to
+            //   code in vulkan.ranchu, works.
+            // - telling the linker explicitly to look for HMI symbol in one of its inputs through
+            //   the -Wl,--undefined=HMI flag works
+            //
+            // This is what is done here.  This is not observed in the normal Android
+            // (non-surfaceless) build.
+            ldflags: ["-Wl,--undefined=HMI"],
             static_libs: [
                 "mesa_u_gralloc",
             ],
@@ -104,9 +117,6 @@ cc_library_shared {
                 "libnativewindow",
                 "libhidlbase",
                 "libutils",
-            ],
-            srcs: [
-                "gfxstream_vk_android.cpp",
             ],
         },
         host: {

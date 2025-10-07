@@ -1,4 +1,4 @@
-.radeonsi-rules:
+.radeonsi-collabora-rules:
   stage: amd
   rules:
     - !reference [.test, rules]
@@ -34,7 +34,7 @@
         - src/amd/vpelib/**/*
       when: on_success
 
-.radeonsi-manual-rules:
+.radeonsi-collabora-manual-rules:
   stage: amd-nightly
   extends: .no-auto-retry
   rules:
@@ -115,14 +115,14 @@
   stage: amd
   rules:
     - !reference [.test, rules]
-    - !reference [.radeonsi-rules, rules]
+    - !reference [.radeonsi-collabora-rules, rules]
     - !reference [.radv-rules, rules]
 
 .radeonsi-vaapi-rules:
   stage: amd
   rules:
     - !reference [.test, rules]
-    - !reference [.radeonsi-rules, rules]
+    - !reference [.radeonsi-collabora-rules, rules]
     - changes: &radeon_vcn_file_list
         - src/gallium/frontends/va/**/*
         - src/gallium/targets/va/**/*
@@ -143,7 +143,7 @@
   rules:
     - !reference [.test, rules]
     - !reference [.valve-farm-rules, rules]
-    - !reference [.radeonsi-rules, rules]
+    - !reference [.radeonsi-collabora-rules, rules]
 
 .radeonsi-valve-manual-rules:
   stage: amd-nightly
@@ -239,6 +239,38 @@
     # https://gitlab.freedesktop.org/mesa/mesa/-/issues/12676
     KERNEL_TAG: "v6.6.21-mesa-1978"
 
+# Status: https://lava.collabora.dev/scheduler/device_type/dell-latitude-3445-7520c-skyrim
+.lava-dell-latitude-3445-7520c-skyrim:x86_64:
+  variables:
+    BOOT_METHOD: depthcharge
+    DEVICE_TYPE: dell-latitude-3445-7520c-skyrim
+    DTB: ""
+    FARM: collabora
+    FDO_CI_CONCURRENT: 8
+    HWCI_FREQ_MAX: "true"
+    HWCI_KERNEL_MODULES: amdgpu
+    KERNEL_IMAGE_TYPE: ""
+    RUNNER_TAG: mesa-ci-x86-64-lava-dell-latitude-3445-7520c-skyrim
+    VK_DRIVER: radeon
+    LAVA_FIRMWARE: amdgpu
+
+# Status: https://lava.collabora.dev/scheduler/device_type/acer-cp514-3wh-r0qs-guybrush
+.lava-acer-cp514-3wh-r0qs-guybrush:x86_64:
+  variables:
+    BOOT_METHOD: depthcharge
+    DEVICE_TYPE: acer-cp514-3wh-r0qs-guybrush
+    DTB: ""
+    FARM: collabora
+    FDO_CI_CONCURRENT: 4
+    HWCI_FREQ_MAX: "true"
+    HWCI_KERNEL_MODULES: amdgpu
+    KERNEL_IMAGE_TYPE: ""
+    RUNNER_TAG: mesa-ci-x86-64-lava-acer-cp514-3wh-r0qs-guybrush
+    VK_DRIVER: radeon
+    LAVA_FIRMWARE: amdgpu
+    # Force fixed 6.6 kernel
+    KERNEL_TAG: "v6.6.21-mesa-1978"
+
 
 ############### LAVA
 # job prefixes: radeonsi (OpenGL), radv (Vulkan), amd (radeonsi+radv)
@@ -251,7 +283,7 @@
   extends:
     - .stoney-test:x86_64
     - .lava-acer-R721T-grunt:x86_64
-    - .radeonsi-rules
+    - .radeonsi-collabora-rules
   variables:
     GPU_VERSION: radeonsi-stoney
     DRIVER_NAME: radeonsi
@@ -268,7 +300,7 @@
 
 .radeonsi-raven-test:x86_64:
   extends:
-    - .radeonsi-rules
+    - .radeonsi-collabora-rules
   variables:
     GPU_VERSION: radeonsi-raven
     DRIVER_NAME: radeonsi
@@ -296,9 +328,9 @@
 .ci-tron-test-amdgpu:
   variables:
     CI_TRON_PATTERN__JOB_WARN__REGEX: '\*ERROR\* ring .* timeout'
-    CI_TRON_KERNEL__URL: "https://fs.mupuf.org/radv/linux-6.14.8/linux-x86_64"
-    CI_TRON_INITRAMFS__DEPMOD__URL: "https://fs.mupuf.org/radv/linux-6.14.8/linux-x86_64.depmod.cpio.xz"
-    CI_TRON_INITRAMFS__GPU__URL: "https://fs.mupuf.org/radv/linux-6.14.8/linux-x86_64.gpu.cpio"
+    CI_TRON_KERNEL__URL: "https://fs.mupuf.org/linux/v6.15.3/linux-x86_64"
+    CI_TRON_INITRAMFS__DEPMOD__URL: "https://fs.mupuf.org/linux/v6.15.3/linux-x86_64.depmod.cpio.xz"
+    CI_TRON_INITRAMFS__GPU__URL: "https://fs.mupuf.org/linux/v6.15.3/linux-x86_64.gpu.cpio"
     CI_TRON_INITRAMFS__GPU__FORMAT__0__ARCHIVE__KEEP__0__PATH: "(lib/(modules|firmware/amdgpu)/.*)"
     CI_TRON_KERNEL_CMDLINE__LOAD_MODULES: 'modules_load=amdgpu'
 
@@ -314,6 +346,7 @@
     # the code generator.
     ACO_DEBUG: validateir,validatera
     MESA_VK_IGNORE_CONFORMANCE_WARNING: 1
+    radv_cooperative_matrix2_nv: 'true'
     # Enable ETC2 emulation on non-native platforms (RENOIR,RDNA+, GFX6-8 dGPUs)
     vk_require_etc2: 'true'
     CI_TRON__B2C_SWAP_SIZE: '16g'
@@ -323,6 +356,8 @@
     - .ci-tron-x86_64-test-vk
     - .radv-valve-rules
     - .ci-tron-test-radv
+  variables:
+    DEQP_SUITE: radv-valve
 
 
 .tahiti-test-valve:
@@ -331,6 +366,7 @@
     RUNNER_FARM_LOCATION: mupuf
     CI_TRON_DUT_SETUP_TAGS: amdgpu:codename:TAHITI
     CI_TRON_KERNEL_CMDLINE__AMDGPU_FORCE_SI_SUPPORT: amdgpu.si_support=1
+    GPU_VERSION: radv-tahiti
 
 .hawaii-test-valve:
   variables:
@@ -338,11 +374,13 @@
     RUNNER_FARM_LOCATION: mupuf
     CI_TRON_DUT_SETUP_TAGS: amdgpu:codename:HAWAII
     CI_TRON_KERNEL_CMDLINE__AMDGPU_FORCE_CIK_SUPPORT: amdgpu.cik_support=1
+    GPU_VERSION: radv-hawaii
 
 .kabini-test-valve:
   variables:
     RUNNER_FARM_LOCATION: mupuf
     CI_TRON_DUT_SETUP_TAGS: amdgpu:codename:KABINI
+    GPU_VERSION: radv-kabini
 
 .polaris10-test-valve:
   variables:
@@ -351,6 +389,7 @@
     # (2022-01) tsc=unstable was added in response to this message in kmsg,
     #    TSC found unstable after boot, most likely due to broken BIOS. Use 'tsc=unstable'.
     CI_TRON_KERNEL_CMDLINE__TSC_WORKAROUND: 'tsc=unstable'
+    GPU_VERSION: radv-polaris10
 
 .polaris10-test-valve-mupuf:
   extends: .polaris10-test-valve
@@ -366,12 +405,14 @@
   variables:
     RUNNER_FARM_LOCATION: keywords
     CI_TRON_DUT_SETUP_TAGS: amdgpu:codename:VEGA10
+    GPU_VERSION: radv-vega10
     FDO_CI_CONCURRENT: 16
 
 .renoir-test-valve:
   variables:
     RUNNER_FARM_LOCATION: mupuf
     CI_TRON_DUT_SETUP_TAGS: amdgpu:codename:RENOIR
+    GPU_VERSION: radv-renoir
     FDO_CI_CONCURRENT: 16
 
 .navi10-test-valve:
@@ -388,6 +429,7 @@
     - .navi10-test-valve
   variables:
     RUNNER_FARM_LOCATION: mupuf
+    GPU_VERSION: radv-navi10
     FDO_CI_CONCURRENT: 24
 
 .navi10-test-valve-kws:
@@ -395,12 +437,14 @@
     - .navi10-test-valve
   variables:
     RUNNER_FARM_LOCATION: keywords
+    GPU_VERSION: radv-navi10
     FDO_CI_CONCURRENT: 16
 
 .navi21-test-valve:
   variables:
     RUNNER_FARM_LOCATION: keywords
     CI_TRON_DUT_SETUP_TAGS: amdgpu:codename:NAVI21
+    GPU_VERSION: radv-navi21
     FDO_CI_CONCURRENT: 32
     # FIXME: drop everything below to use the same kernel as the rest of the amdgpu jobs
     CI_TRON_KERNEL__URL: https://fs.mupuf.org/linux-6.6-b2c-radv-ci
@@ -412,6 +456,7 @@
   variables:
     RUNNER_FARM_LOCATION: mupuf
     CI_TRON_DUT_SETUP_TAGS: amdgpu:codename:VANGOGH
+    GPU_VERSION: radv-vangogh
     FDO_CI_CONCURRENT: 8
   tags:
     - farm:$RUNNER_FARM_LOCATION
@@ -422,18 +467,28 @@
   variables:
     RUNNER_FARM_LOCATION: keywords
     CI_TRON_DUT_SETUP_TAGS: amdgpu:codename:RAPHAEL
+    GPU_VERSION: radv-raphael
     FDO_CI_CONCURRENT: 32
 
 .navi31-test-valve:
   variables:
     RUNNER_FARM_LOCATION: keywords
     CI_TRON_DUT_SETUP_TAGS: amdgpu:codename:NAVI31
+    GPU_VERSION: radv-navi31
     FDO_CI_CONCURRENT: 32
     # FIXME: drop everything below to use the same kernel as the rest of the amdgpu jobs
     CI_TRON_KERNEL__URL: https://fs.mupuf.org/linux-6.6-b2c-radv-ci
     CI_TRON_INITRAMFS__DEPMOD__URL: null
     CI_TRON_INITRAMFS__GPU__URL: null
     CI_TRON_INITRAMFS__GPU__FORMAT__0__ARCHIVE__KEEP__0__PATH: null
+
+
+.gfx1201-test-valve:
+  variables:
+    RUNNER_FARM_LOCATION: keywords
+    CI_TRON_DUT_SETUP_TAGS: amdgpu:codename:NAVI48
+    GPU_VERSION: radv-gfx1201
+    FDO_CI_CONCURRENT: 16  # FIXME: Replace with 32 when the zerovram regression is addressed
 
 ############### Fluster tests ###############
 .radeonsi-vaapi-fluster-rules:

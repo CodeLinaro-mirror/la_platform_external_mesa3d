@@ -239,7 +239,7 @@ radv_meta_get_view_type(const struct radv_image *image)
    case VK_IMAGE_TYPE_3D:
       return VK_IMAGE_VIEW_TYPE_3D;
    default:
-      unreachable("bad VkImageViewType");
+      UNREACHABLE("bad VkImageViewType");
    }
 }
 
@@ -322,12 +322,6 @@ radv_device_init_meta(struct radv_device *device)
    if (pdev->emulate_astc) {
       result = vk_texcompress_astc_init(&device->vk, &device->meta_state.alloc, device->meta_state.cache,
                                         &device->meta_state.astc_decode);
-      if (result != VK_SUCCESS)
-         return result;
-   }
-
-   if (device->vk.enabled_features.nullDescriptor) {
-      result = radv_device_init_null_accel_struct(device);
       if (result != VK_SUCCESS)
          return result;
    }

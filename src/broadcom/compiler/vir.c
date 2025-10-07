@@ -304,7 +304,7 @@ vir_channels_written(struct qinst *inst)
                         return 0xc;
                 }
         }
-        unreachable("Bad pack field");
+        UNREACHABLE("Bad pack field");
 }
 #endif
 
@@ -633,7 +633,7 @@ v3d_nir_lower_null_pointers_cb(nir_builder *b,
         if (src->ssa->parent_instr->type != nir_instr_type_alu)
                 return false;
 
-        nir_alu_instr *alu = nir_instr_as_alu(src->ssa->parent_instr);
+        nir_alu_instr *alu = nir_def_as_alu(src->ssa);
         if (alu->op != nir_op_bcsel)
                 return false;
 
@@ -826,7 +826,7 @@ v3d_vs_set_prog_data(struct v3d_compile *c,
                 prog_data->vpm_input_size++;
 
         prog_data->writes_psiz =
-            c->s->info.outputs_written & (1 << VARYING_SLOT_PSIZ);
+            c->s->info.outputs_written & VARYING_BIT_PSIZ;
 
         /* Input/output segment size are in sectors (8 rows of 32 bits per
          * channel).
@@ -905,7 +905,7 @@ v3d_gs_set_prog_data(struct v3d_compile *c,
         prog_data->num_invocations = c->s->info.gs.invocations;
 
         prog_data->writes_psiz =
-            c->s->info.outputs_written & (1 << VARYING_SLOT_PSIZ);
+            c->s->info.outputs_written & VARYING_BIT_PSIZ;
 }
 
 static void
@@ -992,7 +992,7 @@ v3d_set_prog_data(struct v3d_compile *c,
                 v3d_cs_set_prog_data(c, (struct v3d_compute_prog_data *)prog_data);
                 break;
         default:
-                unreachable("unsupported shader stage");
+                UNREACHABLE("unsupported shader stage");
         }
 }
 
@@ -1018,7 +1018,7 @@ v3d_nir_lower_vs_early(struct v3d_compile *c)
         /* Split our I/O vars and dead code eliminate the unused
          * components.
          */
-        NIR_PASS(_, c->s, nir_lower_io_to_scalar_early,
+        NIR_PASS(_, c->s, nir_lower_io_vars_to_scalar,
                  nir_var_shader_in | nir_var_shader_out);
         uint64_t used_outputs[4] = {0};
         for (int i = 0; i < c->vs_key->num_used_outputs; i++) {
@@ -1060,7 +1060,7 @@ v3d_nir_lower_gs_early(struct v3d_compile *c)
         /* Split our I/O vars and dead code eliminate the unused
          * components.
          */
-        NIR_PASS(_, c->s, nir_lower_io_to_scalar_early,
+        NIR_PASS(_, c->s, nir_lower_io_vars_to_scalar,
                  nir_var_shader_in | nir_var_shader_out);
         uint64_t used_outputs[4] = {0};
         for (int i = 0; i < c->gs_key->num_used_outputs; i++) {
@@ -1119,41 +1119,29 @@ v3d_nir_lower_fs_early(struct v3d_compile *c)
 static void
 v3d_nir_lower_gs_late(struct v3d_compile *c)
 {
-        if (c->key->ucp_enables) {
-                NIR_PASS(_, c->s, nir_lower_clip_gs, c->key->ucp_enables,
-                         true, NULL);
-        }
-
-        /* Note: GS output scalarizing must happen after nir_lower_clip_gs. */
         NIR_PASS(_, c->s, nir_lower_io_to_scalar, nir_var_shader_out, NULL, NULL);
 }
 
 static void
 v3d_nir_lower_vs_late(struct v3d_compile *c)
 {
-        if (c->key->ucp_enables) {
-                NIR_PASS(_, c->s, nir_lower_clip_vs, c->key->ucp_enables,
-                         false, true, NULL);
-                NIR_PASS(_, c->s, nir_lower_io_to_scalar,
-                         nir_var_shader_out, NULL, NULL);
-        }
-
-        /* Note: VS output scalarizing must happen after nir_lower_clip_vs. */
         NIR_PASS(_, c->s, nir_lower_io_to_scalar, nir_var_shader_out, NULL, NULL);
 }
 
 static void
 v3d_nir_lower_fs_late(struct v3d_compile *c)
 {
-        /* In OpenGL the fragment shader can't read gl_ClipDistance[], but
-         * Vulkan allows it, in which case the SPIR-V compiler will declare
-         * VARING_SLOT_CLIP_DIST0 as compact array variable. Pass true as
-         * the last parameter to always operate with a compact array in both
-         * OpenGL and Vulkan so we do't have to care about the API we
-         * are using.
+        /* If there are clip distance writes (either GL/Vulkan
+         * gl_ClipDistance[], or lowered user clip planes for desktop GL),
+         * then we need to emit the discards for them at the top of the fragment
+         * shader.
+         *
+         * The SPIR-V compiler will declare VARING_SLOT_CLIP_DIST0 as compact
+         * array variable, so we have GL's clip lowering follow suit
+         * (compact_arrays option at nir_shader_compiler_options)
          */
-        if (c->key->ucp_enables)
-                NIR_PASS(_, c->s, nir_lower_clip_fs, c->key->ucp_enables, true, false);
+        if (c->fs_key->ucp_enables)
+                NIR_PASS(_, c->s, nir_lower_clip_fs, c->fs_key->ucp_enables, true, false);
 
         NIR_PASS(_, c->s, nir_lower_io_to_scalar, nir_var_shader_in, NULL, NULL);
 }
@@ -1692,7 +1680,7 @@ v3d_attempt_compile(struct v3d_compile *c)
         case MESA_SHADER_COMPUTE:
                 break;
         default:
-                unreachable("unsupported shader stage");
+                UNREACHABLE("unsupported shader stage");
         }
 
         switch (c->s->info.stage) {
@@ -1823,7 +1811,7 @@ v3d_attempt_compile(struct v3d_compile *c)
                 .instr_delay_cb = v3d_instr_delay_cb,
                 .instr_delay_cb_data = c,
         };
-        NIR_PASS_V(c->s, nir_schedule, &schedule_options);
+        NIR_PASS(_, c->s, nir_schedule, &schedule_options);
 
         if (!c->disable_constant_ubo_load_sorting)
                 NIR_PASS(_, c->s, v3d_nir_sort_constant_ubo_loads, c);

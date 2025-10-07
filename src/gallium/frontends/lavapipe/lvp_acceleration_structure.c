@@ -55,6 +55,51 @@ lvp_init_radix_sort(struct lvp_device *device)
 }
 
 static void
+lvp_get_leaf_node_size(VkGeometryTypeKHR geometry_type, uint32_t *ir_leaf_node_size,
+                       uint32_t *output_leaf_node_size)
+{
+   switch (geometry_type) {
+   case VK_GEOMETRY_TYPE_TRIANGLES_KHR:
+      *ir_leaf_node_size = sizeof(struct vk_ir_triangle_node);
+      *output_leaf_node_size = sizeof(struct lvp_bvh_triangle_node);
+      break;
+   case VK_GEOMETRY_TYPE_AABBS_KHR:
+      *ir_leaf_node_size = sizeof(struct vk_ir_aabb_node);
+      *output_leaf_node_size = sizeof(struct lvp_bvh_aabb_node);
+      break;
+   case VK_GEOMETRY_TYPE_INSTANCES_KHR:
+      *ir_leaf_node_size = sizeof(struct vk_ir_instance_node);
+      *output_leaf_node_size = sizeof(struct lvp_bvh_instance_node);
+      break;
+   default:
+      break;
+   }
+}
+
+static VkDeviceSize
+lvp_get_as_size_internal(VkGeometryTypeKHR geometry_type, uint32_t leaf_node_count)
+{
+   uint32_t internal_node_count = MAX2(leaf_node_count, 2) - 1;
+   uint32_t nodes_size = internal_node_count * sizeof(struct lvp_bvh_box_node);
+
+   uint32_t ir_leaf_node_size = 0;
+   uint32_t output_leaf_node_size = 0;
+   lvp_get_leaf_node_size(geometry_type, &ir_leaf_node_size, &output_leaf_node_size);
+
+   nodes_size += leaf_node_count * output_leaf_node_size;
+
+   nodes_size = util_align_npot(nodes_size, LVP_BVH_NODE_PREFETCH_SIZE);
+
+   return sizeof(struct lvp_bvh_header) + nodes_size;
+}
+
+static VkDeviceSize
+lvp_get_as_size(VkDevice device, const struct vk_acceleration_structure_build_state *state)
+{
+   return lvp_get_as_size_internal(vk_get_as_geometry_type(state->build_info), state->leaf_node_count);
+}
+
+static void
 lvp_write_buffer_cp(VkCommandBuffer cmdbuf, VkDeviceAddress addr,
                     void *data, uint32_t size)
 {
@@ -145,16 +190,10 @@ lvp_cmd_fill_buffer_addr(VkCommandBuffer cmdbuf, VkDeviceAddress addr,
 }
 
 static void
-lvp_enqueue_encode_as(VkCommandBuffer commandBuffer,
-                      const VkAccelerationStructureBuildGeometryInfoKHR *build_info,
-                      const VkAccelerationStructureBuildRangeInfoKHR *build_range_infos,
-                      VkDeviceAddress intermediate_as_addr,
-                      VkDeviceAddress intermediate_header_addr,
-                      uint32_t leaf_count,
-                      uint32_t key,
-                      struct vk_acceleration_structure *dst)
+lvp_enqueue_encode_as(VkCommandBuffer commandBuffer, const struct vk_acceleration_structure_build_state *state)
 {
    VK_FROM_HANDLE(lvp_cmd_buffer, cmd_buffer, commandBuffer);
+   VK_FROM_HANDLE(vk_acceleration_structure, dst, state->build_info->dstAccelerationStructure);
 
    struct vk_cmd_queue_entry *entry =
       vk_zalloc(cmd_buffer->vk.cmd_queue.alloc, sizeof(struct vk_cmd_queue_entry),
@@ -172,11 +211,14 @@ lvp_enqueue_encode_as(VkCommandBuffer commandBuffer,
       return;
    }
 
+   uint64_t intermediate_header_addr = state->build_info->scratchData.deviceAddress + state->scratch.header_offset;
+   uint64_t intermediate_bvh_addr = state->build_info->scratchData.deviceAddress + state->scratch.ir_offset;
+
    cmd->dst = dst;
-   cmd->intermediate_as_addr = intermediate_as_addr;
+   cmd->intermediate_as_addr = intermediate_bvh_addr;
    cmd->intermediate_header_addr = intermediate_header_addr;
-   cmd->leaf_count = leaf_count;
-   cmd->geometry_type = vk_get_as_geometry_type(build_info);
+   cmd->leaf_count = state->leaf_node_count;
+   cmd->geometry_type = vk_get_as_geometry_type(state->build_info);
 
    entry->driver_data = cmd;
 
@@ -385,28 +427,6 @@ ret:
    free(internal_nodes);
 }
 
-static void
-lvp_get_leaf_node_size(VkGeometryTypeKHR geometry_type, uint32_t *ir_leaf_node_size,
-                       uint32_t *output_leaf_node_size)
-{
-   switch (geometry_type) {
-   case VK_GEOMETRY_TYPE_TRIANGLES_KHR:
-      *ir_leaf_node_size = sizeof(struct vk_ir_triangle_node);
-      *output_leaf_node_size = sizeof(struct lvp_bvh_triangle_node);
-      break;
-   case VK_GEOMETRY_TYPE_AABBS_KHR:
-      *ir_leaf_node_size = sizeof(struct vk_ir_aabb_node);
-      *output_leaf_node_size = sizeof(struct lvp_bvh_aabb_node);
-      break;
-   case VK_GEOMETRY_TYPE_INSTANCES_KHR:
-      *ir_leaf_node_size = sizeof(struct vk_ir_instance_node);
-      *output_leaf_node_size = sizeof(struct lvp_bvh_instance_node);
-      break;
-   default:
-      break;
-   }
-}
-
 void
 lvp_encode_as(struct vk_acceleration_structure *dst, VkDeviceAddress intermediate_as_addr,
               VkDeviceAddress intermediate_header_addr, uint32_t leaf_count,
@@ -434,8 +454,10 @@ lvp_encode_as(struct vk_acceleration_structure *dst, VkDeviceAddress intermediat
 
    output_header->leaf_nodes_offset = sizeof(struct lvp_bvh_header) + header->ir_internal_node_count * sizeof(struct lvp_bvh_box_node);
 
+   uint32_t bvh_size = lvp_get_as_size_internal(geometry_type, leaf_count);
+   output_header->compacted_size = bvh_size;
    output_header->serialization_size = sizeof(struct lvp_accel_struct_serialization_header) +
-                                       sizeof(uint64_t) * output_header->instance_count + dst->size;
+                                       sizeof(uint64_t) * output_header->instance_count + bvh_size;
 
    for (uint32_t i = 0; i < header->active_leaf_count; i++) {
       const void *ir_leaf = ir_bvh + i * ir_leaf_node_size;
@@ -512,6 +534,13 @@ lvp_encode_as(struct vk_acceleration_structure *dst, VkDeviceAddress intermediat
          const struct vk_ir_node *ir_child = (const void *)(ir_bvh + ir_child_offset);
 
          output_box->bounds[child_index] = ir_child->aabb;
+         /* Increase the bounding box size a bit for watertightness. */
+         output_box->bounds[child_index].min.x -= MAX2(fabsf(output_box->bounds[child_index].min.x), 1.0) * FLT_EPSILON;
+         output_box->bounds[child_index].min.y -= MAX2(fabsf(output_box->bounds[child_index].min.y), 1.0) * FLT_EPSILON;
+         output_box->bounds[child_index].min.z -= MAX2(fabsf(output_box->bounds[child_index].min.z), 1.0) * FLT_EPSILON;
+         output_box->bounds[child_index].max.x += MAX2(fabsf(output_box->bounds[child_index].max.x), 1.0) * FLT_EPSILON;
+         output_box->bounds[child_index].max.y += MAX2(fabsf(output_box->bounds[child_index].max.y), 1.0) * FLT_EPSILON;
+         output_box->bounds[child_index].max.z += MAX2(fabsf(output_box->bounds[child_index].max.z), 1.0) * FLT_EPSILON;
 
          if (ir_child_offset < root_offset) {
             output_box->children[child_index] =
@@ -576,7 +605,7 @@ lvp_WriteAccelerationStructuresPropertiesKHR(
    const VkAccelerationStructureKHR *pAccelerationStructures, VkQueryType queryType,
    size_t dataSize, void *pData, size_t stride)
 {
-   unreachable("Unimplemented");
+   UNREACHABLE("Unimplemented");
    return VK_ERROR_FEATURE_NOT_PRESENT;
 }
 
@@ -586,7 +615,7 @@ lvp_BuildAccelerationStructuresKHR(
    const VkAccelerationStructureBuildGeometryInfoKHR *pInfos,
    const VkAccelerationStructureBuildRangeInfoKHR *const *ppBuildRangeInfos)
 {
-   unreachable("Unimplemented");
+   UNREACHABLE("Unimplemented");
    return VK_ERROR_FEATURE_NOT_PRESENT;
 }
 
@@ -606,7 +635,7 @@ VKAPI_ATTR VkResult VKAPI_CALL
 lvp_CopyAccelerationStructureKHR(VkDevice _device, VkDeferredOperationKHR deferredOperation,
                                  const VkCopyAccelerationStructureInfoKHR *pInfo)
 {
-   unreachable("Unimplemented");
+   UNREACHABLE("Unimplemented");
    return VK_ERROR_FEATURE_NOT_PRESENT;
 }
 
@@ -614,7 +643,7 @@ VKAPI_ATTR VkResult VKAPI_CALL
 lvp_CopyMemoryToAccelerationStructureKHR(VkDevice _device, VkDeferredOperationKHR deferredOperation,
                                          const VkCopyMemoryToAccelerationStructureInfoKHR *pInfo)
 {
-   unreachable("Unimplemented");
+   UNREACHABLE("Unimplemented");
    return VK_ERROR_FEATURE_NOT_PRESENT;
 }
 
@@ -622,46 +651,18 @@ VKAPI_ATTR VkResult VKAPI_CALL
 lvp_CopyAccelerationStructureToMemoryKHR(VkDevice _device, VkDeferredOperationKHR deferredOperation,
                                          const VkCopyAccelerationStructureToMemoryInfoKHR *pInfo)
 {
-   unreachable("Unimplemented");
+   UNREACHABLE("Unimplemented");
    return VK_ERROR_FEATURE_NOT_PRESENT;
 }
 
-static VkDeviceSize
-lvp_get_as_size(VkDevice device,
-                const VkAccelerationStructureBuildGeometryInfoKHR *build_info,
-                uint32_t leaf_count)
-{
-   uint32_t internal_node_count = MAX2(leaf_count, 2) - 1;
-   uint32_t nodes_size = internal_node_count * sizeof(struct lvp_bvh_box_node);
-
-   uint32_t ir_leaf_node_size = 0;
-   uint32_t output_leaf_node_size = 0;
-   lvp_get_leaf_node_size(vk_get_as_geometry_type(build_info), &ir_leaf_node_size, &output_leaf_node_size);
-
-   nodes_size += leaf_count * output_leaf_node_size;
-
-   nodes_size = util_align_npot(nodes_size, LVP_BVH_NODE_PREFETCH_SIZE);
-
-   return sizeof(struct lvp_bvh_header) + nodes_size;
-}
-
-static uint32_t
-lvp_get_encode_key(struct vk_device *device, VkAccelerationStructureTypeKHR type,
-                   VkBuildAccelerationStructureFlagBitsKHR flags)
-{
-   return 0;
-}
-
 static VkResult
-lvp_encode_bind_pipeline(VkCommandBuffer cmd_buffer,
-                         uint32_t key)
+lvp_encode_bind_pipeline(VkCommandBuffer cmd_buffer, const struct vk_acceleration_structure_build_state *state)
 {
    return VK_SUCCESS;
 }
 
 const struct vk_acceleration_structure_build_ops accel_struct_ops = {
    .get_as_size = lvp_get_as_size,
-   .get_encode_key[0] = lvp_get_encode_key,
    .encode_bind_pipeline[0] = lvp_encode_bind_pipeline,
    .encode_as[0] = lvp_enqueue_encode_as,
 };

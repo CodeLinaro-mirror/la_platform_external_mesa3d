@@ -331,7 +331,7 @@ clone_deref_instr(clone_state *state, const nir_deref_instr *deref)
       break;
 
    default:
-      unreachable("Invalid instruction deref type");
+      UNREACHABLE("Invalid instruction deref type");
    }
 
    return nderef;
@@ -414,6 +414,7 @@ clone_tex(clone_state *state, const nir_tex_instr *tex)
 
    ntex->texture_index = tex->texture_index;
    ntex->sampler_index = tex->sampler_index;
+   ntex->can_speculate = tex->can_speculate;
 
    ntex->texture_non_uniform = tex->texture_non_uniform;
    ntex->sampler_non_uniform = tex->sampler_non_uniform;
@@ -500,15 +501,15 @@ clone_instr(clone_state *state, const nir_instr *instr)
    case nir_instr_type_tex:
       return &clone_tex(state, nir_instr_as_tex(instr))->instr;
    case nir_instr_type_phi:
-      unreachable("Cannot clone phis with clone_instr");
+      UNREACHABLE("Cannot clone phis with clone_instr");
    case nir_instr_type_jump:
       return &clone_jump(state, nir_instr_as_jump(instr))->instr;
    case nir_instr_type_call:
       return &clone_call(state, nir_instr_as_call(instr))->instr;
    case nir_instr_type_parallel_copy:
-      unreachable("Cannot clone parallel copies");
+      UNREACHABLE("Cannot clone parallel copies");
    default:
-      unreachable("bad instr type");
+      UNREACHABLE("bad instr type");
       return NULL;
    }
 }
@@ -622,7 +623,7 @@ clone_cf_list(clone_state *state, struct exec_list *dst,
          clone_loop(state, dst, nir_cf_node_as_loop(cf));
          break;
       default:
-         unreachable("bad cf type");
+         UNREACHABLE("bad cf type");
       }
    }
 }

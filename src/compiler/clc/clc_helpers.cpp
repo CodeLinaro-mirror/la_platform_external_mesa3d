@@ -534,7 +534,7 @@ public:
             literalType = CLC_SPEC_CONSTANT_HALF;
             break;
          default:
-            unreachable("Unexpected float bit size");
+            UNREACHABLE("Unexpected float bit size");
          }
          break;
       }
@@ -556,7 +556,7 @@ public:
                literalType = CLC_SPEC_CONSTANT_INT64;
                break;
             default:
-               unreachable("Unexpected int bit size");
+               UNREACHABLE("Unexpected int bit size");
             }
          } else {
             switch (sizeInBits) {
@@ -573,13 +573,13 @@ public:
                literalType = CLC_SPEC_CONSTANT_UINT64;
                break;
             default:
-               unreachable("Unexpected uint bit size");
+               UNREACHABLE("Unexpected uint bit size");
             }
          }
          break;
       }
       default:
-         unreachable("Unexpected type opcode");
+         UNREACHABLE("Unexpected type opcode");
       }
    }
 
@@ -605,7 +605,7 @@ public:
                data.type = CLC_SPEC_CONSTANT_BOOL;
                break;
             default:
-               unreachable("Composites and Ops are not directly specializable.");
+               UNREACHABLE("Composites and Ops are not directly specializable.");
             }
          }
       }
@@ -965,6 +965,9 @@ clc_compile_to_llvm_module(LLVMContext &llvm_ctx,
    c->getPreprocessorOpts().addMacroDef("cl_khr_expect_assume=1");
 
    bool needs_opencl_c_h = false;
+   if (args->features.extended_bit_ops) {
+      c->getPreprocessorOpts().addMacroDef("cl_khr_extended_bit_ops=1");
+   }
    if (args->features.fp16) {
       c->getTargetOpts().OpenCLExtensionsAsWritten.push_back("+cl_khr_fp16");
    }
@@ -1006,6 +1009,15 @@ clc_compile_to_llvm_module(LLVMContext &llvm_ctx,
    }
    if (args->features.images_gl_msaa) {
       c->getTargetOpts().OpenCLExtensionsAsWritten.push_back("+cl_khr_gl_msaa_sharing");
+   }
+   if (args->features.images_unorm_int_2_101010) {
+      c->getPreprocessorOpts().addMacroDef("__opencl_c_ext_image_unorm_int_2_101010=1");
+      if (LLVM_VERSION_MAJOR < 20 || (LLVM_VERSION_MAJOR == 20 && LLVM_VERSION_MINOR < 1)) {
+         /* This feature doesn't really need any compiler support, but it does define a CLK_
+          * macro for the type, which is only available with llvm-20.1 or newer.
+          */
+         c->getPreprocessorOpts().addMacroDef("CLK_UNORM_INT_2_101010_EXT=0x10E5");
+      }
    }
    if (args->features.intel_subgroups) {
       c->getTargetOpts().OpenCLExtensionsAsWritten.push_back("+cl_intel_subgroups");

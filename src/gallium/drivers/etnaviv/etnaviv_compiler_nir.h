@@ -297,6 +297,7 @@ def_for_instr(nir_instr *instr)
           intr->intrinsic == nir_intrinsic_load_vertex_id ||
           intr->intrinsic == nir_intrinsic_load_texture_scale ||
           intr->intrinsic == nir_intrinsic_load_texture_size_etna ||
+          intr->intrinsic == nir_intrinsic_load_sampler_lod_parameters ||
           intr->intrinsic == nir_intrinsic_ddx ||
           intr->intrinsic == nir_intrinsic_ddy)
          def = &intr->def;
@@ -422,7 +423,7 @@ etna_emit_alu(struct etna_compile *c, nir_op op, struct etna_inst_dst dst,
               struct etna_inst_src src[3], bool saturate);
 
 void
-etna_emit_tex(struct etna_compile *c, nir_texop op, unsigned texid, unsigned dst_swiz,
+etna_emit_tex(struct etna_compile *c, nir_tex_instr *tex, unsigned dst_swiz,
               struct etna_inst_dst dst, struct etna_inst_src coord,
               struct etna_inst_src src1, struct etna_inst_src src2);
 

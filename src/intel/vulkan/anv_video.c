@@ -458,7 +458,7 @@ get_h264_video_mem_size(struct anv_video_session *vid, uint32_t mem_idx)
    case ANV_VID_MEM_H264_MPR_ROW_SCRATCH:
       return width_in_mb * 64 * 2;
    default:
-      unreachable("unknown memory");
+      UNREACHABLE("unknown memory");
    }
 }
 
@@ -510,7 +510,7 @@ get_h265_video_mem_size(struct anv_video_session *vid, uint32_t mem_idx)
       return size;
    }
    default:
-      unreachable("unknown memory");
+      UNREACHABLE("unknown memory");
    }
 
    return size << 6;
@@ -561,7 +561,7 @@ get_vp9_video_mem_size(struct anv_video_session *vid, uint32_t mem_idx)
       size = (width_in_ctb * height_in_ctb * 9);
       break;
    default:
-      unreachable("unknown memory");
+      UNREACHABLE("unknown memory");
    }
 
    return size << 6;
@@ -676,6 +676,7 @@ static const uint8_t av1_buffer_size[ANV_VID_MEM_AV1_MAX][4] = {
    { 9 ,   17  ,   11  ,    22 }, /* lrTileColYBuf, */
    { 5 ,   9   ,   6   ,    12 }, /* lrTileColUBuf, */
    { 5 ,   9   ,   6   ,    12 }, /* lrTileColVBuf, */
+   { 4,    8   ,   5   ,    10 }, /* lrTileColAlignBuffer, */
 };
 
 static const uint8_t av1_buffer_size_ext[ANV_VID_MEM_AV1_MAX][4] = {
@@ -710,6 +711,7 @@ static const uint8_t av1_buffer_size_ext[ANV_VID_MEM_AV1_MAX][4] = {
    { 2 ,    2    ,    2    ,    2 },  /* lrTileColYBuf, */
    { 1 ,    1    ,    1    ,    1 },  /* lrTileColUBuf, */
    { 1 ,    1    ,    1    ,    1 },  /* lrTileColVBuf, */
+   { 1,     1    ,    1    ,    1 },  /* lrTileColAlignBuffer, */
 };
 
 const uint32_t av1_mi_size_log2         = 2;
@@ -810,6 +812,7 @@ get_av1_video_session_mem_reqs(struct anv_video_session *vid,
       case ANV_VID_MEM_AV1_LOOP_RESTORATION_FILTER_TILE_COLUMN_Y:
       case ANV_VID_MEM_AV1_LOOP_RESTORATION_FILTER_TILE_COLUMN_U:
       case ANV_VID_MEM_AV1_LOOP_RESTORATION_FILTER_TILE_COLUMN_V:
+      case ANV_VID_MEM_AV1_LOOP_RESTORATION_FILTER_TILE_COLUMN_ALIGNMENT_RW:
       case ANV_VID_MEM_AV1_LOOP_RESTORATION_META_TILE_COLUMN:
          buffer_size = height_in_sb * av1_buffer_size[mem][buf_size_idx] +
             av1_buffer_size_ext[mem][buf_size_idx];
@@ -889,7 +892,7 @@ anv_GetVideoSessionMemoryRequirementsKHR(VkDevice _device,
                                      memory_types);
       break;
    default:
-      unreachable("unknown codec");
+      UNREACHABLE("unknown codec");
    }
 
    return VK_SUCCESS;
@@ -937,7 +940,7 @@ anv_BindVideoSessionMemoryKHR(VkDevice _device,
       }
       break;
    default:
-      unreachable("unknown codec");
+      UNREACHABLE("unknown codec");
    }
    return VK_SUCCESS;
 }
@@ -1075,7 +1078,7 @@ init_all_av1_entry(uint16_t *dst_ptr, int index)
       INIT_TABLE(av1_cdf_intra_coeffs_3);
       break;
    default:
-      unreachable("illegal av1 entry\n");
+      UNREACHABLE("illegal av1 entry\n");
    }
    INIT_TABLE(av1_cdf_intra_part2);
    INIT_TABLE(av1_cdf_inter);

@@ -120,19 +120,25 @@
  * function" warnings.
  */
 #if defined(HAVE___BUILTIN_UNREACHABLE) || __has_builtin(__builtin_unreachable)
-#define unreachable(str)    \
+#define UNREACHABLE(str)    \
 do {                        \
-   assert(!"" str);         \
+   (void)"" str; /* str must be a string literal */ \
+   assert(!str);            \
    __builtin_unreachable(); \
 } while (0)
 #elif defined (_MSC_VER)
-#define unreachable(str)    \
+#define UNREACHABLE(str)    \
 do {                        \
-   assert(!"" str);         \
+   (void)"" str; /* str must be a string literal */ \
+   assert(!str);            \
    __assume(0);             \
 } while (0)
 #else
-#define unreachable(str) assert(!"" str)
+#define UNREACHABLE(str)    \
+do {                        \
+   (void)"" str; /* str must be a string literal */ \
+   assert(!str);            \
+} while (0)
 #endif
 
 /**
@@ -518,5 +524,15 @@ typedef int lock_cap_t;
 #else
 #define PRAGMA_POISON
 #endif
+
+/*
+ * SWAP - swap value of @a and @b
+ */
+#define SWAP(a, b)                                                             \
+   do {                                                                        \
+      __typeof__(a) __tmp = (a);                                               \
+      (a) = (b);                                                               \
+      (b) = __tmp;                                                             \
+   } while (0)
 
 #endif /* UTIL_MACROS_H */

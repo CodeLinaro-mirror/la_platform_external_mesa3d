@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 
 #include "perf/intel_perf.h"
-#include "intel_perf_common.h"
+#include "perf/intel_perf_common.h"
 #include "intel/common/intel_gem.h"
 #include "intel/common/xe/intel_device_query.h"
 #include "intel/common/xe/intel_queue.h"
@@ -337,7 +337,7 @@ xe_perf_stream_read_error(int perf_stream_fd, uint8_t *buffer)
    else if (status.oa_status & DRM_XE_OASTATUS_MMIO_TRG_Q_FULL)
       header->type = INTEL_PERF_RECORD_TYPE_MMIO_TRG_Q_FULL;
    else
-      unreachable("missing");
+      UNREACHABLE("missing");
 
    return header->type ? header->size : -1;
 }

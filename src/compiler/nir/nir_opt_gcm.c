@@ -118,7 +118,7 @@ get_loop_instr_count(struct exec_list *cf_list)
          break;
       }
       default:
-         unreachable("Invalid CF node type");
+         UNREACHABLE("Invalid CF node type");
       }
    }
 
@@ -157,7 +157,7 @@ gcm_build_block_info(struct exec_list *cf_list, struct gcm_state *state,
          break;
       }
       default:
-         unreachable("Invalid CF node type");
+         UNREACHABLE("Invalid CF node type");
       }
    }
 }
@@ -212,6 +212,7 @@ is_src_scalarizable(nir_src *src)
       case nir_intrinsic_load_global_constant:
       case nir_intrinsic_load_input:
       case nir_intrinsic_load_per_primitive_input:
+      case nir_intrinsic_load_ssbo_intel:
          return true;
       default:
          break;
@@ -262,6 +263,7 @@ pin_intrinsic(nir_intrinsic_instr *intrin)
    if (!non_uniform &&
        (intrin->intrinsic == nir_intrinsic_load_ubo ||
         intrin->intrinsic == nir_intrinsic_load_ssbo ||
+        intrin->intrinsic == nir_intrinsic_load_ssbo_intel ||
         intrin->intrinsic == nir_intrinsic_get_ubo_size ||
         intrin->intrinsic == nir_intrinsic_get_ssbo_size ||
         nir_intrinsic_has_image_dim(intrin) ||
@@ -376,7 +378,7 @@ gcm_pin_instructions(nir_function_impl *impl, struct gcm_state *state)
             break;
 
          default:
-            unreachable("Invalid instruction type in GCM");
+            UNREACHABLE("Invalid instruction type in GCM");
          }
 
          if (!(instr->pass_flags & GCM_INSTR_PLACED)) {
@@ -666,9 +668,9 @@ gcm_schedule_late_def(nir_def *def, void *void_state)
    }
 
    if (def->parent_instr->pass_flags & GCM_INSTR_SCHEDULE_EARLIER_ONLY &&
-       lca != def->parent_instr->block &&
-       nir_block_dominates(def->parent_instr->block, lca)) {
-      lca = def->parent_instr->block;
+       lca != nir_def_block(def) &&
+       nir_block_dominates(nir_def_block(def), lca)) {
+      lca = nir_def_block(def);
    }
 
    /* We now have the LCA of all of the uses.  If our invariants hold,
@@ -679,7 +681,7 @@ gcm_schedule_late_def(nir_def *def, void *void_state)
    nir_block *best_block =
       gcm_choose_block_for_instr(def->parent_instr, early_block, lca, state);
 
-   if (def->parent_instr->block != best_block)
+   if (nir_def_block(def) != best_block)
       state->progress = true;
 
    def->parent_instr->block = best_block;

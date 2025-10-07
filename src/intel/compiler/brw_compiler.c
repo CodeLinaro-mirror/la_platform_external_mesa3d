@@ -55,6 +55,7 @@ const struct nir_shader_compiler_options brw_scalar_nir_options = {
    .lower_flrp16 = true,
    .lower_flrp64 = true,
    .lower_fmod = true,
+   .lower_fquantize2f16 = true,
    .lower_hadd64 = true,
    .lower_insert_byte = true,
    .lower_insert_word = true,
@@ -82,7 +83,9 @@ const struct nir_shader_compiler_options brw_scalar_nir_options = {
    .vectorize_tess_levels = true,
    .vertex_id_zero_based = true,
    .scalarize_ddx = true,
-   .support_indirect_inputs = (uint8_t)BITFIELD_MASK(PIPE_SHADER_TYPES),
+   .support_indirect_inputs = BITFIELD_BIT(PIPE_SHADER_TESS_CTRL) |
+                              BITFIELD_BIT(PIPE_SHADER_TESS_EVAL) |
+                              BITFIELD_BIT(PIPE_SHADER_FRAGMENT),
    .support_indirect_outputs = (uint8_t)BITFIELD_MASK(PIPE_SHADER_TYPES),
    .per_view_unique_driver_locations = true,
    .compact_view_index = true,
@@ -250,6 +253,7 @@ brw_get_compiler_config_value(const struct brw_compiler *compiler)
       DEBUG_DO32,
       DEBUG_SOFT64,
       DEBUG_NO_SEND_GATHER,
+      DEBUG_NO_VRT,
    };
    for (uint32_t i = 0; i < ARRAY_SIZE(debug_bits); i++) {
       insert_u64_bit(&config, INTEL_DEBUG(debug_bits[i]));
@@ -350,7 +354,7 @@ brw_write_shader_relocs(const struct brw_isa_info *isa,
                brw_update_reloc_imm(isa, dst, value);
                break;
             default:
-               unreachable("Invalid relocation type");
+               UNREACHABLE("Invalid relocation type");
             }
             break;
          }
@@ -381,4 +385,14 @@ brw_stage_prog_data_add_printf(struct brw_stage_prog_data *prog_data,
       memcpy(prog_data->printf_info[prog_data->printf_info_count - 1].arg_sizes,
              print->arg_sizes, sizeof(print->arg_sizes[0]) *print->num_args);
    }
+}
+
+unsigned
+ptl_register_blocks(unsigned grf_used)
+{
+   if (INTEL_DEBUG(DEBUG_NO_VRT))
+      return (BRW_MAX_GRF / 32) - 1;
+
+   const unsigned n = DIV_ROUND_UP(grf_used, 32) - 1;
+   return (n < 6 ? n : 7);
 }

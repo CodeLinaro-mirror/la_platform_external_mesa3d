@@ -18,6 +18,7 @@
    .lower_usub_borrow = true,                                                 \
    .lower_flrp64 = true,                                                      \
    .lower_fisnormal = true,                                                   \
+   .lower_fquantize2f16 = true,                                               \
    .lower_isign = true,                                                       \
    .lower_ldexp = true,                                                       \
    .lower_bitfield_extract = true,                                            \
@@ -31,7 +32,9 @@
    .lower_base_vertex = true,                                                 \
    .support_16bit_alu = true,                                                 \
    .lower_uniforms_to_ubo = true,                                             \
-   .support_indirect_inputs = (uint8_t)BITFIELD_MASK(PIPE_SHADER_TYPES),      \
+   .support_indirect_inputs = BITFIELD_BIT(MESA_SHADER_TESS_CTRL) |           \
+                              BITFIELD_BIT(MESA_SHADER_TESS_EVAL) |           \
+                              BITFIELD_BIT(MESA_SHADER_FRAGMENT),             \
    .support_indirect_outputs = (uint8_t)BITFIELD_MASK(PIPE_SHADER_TYPES)
 
 #define COMMON_SCALAR_OPTIONS                                                 \

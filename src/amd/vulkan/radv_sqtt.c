@@ -43,7 +43,7 @@ radv_ip_to_queue_family(enum amd_ip_type t)
    case AMD_IP_SDMA:
       return RADV_QUEUE_TRANSFER;
    default:
-      unreachable("Unknown IP type");
+      UNREACHABLE("Unknown IP type");
    }
 }
 
@@ -544,7 +544,7 @@ radv_begin_sqtt(struct radv_queue *queue)
       radeon_emit(0);
       break;
    default:
-      unreachable("Incorrect queue family");
+      UNREACHABLE("Incorrect queue family");
       break;
    }
 
@@ -621,7 +621,7 @@ radv_end_sqtt(struct radv_queue *queue)
       radeon_emit(0);
       break;
    default:
-      unreachable("Incorrect queue family");
+      UNREACHABLE("Incorrect queue family");
       break;
    }
 
@@ -757,8 +757,8 @@ radv_reset_sqtt_trace(struct radv_device *device)
    simple_mtx_lock(&device->sqtt_command_pool_mtx);
    for (unsigned i = 0; i < ARRAY_SIZE(device->sqtt_command_pool); i++) {
       if (device->sqtt_command_pool[i])
-         vk_common_TrimCommandPool(radv_device_to_handle(device), vk_command_pool_to_handle(device->sqtt_command_pool[i]),
-                                0);
+         vk_common_TrimCommandPool(radv_device_to_handle(device),
+                                   vk_command_pool_to_handle(device->sqtt_command_pool[i]), 0);
    }
    simple_mtx_unlock(&device->sqtt_command_pool_mtx);
 }

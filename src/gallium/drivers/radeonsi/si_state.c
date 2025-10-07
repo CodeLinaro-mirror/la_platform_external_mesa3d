@@ -222,8 +222,30 @@ static void si_emit_cb_render_state(struct si_context *sctx, unsigned index)
             break;
 
          case V_028C70_COLOR_5_9_9_9:
-            if (spi_format == V_028714_SPI_SHADER_FP16_ABGR)
-               sx_ps_downconvert |= V_028754_SX_RT_EXPORT_9_9_9_E5 << (i * 4);
+            /* This only executes on GFX10.3+. */
+            if (spi_format == V_028714_SPI_SHADER_FP16_ABGR) {
+               if (sctx->gfx_level >= GFX12) {
+                  sx_ps_downconvert |= V_028754_SX_RT_EXPORT_9_9_9_E5 << (i * 4);
+               } else {
+                  /* GFX10.3-11 have a bug where R9G9B9E5 is broken with RB+ when the color mask is not
+                   * full or empty.
+                   *
+                   * If A is missing in the color mask, add it. If it's the only bit set, remove it.
+                   */
+                  if (colormask == BITFIELD_MASK(3))
+                     cb_target_mask |= BITFIELD_BIT(3) << (i * 4);
+                  else if (colormask == BITFIELD_BIT(3))
+                     cb_target_mask &= ~(BITFIELD_BIT(3) << (i * 4));
+
+                  colormask = (cb_target_mask >> (i * 4)) & 0xf;
+
+                  /* Don't enable RB+ if the color mask is not full or empty, which is done by not
+                   * setting SX_PS_DOWNCONVERT for that MRT.
+                   */
+                  if (colormask == 0xf || colormask == 0)
+                     sx_ps_downconvert |= V_028754_SX_RT_EXPORT_9_9_9_E5 << (i * 4);
+               }
+            }
             break;
          }
       }
@@ -892,22 +914,32 @@ static void si_emit_clip_state(struct si_context *sctx, unsigned index)
 static void si_emit_clip_regs(struct si_context *sctx, unsigned index)
 {
    struct si_shader *vs = si_get_vs(sctx)->current;
-   struct si_shader_selector *vs_sel = vs->selector;
-   struct si_shader_info *info = &vs_sel->info;
    struct si_state_rasterizer *rs = sctx->queued.named.rasterizer;
-   bool window_space = vs_sel->stage == MESA_SHADER_VERTEX ?
-                          info->base.vs.window_space_position : 0;
+   bool window_space = vs->selector->stage == MESA_SHADER_VERTEX ?
+                          vs->selector->info.base.vs.window_space_position : 0;
    unsigned ucp_mask = 0, clipdist_mask = 0, culldist_mask = 0;
 
-   if (!vs_sel->info.clipdist_mask && !vs_sel->info.culldist_mask) {
-      assert(!vs_sel->info.culldist_mask);
+   /* clipdist_mask can include lowered ClipVertex = Position, so check both fields. */
+   if (!vs->selector->info.has_clip_outputs && !vs->info.clipdist_mask) {
+      assert(!vs->info.culldist_mask);
       ucp_mask = SI_USER_CLIP_PLANE_MASK & rs->clip_plane_enable;
    } else {
-      clipdist_mask = vs_sel->info.clipdist_mask & rs->clip_plane_enable;
+      unsigned num_bits = 0;
+
+      /* Pack clipdist_mask and culldist_mask (remove holes) because that's how exports are packed. */
+      u_foreach_bit(i, vs->info.clipdist_mask) {
+         if (rs->clip_plane_enable & BITFIELD_BIT(i))
+            clipdist_mask |= BITFIELD_BIT(num_bits);
+         num_bits++;
+      }
+
+      unsigned num_culldist_bits = util_bitcount(vs->info.culldist_mask);
+      culldist_mask = BITFIELD_RANGE(num_bits, num_culldist_bits);
+
       /* For points, we need to set the cull distance bits too because the clip distance bits have
        * no effect on them.
        */
-      culldist_mask = vs_sel->info.culldist_mask | clipdist_mask;
+      culldist_mask |= clipdist_mask;
    }
 
    unsigned pa_cl_cntl = S_02881C_BYPASS_VTX_RATE_COMBINER(sctx->gfx_level >= GFX10_3 &&
@@ -2563,7 +2595,7 @@ static void si_set_framebuffer_state(struct pipe_context *ctx,
     * We could implement the full workaround here, but it's a useless case.
     */
    if ((!state->width || !state->height) && (state->nr_cbufs || state->zsbuf.texture)) {
-      unreachable("the framebuffer shouldn't have zero area");
+      UNREACHABLE("the framebuffer shouldn't have zero area");
       return;
    }
 
@@ -3738,7 +3770,7 @@ static void cdna_emu_make_image_descriptor(struct si_screen *screen, struct si_t
       break;
 
    default:
-      unreachable("invalid texture target");
+      UNREACHABLE("invalid texture target");
    }
 
    unsigned stride = desc->block.bits / 8;
@@ -4191,9 +4223,9 @@ static uint32_t si_translate_border_color(struct si_context *sctx,
       /* Getting 4096 unique border colors is very unlikely. */
       static bool printed;
       if (!printed) {
-         fprintf(stderr, "radeonsi: The border color table is full. "
-                         "Any new border colors will be just black. "
-                         "This is a hardware limitation.\n");
+         mesa_loge("The border color table is full. "
+                   "Any new border colors will be just black. "
+                   "This is a hardware limitation.");
          printed = true;
       }
       return V_008F3C_SQ_TEX_BORDER_COLOR_TRANS_BLACK;
@@ -4503,7 +4535,7 @@ static void *si_create_vertex_elements(struct pipe_context *ctx, unsigned count,
             break;
          }
          default:
-            unreachable("bad format type");
+            UNREACHABLE("bad format type");
          }
       } else {
          switch (elements[i].src_format) {
@@ -4511,7 +4543,7 @@ static void *si_create_vertex_elements(struct pipe_context *ctx, unsigned count,
             fix_fetch.u.format = AC_FETCH_FORMAT_FLOAT;
             break;
          default:
-            unreachable("bad other format");
+            UNREACHABLE("bad other format");
          }
       }
 
@@ -4997,17 +5029,19 @@ static void si_init_graphics_preamble_state(struct si_context *sctx,
    }
 }
 
-static void gfx6_init_gfx_preamble_state(struct si_context *sctx)
+static bool gfx6_init_gfx_preamble_state(struct si_context *sctx)
 {
    struct si_screen *sscreen = sctx->screen;
    bool has_clear_state = sscreen->info.has_clear_state;
 
    /* We need more space because the preamble is large. */
-   struct si_pm4_state *pm4 = si_pm4_create_sized(sscreen, 214, sctx->has_graphics);
-   if (!pm4)
-      return;
+   struct si_pm4_state *pm4 = si_pm4_create_sized(sscreen, 214, sctx->is_gfx_queue);
+   if (!pm4) {
+      mesa_loge("failed to allocate memory for cs_preamble_state");
+      return false;
+   }
 
-   if (sctx->has_graphics && !sctx->shadowing.registers) {
+   if (sctx->is_gfx_queue && !sctx->uses_kernelq_reg_shadowing) {
       ac_pm4_cmd_add(&pm4->base, PKT3(PKT3_CONTEXT_CONTROL, 1, 0));
       ac_pm4_cmd_add(&pm4->base, CC0_UPDATE_LOAD_ENABLES(1));
       ac_pm4_cmd_add(&pm4->base, CC1_UPDATE_SHADOW_ENABLES(1));
@@ -5025,7 +5059,7 @@ static void gfx6_init_gfx_preamble_state(struct si_context *sctx)
 
    si_init_compute_preamble_state(sctx, pm4);
 
-   if (!sctx->has_graphics)
+   if (!sctx->is_gfx_queue)
       goto done;
 
    /* Graphics registers. */
@@ -5060,64 +5094,48 @@ done:
    ac_pm4_finalize(&pm4->base);
    sctx->cs_preamble_state = pm4;
    sctx->cs_preamble_state_tmz = si_pm4_clone(sscreen, pm4); /* Make a copy of the preamble for TMZ. */
+   return true;
 }
 
-static void cdna_init_compute_preamble_state(struct si_context *sctx)
+static bool cdna_init_compute_preamble_state(struct si_context *sctx)
 {
    struct si_screen *sscreen = sctx->screen;
-   uint64_t border_color_va =
-      sctx->border_color_buffer ? sctx->border_color_buffer->gpu_address : 0;
-   uint32_t compute_cu_en = S_00B858_SH0_CU_EN(sscreen->info.spi_cu_en) |
-                            S_00B858_SH1_CU_EN(sscreen->info.spi_cu_en);
 
    struct si_pm4_state *pm4 = si_pm4_create_sized(sscreen, 48, true);
-   if (!pm4)
-      return;
-
-   /* Compute registers. */
-   /* Disable profiling on compute chips. */
-   ac_pm4_set_reg(&pm4->base, R_00B82C_COMPUTE_PERFCOUNT_ENABLE, 0);
-   ac_pm4_set_reg(&pm4->base, R_00B834_COMPUTE_PGM_HI, S_00B834_DATA(sctx->screen->info.address32_hi >> 8));
-   ac_pm4_set_reg(&pm4->base, R_00B858_COMPUTE_STATIC_THREAD_MGMT_SE0, compute_cu_en);
-   ac_pm4_set_reg(&pm4->base, R_00B85C_COMPUTE_STATIC_THREAD_MGMT_SE1, compute_cu_en);
-   ac_pm4_set_reg(&pm4->base, R_00B864_COMPUTE_STATIC_THREAD_MGMT_SE2, compute_cu_en);
-   ac_pm4_set_reg(&pm4->base, R_00B868_COMPUTE_STATIC_THREAD_MGMT_SE3, compute_cu_en);
-   ac_pm4_set_reg(&pm4->base, R_00B878_COMPUTE_THREAD_TRACE_ENABLE, 0);
-
-   if (sscreen->info.family >= CHIP_GFX940) {
-      ac_pm4_set_reg(&pm4->base, R_00B89C_COMPUTE_TG_CHUNK_SIZE, 0);
-      ac_pm4_set_reg(&pm4->base, R_00B8B4_COMPUTE_PGM_RSRC3, 0);
-   } else {
-      ac_pm4_set_reg(&pm4->base, R_00B894_COMPUTE_STATIC_THREAD_MGMT_SE4, compute_cu_en);
-      ac_pm4_set_reg(&pm4->base, R_00B898_COMPUTE_STATIC_THREAD_MGMT_SE5, compute_cu_en);
-      ac_pm4_set_reg(&pm4->base, R_00B89C_COMPUTE_STATIC_THREAD_MGMT_SE6, compute_cu_en);
-      ac_pm4_set_reg(&pm4->base, R_00B8A0_COMPUTE_STATIC_THREAD_MGMT_SE7, compute_cu_en);
+   if (!pm4) {
+      mesa_loge("failed to allocate memory for cs_preamble_state");
+      return false;
    }
 
-   ac_pm4_set_reg(&pm4->base, R_0301EC_CP_COHER_START_DELAY, 0);
-
-   /* Set the pointer to border colors. Only MI100 supports border colors. */
-   if (sscreen->info.family == CHIP_MI100) {
-      ac_pm4_set_reg(&pm4->base, R_030E00_TA_CS_BC_BASE_ADDR, border_color_va >> 8);
-      ac_pm4_set_reg(&pm4->base, R_030E04_TA_CS_BC_BASE_ADDR_HI,
-                     S_030E04_ADDRESS(border_color_va >> 40));
-   }
+   si_init_compute_preamble_state(sctx, pm4);
 
    ac_pm4_finalize(&pm4->base);
    sctx->cs_preamble_state = pm4;
    sctx->cs_preamble_state_tmz = si_pm4_clone(sscreen, pm4); /* Make a copy of the preamble for TMZ. */
+
+   return true;
 }
 
-static void gfx10_init_gfx_preamble_state(struct si_context *sctx)
+static bool gfx10_init_gfx_preamble_state(struct si_context *sctx)
 {
    struct si_screen *sscreen = sctx->screen;
 
    /* We need more space because the preamble is large. */
-   struct si_pm4_state *pm4 = si_pm4_create_sized(sscreen, 214, sctx->has_graphics);
-   if (!pm4)
-      return;
+   struct si_pm4_state *pm4 = si_pm4_create_sized(sscreen, 214, sctx->is_gfx_queue);
+   if (!pm4) {
+      mesa_loge("failed to allocate memory for cs_preamble_state");
+      return false;
+   }
 
-   if (sctx->has_graphics && !sctx->shadowing.registers) {
+   if (sctx->uses_userq_reg_shadowing) {
+      ac_pm4_cmd_add(&pm4->base, PKT3(PKT3_CONTEXT_CONTROL, 1, 0));
+      ac_pm4_cmd_add(&pm4->base, CC0_UPDATE_LOAD_ENABLES(1) | CC0_LOAD_PER_CONTEXT_STATE(1) |
+                        CC0_LOAD_CS_SH_REGS(1) | CC0_LOAD_GFX_SH_REGS(1) |
+                        CC0_LOAD_GLOBAL_UCONFIG(1));
+      ac_pm4_cmd_add(&pm4->base, CC1_UPDATE_SHADOW_ENABLES(1) | CC1_SHADOW_PER_CONTEXT_STATE(1) |
+                        CC1_SHADOW_CS_SH_REGS(1) | CC1_SHADOW_GFX_SH_REGS(1) |
+                        CC1_SHADOW_GLOBAL_UCONFIG(1) | CC1_SHADOW_GLOBAL_CONFIG(1));
+   } else if (sctx->is_gfx_queue && !sctx->uses_kernelq_reg_shadowing) {
       ac_pm4_cmd_add(&pm4->base, PKT3(PKT3_CONTEXT_CONTROL, 1, 0));
       ac_pm4_cmd_add(&pm4->base, CC0_UPDATE_LOAD_ENABLES(1));
       ac_pm4_cmd_add(&pm4->base, CC1_UPDATE_SHADOW_ENABLES(1));
@@ -5135,7 +5153,7 @@ static void gfx10_init_gfx_preamble_state(struct si_context *sctx)
 
    si_init_compute_preamble_state(sctx, pm4);
 
-   if (!sctx->has_graphics)
+   if (!sctx->is_gfx_queue)
       goto done;
 
    /* Graphics registers. */
@@ -5176,30 +5194,41 @@ done:
    ac_pm4_finalize(&pm4->base);
    sctx->cs_preamble_state = pm4;
    sctx->cs_preamble_state_tmz = si_pm4_clone(sscreen, pm4); /* Make a copy of the preamble for TMZ. */
+   return true;
 }
 
-static void gfx12_init_gfx_preamble_state(struct si_context *sctx)
+static bool gfx12_init_gfx_preamble_state(struct si_context *sctx)
 {
    struct si_screen *sscreen = sctx->screen;
 
-   struct si_pm4_state *pm4 = si_pm4_create_sized(sscreen, 300, sctx->has_graphics);
-   if (!pm4)
-      return;
+   struct si_pm4_state *pm4 = si_pm4_create_sized(sscreen, 300, sctx->is_gfx_queue);
+   if (!pm4) {
+      mesa_loge("failed to allocate memory for cs_preamble_state");
+      return false;
+   }
 
-   if (sctx->has_graphics && !sctx->shadowing.registers) {
+   if (sctx->uses_userq_reg_shadowing) {
+      ac_pm4_cmd_add(&pm4->base, PKT3(PKT3_CONTEXT_CONTROL, 1, 0));
+      ac_pm4_cmd_add(&pm4->base, CC0_UPDATE_LOAD_ENABLES(1) | CC0_LOAD_PER_CONTEXT_STATE(1) |
+                        CC0_LOAD_CS_SH_REGS(1) | CC0_LOAD_GFX_SH_REGS(1) |
+                        CC0_LOAD_GLOBAL_UCONFIG(1));
+      ac_pm4_cmd_add(&pm4->base, CC1_UPDATE_SHADOW_ENABLES(1) | CC1_SHADOW_PER_CONTEXT_STATE(1) |
+                        CC1_SHADOW_CS_SH_REGS(1) | CC1_SHADOW_GFX_SH_REGS(1) |
+                        CC1_SHADOW_GLOBAL_UCONFIG(1) | CC1_SHADOW_GLOBAL_CONFIG(1));
+   } else if (sctx->is_gfx_queue && !sctx->uses_kernelq_reg_shadowing) {
       ac_pm4_cmd_add(&pm4->base, PKT3(PKT3_CONTEXT_CONTROL, 1, 0));
       ac_pm4_cmd_add(&pm4->base, CC0_UPDATE_LOAD_ENABLES(1));
       ac_pm4_cmd_add(&pm4->base, CC1_UPDATE_SHADOW_ENABLES(1));
    }
 
-   if (sctx->has_graphics && sscreen->dpbb_allowed) {
+   if (sctx->is_gfx_queue && sscreen->dpbb_allowed && !sctx->uses_userq_reg_shadowing) {
       ac_pm4_cmd_add(&pm4->base, PKT3(PKT3_EVENT_WRITE, 0, 0));
       ac_pm4_cmd_add(&pm4->base, EVENT_TYPE(V_028A90_BREAK_BATCH) | EVENT_INDEX(0));
    }
 
    si_init_compute_preamble_state(sctx, pm4);
 
-   if (!sctx->has_graphics)
+   if (!sctx->is_gfx_queue)
       goto done;
 
    /* Graphics registers. */
@@ -5232,16 +5261,21 @@ static void gfx12_init_gfx_preamble_state(struct si_context *sctx)
 done:
    sctx->cs_preamble_state = pm4;
    sctx->cs_preamble_state_tmz = si_pm4_clone(sscreen, pm4); /* Make a copy of the preamble for TMZ. */
+   return true;
 }
 
-void si_init_gfx_preamble_state(struct si_context *sctx)
+bool si_init_gfx_preamble_state(struct si_context *sctx)
 {
+   bool ret;
+
    if (!sctx->screen->info.has_graphics)
-      cdna_init_compute_preamble_state(sctx);
+      ret = cdna_init_compute_preamble_state(sctx);
    else if (sctx->gfx_level >= GFX12)
-      gfx12_init_gfx_preamble_state(sctx);
+      ret = gfx12_init_gfx_preamble_state(sctx);
    else if (sctx->gfx_level >= GFX10)
-      gfx10_init_gfx_preamble_state(sctx);
+      ret = gfx10_init_gfx_preamble_state(sctx);
    else
-      gfx6_init_gfx_preamble_state(sctx);
+      ret = gfx6_init_gfx_preamble_state(sctx);
+
+   return ret;
 }

@@ -365,6 +365,18 @@ util_format_is_subsampled_422(enum pipe_format format)
       desc->block.bits == 32;
 }
 
+bool
+util_format_is_float16(enum pipe_format format)
+{
+   const struct util_format_description *desc =
+      util_format_description(format);
+   const int c = util_format_get_first_non_void_channel(format);
+   if (c < 0)
+      return false;
+
+   return desc->channel[c].type == UTIL_FORMAT_TYPE_FLOAT && desc->channel[c].size == 16;
+}
+
 /**
  * Calculates the MRD for the depth format. MRD is used in depth bias
  * for UNORM and unbound depth buffers. When the depth buffer is floating
@@ -1537,7 +1549,7 @@ uint32_t
 util_format_get_tilesize(enum pipe_format format, uint32_t dimensions, uint32_t samples, uint32_t axis)
 {
    if (dimensions == 1)
-      return axis == 0 ? 64 * 1024 : 1;
+      return axis == 0 ? 64 * 1024 / util_next_power_of_two(util_format_get_blocksize(format)) : 1;
 
    uint32_t kind = 0;
    if (dimensions == 2)

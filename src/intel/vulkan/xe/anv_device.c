@@ -73,7 +73,7 @@ drm_sched_priority_to_vk_priority(enum drm_sched_priority drm_sched_priority)
    case DRM_SCHED_PRIORITY_HIGH:
       return VK_QUEUE_GLOBAL_PRIORITY_HIGH_KHR;
    default:
-      unreachable("Invalid drm_sched_priority");
+      UNREACHABLE("Invalid drm_sched_priority");
       return VK_QUEUE_GLOBAL_PRIORITY_LOW_KHR;
    }
 }
@@ -154,7 +154,7 @@ anv_xe_physical_device_init_memory_types(struct anv_physical_device *device)
       device->memory.types[device->memory.type_count++] = (struct anv_memory_type) {
          .propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
          .heapIndex = 0,
-         .compressed = true,
+         .compressed = device->info.ver >= 20,
       };
       device->memory.types[device->memory.type_count++] = (struct anv_memory_type) {
          .propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |

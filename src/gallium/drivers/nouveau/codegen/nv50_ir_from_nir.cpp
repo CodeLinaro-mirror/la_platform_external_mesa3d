@@ -1578,7 +1578,7 @@ Converter::visit(nir_cf_node *node)
 bool
 Converter::visit(nir_block *block)
 {
-   if (!block->predecessors->entries && block->instr_list.is_empty())
+   if (!block->predecessors->entries && exec_list_is_empty(&block->instr_list))
       return true;
 
    BasicBlock *bb = convert(block);
@@ -2014,7 +2014,7 @@ Converter::visit(nir_intrinsic_instr *insn)
          mkOp1(OP_PIXLD, TYPE_U32, newDefs[0], sample)->subOp = NV50_IR_SUBOP_PIXLD_OFFSET;
          mode = NV50_IR_INTERP_OFFSET;
       } else {
-         unreachable("all intrinsics already handled above");
+         UNREACHABLE("all intrinsics already handled above");
       }
 
       loadImm(newDefs[1], mode);
@@ -2369,7 +2369,7 @@ Converter::visit(nir_intrinsic_instr *insn)
          bindless = op == nir_intrinsic_bindless_image_size;
          break;
       default:
-         unreachable("unhandled image opcode");
+         UNREACHABLE("unhandled image opcode");
          break;
       }
 
@@ -2571,7 +2571,7 @@ Converter::convert(nir_load_const_instr *insn, uint8_t idx)
       val = loadImm(getSSA(4), insn->value[idx].u8);
       break;
    default:
-      unreachable("unhandled bit size!\n");
+      UNREACHABLE("unhandled bit size!\n");
    }
    setPosition(bb, true);
    return val;
@@ -3418,7 +3418,7 @@ Converter::run()
 
       if (lowered) {
          nir_function_impl *impl = nir_shader_get_entrypoint(nir);
-         NIR_PASS(_, nir, nir_lower_io_to_temporaries, impl, true, false);
+         NIR_PASS(_, nir, nir_lower_io_vars_to_temporaries, impl, true, false);
          NIR_PASS(_, nir, nir_lower_global_vars_to_local);
          NIR_PASS(_, nir, nv50_nir_lower_load_user_clip_plane, info);
       } else {
@@ -3443,7 +3443,7 @@ Converter::run()
 
    NIR_PASS(_, nir, nir_lower_load_const_to_scalar);
    NIR_PASS(_, nir, nir_lower_alu_to_scalar, NULL, NULL);
-   NIR_PASS(_, nir, nir_lower_phis_to_scalar, false);
+   NIR_PASS(_, nir, nir_lower_phis_to_scalar, NULL, NULL);
 
    NIR_PASS(_, nir, nir_lower_frexp);
 
@@ -3495,7 +3495,7 @@ Converter::run()
       (nir_move_options)(nir_move_const_undef |
                          nir_move_load_ubo |
                          nir_move_load_uniform |
-                         nir_move_load_input);
+                         nir_move_load_input | nir_move_load_frag_coord);
    NIR_PASS(_, nir, nir_opt_sink, move_options);
    NIR_PASS(_, nir, nir_opt_move, move_options);
 
@@ -3614,7 +3614,6 @@ nvir_nir_shader_compiler_options(int chipset, uint8_t shader_type)
    op.lower_extract_word = (chipset < NVISA_GM107_CHIPSET);
    op.lower_insert_byte = true;
    op.lower_insert_word = true;
-   op.lower_all_io_to_temps = false;
    op.vertex_id_zero_based = false;
    op.lower_base_vertex = false;
    op.lower_helper_invocation = false;

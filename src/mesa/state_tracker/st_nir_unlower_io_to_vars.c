@@ -142,7 +142,7 @@ parse_intrinsic(nir_shader *nir, nir_intrinsic_instr *intr,
 
    if (intr->intrinsic == nir_intrinsic_load_interpolated_input &&
        intr->src[0].ssa->parent_instr->type == nir_instr_type_intrinsic)
-      desc->baryc = nir_instr_as_intrinsic(intr->src[0].ssa->parent_instr);
+      desc->baryc = nir_def_as_intrinsic(intr->src[0].ssa);
 
    /* Find the variable if it exists. */
    *var = NULL;
@@ -306,7 +306,7 @@ create_vars(nir_builder *b, nir_intrinsic_instr *intr, void *opaque)
                                           sizeof(float));
                break;
             default:
-               unreachable("unexpected varying slot");
+               UNREACHABLE("unexpected varying slot");
             }
          } else {
             switch (desc.sem.location) {
@@ -359,7 +359,7 @@ create_vars(nir_builder *b, nir_intrinsic_instr *intr, void *opaque)
          else if (nir->info.stage == MESA_SHADER_GEOMETRY && !desc.is_output)
             num_vertices = mesa_vertices_per_prim(nir->info.gs.input_primitive);
          else
-            unreachable("unexpected shader stage for per-vertex IO");
+            UNREACHABLE("unexpected shader stage for per-vertex IO");
 
          var_type = glsl_array_type(var_type, num_vertices, 0);
       }
@@ -511,7 +511,7 @@ create_vars(nir_builder *b, nir_intrinsic_instr *intr, void *opaque)
          var->data.sample = true;
          break;
       default:
-         unreachable("unexpected barycentric intrinsic");
+         UNREACHABLE("unexpected barycentric intrinsic");
       }
 
       if (var->index == VAR_INDEX_INTERP_AT_PIXEL) {
@@ -614,28 +614,8 @@ unlower_io_to_vars(nir_builder *b, nir_intrinsic_instr *intr, void *opaque)
 
    if (desc.is_store) {
       unsigned writemask = nir_intrinsic_write_mask(intr) << desc.component;
-      nir_def *value = intr->src[0].ssa;
-
-      if (desc.component) {
-         unsigned new_num_components = desc.component + value->num_components;
-         unsigned swizzle[4] = {0};
-         assert(new_num_components <= 4);
-
-         /* Move components within the vector to the right because we only
-          * have vec4 stores. The writemask skips the extra components at
-          * the beginning.
-          *
-          * For component = 1: .xyz -> .xxyz
-          * For component = 2: .xy  -> .xxxy
-          * For component = 3: .x   -> .xxxx
-          */
-         for (unsigned i = 1; i < value->num_components; i++)
-            swizzle[desc.component + i] = i;
-
-         value = nir_swizzle(b, value, swizzle, new_num_components);
-      }
-
-      value = nir_resize_vector(b, value, num_components);
+      nir_def *value = nir_shift_channels(b, intr->src[0].ssa, desc.component,
+                                          num_components);
 
       /* virgl requires scalarized TESS_LEVEL stores because originally
        * the GLSL compiler never vectorized them. Doing 1 store per bit of
@@ -712,7 +692,7 @@ st_nir_unlower_io_to_vars(nir_shader *nir)
             nir_io_mix_convergent_flat_with_interpolated));
 
    nir_foreach_variable_with_modes(var, nir, nir_var_shader_in | nir_var_shader_out) {
-      unreachable("the shader should have no IO variables");
+      UNREACHABLE("the shader should have no IO variables");
    }
 
    /* Some drivers can't handle holes in driver locations (bases), so

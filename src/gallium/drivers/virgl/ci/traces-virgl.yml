@@ -24,10 +24,10 @@ traces:
       label: [crash]
   gputest/pixmark-julia-fp32-v2.trace:
     gl-virgl:
-      checksum: a6b4ead13ef5f1d64c132a1467e0045f
+      checksum: 58c9b75b1f0d8717280d6ec0706113e2
   gputest/pixmark-julia-fp64-v2.trace:
     gl-virgl:
-      checksum: 291a08ab346339538916e7816a57fcaf
+      checksum: abee28eabd0220030aa220185f75aee2
   gputest/pixmark-volplosion-v2.trace:
     gl-virgl:
       checksum: aef0b32ce99a3b25d35304ca08032833
@@ -42,7 +42,7 @@ traces:
       checksum: b33fb8ee73b0c50b14822e170f15ab8a
   humus/CelShading-v2.trace:
     gl-virgl:
-      checksum: 3629cba72bde53e4275a8365175fde83
+      checksum: 0e6cc731faf4f2d6c1765f369535ce0d
   humus/DynamicBranching3-v2.trace:
     gl-virgl:
       checksum: 0236b28aa8b26fa60172d71bb040f2e9
@@ -122,4 +122,4 @@ traces:
       checksum: 3a12c08087e16cfae4729f4e9d6c9387
   warzone2100/warzone2100-default.trace:
     gl-virgl:
-      checksum: 1fd3f9b5e5a711bdfac49dc03912e1de
+      checksum: 2a708a4d166dbd56165aad01bd5aa551

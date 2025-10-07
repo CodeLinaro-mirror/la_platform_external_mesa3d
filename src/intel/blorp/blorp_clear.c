@@ -285,7 +285,7 @@ get_fast_clear_rect(const struct isl_device *dev,
             case  32: ccs_format = ISL_FORMAT_GFX12_CCS_32BPP_Y0;  break;
             case  64: ccs_format = ISL_FORMAT_GFX12_CCS_64BPP_Y0;  break;
             case 128: ccs_format = ISL_FORMAT_GFX12_CCS_128BPP_Y0; break;
-            default:  unreachable("Invalid surface bpb for fast clearing");
+            default:  UNREACHABLE("Invalid surface bpb for fast clearing");
             }
          } else {
             assert(aux_surf->usage == ISL_SURF_USAGE_CCS_BIT);
@@ -378,7 +378,7 @@ get_fast_clear_rect(const struct isl_device *dev,
          x_scaledown = dev->info->ver >= 20 ? 8 : 1;
          break;
       default:
-         unreachable("Unexpected MCS format for fast clear");
+         UNREACHABLE("Unexpected MCS format for fast clear");
       }
       y_scaledown = dev->info->ver >= 20 ? 4 : 2;
       x_align = x_scaledown * 2;
@@ -526,6 +526,15 @@ blorp_fast_clear(struct blorp_batch *batch,
                                           &start_tile_B, &end_tile_B)) {
          size_B = end_tile_B - start_tile_B;
          addr.offset += start_tile_B;
+      } else if (isl_tiling_is_64(surf->surf->tiling)) {
+         /* If not supported above, clear the range without redescription. If
+          * the image is 3D, redescription is not possible because multiple
+          * depth slices are non-trivially interleaved into one plane. If the
+          * image is part of a miptail, there should be no benefit from
+          * redescription.
+          */
+         assert(surf->surf->logical_level0_px.d > 1 ||
+                level <= surf->surf->miptail_start_level);
       } else if (level == 0 && start_layer == 0 && num_layers == 1) {
          assert(surf->surf->tiling == ISL_TILING_4 ||
                 surf->surf->tiling == ISL_TILING_Y0);
@@ -831,7 +840,7 @@ blorp_clear(struct blorp_batch *batch,
          assert(params.dst.surf.levels == 1);
          assert(params.dst.surf.samples == 1);
          assert(params.dst.tile_x_sa == 0 || params.dst.tile_y_sa == 0);
-         assert(params.dst.aux_usage == ISL_AUX_USAGE_NONE);
+         assert(params.dst.aux_surf.size_B == 0);
 
          /* max_image_width rounded down to a multiple of 3 */
          const unsigned max_fake_rgb_width = (max_image_width / 3) * 3;
@@ -1548,7 +1557,7 @@ blorp_mcs_ambiguate(struct blorp_batch *batch,
    case 8:  renderable_format = ISL_FORMAT_R8_UINT;     break;
    case 32: renderable_format = ISL_FORMAT_R32_UINT;    break;
    case 64: renderable_format = ISL_FORMAT_R32G32_UINT; break;
-   default: unreachable("Unexpected MCS format size for ambiguate");
+   default: UNREACHABLE("Unexpected MCS format size for ambiguate");
    }
 
    /* From Bspec 57340 (r59562):

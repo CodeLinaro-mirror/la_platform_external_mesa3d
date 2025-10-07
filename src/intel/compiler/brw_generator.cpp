@@ -61,7 +61,7 @@ brw_math_function(enum opcode op)
    case SHADER_OPCODE_INT_REMAINDER:
       return BRW_MATH_FUNCTION_INT_DIV_REMAINDER;
    default:
-      unreachable("not reached: unknown math function");
+      UNREACHABLE("not reached: unknown math function");
    }
 }
 
@@ -85,7 +85,7 @@ normalize_brw_reg_for_encoding(brw_reg *reg)
    case VGRF:
    case ATTR:
    case UNIFORM:
-      unreachable("not reached");
+      UNREACHABLE("not reached");
    }
 
    return brw_reg;
@@ -110,7 +110,7 @@ brw_generator::~brw_generator()
 {
 }
 
-class ip_record : public exec_node {
+class ip_record : public brw_exec_node {
 public:
    DECLARE_RALLOC_CXX_OPERATORS(ip_record)
 
@@ -147,7 +147,7 @@ brw_generator::patch_halt_jumps()
 
    int ip = p->nr_insn;
 
-   foreach_in_list(ip_record, patch_ip, &discard_halt_patches) {
+   brw_foreach_in_list(ip_record, patch_ip, &discard_halt_patches) {
       brw_eu_inst *patch = &p->store[patch_ip->ip];
 
       assert(brw_eu_inst_opcode(p->isa, patch) == BRW_OPCODE_HALT);
@@ -177,6 +177,11 @@ brw_generator::generate_send(brw_inst *inst,
    }
 
    if (ex_desc.file == IMM && ex_desc.ud == 0) {
+      /* An immediate extended descriptor value only happens when the extended
+       * descriptor is written indirectly (it already contains a SS/BSS
+       * surface handle)
+       */
+      assert(!inst->send_ex_desc_imm);
       brw_send_indirect_message(p, inst->sfid, dst, payload, desc, inst->eot, gather);
       if (inst->check_tdr)
          brw_eu_inst_set_opcode(p->isa, brw_last_inst, BRW_OPCODE_SENDC);
@@ -185,8 +190,10 @@ brw_generator::generate_send(brw_inst *inst,
        * also covers the dual-payload case because ex_mlen goes in ex_desc.
        */
       brw_send_indirect_split_message(p, inst->sfid, dst, payload, payload2,
-                                      desc, ex_desc, inst->ex_mlen,
-                                      inst->send_ex_bso, inst->eot, gather);
+                                      desc, ex_desc,
+                                      inst->send_ex_desc_imm ? inst->offset : 0,
+                                      inst->ex_mlen, inst->send_ex_bso,
+                                      inst->eot, gather);
       if (inst->check_tdr)
          brw_eu_inst_set_opcode(p->isa, brw_last_inst,
                              devinfo->ver >= 12 ? BRW_OPCODE_SENDC : BRW_OPCODE_SENDSC);
@@ -1202,7 +1209,7 @@ brw_generator::generate_code(const cfg_t *cfg, int dispatch_width,
       case SHADER_OPCODE_FIND_LIVE_CHANNEL:
       case SHADER_OPCODE_FIND_LAST_LIVE_CHANNEL:
       case SHADER_OPCODE_LOAD_LIVE_CHANNELS:
-         unreachable("Should be lowered by lower_find_live_channel()");
+         UNREACHABLE("Should be lowered by lower_find_live_channel()");
          break;
 
       case FS_OPCODE_LOAD_LIVE_CHANNELS: {
@@ -1330,10 +1337,10 @@ brw_generator::generate_code(const cfg_t *cfg, int dispatch_width,
          break;
 
       default:
-         unreachable("Unsupported opcode");
+         UNREACHABLE("Unsupported opcode");
 
       case SHADER_OPCODE_LOAD_PAYLOAD:
-         unreachable("Should be lowered by lower_load_payload()");
+         UNREACHABLE("Should be lowered by lower_load_payload()");
       }
       prev_inst = inst;
 

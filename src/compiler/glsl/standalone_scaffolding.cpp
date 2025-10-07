@@ -36,6 +36,7 @@
 #include "util/strtod.h"
 #include "main/mtypes.h"
 #include "string_to_uint_map.h"
+#include "pipe/p_screen.h"
 
 void
 _mesa_warning(struct gl_context *ctx, const char *fmt, ...)
@@ -201,6 +202,8 @@ void initialize_context_to_defaults(struct gl_context *ctx, gl_api api)
 {
    memset(ctx, 0, sizeof(*ctx));
 
+   ctx->screen = (struct pipe_screen*)calloc(1, sizeof(struct pipe_screen));
+
    ctx->API = api;
 
    ctx->Extensions.dummy_true = true;
@@ -308,7 +311,7 @@ standalone_create_shader_program(void)
    whole_program->FragDataBindings = new string_to_uint_map;
    whole_program->FragDataIndexBindings = new string_to_uint_map;
 
-   exec_list_make_empty(&whole_program->EmptyUniformLocations);
+   ir_exec_list_make_empty(&whole_program->EmptyUniformLocations);
 
    return whole_program;
 }

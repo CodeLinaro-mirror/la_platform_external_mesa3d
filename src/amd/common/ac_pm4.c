@@ -56,7 +56,7 @@ pairs_packed_opcode_to_regular(unsigned opcode)
    case PKT3_SET_SH_REG_PAIRS_PACKED:
       return PKT3_SET_SH_REG;
    default:
-      unreachable("invalid packed opcode");
+      UNREACHABLE("invalid packed opcode");
    }
 }
 
@@ -199,6 +199,22 @@ ac_pm4_finalize(struct ac_pm4_state *state)
                                          state->info->family, reg_base_offset + i * 4),
                     "SPI_SHADER_PGM_LO_")) {
             state->spi_shader_pgm_lo_reg = reg_base_offset + i * 4;
+
+            break;
+         }
+      }
+   }
+
+   if (state->debug_sqtt && state->last_opcode == PKT3_SET_SH_REG_PAIRS) {
+      /* Set reg_va_low_idx to where the shader address is stored in the pm4 state. */
+      unsigned reg_count = (PKT_COUNT_G(state->pm4[state->last_pm4]) + 1) / 2;
+
+      for (unsigned i = 0; i < reg_count; i++) {
+         unsigned reg_base_offset = SI_SH_REG_OFFSET + state->pm4[state->last_pm4 + 1 + 2 * i] * 4;
+         if (strstr(ac_get_register_name(state->info->gfx_level,
+                                         state->info->family, reg_base_offset),
+                    "SPI_SHADER_PGM_LO_")) {
+            state->spi_shader_pgm_lo_reg = reg_base_offset;
 
             break;
          }

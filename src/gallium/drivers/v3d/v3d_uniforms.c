@@ -83,7 +83,7 @@ get_texture_size(struct v3d_texture_stateobj *texstate,
                 return (texture->u.tex.last_level -
                         texture->u.tex.first_level) + 1;
         default:
-                unreachable("Bad texture size field");
+                UNREACHABLE("Bad texture size field");
         }
 }
 
@@ -120,7 +120,7 @@ get_image_size(struct v3d_shaderimg_stateobj *shaderimg,
                         return image->base.resource->array_size / 6;
                 }
         default:
-                unreachable("Bad texture size field");
+                UNREACHABLE("Bad texture size field");
         }
 }
 
@@ -141,12 +141,13 @@ write_tmu_p0(struct v3d_job *job,
          * This can be interpreted as allowing any result to come back, but
          * not terminate the program (and some tests interpret that).
          *
-         * FIXME: just return is not a full valid solution, as it could still
-         * try to get a wrong address for the shader state address. Perhaps we
-         * would need to set up a BO with a "default texture state"
+         * We write the texture state base address to 0 (NULL) so the default
+         * texture state is used.
          */
-        if (sview == NULL)
+        if (sview == NULL) {
+                cl_aligned_u32(uniforms, v3d_unit_data_get_offset(data) & 0xf);
                 return;
+        }
 
         struct v3d_resource *rsc = v3d_resource(sview->texture);
 
@@ -263,11 +264,6 @@ v3d_write_uniforms(struct v3d_context *v3d, struct v3d_job *job,
                         cl_aligned_f(&uniforms, v3d->viewport.scale[2]);
                         break;
 
-                case QUNIFORM_USER_CLIP_PLANE:
-                        cl_aligned_f(&uniforms,
-                                     v3d->clip.ucp[data / 4][data % 4]);
-                        break;
-
                 case QUNIFORM_TMU_CONFIG_P0:
                         write_tmu_p0(job, &uniforms, texstate, data);
                         break;
@@ -340,6 +336,13 @@ v3d_write_uniforms(struct v3d_context *v3d, struct v3d_job *job,
                         break;
                 }
 
+                case QUNIFORM_GET_UBO_SIZE: {
+                        uint32_t unit = v3d_unit_data_get_unit(data);
+                        cl_aligned_u32(&uniforms,
+                                       cb->cb[unit].buffer_size);
+                        break;
+                }
+
                 case QUNIFORM_SSBO_OFFSET: {
                         struct pipe_shader_buffer *sb =
                                 &v3d->ssbo[stage].sb[data];
@@ -407,7 +410,7 @@ v3d_write_uniforms(struct v3d_context *v3d, struct v3d_job *job,
                         break;
 
                 default:
-                        unreachable("Unknown QUNIFORM");
+                        UNREACHABLE("Unknown QUNIFORM");
 
                 }
 #if 0
@@ -436,6 +439,7 @@ v3d_set_shader_uniform_dirty_flags(struct v3d_compiled_shader *shader)
                         break;
                 case QUNIFORM_UNIFORM:
                 case QUNIFORM_UBO_ADDR:
+                case QUNIFORM_GET_UBO_SIZE:
                         dirty |= V3D_DIRTY_CONSTBUF;
                         break;
 
@@ -444,10 +448,6 @@ v3d_set_shader_uniform_dirty_flags(struct v3d_compiled_shader *shader)
                 case QUNIFORM_VIEWPORT_Z_OFFSET:
                 case QUNIFORM_VIEWPORT_Z_SCALE:
                         dirty |= V3D_DIRTY_VIEWPORT;
-                        break;
-
-                case QUNIFORM_USER_CLIP_PLANE:
-                        dirty |= V3D_DIRTY_CLIP;
                         break;
 
                 case QUNIFORM_TMU_CONFIG_P0:

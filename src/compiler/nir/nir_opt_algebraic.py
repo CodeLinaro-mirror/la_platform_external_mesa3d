@@ -485,10 +485,10 @@ optimizations.extend([
    (('ffma@64', a, b, c), ('fadd', ('fmul', a, b), c), 'options->lower_ffma64'),
    (('ffmaz', a, b, c), ('fadd', ('fmulz', a, b), c), 'options->lower_ffma32'),
    # Always lower inexact ffma, because it will be fused back by late optimizations (nir_opt_algebraic_late).
-   (('~ffma@16', a, b, c), ('fadd', ('fmul', a, b), c), 'options->fuse_ffma16'),
-   (('~ffma@32', a, b, c), ('fadd', ('fmul', a, b), c), 'options->fuse_ffma32'),
-   (('~ffma@64', a, b, c), ('fadd', ('fmul', a, b), c), 'options->fuse_ffma64'),
-   (('~ffmaz', a, b, c), ('fadd', ('fmulz', a, b), c), 'options->fuse_ffma32'),
+   (('ffma@16(contract)', a, b, c), ('fadd', ('fmul', a, b), c), 'options->fuse_ffma16'),
+   (('ffma@32(contract)', a, b, c), ('fadd', ('fmul', a, b), c), 'options->fuse_ffma32'),
+   (('ffma@64(contract)', a, b, c), ('fadd', ('fmul', a, b), c), 'options->fuse_ffma64'),
+   (('ffmaz(contract)', a, b, c), ('fadd', ('fmulz', a, b), c), 'options->fuse_ffma32'),
 
    (('~fmul', ('fadd', ('bcsel', a, ('fmul', b, c), 0), '#d'), '#e'),
     ('bcsel', a, ('fmul', ('fadd', ('fmul', b, c), d), e), ('fmul', d, e))),
@@ -914,6 +914,10 @@ optimizations.extend([
    (('umax', ('umin', a, b), a), a),
    (('imin', ('imax', a, b), a), a),
    (('imax', ('imin', a, b), a), a),
+   (('fmax(nsz)', 'a(is_a_number_not_negative)', 'b(is_not_positive)'), ('fmul', a, 1.0)),
+   (('fmin(nsz)', 'a(is_a_number_not_positive)', 'b(is_not_negative)'), ('fmul', a, 1.0)),
+   (('fmax', 'a(is_a_number_not_negative)', 'b(is_lt_zero)'), ('fmul', a, 1.0)),
+   (('fmin', 'a(is_a_number_not_positive)', 'b(is_gt_zero)'), ('fmul', a, 1.0)),
 ])
 
 for op in ['ine', 'ieq', 'ilt', 'ige', 'ult', 'uge', 'bitz', 'bitnz',
@@ -1033,6 +1037,11 @@ optimizations.extend([
    (('fmax', ('ffma(is_used_once)', 'a', ('fneg', a), '#b(is_zero_to_one)'), 0.0),
     ('fsat', ('ffma', a, ('fneg', a), b)), '!options->lower_fsat'),
 
+   (('fsat', ('fmax', a, 'b(is_not_positive)')), ('fsat', a)),
+
+   (('fsat', ('bcsel(is_used_once)', a, b, '#c')), ('bcsel', a, ('fsat', b), ('fsat', c))),
+   (('fsat', ('bcsel(is_used_once)', a, '#b', c)), ('bcsel', a, ('fsat', b), ('fsat', c))),
+
    (('extract_u8', ('imin', ('imax', a, 0), 0xff), 0), ('imin', ('imax', a, 0), 0xff)),
 
    # The ior versions are exact because fmin and fmax will always pick a
@@ -1073,6 +1082,10 @@ optimizations.extend([
    (('iand', ('ult(is_used_once)', a, c), ('ult', b, c)), ('ult', ('umax', a, b), c)),
    (('iand', ('uge(is_used_once)', a, b), ('uge', a, c)), ('uge', a, ('umax', b, c))),
    (('iand', ('uge(is_used_once)', a, c), ('uge', b, c)), ('uge', ('umin', a, b), c)),
+
+   # Law of trichotomy. This pattern is load-bearing on AGX for optimizing
+   # emulated transform feedback.
+   (('iand', ('uge', a, b), ('ult', a, b)), False),
 
    # A number of shaders contain a pattern like a.x < 0.0 || a.x > 1.0 || a.y
    # < 0.0, || a.y > 1.0 || ...  These patterns rearrange and replace in a
@@ -1141,6 +1154,18 @@ for s in [16, 32, 64]:
        # support fp16 don't support int16.
        (('bcsel@{}'.format(s), ('feq', a, 0.0), 1.0, ('i2f{}'.format(s), ('iadd', ('b2i{}'.format(s), ('flt', 0.0, 'a@{}'.format(s))), ('ineg', ('b2i{}'.format(s), ('flt', 'a@{}'.format(s), 0.0)))))),
         ('i2f{}'.format(s), ('iadd', ('b2i32', ('!fge', a, 0.0)), ('ineg', ('b2i32', ('!flt', a, 0.0)))))),
+
+       # Signed pow() used in Control. It's not enough to match just the
+       # copysign piece because we would require extra instructions to handle
+       # the various floating point special cases. Specializing to the pow
+       # sequence lets us collapse all the sign fixup code.
+       (('fmul', ('fexp2', ('fmul', ('flog2', ('fabs', a)), b)),
+         ('i2f', ('iadd',           ('b2i', ('flt', 0.0, a)),
+                          ('ineg', ('b2i', ('flt', a, 0.0)))))),
+
+        ('bcsel', ('!flt', a, 0.0),
+         ('fneg', ('fexp2', ('fmul', ('flog2', ('fabs', a)), b))),
+                  ('fexp2', ('fmul', ('flog2', ('fabs', a)), b)))),
 
        (('bcsel', a, ('b2f(is_used_once)', 'b@{}'.format(s)), ('b2f', 'c@{}'.format(s))), ('b2f', ('bcsel', a, b, c))),
 
@@ -2075,6 +2100,10 @@ optimizations.extend([
    (('ior', ('u2u16', ('unpack_32_4x8.z', a)), ('ishl', ('u2u16', ('unpack_32_4x8.w', a)), 8)),
     ('unpack_32_2x16_split_y', a), '!options->lower_unpack_32_2x16_split'),
 
+   # Prefer 16bit unpack/extract because it's easier to vectorize
+   (('i2i16', ('unpack_32_4x8(xz_components_unused).y', a)), ('extract_i8', ('unpack_32_2x16.x', a), 1), '!options->lower_extract_byte'),
+   (('i2i16', ('unpack_32_4x8(xz_components_unused).w', a)), ('extract_i8', ('unpack_32_2x16.y', a), 1), '!options->lower_extract_byte'),
+
    (('extract_u16', ('extract_i16', a, b), 0), ('extract_u16', a, b)),
    (('extract_u16', ('extract_u16', a, b), 0), ('extract_u16', a, b)),
 
@@ -2457,10 +2486,13 @@ optimizations.extend([
    (('bitfield_select', ('inot', a), b, c), ('bitfield_select', a, c, b)),
    (('bitfield_select', ('ineg', ('b2i', 'a@1')), b, c), ('bcsel', a, b, c)),
 
-   (('ior@32', ('iand', a, b), ('iand', ('inot', a), c)), ('bitfield_select', a, b, c), 'options->has_bitfield_select'),
-   (('iadd@32', ('iand', a, b), ('iand', ('inot', a), c)), ('bitfield_select', a, b, c), 'options->has_bitfield_select'),
-   (('ixor@32', ('iand', a, b), ('iand', ('inot', a), c)), ('bitfield_select', a, b, c), 'options->has_bitfield_select'),
-   (('ixor@32', ('iand', a, ('ixor', b, c)), c), ('bitfield_select', a, b, c), 'options->has_bitfield_select'),
+   (('ior', ('iand', a, b), ('iand', ('inot', a), c)), ('bitfield_select', a, b, c), 'options->has_bitfield_select'),
+   (('iadd', ('iand', a, b), ('iand', ('inot', a), c)), ('bitfield_select', a, b, c), 'options->has_bitfield_select'),
+   (('ixor', ('iand', a, b), ('iand', ('inot', a), c)), ('bitfield_select', a, b, c), 'options->has_bitfield_select'),
+   (('ixor', ('iand', a, ('ixor', b, c)), c), ('bitfield_select', a, b, c), 'options->has_bitfield_select'),
+
+   # The patterns above could create 1bit bitfield_select, but that's really just bcsel.
+   (('bitfield_select@1', a, b, c), ('bcsel', a, b, c)),
 
    # Note that these opcodes are defined to only use the five least significant bits of 'offset' and 'bits'
    (('ubfe', 'value', 'offset', ('iand', 31, 'bits')), ('ubfe', 'value', 'offset', 'bits')),
@@ -2700,6 +2732,17 @@ optimizations.extend([
 
    (('imul_high@16', a, b), ('i2i16', ('ishr', ('imul24_relaxed', ('i2i32', a), ('i2i32', b)), 16)), 'options->lower_mul_high16'),
    (('umul_high@16', a, b), ('u2u16', ('ushr', ('umul24_relaxed', ('u2u32', a), ('u2u32', b)), 16)), 'options->lower_mul_high16'),
+
+   # Optimize vec2 unsigned comparison predicates to usub_sat with clamp.
+   (('b2i16', ('vec2', ('ult', 'a@16', b), ('ult', 'c@16', d))),
+    ('umin', 1, ('usub_sat', ('vec2', b, d), ('vec2', a, c))),
+    'options->vectorize_vec2_16bit && !options->lower_usub_sat'),
+   (('b2i16', ('vec2', ('uge', 'a@16', '#b(is_not_zero)'), ('uge', 'c@16', '#d(is_not_zero)'))),
+    ('umin', 1, ('usub_sat', ('vec2', a, c), ('iadd', ('vec2', b, d), -1))),
+    'options->vectorize_vec2_16bit && !options->lower_usub_sat'),
+   (('b2i16', ('vec2', ('uge', '#a(is_not_uint_max)', 'b@16'), ('uge', '#c(is_not_uint_max)', 'd@16'))),
+    ('umin', 1, ('usub_sat', ('iadd', ('vec2', a, c), 1), ('vec2', b, d))),
+    'options->vectorize_vec2_16bit && !options->lower_usub_sat'),
 ])
 
 for bit_size in [8, 16, 32, 64]:
@@ -2957,6 +3000,17 @@ optimizations += [
     (('i2i8', ('iand', 'a@64', 0xff)), ('u2u8', a)),
 ]
 
+# Optimize fmin/fmax with constant followed by conversion to 16bit
+# Assume 16bit fmin/fmax is faster.
+optimizations += [
+   (('f2f16', ('fmax(is_used_once)', a, '#b')), ('fmax', ('f2f16', a), ('f2f16', b)), 'options->support_16bit_alu'),
+   (('f2f16', ('fmin(is_used_once)', a, '#b')), ('fmin', ('f2f16', a), ('f2f16', b)), 'options->support_16bit_alu'),
+   (('f2f16', ('vec2(is_used_once)', ('fmax(is_used_once)', a, '#b'), ('fmax(is_used_once)', c, '#d'))),
+    ('fmax', ('f2f16', ('vec2', a, c)), ('f2f16', ('vec2', b, d))), 'options->support_16bit_alu'),
+   (('f2f16', ('vec2(is_used_once)', ('fmin(is_used_once)', a, '#b'), ('fmin(is_used_once)', c, '#d'))),
+    ('fmin', ('f2f16', ('vec2', a, c)), ('f2f16', ('vec2', b, d))), 'options->support_16bit_alu'),
+]
+
 # Some operations such as iadd have the property that the bottom N bits of the
 # output only depends on the bottom N bits of each of the inputs so we can
 # remove casts
@@ -3064,7 +3118,7 @@ def ldexp(f, exp, bits):
    # of our exponent is doubled.
    pow2_1 = fexp2i(('ishr', exp, 1), bits)
    pow2_2 = fexp2i(('isub', exp, ('ishr', exp, 1)), bits)
-   return ('fmul', ('fmul', f, pow2_1), pow2_2)
+   return ('!fmul', ('!fmul', f, pow2_1), pow2_2)
 
 optimizations += [
    (('ldexp@16', 'x', 'exp'), ldexp('x', 'exp', 16), 'options->lower_ldexp'),
@@ -3144,6 +3198,30 @@ optimizations += [
    (('iadd', ('msad_4x8', a, b, 0), c), ('msad_4x8', a, b, c)),
 ]
 
+# VKD3D-Proton patterns for FP16_OVFL=1 conversion to e4m3fn
+def vkd3d_proton_f2e4m3_ovfl(variant, x, nan):
+   if variant == 0:
+      cond = ('feq', ('fabs', x), float('inf'))
+   elif variant == 1:
+      cond = ('feq', f'{x}(is_not_negative)', float('inf'))
+   elif variant == 2:
+      cond = ('feq', f'{x}(is_not_positive)', -float('inf'))
+
+   return ('bcsel', cond, f'#{nan}(is_nan)', x)
+
+
+for var in range(3):
+   optimizations += [
+      (('f2e4m3fn_sat', vkd3d_proton_f2e4m3_ovfl(var, a, b)),
+       ('f2e4m3fn_satfn', a), 'options->has_f2e4m3fn_satfn'),
+   ]
+
+for var0, var1 in itertools.product(range(3), repeat=2):
+   optimizations += [
+      (('f2e4m3fn_sat', ('vec2', vkd3d_proton_f2e4m3_ovfl(var0, a, b),
+                                 vkd3d_proton_f2e4m3_ovfl(var1, c, d))),
+       ('f2e4m3fn_satfn', ('vec2', a, c)), 'options->has_f2e4m3fn_satfn'),
+   ]
 
 # "all_equal(eq(a, b), vec(~0))" is the same as "all_equal(a, b)"
 # "any_nequal(neq(a, b), vec(0))" is the same as "any_nequal(a, b)"
@@ -3524,7 +3602,7 @@ for sz, mulz in itertools.product([16, 32, 64], [False, True]):
     fmul = ('fmulz' if mulz else 'fmul') + '(is_only_used_by_fadd)'
     ffma = 'ffmaz' if mulz else 'ffma'
 
-    fadd = '~fadd@{}'.format(sz)
+    fadd = 'fadd@{}(contract)'.format(sz)
     option = 'options->fuse_ffma{}'.format(sz)
 
     late_optimizations.extend([
@@ -3925,6 +4003,54 @@ distribute_src_mods = [
    (('fabs', ('fsign(is_used_once)', a)), ('fsign', ('fabs', a))),
 ]
 
+# Reassociate multiplication of mat*mat*vec. The typical case of
+# mat4*mat4*vec4 is 80 scalar multiplications, but mat4*(mat4*vec4) is only 32.
+mat_mul_optimizations = []
+for t in ['f', 'i']:
+   add_first = '~{}add(many-comm-expr)'.format(t)
+   add_used_once = '~{}add(is_used_once)'.format(t)
+   add = '~{}add'.format(t)
+   mul = '~{}mul'.format(t)
+
+   # Variable names used below were selected based on these layouts:
+   #     mat4             mat4         vec4
+   # [a, b, c, d]   [q,   r,  s,  t]   [gg]
+   # [e, f, g, h]   [u,   v,  w,  x]   [hh]
+   # [i, j, k, l] x [y,   z, aa, bb] x [ii]
+   # [m, n, o, p]   [cc, dd, ee, ff]   [jj]
+
+   step1 = (add_used_once, (add, (add, (mul, 'a', 'q'), (mul, 'b', 'u')), (mul, 'c', 'y')), (mul, 'd', 'cc'))
+   step2 = (add_used_once, (add, (add, (mul, 'a', 'r'), (mul, 'b', 'v')), (mul, 'c', 'z')), (mul, 'd', 'dd'))
+   step3 = (add_used_once, (add, (add, (mul, 'a', 's'), (mul, 'b', 'w')), (mul, 'c', 'aa')), (mul, 'd', 'ee'))
+   step4 = (add_used_once, (add, (add, (mul, 'a', 't'), (mul, 'b', 'x')), (mul, 'c', 'bb')), (mul, 'd', 'ff'))
+
+   step5 = (add, (add, (add, (mul, 'q', 'gg'), (mul, 'r', 'hh')), (mul, 's', 'ii')), (mul, 't', 'jj'))
+   step6 = (add, (add, (add, (mul, 'u', 'gg'), (mul, 'v', 'hh')), (mul, 'w', 'ii')), (mul, 'x', 'jj'))
+   step7 = (add, (add, (add, (mul, 'y', 'gg'), (mul, 'z', 'hh')), (mul, 'aa', 'ii')), (mul, 'bb', 'jj'))
+   step8 = (add, (add, (add, (mul, 'cc', 'gg'), (mul, 'dd', 'hh')), (mul, 'ee', 'ii')), (mul, 'ff', 'jj'))
+
+   # This finds and replaces common (mat4*mat4)*vec4 with something that will get optimised down to mat4*(mat4*vec4)
+   mat_mul_optimizations += [((add_first, (add, (add, (mul, step1, 'gg'), (mul, step2, 'hh')), (mul, step3, 'ii')), (mul, step4, 'jj')), (add, (add, (add, (mul, step5, 'a'), (mul, step6, 'b')), (mul, step7, 'c')), (mul, step8, 'd')))]
+
+   # This helps propagate the above improvement further up the mul chain e.g. mat4*mat4*mat4*vec4 to (mat4*vec4)*mat4*mat4
+   mat_mul_optimizations += [((add_first, (add, (add, (mul, 'gg', step1), (mul,'hh', step2)), (mul, 'ii', step3)), (mul, 'jj', step4)), (add, (add, (add, (mul, step5, 'a'), (mul, step6, 'b')), (mul, step7, 'c')), (mul, step8, 'd')))]
+
+   # Below handles a real world shader that looks like this mat4*mat4*vec4(xyz, 1.0) where the the multiplication of the 1.0 constant has been optimised away
+   step5_no_w_mul = (add, (add, (add, (mul, 'q', 'gg'), (mul, 'r', 'hh')), (mul, 's', 'ii')), 't')
+   step6_no_w_mul = (add, (add, (add, (mul, 'u', 'gg'), (mul, 'v', 'hh')), (mul, 'w', 'ii')), 'x')
+   step7_no_w_mul = (add, (add, (add, (mul, 'y', 'gg'), (mul, 'z', 'hh')), (mul, 'aa', 'ii')), 'bb')
+   step8_no_w_mul = (add, (add, (add, (mul, 'cc', 'gg'), (mul, 'dd', 'hh')), (mul, 'ee', 'ii')), 'ff')
+
+   mat_mul_optimizations += [((add_first, (add, (add, (mul, step1, 'gg'), (mul, step2, 'hh')), (mul, step3, 'ii')), step4), (add, (add, (add, (mul, step5_no_w_mul, 'a'), (mul, step6_no_w_mul, 'b')), (mul, step7_no_w_mul, 'c')), (mul, step8_no_w_mul, 'd')))]
+
+   # Below handles a real world shader that looks like this mat4*mat4*vec4(xy, 0.0, 1.0) where the the multiplication of the 0.0 and 1.0 constants have been optimised away
+   step5_zero_z_no_w_mul = (add, (add, (mul, 'q', 'gg'), (mul, 'r', 'hh')), 't')
+   step6_zero_z_no_w_mul = (add, (add, (mul, 'u', 'gg'), (mul, 'v', 'hh')), 'x')
+   step7_zero_z_no_w_mul = (add, (add, (mul, 'y', 'gg'), (mul, 'z', 'hh')), 'bb')
+   step8_zero_z_no_w_mul = (add, (add, (mul, 'cc', 'gg'), (mul, 'dd', 'hh')), 'ff')
+
+   mat_mul_optimizations += [((add_first, (add, (mul, step1, 'gg'), step4), (mul, step2, 'hh')), (add, (add, (add, (mul, step5_zero_z_no_w_mul, 'a'), (mul, step6_zero_z_no_w_mul, 'b')), (mul, step7_zero_z_no_w_mul, 'c')), (mul, step8_zero_z_no_w_mul, 'd')))]
+
 before_lower_int64_optimizations = [
     # The i2i64(a) implies that 'a' has at most 32-bits of data.
     (('ishl', ('i2i64', a), b),
@@ -4002,3 +4128,5 @@ with open(args.out, "w", encoding='utf-8') as f:
                                         distribute_src_mods).render())
     f.write(nir_algebraic.AlgebraicPass("nir_opt_algebraic_integer_promotion",
                                         integer_promotion_optimizations).render())
+    f.write(nir_algebraic.AlgebraicPass("nir_opt_reassociate_matrix_mul",
+                                        mat_mul_optimizations).render())

@@ -17,6 +17,7 @@ $ADB push /deqp-tools/* /data/deqp
 $ADB push /deqp-runner/deqp-runner /data/deqp
 
 $ADB push "$INSTALL/all-skips.txt" /data/deqp
+$ADB push "$INSTALL/android-skips.txt" /data/deqp
 $ADB push "$INSTALL/angle-skips.txt" /data/deqp
 if [ -e "$INSTALL/$GPU_VERSION-flakes.txt" ]; then
   $ADB push "$INSTALL/$GPU_VERSION-flakes.txt" /data/deqp
@@ -48,6 +49,16 @@ fi
 
 AOSP_RESULTS=/data/deqp/results
 uncollapsed_section_switch cuttlefish_test "cuttlefish: testing"
+
+# Print the detailed version with the list of backports and local patches
+{ set +x; } 2>/dev/null
+for api in vk-main vk gl gles; do
+  deqp_version_log=/deqp-$api/deqp-$api-version
+  if [ -r "$deqp_version_log" ]; then
+    cat "$deqp_version_log"
+  fi
+done
+set -x
 
 set +e
 $ADB shell "mkdir ${AOSP_RESULTS}; cd ${AOSP_RESULTS}/..; \
@@ -97,3 +108,5 @@ $ADB shell "cd ${AOSP_RESULTS}/..; \
 $ADB pull "$AOSP_RESULTS/junit.xml" "$RESULTS_DIR"
 
 section_end cuttlefish_results
+
+exit $EXIT_CODE

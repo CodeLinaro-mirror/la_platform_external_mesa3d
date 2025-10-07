@@ -8,7 +8,7 @@ use crate::tiling::Tiling;
 use crate::Minify;
 
 use nil_rs_bindings::*;
-use nvidia_headers::classes::{cl9097, cla097, clb197, clc597};
+use nvidia_headers::classes::{cl9097, cla097, clb197, clc597, clcd97};
 
 use std::panic;
 
@@ -317,10 +317,11 @@ impl Image {
                 .clamp(info.extent_px.to_B(info.format, sample_layout))
         } else if (info.usage & IMAGE_USAGE_SPARSE_RESIDENCY_BIT) != 0 {
             assert!((info.usage & IMAGE_USAGE_VIDEO_BIT) == 0);
-            Tiling::sparse(info.format, info.dim)
+            Tiling::sparse(dev, info.format, info.dim)
         } else if (info.usage & IMAGE_USAGE_VIDEO_BIT) != 0 {
             assert!((info.usage & IMAGE_USAGE_SPARSE_RESIDENCY_BIT) == 0);
             let mut min_tiling = Tiling::choose(
+                dev,
                 info.extent_px,
                 info.format,
                 sample_layout,
@@ -329,6 +330,7 @@ impl Image {
             );
             for p in 0..infos.len() {
                 let plane_tiling = Tiling::choose(
+                    dev,
                     infos[p].extent_px,
                     infos[p].format,
                     sample_layout,
@@ -345,6 +347,7 @@ impl Image {
             min_tiling
         } else {
             Tiling::choose(
+                dev,
                 info.extent_px,
                 info.format,
                 sample_layout,
@@ -739,13 +742,20 @@ impl Image {
         samples: u32,
         compressed: bool,
     ) -> u8 {
-        if dev.cls_eng3d >= clc597::TURING_A {
+        if dev.cls_eng3d >= clcd97::BLACKWELL_A {
+            Self::gb202_choose_pte_kind(format, compressed)
+        } else if dev.cls_eng3d >= clc597::TURING_A {
             Self::tu102_choose_pte_kind(format, compressed)
         } else if dev.cls_eng3d >= cl9097::FERMI_A {
             Self::nvc0_choose_pte_kind(format, samples, compressed)
         } else {
             panic!("Unsupported 3d engine class")
         }
+    }
+
+    fn gb202_choose_pte_kind(_format: Format, _compressed: bool) -> u8 {
+        use nvidia_headers::hwref::tu102::mmu::*;
+        return NV_MMU_PTE_KIND_GENERIC_MEMORY.try_into().unwrap();
     }
 
     fn tu102_choose_pte_kind(format: Format, compressed: bool) -> u8 {
@@ -965,10 +975,40 @@ pub enum ViewType {
     CubeArray,
 }
 
+/// An enum describing how an image view will be accessed by the shader.
+#[allow(dead_code)]
+#[derive(Clone, Debug, Copy, PartialEq)]
+#[repr(u8)]
+pub enum ViewAccess {
+    /// This image view will be accessed via texture instructions (tex, etc.)
+    Texture,
+
+    /// This image view will be accessed as a storage image via surface
+    /// instructions (suld/sust)
+    ///
+    /// This primarily affects multisampled images.  With multisampled storage
+    /// image, we generate a descriptor which has the image dimensions in units
+    /// of samples rather than pixels.  The resulting descriptors are safe to
+    /// access via surface instructions (suld/sust) since the surface
+    /// instructions entirely ignore the MULTI_SAMPLE_COUNT field in the image
+    /// descriptor.  They are not, however, safe to access from texture
+    /// instructions as those take the sample count into account and will think
+    /// the image is too big, possibly leading to OOB reads.
+    ///
+    /// In NAK (the compiler component), we have lowering code which takes the
+    /// sample into account and is able compute 2D (x, y) coordidinates in
+    /// sample space which correspond to the logical (x, y, s) coordinate
+    /// provided by the client shader, thus allowing multisampled storage
+    /// access.
+    Storage,
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct View {
     pub view_type: ViewType,
+
+    pub access: ViewAccess,
 
     /// The format to use in the view
     ///

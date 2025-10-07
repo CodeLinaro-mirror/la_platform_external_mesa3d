@@ -70,7 +70,7 @@ struct panvk_rendering_state {
       /* nr_samples to be used before framebuffer / tiler descriptor are emitted */
       uint32_t nr_samples;
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
       uint32_t bo_count;
       struct pan_kmod_bo *bos[MAX_RTS + 2];
 #endif
@@ -128,7 +128,7 @@ struct panvk_cmd_graphics_state {
    struct panvk_occlusion_query_state occlusion_query;
    struct panvk_graphics_sysvals sysvals;
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
    struct panvk_shader_link link;
 #endif
 
@@ -137,7 +137,7 @@ struct panvk_cmd_graphics_state {
       struct panvk_shader_desc_state desc;
       uint64_t push_uniforms;
       bool required;
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
       uint64_t rsd;
 #endif
    } fs;
@@ -146,7 +146,7 @@ struct panvk_cmd_graphics_state {
       const struct panvk_shader *shader;
       struct panvk_shader_desc_state desc;
       uint64_t push_uniforms;
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
       uint64_t attribs;
       uint64_t attrib_bufs;
 #endif
@@ -166,7 +166,7 @@ struct panvk_cmd_graphics_state {
    /* Index buffer */
    struct {
       uint64_t dev_addr;
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
       void *host_addr;
 #endif
       uint64_t size;
@@ -181,7 +181,7 @@ struct panvk_cmd_graphics_state {
 
    bool vk_meta;
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
    uint64_t vpd;
 #endif
 
@@ -260,8 +260,9 @@ static inline bool
 fs_required(const struct panvk_cmd_graphics_state *state,
             const struct vk_dynamic_graphics_state *dyn_state)
 {
-   const struct pan_shader_info *fs_info =
-      state->fs.shader ? &state->fs.shader->info : NULL;
+   const struct panvk_shader_variant *fs =
+      panvk_shader_only_variant(state->fs.shader);
+   const struct pan_shader_info *fs_info = fs ? &fs->info : NULL;
    const struct vk_color_blend_state *cb = &dyn_state->cb;
    const struct vk_rasterization_state *rs = &dyn_state->rs;
 
@@ -377,7 +378,7 @@ struct panvk_draw_info {
    } index;
 
    struct {
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
       int32_t raw_offset;
 #endif
       int32_t base;
@@ -396,7 +397,7 @@ struct panvk_draw_info {
       uint32_t stride;
    } indirect;
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
    uint32_t layer_id;
 #endif
 };
@@ -407,7 +408,7 @@ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
 
 static inline uint32_t
 color_attachment_written_mask(
-   const struct panvk_shader *fs,
+   const struct panvk_shader_variant *fs,
    const struct vk_color_attachment_location_state *cal)
 {
    uint32_t written_by_shader =
@@ -428,7 +429,7 @@ color_attachment_written_mask(
 }
 
 static inline uint32_t
-color_attachment_read_mask(const struct panvk_shader *fs,
+color_attachment_read_mask(const struct panvk_shader_variant *fs,
                            const struct vk_input_attachment_location_state *ial,
                            uint8_t color_attachment_mask)
 {
@@ -453,7 +454,7 @@ color_attachment_read_mask(const struct panvk_shader *fs,
 }
 
 static inline bool
-z_attachment_read(const struct panvk_shader *fs,
+z_attachment_read(const struct panvk_shader_variant *fs,
                   const struct vk_input_attachment_location_state *ial)
 {
    uint32_t depth_mask = ial->depth_att == MESA_VK_ATTACHMENT_NO_INDEX
@@ -465,7 +466,7 @@ z_attachment_read(const struct panvk_shader *fs,
 }
 
 static inline bool
-s_attachment_read(const struct panvk_shader *fs,
+s_attachment_read(const struct panvk_shader_variant *fs,
                   const struct vk_input_attachment_location_state *ial)
 {
    uint32_t stencil_mask = ial->stencil_att == MESA_VK_ATTACHMENT_NO_INDEX

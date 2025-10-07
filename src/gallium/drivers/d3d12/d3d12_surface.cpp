@@ -50,7 +50,7 @@ view_dsv_dimension(enum pipe_texture_target target, unsigned samples)
                            D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
 
    default:
-      unreachable("unexpected target");
+      UNREACHABLE("unexpected target");
    }
 }
 
@@ -76,7 +76,7 @@ view_rtv_dimension(enum pipe_texture_target target, unsigned samples)
    case PIPE_TEXTURE_3D: return D3D12_RTV_DIMENSION_TEXTURE3D;
 
    default:
-      unreachable("unexpected target");
+      UNREACHABLE("unexpected target");
    }
 }
 
@@ -137,7 +137,7 @@ initialize_dsv(struct pipe_context *pctx,
       break;
 
    default:
-      unreachable("Unhandled DSV dimension");
+      UNREACHABLE("Unhandled DSV dimension");
    }
 
    mtx_lock(&screen->descriptor_pool_mutex);
@@ -216,7 +216,7 @@ initialize_rtv(struct pipe_context *pctx,
       break;
 
    default:
-      unreachable("Unhandled RTV dimension");
+      UNREACHABLE("Unhandled RTV dimension");
    }
 
    mtx_lock(&screen->descriptor_pool_mutex);
@@ -305,7 +305,7 @@ d3d12_surface_update_pre_draw(struct pipe_context *pctx,
                               struct d3d12_surface *surface,
                               DXGI_FORMAT format)
 {
-   struct d3d12_screen *screen = d3d12_screen(surface->base.context->screen);
+   struct d3d12_screen *screen = d3d12_screen(pctx->screen);
    struct d3d12_resource *res = d3d12_resource(surface->base.texture);
    DXGI_FORMAT dxgi_format = d3d12_get_resource_rt_format(surface->base.format);
    enum d3d12_surface_conversion_mode mode;
@@ -343,7 +343,7 @@ d3d12_surface_update_pre_draw(struct pipe_context *pctx,
    }
 
    if (!d3d12_descriptor_handle_is_allocated(&surface->uint_rtv_handle)) {
-      initialize_rtv(surface->base.context, &res->base.b, &surface->base,
+      initialize_rtv(pctx, &res->base.b, &surface->base,
                      &surface->uint_rtv_handle, DXGI_FORMAT_R8G8B8A8_UINT);
    }
 

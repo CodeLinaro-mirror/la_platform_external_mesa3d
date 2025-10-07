@@ -47,11 +47,9 @@
 		dri2_query_image;
 		dri2_dup_image;
 		dri2_validate_usage;
-		dri2_from_names;
 		dri2_from_planar;
 		dri2_from_dma_bufs;
 		dri2_blit_image;
-		dri2_get_capabilities;
 		dri2_map_image;
 		dri2_unmap_image;
 		dri_query_dma_buf_formats;
@@ -70,6 +68,7 @@
 		dri_server_wait_sync;
 		dri_set_blob_cache_funcs;
 		dri_get_pipe_screen;
+		dri_get_drm_device_info;
 		dri3*;
 		loader_dri3*;
 		dri_create_drawable;

@@ -181,12 +181,44 @@ brw_emit_interpolation_setup(brw_shader &s)
    const struct intel_device_info *devinfo = s.devinfo;
    const brw_builder bld = brw_builder(&s);
    brw_builder abld = bld.annotate("compute pixel centers");
+   const struct brw_wm_prog_key *wm_key = (brw_wm_prog_key*) s.key;
+   struct brw_wm_prog_data *wm_prog_data = brw_wm_prog_data(s.prog_data);
+
+   brw_reg ub_cps_width, ub_cps_height;
+   {
+      /* The coarse pixel size is delivered as 2 u8 in r1.0 if coarse pixel
+       * dispatch is active. Otherwise we need to build a value ourselves.
+       */
+      brw_builder ubld = bld.exec_all().scalar_group();
+      const brw_reg r1_0 = retype(brw_vec1_reg(FIXED_GRF, 1, 0), BRW_TYPE_UD);
+
+      brw_reg cps_size = ubld.vgrf(BRW_TYPE_UD);
+      switch (wm_prog_data->coarse_pixel_dispatch) {
+      case INTEL_NEVER:
+         ubld.MOV(cps_size, brw_imm_ud(0x00000101));
+         break;
+      case INTEL_SOMETIMES:
+         brw_check_dynamic_msaa_flag(ubld, wm_prog_data,
+                                     INTEL_MSAA_FLAG_COARSE_RT_WRITES);
+
+         set_predicate_inv(BRW_PREDICATE_NORMAL, false,
+                           ubld.MOV(cps_size, r1_0));
+         set_predicate_inv(BRW_PREDICATE_NORMAL, true,
+                           ubld.MOV(cps_size, brw_imm_ud(0x00000101)));
+         break;
+      case INTEL_ALWAYS:
+         ubld.MOV(cps_size, r1_0);
+         break;
+      }
+
+      cps_size = component(cps_size, 0);
+      ub_cps_width = retype(cps_size, BRW_TYPE_UB);
+      ub_cps_height = byte_offset(retype(cps_size, BRW_TYPE_UB), 1);
+   }
 
    s.pixel_x = bld.vgrf(BRW_TYPE_F);
    s.pixel_y = bld.vgrf(BRW_TYPE_F);
 
-   const struct brw_wm_prog_key *wm_key = (brw_wm_prog_key*) s.key;
-   struct brw_wm_prog_data *wm_prog_data = brw_wm_prog_data(s.prog_data);
    brw_fs_thread_payload &payload = s.fs_payload();
 
    brw_reg int_sample_offset_x, int_sample_offset_y; /* Used on Gen12HP+ */
@@ -245,11 +277,7 @@ brw_emit_interpolation_setup(brw_shader &s)
       /* In coarse pixel dispatch we have to do the same ADD instruction that
        * we do in normal per pixel dispatch, except this time we're not adding
        * 1 in each direction, but instead the coarse pixel size.
-       *
-       * The coarse pixel size is delivered as 2 u8 in r1.0
        */
-      struct brw_reg r1_0 = retype(brw_vec1_reg(FIXED_GRF, 1, 0), BRW_TYPE_UB);
-
       const brw_builder dbld =
          abld.exec_all().group(MIN2(16, s.dispatch_width) * 2, 0);
 
@@ -258,21 +286,21 @@ brw_emit_interpolation_setup(brw_shader &s)
           * right mask in X.
           */
          int_coarse_offset_x = dbld.vgrf(BRW_TYPE_UW);
-         dbld.AND(int_coarse_offset_x, byte_offset(r1_0, 0), brw_imm_v(0x0f000f00));
+         dbld.AND(int_coarse_offset_x, ub_cps_width, brw_imm_v(0x0f000f00));
 
          /* And the right mask in Y. */
          int_coarse_offset_y = dbld.vgrf(BRW_TYPE_UW);
-         dbld.AND(int_coarse_offset_y, byte_offset(r1_0, 1), brw_imm_v(0x0f0f0000));
+         dbld.AND(int_coarse_offset_y, ub_cps_height, brw_imm_v(0x0f0f0000));
       } else {
          /* To build the array of half bytes we do and AND operation with the
           * right mask in X.
           */
          int_coarse_offset_x = dbld.vgrf(BRW_TYPE_UW);
-         dbld.AND(int_coarse_offset_x, byte_offset(r1_0, 0), brw_imm_v(0x0000f0f0));
+         dbld.AND(int_coarse_offset_x, ub_cps_width, brw_imm_v(0x0000f0f0));
 
          /* And the right mask in Y. */
          int_coarse_offset_y = dbld.vgrf(BRW_TYPE_UW);
-         dbld.AND(int_coarse_offset_y, byte_offset(r1_0, 1), brw_imm_v(0xff000000));
+         dbld.AND(int_coarse_offset_y, ub_cps_height, brw_imm_v(0xff000000));
 
          /* Finally OR the 2 registers. */
          int_coarse_offset_xy = dbld.vgrf(BRW_TYPE_UW);
@@ -283,8 +311,8 @@ brw_emit_interpolation_setup(brw_shader &s)
       half_int_coarse_offset_x = bld.vgrf(BRW_TYPE_UW);
       half_int_coarse_offset_y = bld.vgrf(BRW_TYPE_UW);
 
-      bld.SHR(half_int_coarse_offset_x, suboffset(r1_0, 0), brw_imm_ud(1));
-      bld.SHR(half_int_coarse_offset_y, suboffset(r1_0, 1), brw_imm_ud(1));
+      bld.SHR(half_int_coarse_offset_x, ub_cps_width, brw_imm_ud(1));
+      bld.SHR(half_int_coarse_offset_y, ub_cps_height, brw_imm_ud(1));
    }
 
    brw_reg int_pixel_offset_x, int_pixel_offset_y; /* Used on Gen12HP+ */
@@ -347,6 +375,9 @@ brw_emit_interpolation_setup(brw_shader &s)
       break;
    }
 
+   brw_reg uw_pixel_x = abld.vgrf(BRW_TYPE_UW);
+   brw_reg uw_pixel_y = abld.vgrf(BRW_TYPE_UW);
+
    for (unsigned i = 0; i < DIV_ROUND_UP(s.dispatch_width, 16); i++) {
       const brw_builder hbld = abld.group(MIN2(16, s.dispatch_width), i);
       /* According to the "PS Thread Payload for Normal Dispatch"
@@ -359,32 +390,54 @@ brw_emit_interpolation_setup(brw_shader &s)
                                     brw_vec1_grf(i + 1, 0);
       const struct brw_reg gi_uw = retype(gi_reg, BRW_TYPE_UW);
 
+      brw_reg int_pixel_x = offset(uw_pixel_x, hbld, i);
+      brw_reg int_pixel_y = offset(uw_pixel_y, hbld, i);
+
       if (devinfo->verx10 >= 125) {
+         /* We compute two sets of int pixel x/y: one with a 2 byte stride for
+          * future load_pixel_coord, and one with a 4 byte stride to meet
+          * regioning restrictions for the add into a float result that
+          * implements the current load_frag_coord.
+          */
          const brw_builder dbld =
             abld.exec_all().group(hbld.dispatch_width() * 2, 0);
-         const brw_reg int_pixel_x = dbld.vgrf(BRW_TYPE_UW);
-         const brw_reg int_pixel_y = dbld.vgrf(BRW_TYPE_UW);
+         const brw_reg int_pixel_x_4b = dbld.vgrf(BRW_TYPE_UW);
+         const brw_reg int_pixel_y_4b = dbld.vgrf(BRW_TYPE_UW);
 
-         dbld.ADD(int_pixel_x,
+         hbld.ADD(int_pixel_x,
                   brw_reg(stride(suboffset(gi_uw, 4), 2, 8, 0)),
                   int_pixel_offset_x);
-         dbld.ADD(int_pixel_y,
+         hbld.ADD(int_pixel_y,
+                  brw_reg(stride(suboffset(gi_uw, 5), 2, 8, 0)),
+                  int_pixel_offset_y);
+         dbld.ADD(int_pixel_x_4b,
+                  brw_reg(stride(suboffset(gi_uw, 4), 2, 8, 0)),
+                  int_pixel_offset_x);
+         dbld.ADD(int_pixel_y_4b,
                   brw_reg(stride(suboffset(gi_uw, 5), 2, 8, 0)),
                   int_pixel_offset_y);
 
          if (wm_prog_data->coarse_pixel_dispatch != INTEL_NEVER) {
-            brw_inst *addx = dbld.ADD(int_pixel_x, int_pixel_x,
+            brw_inst *addx = hbld.ADD(int_pixel_x, int_pixel_x,
                                      horiz_stride(half_int_pixel_offset_x, 0));
-            brw_inst *addy = dbld.ADD(int_pixel_y, int_pixel_y,
+            brw_inst *addy = hbld.ADD(int_pixel_y, int_pixel_y,
                                      horiz_stride(half_int_pixel_offset_y, 0));
+            if (wm_prog_data->coarse_pixel_dispatch != INTEL_ALWAYS) {
+               addx->predicate = BRW_PREDICATE_NORMAL;
+               addy->predicate = BRW_PREDICATE_NORMAL;
+            }
+            addx = dbld.ADD(int_pixel_x_4b, int_pixel_x_4b,
+                            horiz_stride(half_int_pixel_offset_x, 0));
+            addy = dbld.ADD(int_pixel_y_4b, int_pixel_y_4b,
+                            horiz_stride(half_int_pixel_offset_y, 0));
             if (wm_prog_data->coarse_pixel_dispatch != INTEL_ALWAYS) {
                addx->predicate = BRW_PREDICATE_NORMAL;
                addy->predicate = BRW_PREDICATE_NORMAL;
             }
          }
 
-         hbld.MOV(offset(s.pixel_x, hbld, i), horiz_stride(int_pixel_x, 2));
-         hbld.MOV(offset(s.pixel_y, hbld, i), horiz_stride(int_pixel_y, 2));
+         hbld.MOV(offset(s.pixel_x, hbld, i), horiz_stride(int_pixel_x_4b, 2));
+         hbld.MOV(offset(s.pixel_y, hbld, i), horiz_stride(int_pixel_y_4b, 2));
 
       } else {
          /* The "Register Region Restrictions" page says for BDW (and newer,
@@ -405,10 +458,13 @@ brw_emit_interpolation_setup(brw_shader &s)
                   brw_reg(stride(suboffset(gi_uw, 4), 1, 4, 0)),
                   int_pixel_offset_xy);
 
-         hbld.emit(FS_OPCODE_PIXEL_X, offset(s.pixel_x, hbld, i), int_pixel_xy,
+         hbld.emit(FS_OPCODE_PIXEL_X, int_pixel_x, int_pixel_xy,
                                       horiz_stride(half_int_pixel_offset_x, 0));
-         hbld.emit(FS_OPCODE_PIXEL_Y, offset(s.pixel_y, hbld, i), int_pixel_xy,
+         hbld.emit(FS_OPCODE_PIXEL_Y, int_pixel_y, int_pixel_xy,
                                       horiz_stride(half_int_pixel_offset_y, 0));
+
+         hbld.MOV(offset(s.pixel_x, hbld, i), int_pixel_x);
+         hbld.MOV(offset(s.pixel_y, hbld, i), int_pixel_y);
       }
    }
 
@@ -420,6 +476,8 @@ brw_emit_interpolation_setup(brw_shader &s)
        * properly. In the same way we have to add the coarse pixel size to
        * pixels locations, here we recompute the Z value with 2 coefficients
        * in X & Y axis.
+       *
+       * src_z = (x - xstart)*z_cx + (y - ystart)*z_cy + z_c0
        */
       brw_reg coef_payload = brw_vec8_grf(payload.depth_w_coef_reg, 0);
       const brw_reg x_start = devinfo->ver >= 20 ?
@@ -444,19 +502,10 @@ brw_emit_interpolation_setup(brw_shader &s)
       abld.ADD(float_pixel_x, s.pixel_x, negate(x_start));
       abld.ADD(float_pixel_y, s.pixel_y, negate(y_start));
 
-      /* r1.0 - 0:7 ActualCoarsePixelShadingSize.X */
-      const brw_reg u8_cps_width = brw_reg(retype(brw_vec1_grf(1, 0), BRW_TYPE_UB));
-      /* r1.0 - 15:8 ActualCoarsePixelShadingSize.Y */
-      const brw_reg u8_cps_height = byte_offset(u8_cps_width, 1);
-      const brw_reg u32_cps_width = abld.vgrf(BRW_TYPE_UD);
-      const brw_reg u32_cps_height = abld.vgrf(BRW_TYPE_UD);
-      abld.MOV(u32_cps_width, u8_cps_width);
-      abld.MOV(u32_cps_height, u8_cps_height);
-
       const brw_reg f_cps_width = abld.vgrf(BRW_TYPE_F);
       const brw_reg f_cps_height = abld.vgrf(BRW_TYPE_F);
-      abld.MOV(f_cps_width, u32_cps_width);
-      abld.MOV(f_cps_height, u32_cps_height);
+      abld.MOV(f_cps_width, ub_cps_width);
+      abld.MOV(f_cps_height, ub_cps_height);
 
       /* Center in the middle of the coarse pixel. */
       abld.MAD(float_pixel_x, float_pixel_x, f_cps_width, brw_imm_f(0.5f));
@@ -472,22 +521,19 @@ brw_emit_interpolation_setup(brw_shader &s)
 
    if (wm_prog_data->uses_depth_w_coefficients ||
        wm_prog_data->uses_src_depth) {
-      brw_reg sample_z = s.pixel_z;
-
       switch (wm_prog_data->coarse_pixel_dispatch) {
       case INTEL_NEVER:
          break;
 
       case INTEL_SOMETIMES:
-         assert(wm_prog_data->uses_src_depth);
-         assert(wm_prog_data->uses_depth_w_coefficients);
-         s.pixel_z = abld.vgrf(BRW_TYPE_F);
+         /* We cannot enable 3DSTATE_PS_EXTRA::PixelShaderUsesSourceDepth when
+          * coarse is enabled. Here we don't know if it's going to be, but
+          * setting brw_wm_prog_data::uses_src_depth dynamically would disturb
+          * the payload. So instead rely on the computed coarse_z which will
+          * produce a correct value even when coarse is disabled.
+          */
 
-         /* We re-use the check_dynamic_msaa_flag() call from above */
-         set_predicate(BRW_PREDICATE_NORMAL,
-                       abld.SEL(s.pixel_z, coarse_z, sample_z));
-         break;
-
+         /* Fallthrough */
       case INTEL_ALWAYS:
          assert(!wm_prog_data->uses_src_depth);
          assert(wm_prog_data->uses_depth_w_coefficients);
@@ -665,19 +711,22 @@ calculate_urb_setup(const struct intel_device_info *devinfo,
 
    if (mue_map != NULL) {
       memcpy(&vue_map, &mue_map->vue_map, sizeof(vue_map));
-
       memcpy(per_primitive_offsets,
              mue_map->per_primitive_offsets,
              sizeof(mue_map->per_primitive_offsets));
 
-      u_foreach_bit64(location, per_primitive_inputs) {
-         assert(per_primitive_offsets[location] != -1);
+      if (!mue_map->wa_18019110168_active) {
+         u_foreach_bit64(location, per_primitive_inputs) {
+            assert(per_primitive_offsets[location] != -1);
 
-         first_read_offset = MIN2(first_read_offset,
-                                  (uint32_t)per_primitive_offsets[location]);
-         per_primitive_stride =
-            MAX2((uint32_t)per_primitive_offsets[location] + 16,
-                 per_primitive_stride);
+            first_read_offset = MIN2(first_read_offset,
+                                     (uint32_t)per_primitive_offsets[location]);
+            per_primitive_stride =
+               MAX2((uint32_t)per_primitive_offsets[location] + 16,
+                    per_primitive_stride);
+         }
+      } else {
+         first_read_offset = per_primitive_stride = 0;
       }
    } else {
       brw_compute_vue_map(devinfo, &vue_map, inputs_read,
@@ -765,23 +814,6 @@ calculate_urb_setup(const struct intel_device_info *devinfo,
 
    brw_compute_urb_setup_index(prog_data);
 }
-static bool
-is_used_in_not_interp_frag_coord(nir_def *def)
-{
-   nir_foreach_use_including_if(src, def) {
-      if (nir_src_is_if(src))
-         return true;
-
-      if (nir_src_parent_instr(src)->type != nir_instr_type_intrinsic)
-         return true;
-
-      nir_intrinsic_instr *intrin = nir_instr_as_intrinsic(nir_src_parent_instr(src));
-      if (intrin->intrinsic != nir_intrinsic_load_frag_coord)
-         return true;
-   }
-
-   return false;
-}
 
 /**
  * Return a bitfield where bit n is set if barycentric interpolation mode n
@@ -815,10 +847,6 @@ brw_compute_barycentric_interp_modes(const struct intel_device_info *devinfo,
             default:
                continue;
             }
-
-            /* Ignore WPOS; it doesn't require interpolation. */
-            if (!is_used_in_not_interp_frag_coord(&intrin->def))
-               continue;
 
             enum intel_barycentric_mode bary =
                brw_barycentric_mode(key, intrin);
@@ -1030,7 +1058,8 @@ brw_nir_populate_wm_prog_data(nir_shader *shader,
        prog_data->sample_shading ||
        prog_data->uses_sample_mask ||
        (prog_data->computed_depth_mode != BRW_PSCDEPTH_OFF) ||
-       prog_data->computed_stencil) {
+       prog_data->computed_stencil ||
+       devinfo->ver < 11) {
       prog_data->coarse_pixel_dispatch = INTEL_NEVER;
    }
 
@@ -1075,7 +1104,7 @@ brw_nir_populate_wm_prog_data(nir_shader *shader,
       BITSET_TEST(shader->info.system_values_read, SYSTEM_VALUE_FRAG_COORD);
    prog_data->uses_src_depth =
       BITSET_TEST(shader->info.system_values_read, SYSTEM_VALUE_FRAG_COORD) &&
-      prog_data->coarse_pixel_dispatch != INTEL_ALWAYS;
+      prog_data->coarse_pixel_dispatch == INTEL_NEVER;
    prog_data->uses_depth_w_coefficients = prog_data->uses_pc_bary_coefficients ||
       (BITSET_TEST(shader->info.system_values_read, SYSTEM_VALUE_FRAG_COORD) &&
        prog_data->coarse_pixel_dispatch != INTEL_NEVER);
@@ -1111,12 +1140,168 @@ gfx9_ps_header_only_workaround(struct brw_wm_prog_data *wm_prog_data)
    brw_compute_urb_setup_index(wm_prog_data);
 }
 
+static brw_reg
+remap_attr_reg(brw_shader &s,
+               struct brw_wm_prog_data *prog_data,
+               const brw_reg &src,
+               unsigned urb_start,
+               unsigned exec_size)
+{
+   /* ATTR brw_reg::nr in the FS is in units of logical scalar inputs each of
+    * which consumes 16B on Gfx4-Gfx12. In single polygon mode this leads to
+    * the following layout of the vertex setup plane parameters in the ATTR
+    * register file:
+    *
+    *  brw_reg::nr   Input   Comp0  Comp1  Comp2  Comp3
+    *      0       Attr0.x  a1-a0  a2-a0   N/A    a0
+    *      1       Attr0.y  a1-a0  a2-a0   N/A    a0
+    *      2       Attr0.z  a1-a0  a2-a0   N/A    a0
+    *      3       Attr0.w  a1-a0  a2-a0   N/A    a0
+    *      4       Attr1.x  a1-a0  a2-a0   N/A    a0
+    *     ...
+    *
+    * In multipolygon mode that no longer works since different channels may
+    * be processing polygons with different plane parameters, so each
+    * parameter above is represented as a dispatch_width-wide vector:
+    *
+    *  brw_reg::nr     brw_reg::offset    Input      Comp0     ...    CompN
+    *      0                 0          Attr0.x  a1[0]-a0[0] ... a1[N]-a0[N]
+    *      0        4 * dispatch_width  Attr0.x  a2[0]-a0[0] ... a2[N]-a0[N]
+    *      0        8 * dispatch_width  Attr0.x     N/A      ...     N/A
+    *      0       12 * dispatch_width  Attr0.x    a0[0]     ...    a0[N]
+    *      1                 0          Attr0.y  a1[0]-a0[0] ... a1[N]-a0[N]
+    *     ...
+    *
+    * Note that many of the components on a single row above are likely to be
+    * replicated multiple times (if, say, a single SIMD thread is only
+    * processing 2 different polygons), so plane parameters aren't actually
+    * stored in GRF memory with that layout to avoid wasting space. Instead we
+    * compose ATTR register regions with a 2D region that walks through the
+    * parameters of each polygon with the correct stride, reading the
+    * parameter corresponding to each channel directly from the PS thread
+    * payload.
+    *
+    * The latter layout corresponds to a param_width equal to dispatch_width,
+    * while the former (scalar parameter) layout has a param_width of 1.
+    *
+    * Gfx20+ represent plane parameters in a format similar to the above,
+    * except the parameters are packed in 12B and ordered like "a0, a1-a0,
+    * a2-a0" instead of the above vec4 representation with a missing
+    * component.
+    *
+    * First documented in the TGL PRMs, Volume 9: Render Engine, PS Thread
+    * Payload for Normal Dispatch.
+    *
+    * Pre Xe2 : BSpec 47024
+    * Xe2+    : BSpec 56480
+    */
+   const unsigned param_width = (s.max_polygons > 1 ? s.dispatch_width : 1);
+
+   /* Size of a single scalar component of a plane parameter
+    * in bytes.
+    */
+   const unsigned chan_sz = 4;
+   struct brw_reg reg;
+   assert(s.max_polygons > 0);
+
+   /* Calculate the base register on the thread payload of
+    * either the block of vertex setup data or the block of
+    * per-primitive constant data depending on whether we're
+    * accessing a primitive or vertex input.  Also calculate
+    * the index of the input within that block.
+    */
+   const bool per_prim = src.nr < prog_data->num_per_primitive_inputs;
+   const unsigned base = urb_start +
+      (per_prim ? 0 :
+       ALIGN(prog_data->num_per_primitive_inputs / 2,
+             reg_unit(s.devinfo)) * s.max_polygons);
+   const unsigned idx = per_prim ? src.nr :
+      src.nr - prog_data->num_per_primitive_inputs;
+
+   /* Translate the offset within the param_width-wide
+    * representation described above into an offset and a
+    * grf, which contains the plane parameters for the first
+    * polygon processed by the thread.
+    */
+   if (s.devinfo->ver >= 20 && !per_prim) {
+      /* Gfx20+ is able to pack 5 logical input components
+       * per 64B register for vertex setup data.
+       */
+      const unsigned grf = base + idx / 5 * 2 * s.max_polygons;
+      assert(src.offset / param_width < 12);
+      const unsigned delta = idx % 5 * 12 +
+         src.offset / (param_width * chan_sz) * chan_sz +
+         src.offset % chan_sz;
+      reg = byte_offset(retype(brw_vec8_grf(grf, 0), src.type), delta);
+   } else {
+      /* Earlier platforms and per-primitive block pack 2 logical
+       * input components per 32B register.
+       */
+      const unsigned grf = base + idx / 2 * s.max_polygons;
+      assert(reg.offset / param_width < REG_SIZE / 2);
+      const unsigned delta = (idx % 2) * (REG_SIZE / 2) +
+         src.offset / (param_width * chan_sz) * chan_sz +
+         src.offset % chan_sz;
+      reg = byte_offset(retype(brw_vec8_grf(grf, 0), src.type), delta);
+   }
+
+   if (s.max_polygons > 1) {
+      assert(s.devinfo->ver >= 12);
+      /* Misaligned channel strides that would lead to
+       * cross-channel access in the representation above are
+       * disallowed.
+       */
+      assert(src.stride * brw_type_size_bytes(src.type) == chan_sz);
+
+      /* Number of channels processing the same polygon. */
+      const unsigned poly_width = s.dispatch_width / s.max_polygons;
+      assert(s.dispatch_width % s.max_polygons == 0);
+
+      /* Accessing a subset of channels of a parameter vector
+       * starting from "chan" is necessary to handle
+       * SIMD-lowered instructions though.
+       */
+      const unsigned chan = src.offset %
+         (param_width * chan_sz) / chan_sz;
+      assert(chan < s.dispatch_width);
+      assert(chan % poly_width == 0);
+      const unsigned reg_size = reg_unit(s.devinfo) * REG_SIZE;
+      reg = byte_offset(reg, chan / poly_width * reg_size);
+
+      if (exec_size > poly_width) {
+         /* Accessing the parameters for multiple polygons.
+          * Corresponding parameters for different polygons
+          * are stored a GRF apart on the thread payload, so
+          * use that as vertical stride.
+          */
+         const unsigned vstride = reg_size / brw_type_size_bytes(src.type);
+         assert(vstride <= 32);
+         assert(chan % poly_width == 0);
+         reg = stride(reg, vstride, poly_width, 0);
+      } else {
+         /* Accessing one parameter for a single polygon --
+          * Translate to a scalar region.
+          */
+         assert(chan % poly_width + exec_size <= poly_width);
+         reg = stride(reg, 0, 1, 0);
+      }
+
+   } else {
+      const unsigned width = src.stride == 0 ? 1 : MIN2(exec_size, 8);
+      reg = stride(reg, width * src.stride, width, src.stride);
+   }
+
+   reg.abs = src.abs;
+   reg.negate = src.negate;
+
+   return reg;
+}
+
 static void
 brw_assign_urb_setup(brw_shader &s)
 {
    assert(s.stage == MESA_SHADER_FRAGMENT);
 
-   const struct intel_device_info *devinfo = s.devinfo;
    struct brw_wm_prog_data *prog_data = brw_wm_prog_data(s.prog_data);
 
    int urb_start = s.payload().num_regs + prog_data->base.curb_read_length;
@@ -1137,164 +1322,16 @@ brw_assign_urb_setup(brw_shader &s)
          continue;
       }
 
+      if (inst->dst.file == ATTR) {
+         inst->dst = remap_attr_reg(s, prog_data, inst->dst,
+                                    urb_start, inst->exec_size);
+         continue;
+      }
+
       for (int i = 0; i < inst->sources; i++) {
          if (inst->src[i].file == ATTR) {
-            /* ATTR brw_reg::nr in the FS is in units of logical scalar
-             * inputs each of which consumes 16B on Gfx4-Gfx12.  In
-             * single polygon mode this leads to the following layout
-             * of the vertex setup plane parameters in the ATTR
-             * register file:
-             *
-             *  brw_reg::nr   Input   Comp0  Comp1  Comp2  Comp3
-             *      0       Attr0.x  a1-a0  a2-a0   N/A    a0
-             *      1       Attr0.y  a1-a0  a2-a0   N/A    a0
-             *      2       Attr0.z  a1-a0  a2-a0   N/A    a0
-             *      3       Attr0.w  a1-a0  a2-a0   N/A    a0
-             *      4       Attr1.x  a1-a0  a2-a0   N/A    a0
-             *     ...
-             *
-             * In multipolygon mode that no longer works since
-             * different channels may be processing polygons with
-             * different plane parameters, so each parameter above is
-             * represented as a dispatch_width-wide vector:
-             *
-             *  brw_reg::nr     brw_reg::offset    Input      Comp0     ...    CompN
-             *      0                 0          Attr0.x  a1[0]-a0[0] ... a1[N]-a0[N]
-             *      0        4 * dispatch_width  Attr0.x  a2[0]-a0[0] ... a2[N]-a0[N]
-             *      0        8 * dispatch_width  Attr0.x     N/A      ...     N/A
-             *      0       12 * dispatch_width  Attr0.x    a0[0]     ...    a0[N]
-             *      1                 0          Attr0.y  a1[0]-a0[0] ... a1[N]-a0[N]
-             *     ...
-             *
-             * Note that many of the components on a single row above
-             * are likely to be replicated multiple times (if, say, a
-             * single SIMD thread is only processing 2 different
-             * polygons), so plane parameters aren't actually stored
-             * in GRF memory with that layout to avoid wasting space.
-             * Instead we compose ATTR register regions with a 2D
-             * region that walks through the parameters of each
-             * polygon with the correct stride, reading the parameter
-             * corresponding to each channel directly from the PS
-             * thread payload.
-             *
-             * The latter layout corresponds to a param_width equal to
-             * dispatch_width, while the former (scalar parameter)
-             * layout has a param_width of 1.
-             *
-             * Gfx20+ represent plane parameters in a format similar
-             * to the above, except the parameters are packed in 12B
-             * and ordered like "a0, a1-a0, a2-a0" instead of the
-             * above vec4 representation with a missing component.
-             *
-             * First documented in the TGL PRMs, Volume 9: Render Engine, PS
-             * Thread Payload for Normal Dispatch.
-             *
-             * Pre Xe2 : BSpec 47024
-             * Xe2+    : BSpec 56480
-             */
-            const unsigned param_width = (s.max_polygons > 1 ? s.dispatch_width : 1);
-
-            /* Size of a single scalar component of a plane parameter
-             * in bytes.
-             */
-            const unsigned chan_sz = 4;
-            struct brw_reg reg;
-            assert(s.max_polygons > 0);
-
-            /* Calculate the base register on the thread payload of
-             * either the block of vertex setup data or the block of
-             * per-primitive constant data depending on whether we're
-             * accessing a primitive or vertex input.  Also calculate
-             * the index of the input within that block.
-             */
-            const bool per_prim = inst->src[i].nr < prog_data->num_per_primitive_inputs;
-            const unsigned base = urb_start +
-               (per_prim ? 0 :
-                ALIGN(prog_data->num_per_primitive_inputs / 2,
-                      reg_unit(devinfo)) * s.max_polygons);
-            const unsigned idx = per_prim ? inst->src[i].nr :
-               inst->src[i].nr - prog_data->num_per_primitive_inputs;
-
-            /* Translate the offset within the param_width-wide
-             * representation described above into an offset and a
-             * grf, which contains the plane parameters for the first
-             * polygon processed by the thread.
-             */
-            if (devinfo->ver >= 20 && !per_prim) {
-               /* Gfx20+ is able to pack 5 logical input components
-                * per 64B register for vertex setup data.
-                */
-               const unsigned grf = base + idx / 5 * 2 * s.max_polygons;
-               assert(inst->src[i].offset / param_width < 12);
-               const unsigned delta = idx % 5 * 12 +
-                  inst->src[i].offset / (param_width * chan_sz) * chan_sz +
-                  inst->src[i].offset % chan_sz;
-               reg = byte_offset(retype(brw_vec8_grf(grf, 0), inst->src[i].type),
-                                 delta);
-            } else {
-               /* Earlier platforms and per-primitive block pack 2 logical
-                * input components per 32B register.
-                */
-               const unsigned grf = base + idx / 2 * s.max_polygons;
-               assert(inst->src[i].offset / param_width < REG_SIZE / 2);
-               const unsigned delta = (idx % 2) * (REG_SIZE / 2) +
-                  inst->src[i].offset / (param_width * chan_sz) * chan_sz +
-                  inst->src[i].offset % chan_sz;
-               reg = byte_offset(retype(brw_vec8_grf(grf, 0), inst->src[i].type),
-                                 delta);
-            }
-
-            if (s.max_polygons > 1) {
-               assert(devinfo->ver >= 12);
-               /* Misaligned channel strides that would lead to
-                * cross-channel access in the representation above are
-                * disallowed.
-                */
-               assert(inst->src[i].stride * brw_type_size_bytes(inst->src[i].type) == chan_sz);
-
-               /* Number of channels processing the same polygon. */
-               const unsigned poly_width = s.dispatch_width / s.max_polygons;
-               assert(s.dispatch_width % s.max_polygons == 0);
-
-               /* Accessing a subset of channels of a parameter vector
-                * starting from "chan" is necessary to handle
-                * SIMD-lowered instructions though.
-                */
-               const unsigned chan = inst->src[i].offset %
-                  (param_width * chan_sz) / chan_sz;
-               assert(chan < s.dispatch_width);
-               assert(chan % poly_width == 0);
-               const unsigned reg_size = reg_unit(devinfo) * REG_SIZE;
-               reg = byte_offset(reg, chan / poly_width * reg_size);
-
-               if (inst->exec_size > poly_width) {
-                  /* Accessing the parameters for multiple polygons.
-                   * Corresponding parameters for different polygons
-                   * are stored a GRF apart on the thread payload, so
-                   * use that as vertical stride.
-                   */
-                  const unsigned vstride = reg_size / brw_type_size_bytes(inst->src[i].type);
-                  assert(vstride <= 32);
-                  assert(chan % poly_width == 0);
-                  reg = stride(reg, vstride, poly_width, 0);
-               } else {
-                  /* Accessing one parameter for a single polygon --
-                   * Translate to a scalar region.
-                   */
-                  assert(chan % poly_width + inst->exec_size <= poly_width);
-                  reg = stride(reg, 0, 1, 0);
-               }
-
-            } else {
-               const unsigned width = inst->src[i].stride == 0 ?
-                  1 : MIN2(inst->exec_size, 8);
-               reg = stride(reg, width * inst->src[i].stride,
-                            width, inst->src[i].stride);
-            }
-
-            reg.abs = inst->src[i].abs;
-            reg.negate = inst->src[i].negate;
-            inst->src[i] = reg;
+            inst->src[i] = remap_attr_reg(s, prog_data, inst->src[i],
+                                          urb_start, inst->exec_size);
          }
       }
    }
@@ -1456,8 +1493,24 @@ brw_compile_fs(const struct brw_compiler *compiler,
 
    const struct intel_device_info *devinfo = compiler->devinfo;
    const unsigned max_subgroup_size = 32;
+   unsigned max_polygons = MAX2(1, params->max_polygons);
 
    brw_nir_apply_key(nir, compiler, &key->base, max_subgroup_size);
+
+   if (brw_nir_fragment_shader_needs_wa_18019110168(devinfo, key->mesh_input, nir)) {
+      if (params->mue_map && params->mue_map->wa_18019110168_active) {
+         brw_nir_frag_convert_attrs_prim_to_vert(
+            nir, params->mue_map->per_primitive_offsets);
+      } else {
+         NIR_PASS(_, nir, brw_nir_frag_convert_attrs_prim_to_vert_indirect,
+                  devinfo, params);
+      }
+      /* Remapping per-primitive inputs into unused per-vertex inputs cannot
+       * work with multipolygon.
+       */
+      max_polygons = 1;
+   }
+
    brw_nir_lower_fs_inputs(nir, devinfo, key);
    brw_nir_lower_fs_outputs(nir);
 
@@ -1541,8 +1594,8 @@ brw_compile_fs(const struct brw_compiler *compiler,
       unsigned max_dispatch_width = reqd_dispatch_width ? reqd_dispatch_width : 32;
       brw_shader *vbase = NULL;
 
-      if (params->max_polygons >= 2 && !key->coarse_pixel) {
-         if (params->max_polygons >= 4 && max_dispatch_width >= 32 &&
+      if (max_polygons >= 2 && !key->coarse_pixel) {
+         if (max_polygons >= 4 && max_dispatch_width >= 32 &&
              4 * prog_data->num_varying_inputs <= MAX_VARYING &&
              INTEL_SIMD(FS, 4X8)) {
             /* Try a quad-SIMD8 compile */
@@ -1730,13 +1783,12 @@ brw_compile_fs(const struct brw_compiler *compiler,
       }
 
       if (devinfo->ver >= 12 && !has_spilled &&
-          params->max_polygons >= 2 && !key->coarse_pixel &&
+          max_polygons >= 2 && !key->coarse_pixel &&
           reqd_dispatch_width == SUBGROUP_SIZE_VARYING) {
          brw_shader *vbase = v8 ? v8.get() : v16 ? v16.get() : v32.get();
          assert(vbase);
 
-         if (devinfo->ver >= 20 &&
-             params->max_polygons >= 4 &&
+         if (devinfo->ver >= 20 && max_polygons >= 4 &&
              vbase->max_dispatch_width >= 32 &&
              4 * prog_data->num_varying_inputs <= MAX_VARYING &&
              INTEL_SIMD(FS, 4X8)) {
@@ -1871,11 +1923,13 @@ brw_compile_fs(const struct brw_compiler *compiler,
 extern "C" void
 brw_compute_sbe_per_vertex_urb_read(const struct intel_vue_map *prev_stage_vue_map,
                                     bool mesh,
+                                    bool per_primitive_remapping,
                                     const struct brw_wm_prog_data *wm_prog_data,
                                     uint32_t *out_read_offset,
                                     uint32_t *out_read_length,
                                     uint32_t *out_num_varyings,
-                                    uint32_t *out_primitive_id_offset)
+                                    uint32_t *out_primitive_id_offset,
+                                    uint32_t *out_flat_inputs)
 {
    int first_slot = INT32_MAX, last_slot = -1;
 
@@ -1913,6 +1967,7 @@ brw_compute_sbe_per_vertex_urb_read(const struct intel_vue_map *prev_stage_vue_m
           (first_slot >= 0 && last_slot >= 0 && last_slot >= first_slot));
 
    uint32_t num_varyings = wm_prog_data->num_varying_inputs;
+   uint32_t remapped_flat_inputs = 0;
 
    /* When using INTEL_VUE_LAYOUT_SEPARATE_MESH, the location of the
     * PrimitiveID is unknown at compile time, here we compute the offset
@@ -1921,7 +1976,19 @@ brw_compute_sbe_per_vertex_urb_read(const struct intel_vue_map *prev_stage_vue_m
     */
    *out_primitive_id_offset = 0;
    if (prev_stage_vue_map->layout == INTEL_VUE_LAYOUT_SEPARATE_MESH) {
-      if (mesh) {
+      if (per_primitive_remapping && wm_prog_data->per_primitive_inputs != 0) {
+         /* When the mesh shader remaps per-primitive slots to per-vertex
+          * ones, read the entire set of slots.
+          */
+         assert(mesh);
+         remapped_flat_inputs =
+            ((1u << prev_stage_vue_map->num_slots) - 1) &
+            ~((1u << last_slot) - 1);
+         *out_flat_inputs |= remapped_flat_inputs;
+         last_slot = prev_stage_vue_map->num_slots - 1;
+         *out_primitive_id_offset = INTEL_MSAA_FLAG_PRIMITIVE_ID_INDEX_MESH;
+         num_varyings = prev_stage_vue_map->num_slots - first_slot;
+      } else if (mesh) {
          /* When using Mesh, the PrimitiveID is in the per-primitive block. */
          if (wm_prog_data->urb_setup[VARYING_SLOT_PRIMITIVE_ID] >= 0)
             num_varyings--;
@@ -1937,10 +2004,16 @@ brw_compute_sbe_per_vertex_urb_read(const struct intel_vue_map *prev_stage_vue_m
              * use that.
              */
             if (wm_prog_data->urb_setup[VARYING_SLOT_PRIMITIVE_ID] >= 0) {
-               if (first_slot == INT32_MAX)
-                  first_slot = 0;
-               primitive_id_slot =
-                  first_slot + wm_prog_data->urb_setup[VARYING_SLOT_PRIMITIVE_ID];
+               if (first_slot == INT32_MAX) {
+                  first_slot =
+                     wm_prog_data->urb_setup[VARYING_SLOT_PRIMITIVE_ID];
+               }
+               /* urb_setup[VARYING_SLOT_PRIMITIVE_ID] is relative to the
+                * first read slot, so bring primitive_id_slot back into the
+                * absolute indexing of the VUE.
+                */
+               primitive_id_slot = first_slot +
+                  wm_prog_data->urb_setup[VARYING_SLOT_PRIMITIVE_ID];
             } else {
                primitive_id_slot = ++last_slot;
             }
@@ -1948,9 +2021,12 @@ brw_compute_sbe_per_vertex_urb_read(const struct intel_vue_map *prev_stage_vue_m
             primitive_id_slot =
                prev_stage_vue_map->varying_to_slot[VARYING_SLOT_PRIMITIVE_ID];
          }
+         first_slot = MIN2(primitive_id_slot, first_slot);
          last_slot = MAX2(primitive_id_slot, last_slot);
 
-         *out_primitive_id_offset = 4 * (primitive_id_slot - first_slot);
+         *out_primitive_id_offset = primitive_id_slot - first_slot;
+         /* Make sure to have constant interpolation on PrimitiveID */
+         remapped_flat_inputs |= BITFIELD_BIT(*out_primitive_id_offset);
       }
    }
 
@@ -1965,6 +2041,8 @@ brw_compute_sbe_per_vertex_urb_read(const struct intel_vue_map *prev_stage_vue_m
       *out_read_length = DIV_ROUND_UP(last_slot - first_slot + 1, 2);
       *out_num_varyings = num_varyings;
    }
+
+   *out_flat_inputs = wm_prog_data->flat_inputs | remapped_flat_inputs;
 }
 
 extern "C" void
@@ -1995,6 +2073,13 @@ brw_compute_sbe_per_primitive_urb_read(uint64_t inputs_read,
       break;
    }
 
-   *out_read_offset = DIV_ROUND_UP(first_read, 32);
-   *out_read_length = DIV_ROUND_UP(num_varyings, 2);
+   /* Not loading any per-primitive data in this case, the push constants
+    * should be adjusted though.
+    */
+   if (mue_map->wa_18019110168_active) {
+      *out_read_offset = *out_read_length = 0;
+   } else {
+      *out_read_offset = DIV_ROUND_UP(first_read, 32);
+      *out_read_length = DIV_ROUND_UP(num_varyings, 2);
+   }
 }

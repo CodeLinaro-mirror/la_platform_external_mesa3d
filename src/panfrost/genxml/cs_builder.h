@@ -492,6 +492,25 @@ cs_extract32(struct cs_builder *b, struct cs_index idx, unsigned word)
    return cs_reg32(b, idx.reg + word);
 }
 
+static inline struct cs_index
+cs_extract64(struct cs_builder *b, struct cs_index idx, unsigned word)
+{
+   assert(idx.type == CS_INDEX_REGISTER && "unsupported");
+   assert(word + 1 < idx.size && "overrun");
+
+   return cs_reg64(b, idx.reg + word);
+}
+
+static inline struct cs_index
+cs_extract_tuple(struct cs_builder *b, struct cs_index idx, unsigned word,
+                 unsigned size)
+{
+   assert(idx.type == CS_INDEX_REGISTER && "unsupported");
+   assert(word + size < idx.size && "overrun");
+
+   return cs_reg_tuple(b, idx.reg + word, size);
+}
+
 static inline struct cs_block *
 cs_cur_block(struct cs_builder *b)
 {
@@ -513,6 +532,17 @@ cs_reserve_instrs(struct cs_builder *b, uint32_t num_instrs)
    if (unlikely(!cs_is_valid(b)))
       return false;
 
+   /* Make sure we have sufficient capacity if we wont allocate more */
+   if (b->conf.alloc_buffer == NULL) {
+      if (unlikely(b->cur_chunk.size + num_instrs > b->cur_chunk.buffer.capacity)) {
+         assert(!"Out of CS space");
+         b->invalid = true;
+         return false;
+      }
+
+      return true;
+   }
+
    /* Lazy root chunk allocation. */
    if (unlikely(!b->root_chunk.buffer.cpu)) {
       b->root_chunk.buffer = b->conf.alloc_buffer(b->conf.cookie);
@@ -530,8 +560,10 @@ cs_reserve_instrs(struct cs_builder *b, uint32_t num_instrs)
     * We actually do this a few instructions before running out, because the
     * sequence to jump to a new queue takes multiple instructions.
     */
-   if (unlikely((b->cur_chunk.size + num_instrs + JUMP_SEQ_INSTR_COUNT) >
-                b->cur_chunk.buffer.capacity)) {
+   bool jump_to_next_chunk =
+      (b->cur_chunk.size + num_instrs + JUMP_SEQ_INSTR_COUNT) >
+      b->cur_chunk.buffer.capacity;
+   if (unlikely(jump_to_next_chunk)) {
       /* Now, allocate a new chunk */
       struct cs_buffer newbuf = b->conf.alloc_buffer(b->conf.cookie);
 
@@ -1068,9 +1100,9 @@ cs_invert_cond(enum mali_cs_condition cond)
    case MALI_CS_CONDITION_GEQUAL:
       return MALI_CS_CONDITION_LESS;
    case MALI_CS_CONDITION_ALWAYS:
-      unreachable("cannot invert ALWAYS");
+      UNREACHABLE("cannot invert ALWAYS");
    default:
-      unreachable("invalid cond");
+      UNREACHABLE("invalid cond");
    }
 }
 
@@ -1114,7 +1146,7 @@ cs_branch_label_cond64(struct cs_builder *b, struct cs_label *label,
       cs_branch_label_cond32(b, label, MALI_CS_CONDITION_EQUAL, val_hi);
       break;
    default:
-      unreachable("unsupported 64bit condition");
+      UNREACHABLE("unsupported 64bit condition");
    }
 
    cs_set_label(b, &false_label);
@@ -1439,6 +1471,15 @@ cs_patch_maybe(struct cs_builder *b, struct cs_maybe *maybe)
    }
 }
 
+struct cs_single_link_list_node {
+   uint64_t next;
+};
+
+struct cs_single_link_list {
+   uint64_t head;
+   uint64_t tail;
+};
+
 /* Pseudoinstructions follow */
 
 static inline void
@@ -1612,7 +1653,7 @@ cs_finish_fragment(struct cs_builder *b, bool increment_frag_completed,
 
 static inline void
 cs_add32(struct cs_builder *b, struct cs_index dest, struct cs_index src,
-         unsigned imm)
+         int32_t imm)
 {
    cs_emit(b, ADD_IMM32, I) {
       I.destination = cs_dst32(b, dest);
@@ -1623,7 +1664,7 @@ cs_add32(struct cs_builder *b, struct cs_index dest, struct cs_index src,
 
 static inline void
 cs_add64(struct cs_builder *b, struct cs_index dest, struct cs_index src,
-         unsigned imm)
+         int32_t imm)
 {
    cs_emit(b, ADD_IMM64, I) {
       I.destination = cs_dst64(b, dest);
@@ -2582,6 +2623,55 @@ cs_trace_run_compute_indirect(struct cs_builder *b,
                cs_trace_field_offset(run_compute, sr[0]) + i * sizeof(uint32_t));
    cs_store(b, cs_reg_tuple(b, 32, 8), tracebuf_addr, BITFIELD_MASK(8),
             cs_trace_field_offset(run_compute, sr[32]));
+   cs_flush_stores(b);
+}
+
+#define cs_single_link_list_for_each_from(b, current, node_type, base_name)    \
+   cs_while(b, MALI_CS_CONDITION_NEQUAL, current)                              \
+      for (bool done = false; !done;                                           \
+           cs_load64_to(b, current, current,                                   \
+                        offsetof(node_type, base_name.next)),                  \
+                done = true)
+
+/**
+ * Append an item to a cs_single_link_list.
+ *
+ * @param b The current cs_builder.
+ * @param list_base CS register with the base address for the list pointer.
+ * @param list_offset Offset added to list_base.
+ * @param new_node_gpu GPU address of the node to insert.
+ * @param base_offset Offset of cs_single_link_list_node in the new node.
+ * @param head_tail Temporary register pair used in the function.
+ */
+static inline void
+cs_single_link_list_add_tail(struct cs_builder *b, struct cs_index list_base,
+                             int list_offset, struct cs_index new_node_gpu,
+                             int base_offset, struct cs_index head_tail)
+{
+   assert(head_tail.size == 4);
+   assert(head_tail.reg % 2 == 0);
+
+   STATIC_ASSERT(offsetof(struct cs_single_link_list, tail) ==
+                 offsetof(struct cs_single_link_list, head) + sizeof(uint64_t));
+   struct cs_index head = cs_reg64(b, head_tail.reg);
+   struct cs_index tail = cs_reg64(b, head_tail.reg + 2);
+
+   /* Offset of the next pointer inside the node pointed to by new_node_gpu. */
+   const int offset_next =
+      base_offset + offsetof(struct cs_single_link_list_node, next);
+
+   STATIC_ASSERT(offsetof(struct cs_single_link_list, head) == 0);
+   cs_load_to(b, head_tail, list_base, BITFIELD_MASK(4), list_offset);
+
+   /* If the list is empty (head == NULL), set the head, otherwise append to the
+    * last node. */
+   cs_if(b, MALI_CS_CONDITION_EQUAL, head)
+      cs_add64(b, head, new_node_gpu, 0);
+   cs_else(b)
+      cs_store64(b, new_node_gpu, tail, offset_next);
+
+   cs_add64(b, tail, new_node_gpu, 0);
+   cs_store(b, head_tail, list_base, BITFIELD_MASK(4), list_offset);
    cs_flush_stores(b);
 }
 

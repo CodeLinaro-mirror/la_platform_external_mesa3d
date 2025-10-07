@@ -174,7 +174,7 @@ ttn_get_depth_layout(unsigned tgsi_fs_depth_layout)
    case TGSI_FS_DEPTH_LAYOUT_UNCHANGED:
       return FRAG_DEPTH_LAYOUT_UNCHANGED;
    default:
-      unreachable("bad TGSI FS depth layout");
+      UNREACHABLE("bad TGSI FS depth layout");
    }
 }
 
@@ -191,7 +191,7 @@ ttn_translate_interp_mode(unsigned tgsi_interp)
    case TGSI_INTERPOLATE_COLOR:
       return INTERP_MODE_NONE;
    default:
-      unreachable("bad TGSI interpolation mode");
+      UNREACHABLE("bad TGSI interpolation mode");
    }
 }
 
@@ -450,7 +450,7 @@ ttn_emit_declaration(struct ttn_compile *c)
             var->data.location = idx;
             break;
          default:
-            unreachable("bad declaration file");
+            UNREACHABLE("bad declaration file");
             return;
          }
 
@@ -633,7 +633,7 @@ ttn_src_for_file_and_index(struct ttn_compile *c, unsigned file, unsigned index,
          b->shader->info.fs.uses_sample_shading = true;
          break;
       default:
-         unreachable("bad system value");
+         UNREACHABLE("bad system value");
       }
 
       if (load->num_components == 2)
@@ -674,7 +674,7 @@ ttn_src_for_file_and_index(struct ttn_compile *c, unsigned file, unsigned index,
                                                       c->outputs[index]);
          return nir_src_for_ssa(nir_load_deref(&c->build, deref));
       }
-      unreachable("unsupported output read");
+      UNREACHABLE("unsupported output read");
       break;
 
    case TGSI_FILE_CONSTANT: {
@@ -751,7 +751,7 @@ ttn_src_for_file_and_index(struct ttn_compile *c, unsigned file, unsigned index,
    }
 
    default:
-      unreachable("bad src file");
+      UNREACHABLE("bad src file");
    }
 
 
@@ -1082,7 +1082,7 @@ base_type_for_alu_type(nir_alu_type type)
    case nir_type_uint:
       return GLSL_TYPE_UINT;
    default:
-      unreachable("invalid type");
+      UNREACHABLE("invalid type");
    }
 }
 
@@ -1259,6 +1259,7 @@ ttn_tex(struct ttn_compile *c, nir_def **src)
 
    instr = nir_tex_instr_create(b->shader, num_srcs);
    instr->op = op;
+   instr->can_speculate = true; /* No shaders come from SPIR-V or GLSL. */
 
    get_texture_info(tgsi_inst->Texture.Texture,
                     &instr->sampler_dim, &instr->is_shadow, &instr->is_array);
@@ -1441,12 +1442,14 @@ ttn_txq(struct ttn_compile *c, nir_def **src)
    txs = nir_tex_instr_create(b->shader, 2);
    txs->op = nir_texop_txs;
    txs->dest_type = nir_type_uint32;
+   txs->can_speculate = true;
    get_texture_info(tgsi_inst->Texture.Texture,
                     &txs->sampler_dim, &txs->is_shadow, &txs->is_array);
 
    qlv = nir_tex_instr_create(b->shader, 1);
    qlv->op = nir_texop_query_levels;
    qlv->dest_type = nir_type_uint32;
+   qlv->can_speculate = true;
    get_texture_info(tgsi_inst->Texture.Texture,
                     &qlv->sampler_dim, &qlv->is_shadow, &qlv->is_array);
 
@@ -1540,7 +1543,7 @@ ttn_mem(struct ttn_compile *c, nir_def **src)
       addr_src_index = 0;
       break;
    default:
-      unreachable("unexpected memory opcode");
+      UNREACHABLE("unexpected memory opcode");
    }
 
    if (file == TGSI_FILE_BUFFER) {
@@ -1554,7 +1557,7 @@ ttn_mem(struct ttn_compile *c, nir_def **src)
          op = nir_intrinsic_store_ssbo;
          break;
       default:
-         unreachable("unexpected buffer opcode");
+         UNREACHABLE("unexpected buffer opcode");
       }
 
       add_ssbo_var(c, resource_index);
@@ -1585,7 +1588,7 @@ ttn_mem(struct ttn_compile *c, nir_def **src)
          op = nir_intrinsic_image_deref_store;
          break;
       default:
-         unreachable("unexpected file opcode");
+         UNREACHABLE("unexpected file opcode");
       }
 
       instr = nir_intrinsic_instr_create(b->shader, op);
@@ -1631,7 +1634,7 @@ ttn_mem(struct ttn_compile *c, nir_def **src)
 
       instr->num_components = num_components;
    } else {
-      unreachable("unexpected file");
+      UNREACHABLE("unexpected file");
    }
 
 
@@ -2245,10 +2248,8 @@ ttn_compile_init(const void *tgsi_tokens,
    tgsi_scan_shader(tgsi_tokens, &scan);
    c->scan = &scan;
 
-   if (!options) {
-      options =
-         screen->get_compiler_options(screen, PIPE_SHADER_IR_NIR, scan.processor);
-   }
+   if (!options)
+      options = screen->nir_options[scan.processor];
 
    c->build = nir_builder_init_simple_shader(tgsi_processor_to_shader_stage(scan.processor),
                                              options, "TTN%d", (int)p_atomic_inc_return(&ttn_sh_counter));
@@ -2342,7 +2343,7 @@ ttn_compile_init(const void *tgsi_tokens,
          if (value) {
             fprintf(stderr, "tgsi_to_nir: unhandled TGSI property %u = %u\n",
                     i, value);
-            unreachable("unhandled TGSI property");
+            UNREACHABLE("unhandled TGSI property");
          }
       }
    }
@@ -2400,7 +2401,7 @@ ttn_optimize_nir(nir_shader *nir)
       if (nir->options->lower_to_scalar) {
          NIR_PASS(progress, nir, nir_lower_alu_to_scalar,
                     nir->options->lower_to_scalar_filter, NULL);
-         NIR_PASS(progress, nir, nir_lower_phis_to_scalar, false);
+         NIR_PASS(progress, nir, nir_lower_phis_to_scalar, NULL, NULL);
       }
 
       NIR_PASS(progress, nir, nir_lower_alu);
@@ -2551,7 +2552,7 @@ ttn_finalize_nir(struct ttn_compile *c, struct pipe_screen *screen)
 
    /* driver needs clipdistance as array<float> */
    if ((nir->info.outputs_written &
-        (BITFIELD64_BIT(VARYING_SLOT_CLIP_DIST0) | BITFIELD64_BIT(VARYING_SLOT_CLIP_DIST1))) &&
+        (VARYING_BIT_CLIP_DIST0 | VARYING_BIT_CLIP_DIST1)) &&
         nir->options->compact_arrays) {
       NIR_PASS(_, nir, lower_clipdistance_to_array);
    }
@@ -2566,8 +2567,7 @@ ttn_finalize_nir(struct ttn_compile *c, struct pipe_screen *screen)
       NIR_PASS(_, nir, nir_lower_samplers);
 
    if (screen->finalize_nir) {
-      char *msg = screen->finalize_nir(screen, nir);
-      free(msg);
+      screen->finalize_nir(screen, nir);
    } else {
       ttn_optimize_nir(nir);
    }
@@ -2608,8 +2608,7 @@ load_nir_from_disk_cache(struct disk_cache *cache,
                          uint8_t key[CACHE_KEY_SIZE],
                          unsigned processor)
 {
-   const nir_shader_compiler_options *options =
-      screen->get_compiler_options(screen, PIPE_SHADER_IR_NIR, processor);
+   const nir_shader_compiler_options *options = screen->nir_options[processor];
    struct blob_reader blob_reader;
    size_t size;
    nir_shader *s;

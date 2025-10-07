@@ -71,7 +71,7 @@ init_dt_type(struct kopper_displaytarget *cdt)
       break;
 #endif
    default:
-      unreachable("unsupported!");
+      UNREACHABLE("unsupported!");
    }
 }
 
@@ -110,7 +110,7 @@ kopper_CreateSurface(struct zink_screen *screen, struct kopper_displaytarget *cd
    }
 #endif
    default:
-      unreachable("unsupported!");
+      UNREACHABLE("unsupported!");
    }
    if (error != VK_SUCCESS) {
       return VK_NULL_HANDLE;
@@ -150,10 +150,16 @@ destroy_swapchain(struct zink_screen *screen, struct kopper_swapchain *cswap)
       return;
    util_queue_fence_destroy(&cswap->present_fence);
    for (unsigned i = 0; i < cswap->num_images; i++) {
-      simple_mtx_lock(&screen->semaphores_lock);
-      util_dynarray_append(&screen->semaphores, VkSemaphore, cswap->images[i].acquire);
-      simple_mtx_unlock(&screen->semaphores_lock);
+      /* Destroy the acquire semaphore directly, if any.  If acquire != NULL
+       * then we've called vkAcquireNextImage() with the given semaphore but
+       * not submitted anything which waits on it.  This means the semaphore
+       * has a pending signal operation and is not safe to recycle.
+       */
+      if (cswap->images[i].acquire != VK_NULL_HANDLE)
+         VKSCR(DestroySemaphore)(screen->dev, cswap->images[i].acquire, NULL);
+
       pipe_resource_reference(&cswap->images[i].readback, NULL);
+      zink_destroy_resource_surface_cache(screen, &cswap->images[i].surface_cache, false);
    }
    free(cswap->images);
    hash_table_foreach(cswap->presents, he) {
@@ -220,7 +226,7 @@ find_dt_entry(struct zink_screen *screen, const struct kopper_displaytarget *cdt
    }
 #endif
    default:
-      unreachable("unsupported!");
+      UNREACHABLE("unsupported!");
    }
    return he;
 }
@@ -322,7 +328,7 @@ kopper_CreateSwapchain(struct zink_screen *screen, struct kopper_displaytarget *
       cswap->scci.imageExtent.height = h;
       break;
    default:
-      unreachable("unknown display platform");
+      UNREACHABLE("unknown display platform");
    }
 
    error = VKSCR(CreateSwapchainKHR)(screen->dev, &cswap->scci, NULL,
@@ -367,8 +373,10 @@ kopper_GetSwapchainImages(struct zink_screen *screen, struct kopper_swapchain *c
    error = VKSCR(GetSwapchainImagesKHR)(screen->dev, cswap->swapchain, &cswap->num_images, images);
    assert(cswap->num_images <= ARRAY_SIZE(images));
    if (zink_screen_handle_vkresult(screen, error)) {
-      for (unsigned i = 0; i < cswap->num_images; i++)
+      for (unsigned i = 0; i < cswap->num_images; i++) {
          cswap->images[i].image = images[i];
+         _mesa_set_init(&cswap->images[i].surface_cache, NULL, NULL, equals_surface_key);
+      }
    }
    cswap->max_acquires = cswap->num_images - cswap->scci.minImageCount + 1;
    return error;
@@ -426,7 +434,7 @@ zink_kopper_displaytarget_create(struct zink_screen *screen, unsigned tex_usage,
             _mesa_hash_table_init(&screen->dts, screen, _mesa_hash_pointer, _mesa_key_pointer_equal);
             break;
          default:
-            unreachable("unknown kopper type");
+            UNREACHABLE("unknown kopper type");
          }
       } else {
          he = find_dt_entry(screen, &k);
@@ -496,7 +504,7 @@ zink_kopper_displaytarget_create(struct zink_screen *screen, unsigned tex_usage,
    }
 #endif
    default:
-      unreachable("unsupported!");
+      UNREACHABLE("unsupported!");
    }
    simple_mtx_unlock(&screen->dt_lock);
 
@@ -594,7 +602,7 @@ kopper_acquire(struct zink_screen *screen, struct zink_resource *res, uint64_t t
          }
          if (ret == VK_NOT_READY || ret == VK_TIMEOUT) {
             if (timeout > 1000000)
-               unreachable("kopper_acquire: updated timeout after failure has become unreasonable large");
+               UNREACHABLE("kopper_acquire: updated timeout after failure has become unreasonable large");
             timeout += 4000;
             continue;
          }
@@ -615,7 +623,19 @@ kopper_acquire(struct zink_screen *screen, struct zink_resource *res, uint64_t t
       /* swapchain images are initially in the UNDEFINED layout */
       res->layout = VK_IMAGE_LAYOUT_UNDEFINED;
       cdt->swapchain->images[res->obj->dt_idx].init = true;
+      if (screen->info.have_EXT_host_image_copy && res->obj->vkusage & VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT) {
+         VkImageLayout layout = screen->info.have_KHR_unified_image_layouts ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+         zink_resource_image_hic_transition(screen, res, layout);
+      }
    }
+   res->obj->unordered_read = true;
+   res->obj->unordered_write = true;
+   res->obj->access = 0;
+   res->obj->unordered_access = 0;
+   /* this is the stage used by the acquire semaphore */
+   res->obj->unordered_access_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+   res->obj->access_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+   res->obj->ordered_access_is_copied = true;
    if (timeout == UINT64_MAX) {
       res->obj->indefinite_acquire = true;
       p_atomic_inc(&cdt->swapchain->num_acquires);
@@ -633,6 +653,7 @@ kill_swapchain(struct zink_context *ctx, struct zink_resource *res)
    zink_batch_reference_resource(ctx, res);
    struct pipe_resource *pres = screen->base.resource_create(&screen->base, &res->base.b);
    zink_resource_object_reference(screen, &res->obj, zink_resource(pres)->obj);
+   res->rebind_count++;
    res->layout = VK_IMAGE_LAYOUT_UNDEFINED;
    res->swapchain = false;
    pipe_resource_reference(&pres, NULL);
@@ -1130,12 +1151,10 @@ zink_kopper_fixup_depth_buffer(struct zink_context *ctx)
    struct pipe_resource *pz = screen->base.resource_create(&screen->base, &templ);
    struct zink_resource *z = zink_resource(pz);
    zink_resource_object_reference(screen, &res->obj, z->obj);
+   res->rebind_count++;
    res->base.b.width0 = ctx->fb_state.width;
    res->base.b.height0 = ctx->fb_state.height;
    pipe_resource_reference(&pz, NULL);
-
-   pipe_surface_unref(&ctx->base, &ctx->fb_zsbuf);
-   ctx->fb_zsbuf = ctx->base.create_surface(&ctx->base, &res->base.b, &ctx->fb_state.zsbuf);
 }
 
 bool

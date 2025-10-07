@@ -129,6 +129,7 @@ sample_via_nir(nir_builder *b,  const char *name, int sampler,
    tex->op = nir_texop_tex;
    tex->sampler_dim = GLSL_SAMPLER_DIM_2D;
    tex->coord_components = 2;
+   tex->can_speculate = true;
    tex->dest_type = alu_type;
    tex->src[0] = nir_tex_src_for_ssa(nir_tex_src_texture_deref,
                                      &deref->def);
@@ -147,7 +148,7 @@ make_drawpix_z_stencil_program_nir(struct st_context *st,
                                    bool write_stencil)
 {
    const nir_shader_compiler_options *options =
-      st_get_nir_compiler_options(st, MESA_SHADER_FRAGMENT);
+      st->screen->nir_options[MESA_SHADER_FRAGMENT];
 
    nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_FRAGMENT, options,
                                                   "drawpixels %s%s",
@@ -184,7 +185,7 @@ make_drawpix_zs_to_color_program_nir(struct st_context *st,
                                    bool rgba)
 {
    const nir_shader_compiler_options *options =
-      st_get_nir_compiler_options(st, MESA_SHADER_FRAGMENT);
+      st->screen->nir_options[MESA_SHADER_FRAGMENT];
 
    nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_FRAGMENT, options,
                                                   "copypixels ZStoC");
@@ -848,11 +849,11 @@ draw_textured_quad(struct gl_context *ctx, GLint x, GLint y, GLfloat z,
    /* user textures, plus the drawpix textures */
    if (fpv) {
       struct pipe_sampler_view *sampler_views[PIPE_MAX_SAMPLERS];
-      unsigned num_owned_views = 0;
+      unsigned extra_sampler_views = 0;
       /* drawing a color image */
       unsigned num_views =
          st_get_sampler_views(st, PIPE_SHADER_FRAGMENT,
-                              ctx->FragmentProgram._Current, sampler_views, &num_owned_views);
+                              ctx->FragmentProgram._Current, sampler_views, &extra_sampler_views);
 
       num_views = MAX3(fpv->drawpix_sampler + 1, fpv->pixelmap_sampler + 1,
                        num_views);
@@ -865,9 +866,9 @@ draw_textured_quad(struct gl_context *ctx, GLint x, GLint y, GLfloat z,
       st->state.num_sampler_views[PIPE_SHADER_FRAGMENT] = num_views;
 
       /* release YUV views back to driver */
-      unsigned base_idx = num_views - num_owned_views;
-      for (unsigned i = 0; i < num_owned_views; i++)
-         pipe->sampler_view_release(pipe, sampler_views[base_idx + i]);
+      u_foreach_bit (i, extra_sampler_views) {
+         pipe->sampler_view_release(pipe, sampler_views[i]);
+      }
    } else {
       /* drawing a depth/stencil image */
       pipe->set_sampler_views(pipe, PIPE_SHADER_FRAGMENT, 0, num_sampler_view,

@@ -138,7 +138,7 @@ ac_build_gfx6_fmask_descriptor(const enum amd_gfx_level gfx_level, const struct 
          num_format = V_008F14_IMG_NUM_FORMAT_FMASK_64_16_8;
          break;
       default:
-         unreachable("invalid nr_samples");
+         UNREACHABLE("invalid nr_samples");
       }
    } else {
       switch (FMASK(state->num_samples, state->num_storage_samples)) {
@@ -182,7 +182,7 @@ ac_build_gfx6_fmask_descriptor(const enum amd_gfx_level gfx_level, const struct 
          data_format = V_008F14_IMG_DATA_FORMAT_FMASK64_S16_F8;
          break;
       default:
-         unreachable("invalid nr_samples");
+         UNREACHABLE("invalid nr_samples");
       }
       num_format = V_008F14_IMG_NUM_FORMAT_UINT;
    }
@@ -282,7 +282,7 @@ ac_build_gfx10_fmask_descriptor(const enum amd_gfx_level gfx_level, const struct
       format = V_008F0C_GFX10_FORMAT_FMASK64_S16_F8;
       break;
    default:
-      unreachable("invalid nr_samples");
+      UNREACHABLE("invalid nr_samples");
    }
 #undef FMASK
 
@@ -437,7 +437,7 @@ ac_build_gfx10_texture_descriptor(const struct radeon_info *info, const struct a
    const struct radeon_surf *surf = state->surf;
    const struct util_format_description *fmt_desc = util_format_description(state->format);
    const uint32_t img_format = ac_get_gfx10_img_format(info->gfx_level, state);
-   const struct ac_surf_nbc_view *nbc_view = state->gfx9.nbc_view;
+   const struct ac_surf_nbc_view *nbc_view = state->gfx10.nbc_view;
    const uint32_t field_last_level = state->num_samples > 1 ? util_logbase2(state->num_samples) : state->last_level;
 
    desc[0] = 0;
@@ -500,7 +500,7 @@ ac_build_gfx12_texture_descriptor(const struct radeon_info *info, const struct a
    const bool no_edge_clamp = state->num_levels > 1 && util_format_is_compressed(state->img_format) &&
                               !util_format_is_compressed(state->format);
    const uint32_t min_lod_clamped = util_unsigned_fixed(CLAMP(state->min_lod, 0, 15), 8);
-   const struct ac_surf_nbc_view *nbc_view = state->gfx9.nbc_view;
+   const struct ac_surf_nbc_view *nbc_view = state->gfx10.nbc_view;
 
    uint32_t max_mip = state->num_samples > 1 ? util_logbase2(state->num_samples) : state->num_levels - 1;
    if (nbc_view && nbc_view->valid)
@@ -562,7 +562,7 @@ ac_set_mutable_tex_desc_fields(const struct radeon_info *info, const struct ac_m
 {
    const struct radeon_surf *surf = state->surf;
    const struct legacy_surf_level *base_level_info = state->gfx6.base_level_info;
-   const struct ac_surf_nbc_view *nbc_view = state->gfx9.nbc_view;
+   const struct ac_surf_nbc_view *nbc_view = state->gfx10.nbc_view;
    uint8_t swizzle = surf->tile_swizzle;
    uint64_t va = state->va, meta_va = 0;
 
@@ -1005,7 +1005,10 @@ ac_init_gfx12_ds_surface(const struct radeon_info *info, const struct ac_ds_stat
 
    ds->db_depth_view = S_028004_SLICE_START(state->first_layer) |
                        S_028004_SLICE_MAX(state->last_layer);
-   ds->u.gfx12.db_depth_view1 = S_028008_MIPID_GFX12(state->level);
+   ds->u.gfx12.db_depth_view1 = S_028008_MIPID_GFX12(state->level) |
+                                S_028008_Z_READ_ONLY(state->z_read_only) |
+                                S_028008_STENCIL_READ_ONLY(state->stencil_read_only);
+
    ds->db_depth_size = S_028014_X_MAX(state->width - 1) |
                        S_028014_Y_MAX(state->height - 1);
    ds->db_z_info = S_028018_FORMAT(db_format) |

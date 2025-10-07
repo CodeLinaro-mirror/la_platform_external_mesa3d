@@ -6,6 +6,10 @@
 
 #include "panvk_cmd_meta.h"
 #include "panvk_entrypoints.h"
+#include "panvk_tracepoints.h"
+#if PAN_ARCH >= 10
+#include "csf/panvk_instr.h"
+#endif
 
 static bool
 copy_to_image_use_gfx_pipeline(struct panvk_device *dev,
@@ -45,6 +49,11 @@ panvk_per_arch(cmd_meta_compute_start)(
    save_ctx->push_constants = cmdbuf->state.push_constants;
    save_ctx->cs.shader = cmdbuf->state.compute.shader;
    save_ctx->cs.desc = cmdbuf->state.compute.cs.desc;
+
+#if PAN_ARCH >= 10
+   panvk_per_arch(panvk_instr_begin_work)(PANVK_SUBQUEUE_COMPUTE, cmdbuf,
+                                          PANVK_INSTR_WORK_TYPE_META);
+#endif
 }
 
 void
@@ -54,6 +63,13 @@ panvk_per_arch(cmd_meta_compute_end)(
 {
    struct panvk_descriptor_set *push_set0 =
       cmdbuf->state.compute.desc_state.push_sets[0];
+
+#if PAN_ARCH >= 10
+   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+   panvk_per_arch(panvk_instr_end_work_async)(PANVK_SUBQUEUE_COMPUTE, cmdbuf,
+                                              PANVK_INSTR_WORK_TYPE_META, NULL,
+                                              dev->csf.sb.all_iters_mask);
+#endif
 
    cmdbuf->state.compute.desc_state.sets[0] = save_ctx->set0;
    if (save_ctx->push_set0.desc_count) {
@@ -108,6 +124,13 @@ panvk_per_arch(cmd_meta_gfx_start)(
    gfx_state_set_dirty(cmdbuf, OQ);
 
    cmdbuf->state.gfx.vk_meta = true;
+
+#if PAN_ARCH >= 10
+   panvk_per_arch(panvk_instr_begin_work)(PANVK_SUBQUEUE_VERTEX_TILER, cmdbuf,
+                                          PANVK_INSTR_WORK_TYPE_META);
+   panvk_per_arch(panvk_instr_begin_work)(PANVK_SUBQUEUE_FRAGMENT, cmdbuf,
+                                          PANVK_INSTR_WORK_TYPE_META);
+#endif
 }
 
 void
@@ -117,6 +140,16 @@ panvk_per_arch(cmd_meta_gfx_end)(
 {
    struct panvk_descriptor_set *push_set0 =
       cmdbuf->state.gfx.desc_state.push_sets[0];
+
+#if PAN_ARCH >= 10
+   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+   panvk_per_arch(panvk_instr_end_work_async)(
+      PANVK_SUBQUEUE_VERTEX_TILER, cmdbuf, PANVK_INSTR_WORK_TYPE_META, NULL,
+      dev->csf.sb.all_iters_mask);
+   panvk_per_arch(panvk_instr_end_work_async)(PANVK_SUBQUEUE_FRAGMENT, cmdbuf,
+                                              PANVK_INSTR_WORK_TYPE_META, NULL,
+                                              dev->csf.sb.all_iters_mask);
+#endif
 
    cmdbuf->state.gfx.desc_state.sets[0] = save_ctx->set0;
    if (save_ctx->push_set0.desc_count) {
@@ -136,7 +169,7 @@ panvk_per_arch(cmd_meta_gfx_end)(
    cmdbuf->state.gfx.vs.desc = save_ctx->vs.desc;
    cmdbuf->state.gfx.vb.bufs[0] = save_ctx->vb0;
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
    cmdbuf->state.gfx.vs.attribs = 0;
    cmdbuf->state.gfx.vs.attrib_bufs = 0;
    cmdbuf->state.gfx.fs.rsd = 0;

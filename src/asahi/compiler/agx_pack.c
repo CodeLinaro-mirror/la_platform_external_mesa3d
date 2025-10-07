@@ -50,7 +50,7 @@ assert_register_is_aligned(const agx_instr *I, agx_index reg)
       return;
    }
 
-   unreachable("Invalid register size");
+   UNREACHABLE("Invalid register size");
 }
 
 /* Texturing has its own operands */
@@ -88,7 +88,7 @@ agx_pack_texture(const agx_instr *I, agx_index base, agx_index index,
       pack_assert(I, base.type == AGX_INDEX_UNIFORM);
       pack_assert(I, base.size == AGX_SIZE_64);
       pack_assert(I, (base.value & 3) == 0);
-      pack_assert(I, index.size == AGX_SIZE_32);
+      pack_assert(I, index.size <= AGX_SIZE_32);
 
       /* Bindless */
       *packed_base = base.value >> 2;
@@ -169,7 +169,7 @@ agx_pack_pbe_lod(const agx_instr *I, agx_index index, bool *flag)
    else if (index.type == AGX_INDEX_REGISTER)
       *flag = false;
    else
-      unreachable("Invalid PBE LOD type");
+      UNREACHABLE("Invalid PBE LOD type");
 
    return index.value;
 }
@@ -919,6 +919,25 @@ agx_pack_instr(struct util_dynarray *emission, struct util_dynarray *fixups,
       if (L)
          memcpy(util_dynarray_grow_bytes(emission, 1, 4), &extend, 4);
 
+      break;
+   }
+
+   case AGX_OPCODE_TEX_STATE_STORE:
+   case AGX_OPCODE_SAMPLER_STATE_STORE: {
+      unsigned U, Tt, T = agx_pack_texture(I, I->src[0], I->src[1], &U, &Tt);
+
+      pack_assert(I, U < (1 << 4));
+      pack_assert(I, (T & 1) == 0);
+      pack_assert(I, T < (1 << 24));
+      pack_assert(I, I->imm < (1 << 7));
+
+      uint64_t raw =
+         agx_opcodes_info[I->op].encoding.exact | (I->imm << 8) |
+         (I->scoreboard << 16) | ((uint64_t)T << 26) |
+         ((I->src[1].type == AGX_INDEX_IMMEDIATE) ? (1ul << 58) : 0) |
+         ((uint64_t)U << 59);
+
+      memcpy(util_dynarray_grow_bytes(emission, 1, 8), &raw, 8);
       break;
    }
 

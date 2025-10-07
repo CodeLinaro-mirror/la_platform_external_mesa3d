@@ -22,7 +22,7 @@ brw_print_instructions(const brw_shader &s, FILE *file)
       unsigned cf_count = 0;
       foreach_block(block, s.cfg) {
          fprintf(file, "START B%d", block->num);
-         foreach_list_typed(bblock_link, link, link, &block->parents) {
+         brw_foreach_list_typed(bblock_link, link, link, &block->parents) {
             fprintf(file, " <%cB%d",
                     link->kind == bblock_link_logical ? '-' : '~',
                     link->block->num);
@@ -54,7 +54,7 @@ brw_print_instructions(const brw_shader &s, FILE *file)
          }
 
          fprintf(file, "END B%d", block->num);
-         foreach_list_typed(bblock_link, link, link, &block->children) {
+         brw_foreach_list_typed(bblock_link, link, link, &block->children) {
             fprintf(file, " %c>B%d",
                     link->kind == bblock_link_logical ? '-' : '~',
                     link->block->num);
@@ -63,12 +63,12 @@ brw_print_instructions(const brw_shader &s, FILE *file)
       }
       if (rp)
          fprintf(file, "Maximum %3d registers live at once.\n", max_pressure);
-   } else if (s.cfg && exec_list_is_empty(&s.instructions)) {
+   } else if (s.cfg && brw_exec_list_is_empty(&s.instructions)) {
       foreach_block_and_inst(block, brw_inst, inst, s.cfg) {
          brw_print_instruction(s, inst, file);
       }
    } else {
-      foreach_in_list(brw_inst, inst, &s.instructions) {
+      brw_foreach_in_list(brw_inst, inst, &s.instructions) {
          brw_print_instruction(s, inst, file);
       }
    }
@@ -309,7 +309,7 @@ brw_instruction_name(const struct brw_isa_info *isa, enum opcode op)
       return "flow";
    }
 
-   unreachable("not reached");
+   UNREACHABLE("not reached");
 }
 
 /**
@@ -322,7 +322,9 @@ static bool
 print_memory_logical_source(FILE *file, const brw_inst *inst, unsigned i)
 {
    if (inst->is_control_source(i)) {
-      assert(inst->src[i].file == IMM && inst->src[i].type == BRW_TYPE_UD);
+      assert(inst->src[i].file == IMM &&
+             (inst->src[i].type == BRW_TYPE_UD ||
+              inst->src[i].type == BRW_TYPE_D));
       assert(!inst->src[i].negate);
       assert(!inst->src[i].abs);
    }
@@ -353,6 +355,9 @@ print_memory_logical_source(FILE *file, const brw_inst *inst, unsigned i)
    case MEMORY_LOGICAL_ADDRESS:
       fprintf(file, " addr: ");
       return false;
+   case MEMORY_LOGICAL_ADDRESS_OFFSET:
+      fprintf(file, " offset: ");
+      return false;
    case MEMORY_LOGICAL_COORD_COMPONENTS:
       fprintf(file, " coord_comps:");
       return false;
@@ -380,7 +385,7 @@ print_memory_logical_source(FILE *file, const brw_inst *inst, unsigned i)
       fprintf(file, " data1: ");
       return false;
    default:
-      unreachable("invalid source");
+      UNREACHABLE("invalid source");
    }
 }
 
@@ -475,7 +480,7 @@ brw_print_instruction(const brw_shader &s, const brw_inst *inst, FILE *file, con
       }
       break;
    case IMM:
-      unreachable("not reached");
+      UNREACHABLE("not reached");
    }
 
    if (inst->dst.offset ||
@@ -643,7 +648,7 @@ brw_print_instruction(const brw_shader &s, const brw_inst *inst, FILE *file, con
          case BRW_SWAP_VERTICAL:   name = "vertical";   break;
          case BRW_SWAP_DIAGONAL:   name = "diagonal";   break;
          default:
-            unreachable("invalid brw_swap_direction");
+            UNREACHABLE("invalid brw_swap_direction");
          }
          fprintf(file, " (%s)", name);
       }
@@ -659,6 +664,15 @@ brw_print_instruction(const brw_shader &s, const brw_inst *inst, FILE *file, con
 
    if (inst->has_no_mask_send_params)
       fprintf(file, "NoMaskParams ");
+
+   if (is_send && inst->desc)
+      fprintf(file, "Desc 0x%08x ", inst->desc);
+
+   if (is_send && inst->ex_desc)
+      fprintf(file, "ExDesc 0x%08x ", inst->ex_desc);
+
+   if (is_send && inst->send_ex_desc_imm)
+      fprintf(file, "ExDescImmInst 0x%08x ", inst->offset);
 
    if (inst->sched.regdist || inst->sched.mode) {
       fprintf(file, "{ ");

@@ -428,11 +428,11 @@ v3dX(clamp_for_format_and_type)(uint32_t rt_type,
         case V3D_INTERNAL_TYPE_32F:
                 return V3D_RENDER_TARGET_TYPE_CLAMP_32F;
         default:
-                unreachable("Unknown internal render target type");
+                UNREACHABLE("Unknown internal render target type");
         }
         return V3D_RENDER_TARGET_TYPE_CLAMP_INVALID;
 #endif
-        unreachable("Wrong V3D_VERSION");
+        UNREACHABLE("Wrong V3D_VERSION");
 }
 
 #if V3D_VERSION >= 71
@@ -642,6 +642,14 @@ emit_render_layer(struct v3d_job *job, uint32_t layer)
 
         v3d_rcl_emit_generic_per_tile_list(job, layer);
 
+        /* If rasterization has been disabled for all the draws/clears of the
+         * job we can avoid the submission of the Supertile Coordinates.
+         * This disables the execution of the fragment shader for each of the
+         * tiles.
+         */
+        if (!job->does_rasterization)
+               return;
+
         /* XXX perf: We should expose GL_MESA_tile_raster_order to
          * improve X11 performance, but we should use Morton order
          * otherwise to improve cache locality.
@@ -678,10 +686,12 @@ v3dX(emit_rcl)(struct v3d_job *job)
         /* The RCL list should be empty. */
         assert(!job->rcl.bo);
         struct v3d_device_info *devinfo = &job->v3d->screen->devinfo;
-
-        v3d_cl_ensure_space_with_branch(&job->rcl, 200 +
-                                        MAX2(job->num_layers, 1) * 256 *
-                                        cl_packet_length(SUPERTILE_COORDINATES));
+        uint32_t cl_supertile_coordinates_size = 0;
+        if (job->does_rasterization) {
+                cl_supertile_coordinates_size = MAX2(job->num_layers, 1) *
+                        256 * cl_packet_length(SUPERTILE_COORDINATES);
+        }
+        v3d_cl_ensure_space_with_branch(&job->rcl, 200 + cl_supertile_coordinates_size);
         job->submit.rcl_start = job->rcl.bo->offset;
         v3d_job_add_bo(job, job->rcl.bo);
 

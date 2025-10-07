@@ -38,7 +38,8 @@
 #include "util/mesa-sha1.h"
 #include "util/mesa-blake3.h"
 #include "compiler/shader_info.h"
-#include "compiler/glsl/list.h"
+#include "compiler/list.h"
+#include "compiler/glsl/ir_list.h"
 
 #include "pipe/p_state.h"
 
@@ -187,7 +188,7 @@ struct gl_shader
    GLbitfield BlendSupport;
 
    struct nir_shader *nir;
-   struct exec_list *ir;
+   struct ir_exec_list *ir;
 
    /**
     * Whether early fragment tests are enabled as defined by
@@ -445,7 +446,7 @@ struct gl_shader_program
     * allocate slots to explicit locations. This list stores the blocks of
     * continuous empty slots inside UniformRemapTable.
     */
-   struct exec_list EmptyUniformLocations;
+   struct ir_exec_list EmptyUniformLocations;
 
    /**
     * Total number of explicit uniform location including inactive uniforms.
@@ -480,8 +481,6 @@ struct gl_program
    GLint RefCount;
    GLubyte *String;  /**< Null-terminated program text */
 
-   /** GL_VERTEX/FRAGMENT_PROGRAM_ARB, GL_GEOMETRY_PROGRAM_NV */
-   GLenum16 Target;
    GLenum16 Format;    /**< String encoding format */
 
    GLboolean _Used;        /**< Ever used for drawing? Used for debugging */

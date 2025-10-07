@@ -67,7 +67,7 @@ get_const_vec(nir_def* vec, nir_const_value* cv[4])
 {
    if (vec->parent_instr->type != nir_instr_type_alu)
       return;
-   nir_alu_instr* vec_instr = nir_instr_as_alu(vec->parent_instr);
+   nir_alu_instr* vec_instr = nir_def_as_alu(vec);
    if (vec_instr->op != nir_op_vec(vec->num_components))
       return;
 
@@ -113,11 +113,11 @@ visit_tex(isel_context* ctx, nir_tex_instr* instr)
    bool a16 = false, g16 = false;
 
    int coord_idx = nir_tex_instr_src_index(instr, nir_tex_src_coord);
-   if (coord_idx > 0)
+   if (coord_idx >= 0)
       a16 = instr->src[coord_idx].src.ssa->bit_size == 16;
 
    int ddx_idx = nir_tex_instr_src_index(instr, nir_tex_src_ddx);
-   if (ddx_idx > 0)
+   if (ddx_idx >= 0)
       g16 = instr->src[ddx_idx].src.ssa->bit_size == 16;
 
    for (unsigned i = 0; i < instr->num_srcs; i++) {
@@ -442,7 +442,7 @@ visit_tex(isel_context* ctx, nir_tex_instr* instr)
          case 2: op = aco_opcode::buffer_load_format_d16_xy; break;
          case 3: op = aco_opcode::buffer_load_format_d16_xyz; break;
          case 4: op = aco_opcode::buffer_load_format_d16_xyzw; break;
-         default: unreachable("Tex instruction loads more than 4 components.");
+         default: UNREACHABLE("Tex instruction loads more than 4 components.");
          }
       } else {
          switch (util_last_bit(dmask & 0xf)) {
@@ -450,7 +450,7 @@ visit_tex(isel_context* ctx, nir_tex_instr* instr)
          case 2: op = aco_opcode::buffer_load_format_xy; break;
          case 3: op = aco_opcode::buffer_load_format_xyz; break;
          case 4: op = aco_opcode::buffer_load_format_xyzw; break;
-         default: unreachable("Tex instruction loads more than 4 components.");
+         default: UNREACHABLE("Tex instruction loads more than 4 components.");
          }
       }
 
@@ -943,7 +943,7 @@ visit_cf_list(isel_context* ctx, struct exec_list* list)
       case nir_cf_node_block: visit_block(ctx, nir_cf_node_as_block(node)); break;
       case nir_cf_node_if: visit_if(ctx, nir_cf_node_as_if(node)); break;
       case nir_cf_node_loop: visit_loop(ctx, nir_cf_node_as_loop(node)); break;
-      default: unreachable("unimplemented cf list type");
+      default: UNREACHABLE("unimplemented cf list type");
       }
    }
 
@@ -1429,6 +1429,7 @@ select_program(Program* program, unsigned shader_count, struct nir_shader* const
       return select_program_rt(ctx, shader_count, shaders, args);
 
    if (shader_count >= 2) {
+      program->needs_fp_mode_insertion = true;
       select_program_merged(ctx, shader_count, shaders);
    } else {
       bool need_barrier = false, check_merged_wave_info = false, endif_merged_wave_info = false;
@@ -1437,6 +1438,7 @@ select_program(Program* program, unsigned shader_count, struct nir_shader* const
       /* Handle separate compilation of VS+TCS and {VS,TES}+GS on GFX9+. */
       if (ctx.program->info.merged_shader_compiled_separately) {
          assert(ctx.program->gfx_level >= GFX9);
+         program->needs_fp_mode_insertion = true;
          if (ctx.stage.sw == SWStage::VS || ctx.stage.sw == SWStage::TES) {
             check_merged_wave_info = endif_merged_wave_info = true;
          } else {

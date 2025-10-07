@@ -1138,7 +1138,6 @@ static void si_set_constant_buffer(struct si_context *sctx, struct si_buffer_res
 
    if (input && (input->buffer || input->user_buffer)) {
       struct pipe_resource *buffer = NULL;
-      uint64_t va;
       unsigned buffer_offset;
 
       /* Upload the user buffer if needed. */
@@ -1159,12 +1158,9 @@ static void si_set_constant_buffer(struct si_context *sctx, struct si_buffer_res
          buffer_offset = input->buffer_offset;
       }
 
-      va = si_resource(buffer)->gpu_address + buffer_offset;
-
       /* Set the descriptor. */
       uint32_t *desc = descs->list + slot * 4;
-      desc[0] = va;
-      desc[1] = S_008F04_BASE_ADDRESS_HI(va >> 32) | S_008F04_STRIDE(0);
+      si_set_buf_desc_address(si_resource(buffer), buffer_offset, desc);
       desc[2] = input->buffer_size;
 
       buffers->buffers[slot] = buffer;
@@ -1315,10 +1311,8 @@ static void si_set_shader_buffer(struct si_context *sctx, struct si_buffer_resou
     * granularity than 4 bytes.
     */
    assert(sbuffer->buffer_offset + sbuffer->buffer_size <= align(buf->bo_size, 4));
-   uint64_t va = buf->gpu_address + sbuffer->buffer_offset;
 
-   desc[0] = va;
-   desc[1] = S_008F04_BASE_ADDRESS_HI(va >> 32) | S_008F04_STRIDE(0);
+   si_set_buf_desc_address(buf, sbuffer->buffer_offset, desc);
    desc[2] = sbuffer->buffer_size;
 
    pipe_resource_reference(&buffers->buffers[slot], &buf->b.b);
@@ -1428,7 +1422,7 @@ void si_set_ring_buffer(struct si_context *sctx, uint slot, struct pipe_resource
 
       switch (element_size) {
       default:
-         unreachable("Unsupported ring buffer element size");
+         UNREACHABLE("Unsupported ring buffer element size");
       case 0:
       case 2:
          element_size = 0;
@@ -1446,7 +1440,7 @@ void si_set_ring_buffer(struct si_context *sctx, uint slot, struct pipe_resource
 
       switch (index_stride) {
       default:
-         unreachable("Unsupported ring buffer index stride");
+         UNREACHABLE("Unsupported ring buffer index stride");
       case 0:
       case 8:
          index_stride = 0;
@@ -2172,7 +2166,7 @@ static void si_emit_global_shader_pointers(struct si_context *sctx, struct si_de
       radeon_emit_one_32bit_pointer(descs, R_00B130_SPI_SHADER_USER_DATA_VS_0);
       radeon_emit_one_32bit_pointer(descs, R_00B230_SPI_SHADER_USER_DATA_GS_0);
       radeon_emit_one_32bit_pointer(descs, R_00B430_SPI_SHADER_USER_DATA_HS_0);
-   } else if (sctx->gfx_level == GFX9 && sctx->shadowing.registers) {
+   } else if (sctx->gfx_level == GFX9 && sctx->uses_kernelq_reg_shadowing) {
       /* We can't use the COMMON registers with register shadowing. */
       radeon_emit_one_32bit_pointer(descs, R_00B030_SPI_SHADER_USER_DATA_PS_0);
       radeon_emit_one_32bit_pointer(descs, R_00B130_SPI_SHADER_USER_DATA_VS_0);
@@ -2859,7 +2853,7 @@ static void si_emit_gfx_resources_add_all_to_bo_list(struct si_context *sctx, un
 void si_init_all_descriptors(struct si_context *sctx)
 {
    int i;
-   unsigned first_shader = sctx->has_graphics ? 0 : PIPE_SHADER_COMPUTE;
+   unsigned first_shader = sctx->is_gfx_queue ? 0 : PIPE_SHADER_COMPUTE;
    unsigned hs_sgpr0, gs_sgpr0;
 
    if (sctx->gfx_level >= GFX12) {
@@ -2955,7 +2949,7 @@ void si_init_all_descriptors(struct si_context *sctx)
    sctx->b.delete_image_handle = si_delete_image_handle;
    sctx->b.make_image_handle_resident = si_make_image_handle_resident;
 
-   if (!sctx->has_graphics)
+   if (!sctx->is_gfx_queue)
       return;
 
    sctx->b.set_polygon_stipple = si_set_polygon_stipple;

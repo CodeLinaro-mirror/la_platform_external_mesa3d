@@ -75,7 +75,7 @@ d3d12_query_heap_type(unsigned query_type, unsigned sub_query)
    default:
       debug_printf("unknown query: %s\n",
                    util_str_query_type(query_type, true));
-      unreachable("d3d12: unknown query type");
+      UNREACHABLE("d3d12: unknown query type");
    }
 }
 
@@ -106,7 +106,7 @@ d3d12_query_type(unsigned query_type, unsigned sub_query, unsigned index)
    default:
       debug_printf("unknown query: %s\n",
                    util_str_query_type(query_type, true));
-      unreachable("d3d12: unknown query type");
+      UNREACHABLE("d3d12: unknown query type");
    }
 }
 
@@ -264,7 +264,7 @@ accumulate_subresult_cpu(struct d3d12_context *ctx, struct d3d12_query *q_parent
       default:
          debug_printf("unsupported query type: %s\n",
                       util_str_query_type(q_parent->type, true));
-         unreachable("unexpected query type");
+         UNREACHABLE("unexpected query type");
       }
    }
 
@@ -329,7 +329,7 @@ subquery_should_be_active(struct d3d12_context *ctx, struct d3d12_query *q, unsi
       case 0: return has_xfb;
       case 1: return !has_xfb && has_gs;
       case 2: return !has_xfb && !has_gs;
-      default: unreachable("Invalid subquery for primitives generated");
+      default: UNREACHABLE("Invalid subquery for primitives generated");
       }
       break;
    }
@@ -456,6 +456,7 @@ begin_subquery(struct d3d12_context *ctx, struct d3d12_query *q_parent, unsigned
    }
 
    ctx->cmdlist->BeginQuery(q->query_heap, q->d3d12qtype, q->curr_query);
+   ctx->has_commands = true;
    q->active = true;
 }
 
@@ -493,6 +494,7 @@ begin_timer_query(struct d3d12_context *ctx, struct d3d12_query *q_parent, bool 
    }
 
    ctx->cmdlist->EndQuery(q->query_heap, q->d3d12qtype, query_index);
+   ctx->has_commands = true;
    q->active = true;
 }
 
@@ -543,6 +545,7 @@ end_subquery(struct d3d12_context *ctx, struct d3d12_query *q_parent, unsigned s
    d3d12_apply_resource_states(ctx, false);
    ctx->cmdlist->ResolveQueryData(q->query_heap, q->d3d12qtype, resolve_index,
       resolve_count, d3d12_res, offset);
+   ctx->has_commands = true;
 
    d3d12_batch_reference_object(batch, q->query_heap);
    d3d12_batch_reference_resource(batch, res, true);

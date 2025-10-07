@@ -88,6 +88,7 @@ void ac_nir_set_options(struct radeon_info *info, bool use_llvm,
    options->has_msad = true;
    options->has_shfr32 = true;
    options->has_mul24_relaxed = true;
+   options->has_f2e4m3fn_satfn = !use_llvm && info->gfx_level >= GFX12;
    options->lower_int64_options = nir_lower_imul64 | nir_lower_imul_high64 | nir_lower_imul_2x32_64 | nir_lower_divmod64 |
                                   nir_lower_minmax64 | nir_lower_iabs64 | nir_lower_iadd_sat64 | nir_lower_conv64 |
                                   nir_lower_bitfield_extract64;
@@ -162,7 +163,7 @@ ac_nir_load_arg_upper_bound(nir_builder *b, const struct ac_shader_args *ac_args
                             unsigned upper_bound)
 {
    nir_def *value = ac_nir_load_arg_at_offset(b, ac_args, arg, 0);
-   nir_intrinsic_set_arg_upper_bound_u32_amd(nir_instr_as_intrinsic(value->parent_instr),
+   nir_intrinsic_set_arg_upper_bound_u32_amd(nir_def_as_intrinsic(value),
                                              upper_bound);
    return value;
 }
@@ -331,7 +332,7 @@ ac_nir_varying_expression_max_cost(nir_shader *producer, nir_shader *consumer)
       return 12;
 
    default:
-      unreachable("unexpected shader stage");
+      UNREACHABLE("unexpected shader stage");
    }
 }
 
@@ -360,7 +361,6 @@ lower_bit_size_callback(const nir_instr *instr, enum amd_gfx_level chip, bool di
    if (alu->def.bit_size & (8 | 16)) {
       unsigned bit_size = alu->def.bit_size;
       switch (alu->op) {
-      case nir_op_bitfield_select:
       case nir_op_imul_high:
       case nir_op_umul_high:
       case nir_op_uadd_carry:
@@ -381,6 +381,9 @@ lower_bit_size_callback(const nir_instr *instr, enum amd_gfx_level chip, bool di
       case nir_op_iadd_sat:
       case nir_op_isub_sat:
          return !divergence_known || bit_size == 8 || !alu->def.divergent ? 32 : 0;
+      case nir_op_extract_u8:
+      case nir_op_extract_i8:
+         return !divergence_known || !alu->def.divergent ? 32 : 0;
 
       default:
          return 0;
@@ -610,6 +613,9 @@ ac_nir_mem_vectorize_callback(unsigned align_mul, unsigned align_offset, unsigne
    if (!is_shared) {
       return (align % (bit_size / 8u)) == 0 && num_components <= NIR_MAX_VEC_COMPONENTS;
    } else {
+      /* 96-bit and 128-bit LDS loads are slow. Don't use them. */
+      if (!is_store && bit_size * num_components > 64)
+         return false;
       if (bit_size >= 32 && num_components == 3) {
          /* AMD hardware can't do 3-component loads except for 96-bit loads. */
          return bit_size == 32 && align % 16 == 0;
@@ -680,7 +686,7 @@ enum gl_access_qualifier ac_nir_get_mem_access_flags(const nir_intrinsic_instr *
          break;
 
       default:
-         unreachable("unexpected store instruction");
+         UNREACHABLE("unexpected store instruction");
       }
    }
 
@@ -756,7 +762,7 @@ summarize_repack(nir_builder *b, nir_def *packed_counts, bool mask_lane_id, unsi
          return nir_msad_4x8(b, nir_unpack_64_2x32_split_y(b, sad_op), nir_imm_int(b, 0), sum);
       }
    } else {
-      unreachable("Unimplemented NGG wave count");
+      UNREACHABLE("Unimplemented NGG wave count");
    }
 }
 
@@ -877,4 +883,14 @@ ac_nir_repack_invocations_in_workgroup(nir_builder *b, nir_def **input_bool,
       results[i].repacked_invocation_index =
          nir_mbcnt_amd(b, input_mask[i], wg_repacked_index_base);
    }
+}
+
+uint8_t
+ac_nir_lower_phis_to_scalar_cb(const nir_instr *instr, const void *_)
+{
+   nir_phi_instr *phi = nir_instr_as_phi(instr);
+   if (phi->def.bit_size == 1 || phi->def.bit_size >= 32)
+      return 1;
+
+   return 32 / phi->def.bit_size;
 }

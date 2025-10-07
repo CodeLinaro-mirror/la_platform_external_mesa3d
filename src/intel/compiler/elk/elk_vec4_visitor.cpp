@@ -357,7 +357,7 @@ void
 vec4_visitor::emit_pack_half_2x16(dst_reg dst, src_reg src0)
 {
    if (devinfo->ver < 7) {
-      unreachable("ir_unop_pack_half_2x16 should be lowered");
+      UNREACHABLE("ir_unop_pack_half_2x16 should be lowered");
    }
 
    assert(dst.type == ELK_REGISTER_TYPE_UD);
@@ -434,7 +434,7 @@ void
 vec4_visitor::emit_unpack_half_2x16(dst_reg dst, src_reg src0)
 {
    if (devinfo->ver < 7) {
-      unreachable("ir_unop_unpack_half_2x16 should be lowered");
+      UNREACHABLE("ir_unop_unpack_half_2x16 should be lowered");
    }
 
    assert(dst.type == ELK_REGISTER_TYPE_F);
@@ -575,6 +575,8 @@ elk_type_size_xvec4(const struct glsl_type *type, bool as_vec4, bool bindless)
    case GLSL_TYPE_FLOAT:
    case GLSL_TYPE_FLOAT16:
    case GLSL_TYPE_BFLOAT16:
+   case GLSL_TYPE_FLOAT_E4M3FN:
+   case GLSL_TYPE_FLOAT_E5M2:
    case GLSL_TYPE_BOOL:
    case GLSL_TYPE_DOUBLE:
    case GLSL_TYPE_UINT16:
@@ -624,7 +626,7 @@ elk_type_size_xvec4(const struct glsl_type *type, bool as_vec4, bool bindless)
    case GLSL_TYPE_VOID:
    case GLSL_TYPE_ERROR:
    case GLSL_TYPE_COOPERATIVE_MATRIX:
-      unreachable("not reached");
+      UNREACHABLE("not reached");
    }
 
    return 0;
@@ -793,13 +795,13 @@ vec4_visitor::emit_uniformize(const src_reg &src)
 void
 vec4_visitor::gs_emit_vertex(int /* stream_id */)
 {
-   unreachable("not reached");
+   UNREACHABLE("not reached");
 }
 
 void
 vec4_visitor::gs_end_primitive()
 {
-   unreachable("not reached");
+   UNREACHABLE("not reached");
 }
 
 void

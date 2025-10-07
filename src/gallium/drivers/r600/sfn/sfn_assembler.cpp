@@ -222,7 +222,7 @@ AssamblerVisitor::emit_lds_op(const AluInstr& lds)
       break;
    default:
       std::cerr << "\n R600: error op: " << lds << "\n";
-      unreachable("Unhandled LDS op");
+      UNREACHABLE("Unhandled LDS op");
    }
 
    copy_src(alu.src[0], lds.src(0));
@@ -329,7 +329,7 @@ AssamblerVisitor::emit_alu_op(const AluInstr& ai)
             case 1: kcache_index_mode = bim_zero; break;
             case 2: kcache_index_mode = bim_one; break;
             default:
-               unreachable("Unsupported index mode");
+               UNREACHABLE("Unsupported index mode");
             }
          } else {
             kcache_index_mode = bim_zero;
@@ -464,24 +464,7 @@ AssamblerVisitor::visit(const AluGroup& group)
    }
 
    auto [addr, is_index] = group.addr();
-
-   if (addr) {
-      if (!addr->has_flag(Register::addr_or_idx)) {
-         if (is_index) {
-            emit_index_reg(*addr, 0);
-         } else {
-            auto reg = addr->as_register();
-            assert(reg);
-            if (!m_last_addr || !m_bc->ar_loaded || !m_last_addr->equal_to(*reg)) {
-               m_last_addr = reg;
-               m_bc->ar_reg = reg->sel();
-               m_bc->ar_chan = reg->chan();
-               m_bc->ar_loaded = 0;
-               r600_load_ar(m_bc, group.addr_for_src());
-            }
-         }
-      }
-   }
+   assert(!addr || addr->has_flag(Register::addr_or_idx));
 
    for (auto& i : group) {
       if (i)
@@ -972,7 +955,7 @@ AssamblerVisitor::visit(const ControlFlowInstr& instr)
       }
    } break;
    default:
-      unreachable("Unknown CF instruction type");
+      UNREACHABLE("Unknown CF instruction type");
    }
 }
 
@@ -1030,14 +1013,14 @@ void
 AssamblerVisitor::visit(const LDSAtomicInstr& instr)
 {
    (void)instr;
-   unreachable("LDSAtomicInstr must be lowered to ALUInstr");
+   UNREACHABLE("LDSAtomicInstr must be lowered to ALUInstr");
 }
 
 void
 AssamblerVisitor::visit(const LDSReadInstr& instr)
 {
    (void)instr;
-   unreachable("LDSReadInstr must be lowered to ALUInstr");
+   UNREACHABLE("LDSReadInstr must be lowered to ALUInstr");
 }
 
 EBufferIndexMode
@@ -1199,13 +1182,6 @@ AssamblerVisitor::copy_dst(r600_bytecode_alu_dst& dst, const Register& d, bool w
    if (m_last_addr && m_last_addr->equal_to(d))
       m_last_addr = nullptr;
 
-   for (int i = 0; i < 2; ++i) {
-      /* Force emitting index register, if we didn't emit it yet, because
-       * the register value will change now */
-      if (dst.sel == m_bc->index_reg[i] && dst.chan == m_bc->index_reg_chan[i])
-         m_bc->index_loaded[i] = false;
-   }
-
    return true;
 }
 
@@ -1271,7 +1247,7 @@ void
 EncodeSourceVisitor::visit(const LocalArray& value)
 {
    (void)value;
-   unreachable("An array can't be a source register");
+   UNREACHABLE("An array can't be a source register");
 }
 
 void

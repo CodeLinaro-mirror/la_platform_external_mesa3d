@@ -72,6 +72,7 @@ enum tu_debug_flags : uint64_t
    TU_DEBUG_FDM_OFFSET               = BITFIELD64_BIT(31),
    TU_DEBUG_CHECK_CMD_BUFFER_STATUS  = BITFIELD64_BIT(32),
    TU_DEBUG_COMM                     = BITFIELD64_BIT(33),
+   TU_DEBUG_NOFDM                    = BITFIELD64_BIT(34),
 };
 
 struct tu_env {
@@ -343,7 +344,7 @@ tu6_tex_filter(VkFilter filter, unsigned aniso)
    case VK_FILTER_CUBIC_EXT:
       return A6XX_TEX_CUBIC;
    default:
-      unreachable("illegal texture filter");
+      UNREACHABLE("illegal texture filter");
       break;
    }
 }
@@ -383,7 +384,7 @@ tu6_polygon_mode(VkPolygonMode mode)
    case VK_POLYGON_MODE_FILL:
       return POLYMODE6_TRIANGLES;
    default:
-      unreachable("bad polygon mode");
+      UNREACHABLE("bad polygon mode");
    }
 }
 

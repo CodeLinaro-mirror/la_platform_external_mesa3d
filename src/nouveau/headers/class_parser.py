@@ -11,6 +11,9 @@ import subprocess
 
 from mako.template import Template
 
+import util
+
+
 METHOD_ARRAY_SIZES = {
     'BIND_GROUP_CONSTANT_BUFFER'                            : 16,
     'CALL_MME_DATA'                                         : 256,
@@ -63,6 +66,11 @@ METHOD_IS_FLOAT = [
     'SET_VIEWPORT_CLIP_MIN_Z',
     'SET_VIEWPORT_CLIP_MAX_Z',
     'SET_Z_CLEAR_VALUE',
+]
+
+# generator chokes on these in later files
+SKIP_FIELD = [
+    'CURRENT_SCG_TYPE'
 ]
 
 TEMPLATE_H = Template("""\
@@ -200,7 +208,7 @@ P_DUMP_${nvcl}_MTHD_DATA(FILE *fp, uint16_t idx, uint32_t data,
         fprintf(fp, "%s.${field.name} = ", prefix);
     %if len(field.defs):
         switch (parsed) {
-      %for d in field.defs:
+      %for d in field.unique_defs:
         case ${nvcl}_${mthd.name}_${field.name}_${d}:
             fprintf(fp, "${d}${bs}n");
             break;
@@ -235,6 +243,8 @@ pub const ${version[0]}: u16 = ${version[1]};
 """)
 
 TEMPLATE_RS_MTHD = Template("""\
+use crate::Mthd;
+use crate::ArrayMthd;
 
 %if prev_mod is not None:
 use crate::classes::${prev_mod}::mthd as ${prev_mod};
@@ -264,7 +274,7 @@ pub use ${prev_mod}::${to_camel(mthd.name)};
 #[repr(u16)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ${field.rs_type(mthd)} {
-    %for def_name, def_value in field.defs.items():
+    %for def_name, def_value in field.unique_defs.items():
     ${to_camel(def_name)} = ${def_value.lower()},
     %endfor
 }
@@ -345,6 +355,8 @@ class Field(object):
         self.start = int(start)
         self.end = int(end)
         self.defs = {}
+        self._values = set()
+        self.unique_defs = {}
 
     def __eq__(self, other):
         if not isinstance(other, Field):
@@ -354,6 +366,14 @@ class Field(object):
                self.start == other.start and \
                self.end == other.end and \
                self.defs == other.defs
+
+    def add_def(self, name, value):
+        assert name not in self.defs
+        self.defs[name] = value
+
+        if value not in self._values:
+            self._values.add(value)
+            self.unique_defs[name] = value
 
     @property
     def is_bool(self):
@@ -467,7 +487,8 @@ def parse_header(nvcl, f):
                 if ":" in list[2]:
                     state = 1
                 elif teststr in list[1]:
-                    curfield.defs[list[1].removeprefix(teststr)] = list[2]
+                    if not SKIP_FIELD[0] in list[1]:
+                        curfield.add_def(list[1].removeprefix(teststr), list[2])
                 else:
                     state = 1
 
@@ -557,33 +578,16 @@ def main():
         'bs': '\\'
     }
 
-    try:
-        if args.out_h is not None:
-            environment['header'] = os.path.basename(args.out_h)
-            with open(args.out_h, 'w', encoding='utf-8') as f:
-                f.write(TEMPLATE_H.render(**environment))
-        if args.out_c is not None:
-            with open(args.out_c, 'w', encoding='utf-8') as f:
-                f.write(TEMPLATE_C.render(**environment))
-        if args.out_rs is not None:
-            with open(args.out_rs, 'w', encoding='utf-8') as f:
-                f.write(TEMPLATE_RS.render(**environment))
-        if args.out_rs_mthd is not None:
-            with open(args.out_rs_mthd, 'w', encoding='utf-8') as f:
-                f.write("use crate::Mthd;\n")
-                f.write("use crate::ArrayMthd;\n")
-                f.write("\n")
-                f.write(TEMPLATE_RS_MTHD.render(**environment))
+    if args.out_h is not None:
+        environment['header'] = os.path.basename(args.out_h)
+        util.write_template(args.out_h, TEMPLATE_H, environment)
+    if args.out_c is not None:
+        util.write_template(args.out_c, TEMPLATE_C, environment)
+    if args.out_rs is not None:
+        util.write_template_rs(args.out_rs, TEMPLATE_RS, environment)
+    if args.out_rs_mthd is not None:
+        util.write_template_rs(args.out_rs_mthd, TEMPLATE_RS_MTHD, environment)
 
-    except Exception:
-        # In the event there's an error, this imports some helpers from mako
-        # to print a useful stack trace and prints it, then exits with
-        # status 1, if python is run with debug; otherwise it just raises
-        # the exception
-        import sys
-        from mako import exceptions
-        print(exceptions.text_error_template().render(), file=sys.stderr)
-        sys.exit(1)
 
 if __name__ == '__main__':
     main()

@@ -61,6 +61,7 @@ template = """\
 #include "util/double.h"
 #include "util/softfloat.h"
 #include "util/bfloat.h"
+#include "util/float8.h"
 #include "util/bigmath.h"
 #include "util/format/format_utils.h"
 #include "util/format_r11g11b10f.h"
@@ -587,7 +588,7 @@ evaluate_${name}(nir_const_value *_dst_val,
       % endfor
 
       default:
-         unreachable("unknown bit width");
+         UNREACHABLE("unknown bit width");
       }
    % else:
       ${evaluate_op(op, 0, execution_mode)}
@@ -613,7 +614,7 @@ nir_eval_const_opcode(nir_op op, nir_const_value *dest,
       return;
 % endfor
    default:
-      unreachable("shouldn't get here");
+      UNREACHABLE("shouldn't get here");
    }
 }"""
 

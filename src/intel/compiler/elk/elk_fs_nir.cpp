@@ -192,18 +192,18 @@ emit_system_values_block(nir_to_elk_state &ntb, nir_block *block)
       switch (intrin->intrinsic) {
       case nir_intrinsic_load_vertex_id:
       case nir_intrinsic_load_base_vertex:
-         unreachable("should be lowered by nir_lower_system_values().");
+         UNREACHABLE("should be lowered by nir_lower_system_values().");
 
       case nir_intrinsic_load_vertex_id_zero_base:
       case nir_intrinsic_load_is_indexed_draw:
       case nir_intrinsic_load_first_vertex:
       case nir_intrinsic_load_instance_id:
       case nir_intrinsic_load_base_instance:
-         unreachable("should be lowered by elk_nir_lower_vs_inputs().");
+         UNREACHABLE("should be lowered by elk_nir_lower_vs_inputs().");
          break;
 
       case nir_intrinsic_load_draw_id:
-         unreachable("should be lowered by elk_nir_lower_vs_inputs().");
+         UNREACHABLE("should be lowered by elk_nir_lower_vs_inputs().");
          break;
 
       case nir_intrinsic_load_invocation_id:
@@ -378,7 +378,7 @@ fs_nir_emit_cf_list(nir_to_elk_state &ntb, exec_list *list)
          break;
 
       default:
-         unreachable("Invalid CFG node block");
+         UNREACHABLE("Invalid CFG node block");
       }
    }
 }
@@ -622,7 +622,7 @@ elk_rnd_mode_from_nir_op (const nir_op op) {
    case nir_op_f2f16_rtne:
       return ELK_RND_MODE_RTNE;
    default:
-      unreachable("Operation doesn't support rounding mode");
+      UNREACHABLE("Operation doesn't support rounding mode");
    }
 }
 
@@ -862,7 +862,7 @@ emit_fsign(nir_to_elk_state &ntb, const fs_builder &bld, const nir_alu_instr *in
 
       inst->predicate = ELK_PREDICATE_NORMAL;
    } else {
-      unreachable("Should have been lowered by nir_opt_algebraic.");
+      UNREACHABLE("Should have been lowered by nir_opt_algebraic.");
    }
 }
 
@@ -1299,10 +1299,10 @@ fs_nir_emit_alu(nir_to_elk_state &ntb, nir_alu_instr *instr,
       break;
 
    case nir_op_uadd_carry:
-      unreachable("Should have been lowered by carry_to_arith().");
+      UNREACHABLE("Should have been lowered by carry_to_arith().");
 
    case nir_op_usub_borrow:
-      unreachable("Should have been lowered by borrow_to_arith().");
+      UNREACHABLE("Should have been lowered by borrow_to_arith().");
 
    case nir_op_umod:
    case nir_op_irem:
@@ -1457,7 +1457,7 @@ fs_nir_emit_alu(nir_to_elk_state &ntb, nir_alu_instr *instr,
                return;
 
             default:
-               unreachable("impossible opcode");
+               UNREACHABLE("impossible opcode");
             }
          }
          op[0] = resolve_source_modifiers(bld, op[0]);
@@ -1498,10 +1498,10 @@ fs_nir_emit_alu(nir_to_elk_state &ntb, nir_alu_instr *instr,
    case nir_op_b32any_inequal3:
    case nir_op_b32any_fnequal4:
    case nir_op_b32any_inequal4:
-      unreachable("Lowered by nir_lower_alu_reductions");
+      UNREACHABLE("Lowered by nir_lower_alu_reductions");
 
    case nir_op_ldexp:
-      unreachable("not reached: should be handled by ldexp_to_arith()");
+      UNREACHABLE("not reached: should be handled by ldexp_to_arith()");
 
    case nir_op_fsqrt:
       inst = bld.emit(ELK_SHADER_OPCODE_SQRT, result, op[0]);
@@ -1545,32 +1545,6 @@ fs_nir_emit_alu(nir_to_elk_state &ntb, nir_alu_instr *instr,
       }
       break;
 
-   case nir_op_fquantize2f16: {
-      elk_fs_reg tmp16 = bld.vgrf(ELK_REGISTER_TYPE_D);
-      elk_fs_reg tmp32 = bld.vgrf(ELK_REGISTER_TYPE_F);
-      elk_fs_reg zero = bld.vgrf(ELK_REGISTER_TYPE_F);
-
-      /* The destination stride must be at least as big as the source stride. */
-      tmp16 = subscript(tmp16, ELK_REGISTER_TYPE_HF, 0);
-
-      /* Check for denormal */
-      elk_fs_reg abs_src0 = op[0];
-      abs_src0.abs = true;
-      bld.CMP(bld.null_reg_f(), abs_src0, elk_imm_f(ldexpf(1.0, -14)),
-              ELK_CONDITIONAL_L);
-      /* Get the appropriately signed zero */
-      bld.AND(retype(zero, ELK_REGISTER_TYPE_UD),
-              retype(op[0], ELK_REGISTER_TYPE_UD),
-              elk_imm_ud(0x80000000));
-      /* Do the actual F32 -> F16 -> F32 conversion */
-      bld.F32TO16(tmp16, op[0]);
-      bld.F16TO32(tmp32, tmp16);
-      /* Select that or zero based on normal status */
-      inst = bld.SEL(result, zero, tmp32);
-      inst->predicate = ELK_PREDICATE_NORMAL;
-      break;
-   }
-
    case nir_op_imin:
    case nir_op_umin:
    case nir_op_fmin:
@@ -1593,7 +1567,7 @@ fs_nir_emit_alu(nir_to_elk_state &ntb, nir_alu_instr *instr,
    case nir_op_unpack_unorm_4x8:
    case nir_op_unpack_half_2x16:
    case nir_op_pack_half_2x16:
-      unreachable("not reached: should be handled by lower_packing_builtins");
+      UNREACHABLE("not reached: should be handled by lower_packing_builtins");
 
    case nir_op_unpack_half_2x16_split_x:
       inst = bld.F16TO32(result, subscript(op[0], ELK_REGISTER_TYPE_HF, 0));
@@ -1681,7 +1655,7 @@ fs_nir_emit_alu(nir_to_elk_state &ntb, nir_alu_instr *instr,
 
    case nir_op_ubitfield_extract:
    case nir_op_ibitfield_extract:
-      unreachable("should have been lowered");
+      UNREACHABLE("should have been lowered");
    case nir_op_ubfe:
    case nir_op_ibfe:
       assert(instr->def.bit_size < 64);
@@ -1706,7 +1680,7 @@ fs_nir_emit_alu(nir_to_elk_state &ntb, nir_alu_instr *instr,
       break;
 
    case nir_op_bitfield_insert:
-      unreachable("not reached: should have been lowered");
+      UNREACHABLE("not reached: should have been lowered");
 
    /* With regards to implicit masking of the shift counts for 8- and 16-bit
     * types, the PRMs are **incorrect**. They falsely state that on Gen9+ only
@@ -1828,7 +1802,7 @@ fs_nir_emit_alu(nir_to_elk_state &ntb, nir_alu_instr *instr,
    }
 
    default:
-      unreachable("unhandled instruction");
+      UNREACHABLE("unhandled instruction");
    }
 
    /* If we need to do a boolean resolve, replace the result with -(x & 1)
@@ -1885,7 +1859,7 @@ fs_nir_emit_load_const(nir_to_elk_state &ntb,
       break;
 
    default:
-      unreachable("Invalid bit size");
+      UNREACHABLE("Invalid bit size");
    }
 
    ntb.ssa_values[instr->def.index] = reg;
@@ -1901,7 +1875,7 @@ static bool
 is_resource_src(nir_src src)
 {
    return src.ssa->parent_instr->type == nir_instr_type_intrinsic &&
-          nir_instr_as_intrinsic(src.ssa->parent_instr)->intrinsic == nir_intrinsic_resource_intel;
+          nir_def_as_intrinsic(src.ssa)->intrinsic == nir_intrinsic_resource_intel;
 }
 
 static elk_fs_reg
@@ -2552,7 +2526,7 @@ fs_nir_emit_vs_intrinsic(nir_to_elk_state &ntb,
    switch (instr->intrinsic) {
    case nir_intrinsic_load_vertex_id:
    case nir_intrinsic_load_base_vertex:
-      unreachable("should be lowered by nir_lower_system_values()");
+      UNREACHABLE("should be lowered by nir_lower_system_values()");
 
    case nir_intrinsic_load_input: {
       assert(instr->def.bit_size == 32);
@@ -2572,7 +2546,7 @@ fs_nir_emit_vs_intrinsic(nir_to_elk_state &ntb,
    case nir_intrinsic_load_draw_id:
    case nir_intrinsic_load_first_vertex:
    case nir_intrinsic_load_is_indexed_draw:
-      unreachable("lowered by elk_nir_lower_vs_inputs");
+      UNREACHABLE("lowered by elk_nir_lower_vs_inputs");
 
    default:
       fs_nir_emit_intrinsic(ntb, bld, instr);
@@ -2704,7 +2678,7 @@ emit_barrier(nir_to_elk_state &ntb)
    case 8:
       barrier_id_mask = 0x0f000000u; break;
    default:
-      unreachable("barrier is only available on gen >= 7");
+      UNREACHABLE("barrier is only available on gen >= 7");
    }
 
    /* Copy the barrier id from r0.2 to the message payload reg.2 */
@@ -2783,7 +2757,7 @@ fs_nir_emit_tcs_intrinsic(nir_to_elk_state &ntb,
       break;
 
    case nir_intrinsic_load_input:
-      unreachable("nir_lower_io should never give us these.");
+      UNREACHABLE("nir_lower_io should never give us these.");
       break;
 
    case nir_intrinsic_load_per_vertex_input: {
@@ -3110,7 +3084,7 @@ fs_nir_emit_gs_intrinsic(nir_to_elk_state &ntb,
       break;
 
    case nir_intrinsic_load_input:
-      unreachable("load_input intrinsics are invalid for the GS stage");
+      UNREACHABLE("load_input intrinsics are invalid for the GS stage");
 
    case nir_intrinsic_load_per_vertex_input:
       emit_gs_input_load(ntb, dest, instr->src[0], nir_intrinsic_base(instr),
@@ -3213,8 +3187,8 @@ emit_non_coherent_fb_read(nir_to_elk_state &ntb, const fs_builder &bld, const el
 
    /* Calculate the fragment coordinates. */
    const elk_fs_reg coords = bld.vgrf(ELK_REGISTER_TYPE_UD, 3);
-   bld.MOV(offset(coords, bld, 0), s.pixel_x);
-   bld.MOV(offset(coords, bld, 1), s.pixel_y);
+   bld.MOV(offset(coords, bld, 0), s.uw_pixel_x);
+   bld.MOV(offset(coords, bld, 1), s.uw_pixel_y);
    bld.MOV(offset(coords, bld, 2), fetch_render_target_array_index(bld));
 
    /* Calculate the sample index and MCS payload when multisampling.  Luckily
@@ -3311,7 +3285,7 @@ alloc_frag_output(nir_to_elk_state &ntb, unsigned location)
                              &s.outputs[l - FRAG_RESULT_DATA0], 1);
 
    else
-      unreachable("Invalid location");
+      UNREACHABLE("Invalid location");
 }
 
 static void
@@ -3341,37 +3315,6 @@ emit_is_helper_invocation(nir_to_elk_state &ntb, elk_fs_reg result)
       elk_emit_predicate_on_sample_mask(b.at(NULL, mov), mov);
       mov->predicate_inverse = true;
    }
-}
-
-static void
-emit_fragcoord_interpolation(nir_to_elk_state &ntb, elk_fs_reg wpos)
-{
-   const intel_device_info *devinfo = ntb.devinfo;
-   const fs_builder &bld = ntb.bld;
-   elk_fs_visitor &s = ntb.s;
-
-   assert(s.stage == MESA_SHADER_FRAGMENT);
-
-   /* gl_FragCoord.x */
-   bld.MOV(wpos, s.pixel_x);
-   wpos = offset(wpos, bld, 1);
-
-   /* gl_FragCoord.y */
-   bld.MOV(wpos, s.pixel_y);
-   wpos = offset(wpos, bld, 1);
-
-   /* gl_FragCoord.z */
-   if (devinfo->ver >= 6) {
-      bld.MOV(wpos, s.pixel_z);
-   } else {
-      bld.emit(ELK_FS_OPCODE_LINTERP, wpos,
-               s.delta_xy[ELK_BARYCENTRIC_PERSPECTIVE_PIXEL],
-               s.interp_reg(bld, VARYING_SLOT_POS, 2, 0));
-   }
-   wpos = offset(wpos, bld, 1);
-
-   /* gl_FragCoord.w: Already set up in emit_interpolation */
-   bld.MOV(wpos, s.wpos_w);
 }
 
 static elk_fs_reg
@@ -3965,7 +3908,25 @@ fs_nir_emit_fs_intrinsic(nir_to_elk_state &ntb,
    }
 
    case nir_intrinsic_load_frag_coord:
-      emit_fragcoord_interpolation(ntb, dest);
+      UNREACHABLE("should be lowered by elk_nir_lower_frag_coord");
+
+   case nir_intrinsic_load_pixel_coord:
+      /* gl_FragCoord.xy: Just load the pixel xy from the payload, or more
+      * complicated emit_interpolation_setup_gfx6 setup
+      */
+      dest = retype(dest, ELK_REGISTER_TYPE_UW);
+      bld.MOV(dest, s.uw_pixel_x);
+      bld.MOV(offset(dest, bld, 1), s.uw_pixel_y);
+      break;
+
+   case nir_intrinsic_load_frag_coord_z:
+      bld.MOV(dest, s.pixel_z);
+      break;
+
+   case nir_intrinsic_load_frag_coord_w:
+      /* Lowered to interpolation pre-gen6. */
+      assert(devinfo->ver >= 6);
+      bld.emit(ELK_SHADER_OPCODE_RCP, dest, fetch_payload_reg(bld, s.fs_payload().source_w_reg));
       break;
 
    case nir_intrinsic_load_interpolated_input: {
@@ -3974,8 +3935,6 @@ fs_nir_emit_fs_intrinsic(nir_to_elk_state &ntb,
       nir_intrinsic_instr *bary_intrinsic =
          nir_instr_as_intrinsic(instr->src[0].ssa->parent_instr);
       nir_intrinsic_op bary_intrin = bary_intrinsic->intrinsic;
-      enum glsl_interp_mode interp_mode =
-         (enum glsl_interp_mode) nir_intrinsic_interp_mode(bary_intrinsic);
       elk_fs_reg dst_xy;
 
       if (bary_intrin == nir_intrinsic_load_barycentric_at_offset ||
@@ -3995,13 +3954,7 @@ fs_nir_emit_fs_intrinsic(nir_to_elk_state &ntb,
          interp.type = ELK_REGISTER_TYPE_F;
          dest.type = ELK_REGISTER_TYPE_F;
 
-         if (devinfo->ver < 6 && interp_mode == INTERP_MODE_SMOOTH) {
-            elk_fs_reg tmp = s.vgrf(glsl_float_type());
-            bld.emit(ELK_FS_OPCODE_LINTERP, tmp, dst_xy, interp);
-            bld.MUL(offset(dest, bld, i), tmp, s.pixel_w);
-         } else {
-            bld.emit(ELK_FS_OPCODE_LINTERP, offset(dest, bld, i), dst_xy, interp);
-         }
+         bld.emit(ELK_FS_OPCODE_LINTERP, offset(dest, bld, i), dst_xy, interp);
       }
       break;
    }
@@ -4184,7 +4137,7 @@ fs_nir_emit_cs_intrinsic(nir_to_elk_state &ntb,
       /* Should have been lowered by elk_nir_lower_cs_intrinsics() or
        * crocus/iris_setup_uniforms() for the variable group size case.
        */
-      unreachable("Should have been lowered");
+      UNREACHABLE("Should have been lowered");
       break;
    }
 
@@ -4217,7 +4170,7 @@ elk_nir_reduction_op_identity(const fs_builder &bld,
       else
          return retype(elk_imm_u64(value.u64), type);
    default:
-      unreachable("Invalid type size");
+      UNREACHABLE("Invalid type size");
    }
 }
 
@@ -4239,7 +4192,7 @@ elk_op_for_nir_reduction_op(nir_op op)
    case nir_op_ior:  return ELK_OPCODE_OR;
    case nir_op_ixor: return ELK_OPCODE_XOR;
    default:
-      unreachable("Invalid reduction operation");
+      UNREACHABLE("Invalid reduction operation");
    }
 }
 
@@ -4261,7 +4214,7 @@ elk_cond_mod_for_nir_reduction_op(nir_op op)
    case nir_op_ior:  return ELK_CONDITIONAL_NONE;
    case nir_op_ixor: return ELK_CONDITIONAL_NONE;
    default:
-      unreachable("Invalid reduction operation");
+      UNREACHABLE("Invalid reduction operation");
    }
 }
 
@@ -4304,13 +4257,13 @@ try_rebuild_resource(nir_to_elk_state &ntb, const elk::fs_builder &bld, nir_def 
 
       if (def->parent_instr->type == nir_instr_type_load_const) {
          nir_load_const_instr *load_const =
-            nir_instr_as_load_const(def->parent_instr);
+            nir_def_as_load_const(def);
          return elk_imm_ud(load_const->value[0].i32);
       } else {
          assert(def->parent_instr->type == nir_instr_type_intrinsic &&
-                (nir_instr_as_intrinsic(def->parent_instr)->intrinsic ==
+                (nir_def_as_intrinsic(def)->intrinsic ==
                  nir_intrinsic_load_uniform));
-         nir_intrinsic_instr *intrin = nir_instr_as_intrinsic(def->parent_instr);
+         nir_intrinsic_instr *intrin = nir_def_as_intrinsic(def);
          unsigned base_offset = nir_intrinsic_base(intrin);
          unsigned load_offset = nir_src_as_uint(intrin->src[0]);
          elk_fs_reg src(UNIFORM, base_offset / 4, ELK_REGISTER_TYPE_UD);
@@ -4861,7 +4814,7 @@ fs_nir_emit_intrinsic(nir_to_elk_state &ntb,
          break;
 
       default:
-         unreachable("invalid intrinsic");
+         UNREACHABLE("invalid intrinsic");
       }
 
       if (opcode == ELK_OPCODE_NOP)
@@ -5665,7 +5618,7 @@ fs_nir_emit_intrinsic(nir_to_elk_state &ntb,
    case nir_intrinsic_load_subgroup_gt_mask:
    case nir_intrinsic_load_subgroup_le_mask:
    case nir_intrinsic_load_subgroup_lt_mask:
-      unreachable("not reached");
+      UNREACHABLE("not reached");
 
    case nir_intrinsic_vote_any: {
       const fs_builder ubld1 = bld.exec_all().group(1, 0);
@@ -6208,7 +6161,7 @@ fs_nir_emit_intrinsic(nir_to_elk_state &ntb,
       assert(instr->intrinsic < nir_num_intrinsics);
       fprintf(stderr, "intrinsic: %s\n", nir_intrinsic_infos[instr->intrinsic].name);
 #endif
-      unreachable("unknown intrinsic");
+      UNREACHABLE("unknown intrinsic");
    }
 }
 
@@ -6311,7 +6264,7 @@ fs_nir_emit_surface_atomic(nir_to_elk_state &ntb, const fs_builder &bld,
                   dest, srcs, SURFACE_LOGICAL_NUM_SRCS);
          break;
       default:
-         unreachable("Unsupported bit size");
+         UNREACHABLE("Unsupported bit size");
    }
 }
 
@@ -6361,7 +6314,7 @@ fs_nir_emit_global_atomic(nir_to_elk_state &ntb, const fs_builder &bld,
                srcs, A64_LOGICAL_NUM_SRCS);
       break;
    default:
-      unreachable("Unsupported bit size");
+      UNREACHABLE("Unsupported bit size");
    }
 }
 
@@ -6470,7 +6423,7 @@ fs_nir_emit_texture(nir_to_elk_state &ntb,
       }
 
       case nir_tex_src_projector:
-         unreachable("should be lowered");
+         UNREACHABLE("should be lowered");
 
       case nir_tex_src_texture_offset: {
          assert(srcs[TEX_LOGICAL_SRC_SURFACE].file == BAD_FILE);
@@ -6535,7 +6488,7 @@ fs_nir_emit_texture(nir_to_elk_state &ntb,
          break;
 
       default:
-         unreachable("unknown texture source");
+         UNREACHABLE("unknown texture source");
       }
    }
 
@@ -6620,7 +6573,7 @@ fs_nir_emit_texture(nir_to_elk_state &ntb,
       return;
    }
    default:
-      unreachable("unknown texture opcode");
+      UNREACHABLE("unknown texture opcode");
    }
 
    if (instr->op == nir_texop_tg4) {
@@ -6709,7 +6662,7 @@ fs_nir_emit_jump(nir_to_elk_state &ntb, nir_jump_instr *instr)
       break;
    case nir_jump_return:
    default:
-      unreachable("unknown jump");
+      UNREACHABLE("unknown jump");
    }
 }
 
@@ -6910,7 +6863,7 @@ fs_nir_emit_instr(nir_to_elk_state &ntb, nir_instr *instr)
       break;
 
    case nir_instr_type_deref:
-      unreachable("All derefs should've been lowered");
+      UNREACHABLE("All derefs should've been lowered");
       break;
 
    case nir_instr_type_intrinsic:
@@ -6934,7 +6887,7 @@ fs_nir_emit_instr(nir_to_elk_state &ntb, nir_instr *instr)
          fs_nir_emit_cs_intrinsic(ntb, nir_instr_as_intrinsic(instr));
          break;
       default:
-         unreachable("unsupported shader stage");
+         UNREACHABLE("unsupported shader stage");
       }
       break;
 
@@ -6958,7 +6911,7 @@ fs_nir_emit_instr(nir_to_elk_state &ntb, nir_instr *instr)
       break;
 
    default:
-      unreachable("unknown instruction type");
+      UNREACHABLE("unknown instruction type");
    }
 }
 

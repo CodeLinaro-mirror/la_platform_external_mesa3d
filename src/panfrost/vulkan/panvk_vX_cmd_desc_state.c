@@ -108,12 +108,12 @@ cmd_get_push_desc_set(struct vk_command_buffer *vk_cmdbuf,
    return set;
 }
 
-#if PAN_ARCH <= 7
+#if PAN_ARCH < 9
 VkResult
 panvk_per_arch(cmd_prepare_dyn_ssbos)(
    struct panvk_cmd_buffer *cmdbuf,
    const struct panvk_descriptor_state *desc_state,
-   const struct panvk_shader *shader,
+   const struct panvk_shader_variant *shader,
    struct panvk_shader_desc_state *shader_desc_state)
 {
    shader_desc_state->dyn_ssbos = 0;
@@ -151,7 +151,7 @@ panvk_per_arch(cmd_prepare_dyn_ssbos)(
 
 static void
 panvk_cmd_fill_dyn_ubos(const struct panvk_descriptor_state *desc_state,
-                        const struct panvk_shader *shader,
+                        const struct panvk_shader_variant *shader,
                         struct mali_uniform_buffer_packed *ubos,
                         uint32_t ubo_count)
 {
@@ -180,7 +180,7 @@ VkResult
 panvk_per_arch(cmd_prepare_shader_desc_tables)(
    struct panvk_cmd_buffer *cmdbuf,
    const struct panvk_descriptor_state *desc_state,
-   const struct panvk_shader *shader,
+   const struct panvk_shader_variant *shader,
    struct panvk_shader_desc_state *shader_desc_state)
 {
    memset(shader_desc_state->tables, 0, sizeof(shader_desc_state->tables));
@@ -246,7 +246,8 @@ panvk_per_arch(cmd_prepare_shader_desc_tables)(
 void
 panvk_per_arch(cmd_fill_dyn_bufs)(
    const struct panvk_descriptor_state *desc_state,
-   const struct panvk_shader *shader, struct mali_buffer_packed *buffers)
+   const struct panvk_shader_variant *shader,
+   struct mali_buffer_packed *buffers)
 {
    if (!shader)
       return;
@@ -273,7 +274,7 @@ VkResult
 panvk_per_arch(cmd_prepare_shader_res_table)(
    struct panvk_cmd_buffer *cmdbuf,
    const struct panvk_descriptor_state *desc_state,
-   const struct panvk_shader *shader,
+   const struct panvk_shader_variant *shader,
    struct panvk_shader_desc_state *shader_desc_state, uint32_t repeat_count)
 {
    if (!shader) {
@@ -282,7 +283,8 @@ panvk_per_arch(cmd_prepare_shader_res_table)(
    }
 
    uint32_t first_unused_set = util_last_bit(shader->desc_info.used_set_mask);
-   uint32_t res_count = 1 + first_unused_set;
+   uint32_t res_count =
+      ALIGN_POT(1 + first_unused_set, MALI_RESOURCE_TABLE_SIZE_ALIGNMENT);
    struct pan_ptr ptr =
       panvk_cmd_alloc_desc_array(cmdbuf, res_count * repeat_count, RESOURCE);
    if (!ptr.gpu)
@@ -317,8 +319,15 @@ panvk_per_arch(cmd_prepare_shader_res_table)(
             }
          }
       }
+      for (uint32_t i = first_unused_set + 1; i < res_count; i++) {
+         pan_pack(&res_table[i], RESOURCE, cfg) {
+            cfg.address = 0;
+            cfg.contains_descriptors = false;
+            cfg.size = 0;
+         }
+      }
 
-      res_table += first_unused_set + 1;
+      res_table += res_count;
    }
 
    shader_desc_state->res_table = ptr.gpu | res_count;

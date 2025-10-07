@@ -449,6 +449,9 @@ struct pipe_context {
    void (*set_min_samples)(struct pipe_context *,
                            unsigned min_samples);
 
+   /* Called to set user clip plane state.  Unused on GL drivers with
+    * !caps->clip_planes.
+    */
    void (*set_clip_state)(struct pipe_context *,
                           const struct pipe_clip_state *);
 
@@ -690,6 +693,20 @@ struct pipe_context {
                                 unsigned src_level,
                                 const struct pipe_box *src_box);
 
+   /**
+    * Perform a copy between an image and a buffer in either direction.
+    * buffer_stride=0 or buffer_layer_stride=0 means tightly packed on that axis
+    * Resources with nr_samples > 1 are not allowed.
+    */
+   void (*image_copy_buffer)(struct pipe_context *pipe,
+                             struct pipe_resource *dst,
+                             struct pipe_resource *src,
+                             unsigned buffer_offset,
+                             unsigned buffer_stride,
+                             unsigned buffer_layer_stride,
+                             unsigned level,
+                             const struct pipe_box *box);
+
    /* Optimal hardware path for blitting pixels.
     * Scaling, format conversion, up- and downsampling (resolve) are allowed.
     */
@@ -811,13 +828,15 @@ struct pipe_context {
     * Insert commands to have GPU wait for fence to be signaled.
     */
    void (*fence_server_sync)(struct pipe_context *pipe,
-                             struct pipe_fence_handle *fence);
+                             struct pipe_fence_handle *fence,
+                             uint64_t timeline_value);
 
    /**
     * Insert commands to have the GPU signal a fence.
     */
    void (*fence_server_signal)(struct pipe_context *pipe,
-                               struct pipe_fence_handle *fence);
+                               struct pipe_fence_handle *fence,
+                               uint64_t timeline_value);
 
    /**
     * Create a view on a texture to be used by a shader stage.
@@ -1020,7 +1039,6 @@ struct pipe_context {
                        const struct pipe_grid_info *info);
 
    void (*draw_mesh_tasks)(struct pipe_context *context,
-                           unsigned drawid_offset,
                            const struct pipe_grid_info *info);
    /*@}*/
 
@@ -1235,6 +1253,15 @@ struct pipe_context {
                                                      const struct pipe_video_buffer *templat,
                                                      struct winsys_handle *handle,
                                                      unsigned usage );
+
+   /**
+    * Checks whether an operation can be accelerated by this context.
+    *
+    * \param ctx         pipe context
+    * \param operation   pipe_ml_operation to be checked
+    * \return            whether the context can accelerate this operation
+    */
+    bool (*ml_operation_supported)(struct pipe_context *context, const struct pipe_ml_operation *operation);
 
    /**
     * Compiles a ML subgraph, to be executed later. The returned pipe_ml_subgraph

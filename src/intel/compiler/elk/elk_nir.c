@@ -88,7 +88,7 @@ remap_tess_levels(nir_builder *b, nir_intrinsic_instr *intr,
          out_of_bounds = true;
          break;
       default:
-         unreachable("Bogus tessellation domain");
+         UNREACHABLE("Bogus tessellation domain");
       }
    } else if (location == VARYING_SLOT_TESS_LEVEL_OUTER) {
       b->cursor = write ? nir_before_instr(&intr->instr)
@@ -140,7 +140,7 @@ remap_tess_levels(nir_builder *b, nir_intrinsic_instr *intr,
          }
          break;
       default:
-         unreachable("Bogus tessellation domain");
+         UNREACHABLE("Bogus tessellation domain");
       }
    } else {
       return false;
@@ -157,8 +157,7 @@ remap_tess_levels(nir_builder *b, nir_intrinsic_instr *intr,
          nir_src_rewrite(&intr->src[0], src);
       }
    } else if (dest) {
-      nir_def_rewrite_uses_after(&intr->def, dest,
-                                     dest->parent_instr);
+      nir_def_rewrite_uses_after(&intr->def, dest);
    }
 
    return true;
@@ -324,7 +323,7 @@ elk_nir_lower_vs_inputs(nir_shader *nir,
                      nir_intrinsic_set_component(load, 1);
                   break;
                default:
-                  unreachable("Invalid system value intrinsic");
+                  UNREACHABLE("Invalid system value intrinsic");
                }
 
                load->num_components = 1;
@@ -488,6 +487,78 @@ lower_barycentric_at_offset(nir_builder *b, nir_intrinsic_instr *intrin,
    return true;
 }
 
+static bool
+elk_nir_lower_fs_smooth_interp_gfx4_instr(nir_builder *b, nir_intrinsic_instr *intr, void *_data)
+{
+   if (intr->intrinsic != nir_intrinsic_load_deref)
+      return false;
+
+   nir_deref_instr *deref = nir_def_as_deref(intr->src[0].ssa);
+   nir_variable *var = nir_deref_instr_get_variable(deref);
+
+   if (var->data.interpolation != INTERP_MODE_SMOOTH)
+      return false;
+
+   /* If we haven't computed pixel_w yet, do so now (once, at the start of the
+    * shader).  CSE could do this, but this makes things more legible and saves
+    * followup optimization.
+    */
+   nir_def **pixel_w = _data;
+   if (!*pixel_w) {
+      b->cursor = nir_before_block(nir_start_block(b->impl));
+
+      nir_def *w = nir_load_frag_coord_w(b);
+      BITSET_SET(b->shader->info.system_values_read, SYSTEM_VALUE_FRAG_COORD_W);
+      *pixel_w = nir_frcp(b, w);
+   }
+
+   b->cursor = nir_after_instr(&intr->instr);
+   nir_def *result = nir_fmul(b, &intr->def, *pixel_w);
+
+   nir_def_rewrite_uses_after(&intr->def, result);
+   return true;
+}
+
+/* Multiplies all smooth interpolation outputs by 1/frag_w. */
+static bool
+elk_nir_lower_fs_smooth_interp_gfx4(nir_shader *shader)
+{
+   nir_def *pixel_w = NULL;
+   return nir_shader_intrinsics_pass(shader, elk_nir_lower_fs_smooth_interp_gfx4_instr,
+                                     nir_metadata_block_index | nir_metadata_dominance,
+                                     &pixel_w);
+}
+
+
+static bool
+elk_nir_lower_load_frag_coord_w_gfx4_instr(nir_builder *b, nir_intrinsic_instr *intr, void *_data)
+{
+   if (intr->intrinsic != nir_intrinsic_load_frag_coord_w)
+      return false;
+
+   nir_variable *pos = nir_get_variable_with_location(b->shader, nir_var_shader_in,
+                                                      VARYING_SLOT_POS, glsl_vec4_type());
+
+   /* See elk_nir_lower_fs_inputs(), which did this for other vars already. */
+   pos->data.driver_location = VARYING_SLOT_POS;
+
+   b->cursor = nir_instr_remove(&intr->instr);
+   nir_def_rewrite_uses(&intr->def, nir_channel(b, nir_load_var(b, pos), 3));
+
+   return true;
+}
+
+/* No actual sysval for gl_FragCoord.w on this hardware, promote it to a varying
+ * interpolation.
+ */
+static bool
+elk_nir_lower_load_frag_coord_w_gfx4(nir_shader *shader)
+{
+   return nir_shader_intrinsics_pass(shader, elk_nir_lower_load_frag_coord_w_gfx4_instr,
+                                     nir_metadata_block_index | nir_metadata_dominance,
+                                     NULL);
+}
+
 void
 elk_nir_lower_fs_inputs(nir_shader *nir,
                         const struct intel_device_info *devinfo,
@@ -518,6 +589,14 @@ elk_nir_lower_fs_inputs(nir_shader *nir,
          var->data.centroid = false;
          var->data.sample = false;
       }
+   }
+
+   /* This needs to run late, after lower_wpos_center and lower_input_attachments. */
+   NIR_PASS(_, nir, nir_lower_frag_coord_to_pixel_coord);
+   if (devinfo->ver < 6) {
+      /* Needs to be run before nir_lower_io. */
+      NIR_PASS(_, nir, elk_nir_lower_fs_smooth_interp_gfx4);
+      NIR_PASS(_, nir, elk_nir_lower_load_frag_coord_w_gfx4);
    }
 
    nir_lower_io(nir, nir_var_shader_in, elk_type_size_vec4,
@@ -635,7 +714,7 @@ elk_nir_optimize(nir_shader *nir, bool is_scalar,
       OPT(nir_copy_prop);
 
       if (is_scalar) {
-         OPT(nir_lower_phis_to_scalar, false);
+         OPT(nir_lower_phis_to_scalar, NULL, NULL);
       }
 
       OPT(nir_copy_prop);
@@ -781,7 +860,7 @@ lower_bit_size_callback(const nir_instr *instr, UNUSED void *data)
       case nir_op_fcos:
          return 32;
       case nir_op_isign:
-         unreachable("Should have been lowered by nir_opt_algebraic.");
+         UNREACHABLE("Should have been lowered by nir_opt_algebraic.");
       default:
          if (nir_op_infos[alu->op].num_inputs >= 2 &&
              alu->def.bit_size == 8)
@@ -1064,7 +1143,7 @@ elk_nir_link_shaders(const struct elk_compiler *compiler,
 {
    const struct intel_device_info *devinfo = compiler->devinfo;
 
-   nir_lower_io_arrays_to_elements(producer, consumer);
+   nir_lower_io_array_vars_to_elements(producer, consumer);
    nir_validate_shader(producer, "after nir_lower_io_arrays_to_elements");
    nir_validate_shader(consumer, "after nir_lower_io_arrays_to_elements");
 
@@ -1072,8 +1151,8 @@ elk_nir_link_shaders(const struct elk_compiler *compiler,
    const bool c_is_scalar = compiler->scalar_stage[consumer->info.stage];
 
    if (p_is_scalar && c_is_scalar) {
-      NIR_PASS(_, producer, nir_lower_io_to_scalar_early, nir_var_shader_out);
-      NIR_PASS(_, consumer, nir_lower_io_to_scalar_early, nir_var_shader_in);
+      NIR_PASS(_, producer, nir_lower_io_vars_to_scalar, nir_var_shader_out);
+      NIR_PASS(_, consumer, nir_lower_io_vars_to_scalar, nir_var_shader_in);
       elk_nir_optimize(producer, p_is_scalar, devinfo);
       elk_nir_optimize(consumer, c_is_scalar, devinfo);
    }
@@ -1112,23 +1191,23 @@ elk_nir_link_shaders(const struct elk_compiler *compiler,
       elk_nir_optimize(consumer, c_is_scalar, devinfo);
    }
 
-   NIR_PASS(_, producer, nir_lower_io_to_vector, nir_var_shader_out);
+   NIR_PASS(_, producer, nir_opt_vectorize_io_vars, nir_var_shader_out);
 
    if (producer->info.stage == MESA_SHADER_TESS_CTRL &&
        producer->options->vectorize_tess_levels)
-   NIR_PASS_V(producer, nir_vectorize_tess_levels);
+   NIR_PASS(_, producer, nir_lower_tess_level_array_vars_to_vec);
 
    NIR_PASS(_, producer, nir_opt_combine_stores, nir_var_shader_out);
-   NIR_PASS(_, consumer, nir_lower_io_to_vector, nir_var_shader_in);
+   NIR_PASS(_, consumer, nir_opt_vectorize_io_vars, nir_var_shader_in);
 
    if (producer->info.stage != MESA_SHADER_TESS_CTRL) {
       /* Calling lower_io_to_vector creates output variable writes with
        * write-masks.  On non-TCS outputs, the back-end can't handle it and we
-       * need to call nir_lower_io_to_temporaries to get rid of them.  This,
+       * need to call nir_lower_io_vars_to_temporaries to get rid of them.  This,
        * in turn, creates temporary variables and extra copy_deref intrinsics
        * that we need to clean up.
        */
-      NIR_PASS_V(producer, nir_lower_io_to_temporaries,
+      NIR_PASS(_, producer, nir_lower_io_vars_to_temporaries,
                  nir_shader_get_entrypoint(producer), true, false);
       NIR_PASS(_, producer, nir_lower_global_vars_to_local);
       NIR_PASS(_, producer, nir_split_var_copies);
@@ -1630,7 +1709,7 @@ get_subgroup_size(const struct shader_info *info, unsigned max_subgroup_size)
       return info->stage == MESA_SHADER_FRAGMENT ? 0 : max_subgroup_size;
 
    case SUBGROUP_SIZE_REQUIRE_4:
-      unreachable("Unsupported subgroup size type");
+      UNREACHABLE("Unsupported subgroup size type");
 
    case SUBGROUP_SIZE_REQUIRE_8:
    case SUBGROUP_SIZE_REQUIRE_16:
@@ -1648,7 +1727,7 @@ get_subgroup_size(const struct shader_info *info, unsigned max_subgroup_size)
       break;
    }
 
-   unreachable("Invalid subgroup size type");
+   UNREACHABLE("Invalid subgroup size type");
 }
 
 unsigned
@@ -1730,7 +1809,7 @@ elk_cmod_for_nir_comparison(nir_op op)
       return ELK_CONDITIONAL_NZ;
 
    default:
-      unreachable("Unsupported NIR comparison op");
+      UNREACHABLE("Unsupported NIR comparison op");
    }
 }
 
@@ -1753,7 +1832,7 @@ elk_lsc_aop_for_nir_intrinsic(const nir_intrinsic_instr *atomic)
          src_idx = 1;
          break;
       default:
-         unreachable("Invalid add atomic opcode");
+         UNREACHABLE("Invalid add atomic opcode");
       }
 
       if (nir_src_is_const(atomic->src[src_idx])) {
@@ -1782,7 +1861,7 @@ elk_lsc_aop_for_nir_intrinsic(const nir_intrinsic_instr *atomic)
    case nir_atomic_op_fadd: return LSC_OP_ATOMIC_FADD;
 
    default:
-      unreachable("Unsupported NIR atomic intrinsic");
+      UNREACHABLE("Unsupported NIR atomic intrinsic");
    }
 }
 
@@ -1819,7 +1898,7 @@ elk_type_for_nir_type(const struct intel_device_info *devinfo,
    case nir_type_uint8:
       return ELK_REGISTER_TYPE_UB;
    default:
-      unreachable("unknown type");
+      UNREACHABLE("unknown type");
    }
 
    return ELK_REGISTER_TYPE_F;
