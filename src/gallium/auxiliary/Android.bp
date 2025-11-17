@@ -44,7 +44,6 @@ python_binary_host {
         "indices/u_indices_gen.py",
     ],
     libs: ["mako"],
-    embedded_launcher: false,
 }
 
 python_binary_host {
@@ -54,7 +53,6 @@ python_binary_host {
         "indices/u_unfilled_gen.py",
     ],
     libs: ["mako"],
-    embedded_launcher: false,
 }
 
 python_binary_host {
@@ -64,7 +62,6 @@ python_binary_host {
         "driver_trace/enums2names.py",
     ],
     libs: ["mako"],
-    embedded_launcher: false,
 }
 
 python_binary_host {
@@ -75,7 +72,6 @@ python_binary_host {
         ":mesa_u_trace.py",
     ],
     libs: ["mako"],
-    embedded_launcher: false,
 }
 
 python_binary_host {
@@ -86,7 +82,6 @@ python_binary_host {
         ":mesa_u_trace.py",
     ],
     libs: ["mako"],
-    embedded_launcher: false,
 }
 
 genrule {
