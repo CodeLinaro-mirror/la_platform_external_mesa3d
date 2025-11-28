@@ -119,7 +119,7 @@ exp2(double d)
 /*
  * signbit() is a macro on Linux.  Not available on Windows.
  */
-#ifndef signbit
+#if !defined(__cplusplus) && !defined(signbit)
 #define signbit(x) ((x) < 0.0f)
 #endif
 
