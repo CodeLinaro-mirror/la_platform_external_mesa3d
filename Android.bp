@@ -193,6 +193,8 @@ cc_defaults {
         "-Wno-sync-alignment",
         "-Wno-implicit-function-declaration",
         "-Wno-constant-conversion",
+        // This warning can be re-enabled after updating to newer llvm version.
+        "-Wno-unnecessary-virtual-specifier",
         "-DHAVE_TIMESPEC_GET",
         "-DHAVE_STRUCT_TIMESPEC",
         "-DMESA_LLVM_VERSION_STRING=\"16.0.0\"",
