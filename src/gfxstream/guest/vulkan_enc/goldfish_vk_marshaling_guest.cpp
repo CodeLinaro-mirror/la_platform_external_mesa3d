@@ -14665,6 +14665,168 @@ void unmarshal_VkCreateBlobGOOGLE(VulkanStreamGuest* vkStream, VkStructureType r
     vkStream->read((uint64_t*)&forUnmarshaling->blobId, sizeof(uint64_t));
 }
 
+void marshal_VkDebugMetadataGuestProcessNameGOOGLE(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkDebugMetadataGuestProcessNameGOOGLE* forMarshaling) {
+    (void)rootType;
+    vkStream->write((VkStructureType*)&forMarshaling->sType, sizeof(VkStructureType));
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = forMarshaling->sType;
+    }
+    marshal_extension_struct(vkStream, rootType, forMarshaling->pNext);
+    if (vkStream->getFeatureBits() & VULKAN_STREAM_FEATURE_NULL_OPTIONAL_STRINGS_BIT) {
+        // WARNING PTR CHECK
+        uint64_t cgen_var_0 = (uint64_t)(uintptr_t)forMarshaling->pName;
+        vkStream->putBe64(cgen_var_0);
+        if (forMarshaling->pName) {
+            vkStream->putString(forMarshaling->pName);
+        }
+    } else {
+        vkStream->putString(forMarshaling->pName);
+    }
+}
+
+void unmarshal_VkDebugMetadataGuestProcessNameGOOGLE(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    VkDebugMetadataGuestProcessNameGOOGLE* forUnmarshaling) {
+    (void)rootType;
+    vkStream->read((VkStructureType*)&forUnmarshaling->sType, sizeof(VkStructureType));
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = forUnmarshaling->sType;
+    }
+    unmarshal_extension_struct(vkStream, rootType, (void*)(forUnmarshaling->pNext));
+    if (vkStream->getFeatureBits() & VULKAN_STREAM_FEATURE_NULL_OPTIONAL_STRINGS_BIT) {
+        // WARNING PTR CHECK
+        const char* check_pName;
+        (void)check_pName;
+        check_pName = (const char*)(uintptr_t)vkStream->getBe64();
+        if (forUnmarshaling->pName) {
+            if (!(check_pName)) {
+                fprintf(stderr,
+                        "fatal: forUnmarshaling->pName inconsistent between guest and host\n");
+            }
+            vkStream->loadStringInPlace((char**)&forUnmarshaling->pName);
+        }
+    } else {
+        vkStream->loadStringInPlace((char**)&forUnmarshaling->pName);
+    }
+}
+
+void marshal_VkDebugMetadataGuestProcessIdGOOGLE(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkDebugMetadataGuestProcessIdGOOGLE* forMarshaling) {
+    (void)rootType;
+    vkStream->write((VkStructureType*)&forMarshaling->sType, sizeof(VkStructureType));
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = forMarshaling->sType;
+    }
+    marshal_extension_struct(vkStream, rootType, forMarshaling->pNext);
+    vkStream->write((uint64_t*)&forMarshaling->id, sizeof(uint64_t));
+}
+
+void unmarshal_VkDebugMetadataGuestProcessIdGOOGLE(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    VkDebugMetadataGuestProcessIdGOOGLE* forUnmarshaling) {
+    (void)rootType;
+    vkStream->read((VkStructureType*)&forUnmarshaling->sType, sizeof(VkStructureType));
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = forUnmarshaling->sType;
+    }
+    unmarshal_extension_struct(vkStream, rootType, (void*)(forUnmarshaling->pNext));
+    vkStream->read((uint64_t*)&forUnmarshaling->id, sizeof(uint64_t));
+}
+
+void marshal_VkDebugMetadataGuestThreadNameGOOGLE(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkDebugMetadataGuestThreadNameGOOGLE* forMarshaling) {
+    (void)rootType;
+    vkStream->write((VkStructureType*)&forMarshaling->sType, sizeof(VkStructureType));
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = forMarshaling->sType;
+    }
+    marshal_extension_struct(vkStream, rootType, forMarshaling->pNext);
+    if (vkStream->getFeatureBits() & VULKAN_STREAM_FEATURE_NULL_OPTIONAL_STRINGS_BIT) {
+        // WARNING PTR CHECK
+        uint64_t cgen_var_0 = (uint64_t)(uintptr_t)forMarshaling->pName;
+        vkStream->putBe64(cgen_var_0);
+        if (forMarshaling->pName) {
+            vkStream->putString(forMarshaling->pName);
+        }
+    } else {
+        vkStream->putString(forMarshaling->pName);
+    }
+}
+
+void unmarshal_VkDebugMetadataGuestThreadNameGOOGLE(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    VkDebugMetadataGuestThreadNameGOOGLE* forUnmarshaling) {
+    (void)rootType;
+    vkStream->read((VkStructureType*)&forUnmarshaling->sType, sizeof(VkStructureType));
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = forUnmarshaling->sType;
+    }
+    unmarshal_extension_struct(vkStream, rootType, (void*)(forUnmarshaling->pNext));
+    if (vkStream->getFeatureBits() & VULKAN_STREAM_FEATURE_NULL_OPTIONAL_STRINGS_BIT) {
+        // WARNING PTR CHECK
+        const char* check_pName;
+        (void)check_pName;
+        check_pName = (const char*)(uintptr_t)vkStream->getBe64();
+        if (forUnmarshaling->pName) {
+            if (!(check_pName)) {
+                fprintf(stderr,
+                        "fatal: forUnmarshaling->pName inconsistent between guest and host\n");
+            }
+            vkStream->loadStringInPlace((char**)&forUnmarshaling->pName);
+        }
+    } else {
+        vkStream->loadStringInPlace((char**)&forUnmarshaling->pName);
+    }
+}
+
+void marshal_VkDebugMetadataGuestThreadIdGOOGLE(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkDebugMetadataGuestThreadIdGOOGLE* forMarshaling) {
+    (void)rootType;
+    vkStream->write((VkStructureType*)&forMarshaling->sType, sizeof(VkStructureType));
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = forMarshaling->sType;
+    }
+    marshal_extension_struct(vkStream, rootType, forMarshaling->pNext);
+    vkStream->write((uint64_t*)&forMarshaling->id, sizeof(uint64_t));
+}
+
+void unmarshal_VkDebugMetadataGuestThreadIdGOOGLE(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    VkDebugMetadataGuestThreadIdGOOGLE* forUnmarshaling) {
+    (void)rootType;
+    vkStream->read((VkStructureType*)&forUnmarshaling->sType, sizeof(VkStructureType));
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = forUnmarshaling->sType;
+    }
+    unmarshal_extension_struct(vkStream, rootType, (void*)(forUnmarshaling->pNext));
+    vkStream->read((uint64_t*)&forUnmarshaling->id, sizeof(uint64_t));
+}
+
+void marshal_VkDebugMetadataGOOGLE(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                   const VkDebugMetadataGOOGLE* forMarshaling) {
+    (void)rootType;
+    vkStream->write((VkStructureType*)&forMarshaling->sType, sizeof(VkStructureType));
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = forMarshaling->sType;
+    }
+    marshal_extension_struct(vkStream, rootType, forMarshaling->pNext);
+}
+
+void unmarshal_VkDebugMetadataGOOGLE(VulkanStreamGuest* vkStream, VkStructureType rootType,
+                                     VkDebugMetadataGOOGLE* forUnmarshaling) {
+    (void)rootType;
+    vkStream->read((VkStructureType*)&forUnmarshaling->sType, sizeof(VkStructureType));
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = forUnmarshaling->sType;
+    }
+    unmarshal_extension_struct(vkStream, rootType, (void*)(forUnmarshaling->pNext));
+}
+
 #endif
 #ifdef VK_EXT_image_compression_control_swapchain
 void marshal_VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT(
@@ -16028,6 +16190,30 @@ void marshal_extension_struct(VulkanStreamGuest* vkStream, VkStructureType rootT
                 vkStream, rootType, reinterpret_cast<const VkCreateBlobGOOGLE*>(structExtension));
             break;
         }
+        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_PROCESS_NAME_GOOGLE: {
+            marshal_VkDebugMetadataGuestProcessNameGOOGLE(
+                vkStream, rootType,
+                reinterpret_cast<const VkDebugMetadataGuestProcessNameGOOGLE*>(structExtension));
+            break;
+        }
+        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_PROCESS_ID_GOOGLE: {
+            marshal_VkDebugMetadataGuestProcessIdGOOGLE(
+                vkStream, rootType,
+                reinterpret_cast<const VkDebugMetadataGuestProcessIdGOOGLE*>(structExtension));
+            break;
+        }
+        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_THREAD_NAME_GOOGLE: {
+            marshal_VkDebugMetadataGuestThreadNameGOOGLE(
+                vkStream, rootType,
+                reinterpret_cast<const VkDebugMetadataGuestThreadNameGOOGLE*>(structExtension));
+            break;
+        }
+        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_THREAD_ID_GOOGLE: {
+            marshal_VkDebugMetadataGuestThreadIdGOOGLE(
+                vkStream, rootType,
+                reinterpret_cast<const VkDebugMetadataGuestThreadIdGOOGLE*>(structExtension));
+            break;
+        }
 #endif
 #ifdef VK_EXT_image_compression_control_swapchain
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_FEATURES_EXT: {
@@ -17366,6 +17552,30 @@ void unmarshal_extension_struct(VulkanStreamGuest* vkStream, VkStructureType roo
                 vkStream, rootType, reinterpret_cast<VkCreateBlobGOOGLE*>(structExtension_out));
             break;
         }
+        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_PROCESS_NAME_GOOGLE: {
+            unmarshal_VkDebugMetadataGuestProcessNameGOOGLE(
+                vkStream, rootType,
+                reinterpret_cast<VkDebugMetadataGuestProcessNameGOOGLE*>(structExtension_out));
+            break;
+        }
+        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_PROCESS_ID_GOOGLE: {
+            unmarshal_VkDebugMetadataGuestProcessIdGOOGLE(
+                vkStream, rootType,
+                reinterpret_cast<VkDebugMetadataGuestProcessIdGOOGLE*>(structExtension_out));
+            break;
+        }
+        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_THREAD_NAME_GOOGLE: {
+            unmarshal_VkDebugMetadataGuestThreadNameGOOGLE(
+                vkStream, rootType,
+                reinterpret_cast<VkDebugMetadataGuestThreadNameGOOGLE*>(structExtension_out));
+            break;
+        }
+        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_THREAD_ID_GOOGLE: {
+            unmarshal_VkDebugMetadataGuestThreadIdGOOGLE(
+                vkStream, rootType,
+                reinterpret_cast<VkDebugMetadataGuestThreadIdGOOGLE*>(structExtension_out));
+            break;
+        }
 #endif
 #ifdef VK_EXT_image_compression_control_swapchain
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_FEATURES_EXT: {
@@ -18284,6 +18494,11 @@ const char* api_opcode_to_string(const uint32_t opcode) {
 #ifdef VK_EXT_private_data
         case OP_vkCreatePrivateDataSlotEXT: {
             return "OP_vkCreatePrivateDataSlotEXT";
+        }
+#endif
+#ifdef VK_GOOGLE_gfxstream
+        case OP_vkSetDebugMetadataAsyncGOOGLE: {
+            return "OP_vkSetDebugMetadataAsyncGOOGLE";
         }
 #endif
 #ifdef VK_VERSION_1_3
