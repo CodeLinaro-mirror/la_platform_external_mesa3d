@@ -1,0 +1,110 @@
+// The modules below build Mesa3D via Meson by launching android.sh in "mesa_meson".
+// All the preconditions are mentioned in the android.sh script, they are non-trivial.
+//
+// "mesa_meson" is the core that builds everything. The module that has to be
+// added to PRODUCT_PACKAGES is "libEGL_mesa". It will automatically install the other two
+// and the dependencies. See https://source.android.com/docs/core/graphics/implement-opengl-es.
+//
+// All the library modules refer to their corresponding "mesa_meson" output files. This approach
+// was chosen because translating meson.build to Android.bp is not maintainable, even if scripted.
+//
+// Note that a single-library variant "libGLES_mesa" is not provided. If absolutely necessary,
+// copy the libEGL_mesa module, remove "required", and change "name" property to "libGLES_mesa".
+// Use check_elf_files property to suppress SONAME mismatch error.
+
+// Dependency on all files to rebuild mesa_meson automatically during development activities.
+filegroup {
+    name: "mesa_srcs",
+    srcs: ["**/*"],
+}
+
+cc_genrule {
+    name: "mesa_meson",
+    vendor: true,
+    tool_files: ["android.sh"],
+    srcs: [
+        ":libdrm",
+        ":libz",
+        ":mesa_srcs",
+    ],
+    out: [
+        "libEGL_mesa.so",
+        "libGLESv1_CM_mesa.so",
+        "libGLESv2_mesa.so",
+        "libgallium_dri.so",
+        "libglapi.so",
+    ],
+    cmd: "bash $(location) $$CC_ARCH $(genDir) $(location :libdrm) $(location :libz)",
+}
+
+cc_prebuilt_library_shared {
+    name: "libEGL_mesa",
+    vendor: true,
+    srcs: [":mesa_meson{libEGL_mesa.so}"],
+    relative_install_path: "egl",
+    shared_libs: [
+        "libcutils",
+        "libhardware",
+        "liblog",
+        "libnativewindow",
+        "libsync",
+        "libgallium_dri",
+        "libglapi",
+        "libdrm",
+        "libm",
+        "libdl",
+        "libc",
+    ],
+    required: [
+        "libGLESv1_CM_mesa",
+        "libGLESv2_mesa",
+    ],
+}
+
+cc_prebuilt_library_shared {
+    name: "libGLESv1_CM_mesa",
+    vendor: true,
+    srcs: [":mesa_meson{libGLESv1_CM_mesa.so}"],
+    relative_install_path: "egl",
+    shared_libs: [
+        "libglapi",
+        "libc",
+    ],
+}
+
+cc_prebuilt_library_shared {
+    name: "libGLESv2_mesa",
+    vendor: true,
+    srcs: [":mesa_meson{libGLESv2_mesa.so}"],
+    relative_install_path: "egl",
+    shared_libs: [
+        "libglapi",
+        "libc",
+    ],
+}
+
+cc_prebuilt_library_shared {
+    name: "libgallium_dri",
+    vendor: true,
+    srcs: [":mesa_meson{libgallium_dri.so}"],
+    shared_libs: [
+        "libcutils",
+        "liblog",
+        "libsync",
+        "libglapi",
+        "libdrm",
+        "libz",
+        "libm",
+        "libdl",
+        "libc",
+    ],
+}
+
+cc_prebuilt_library_shared {
+    name: "libglapi",
+    vendor: true,
+    srcs: [":mesa_meson{libglapi.so}"],
+    shared_libs: [
+        "libc",
+    ],
+}
