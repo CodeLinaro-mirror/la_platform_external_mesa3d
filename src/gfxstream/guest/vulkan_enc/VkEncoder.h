@@ -1087,8 +1087,6 @@ class VkEncoder {
     VkResult vkGetSemaphoreGOOGLE(VkDevice device, VkSemaphore semaphore, uint64_t syncId,
                                   uint32_t doLock);
     void vkTraceAsyncGOOGLE(uint64_t id, uint32_t doLock);
-    void vkSetDebugMetadataAsyncGOOGLE(const VkDebugMetadataGOOGLE* pDebugMetadata,
-                                       uint32_t doLock);
 #endif
    private:
     class Impl;

@@ -242,7 +242,6 @@ cc_defaults {
         },
         android: {
             cflags: [
-                "-DHAVE_GETTID",
                 "-DHAVE_REALLOCARRAY",
             ],
         },
