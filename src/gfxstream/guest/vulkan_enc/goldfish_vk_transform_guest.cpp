@@ -8424,96 +8424,6 @@ void transform_fromhost_VkCreateBlobGOOGLE(ResourceTracker* resourceTracker,
     }
 }
 
-void transform_tohost_VkDebugMetadataGuestProcessNameGOOGLE(
-    ResourceTracker* resourceTracker, VkDebugMetadataGuestProcessNameGOOGLE* toTransform) {
-    (void)resourceTracker;
-    (void)toTransform;
-    if (toTransform->pNext) {
-        transform_tohost_extension_struct(resourceTracker, (void*)(toTransform->pNext));
-    }
-}
-
-void transform_fromhost_VkDebugMetadataGuestProcessNameGOOGLE(
-    ResourceTracker* resourceTracker, VkDebugMetadataGuestProcessNameGOOGLE* toTransform) {
-    (void)resourceTracker;
-    (void)toTransform;
-    if (toTransform->pNext) {
-        transform_fromhost_extension_struct(resourceTracker, (void*)(toTransform->pNext));
-    }
-}
-
-void transform_tohost_VkDebugMetadataGuestProcessIdGOOGLE(
-    ResourceTracker* resourceTracker, VkDebugMetadataGuestProcessIdGOOGLE* toTransform) {
-    (void)resourceTracker;
-    (void)toTransform;
-    if (toTransform->pNext) {
-        transform_tohost_extension_struct(resourceTracker, (void*)(toTransform->pNext));
-    }
-}
-
-void transform_fromhost_VkDebugMetadataGuestProcessIdGOOGLE(
-    ResourceTracker* resourceTracker, VkDebugMetadataGuestProcessIdGOOGLE* toTransform) {
-    (void)resourceTracker;
-    (void)toTransform;
-    if (toTransform->pNext) {
-        transform_fromhost_extension_struct(resourceTracker, (void*)(toTransform->pNext));
-    }
-}
-
-void transform_tohost_VkDebugMetadataGuestThreadNameGOOGLE(
-    ResourceTracker* resourceTracker, VkDebugMetadataGuestThreadNameGOOGLE* toTransform) {
-    (void)resourceTracker;
-    (void)toTransform;
-    if (toTransform->pNext) {
-        transform_tohost_extension_struct(resourceTracker, (void*)(toTransform->pNext));
-    }
-}
-
-void transform_fromhost_VkDebugMetadataGuestThreadNameGOOGLE(
-    ResourceTracker* resourceTracker, VkDebugMetadataGuestThreadNameGOOGLE* toTransform) {
-    (void)resourceTracker;
-    (void)toTransform;
-    if (toTransform->pNext) {
-        transform_fromhost_extension_struct(resourceTracker, (void*)(toTransform->pNext));
-    }
-}
-
-void transform_tohost_VkDebugMetadataGuestThreadIdGOOGLE(
-    ResourceTracker* resourceTracker, VkDebugMetadataGuestThreadIdGOOGLE* toTransform) {
-    (void)resourceTracker;
-    (void)toTransform;
-    if (toTransform->pNext) {
-        transform_tohost_extension_struct(resourceTracker, (void*)(toTransform->pNext));
-    }
-}
-
-void transform_fromhost_VkDebugMetadataGuestThreadIdGOOGLE(
-    ResourceTracker* resourceTracker, VkDebugMetadataGuestThreadIdGOOGLE* toTransform) {
-    (void)resourceTracker;
-    (void)toTransform;
-    if (toTransform->pNext) {
-        transform_fromhost_extension_struct(resourceTracker, (void*)(toTransform->pNext));
-    }
-}
-
-void transform_tohost_VkDebugMetadataGOOGLE(ResourceTracker* resourceTracker,
-                                            VkDebugMetadataGOOGLE* toTransform) {
-    (void)resourceTracker;
-    (void)toTransform;
-    if (toTransform->pNext) {
-        transform_tohost_extension_struct(resourceTracker, (void*)(toTransform->pNext));
-    }
-}
-
-void transform_fromhost_VkDebugMetadataGOOGLE(ResourceTracker* resourceTracker,
-                                              VkDebugMetadataGOOGLE* toTransform) {
-    (void)resourceTracker;
-    (void)toTransform;
-    if (toTransform->pNext) {
-        transform_fromhost_extension_struct(resourceTracker, (void*)(toTransform->pNext));
-    }
-}
-
 #endif
 #ifdef VK_EXT_image_compression_control_swapchain
 void transform_tohost_VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT(
@@ -9733,30 +9643,6 @@ void transform_tohost_extension_struct(ResourceTracker* resourceTracker,
                 resourceTracker, reinterpret_cast<VkCreateBlobGOOGLE*>(structExtension_out));
             break;
         }
-        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_PROCESS_NAME_GOOGLE: {
-            transform_tohost_VkDebugMetadataGuestProcessNameGOOGLE(
-                resourceTracker,
-                reinterpret_cast<VkDebugMetadataGuestProcessNameGOOGLE*>(structExtension_out));
-            break;
-        }
-        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_PROCESS_ID_GOOGLE: {
-            transform_tohost_VkDebugMetadataGuestProcessIdGOOGLE(
-                resourceTracker,
-                reinterpret_cast<VkDebugMetadataGuestProcessIdGOOGLE*>(structExtension_out));
-            break;
-        }
-        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_THREAD_NAME_GOOGLE: {
-            transform_tohost_VkDebugMetadataGuestThreadNameGOOGLE(
-                resourceTracker,
-                reinterpret_cast<VkDebugMetadataGuestThreadNameGOOGLE*>(structExtension_out));
-            break;
-        }
-        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_THREAD_ID_GOOGLE: {
-            transform_tohost_VkDebugMetadataGuestThreadIdGOOGLE(
-                resourceTracker,
-                reinterpret_cast<VkDebugMetadataGuestThreadIdGOOGLE*>(structExtension_out));
-            break;
-        }
 #endif
 #ifdef VK_EXT_image_compression_control_swapchain
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_FEATURES_EXT: {
@@ -10967,30 +10853,6 @@ void transform_fromhost_extension_struct(ResourceTracker* resourceTracker,
         case VK_STRUCTURE_TYPE_CREATE_BLOB_GOOGLE: {
             transform_fromhost_VkCreateBlobGOOGLE(
                 resourceTracker, reinterpret_cast<VkCreateBlobGOOGLE*>(structExtension_out));
-            break;
-        }
-        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_PROCESS_NAME_GOOGLE: {
-            transform_fromhost_VkDebugMetadataGuestProcessNameGOOGLE(
-                resourceTracker,
-                reinterpret_cast<VkDebugMetadataGuestProcessNameGOOGLE*>(structExtension_out));
-            break;
-        }
-        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_PROCESS_ID_GOOGLE: {
-            transform_fromhost_VkDebugMetadataGuestProcessIdGOOGLE(
-                resourceTracker,
-                reinterpret_cast<VkDebugMetadataGuestProcessIdGOOGLE*>(structExtension_out));
-            break;
-        }
-        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_THREAD_NAME_GOOGLE: {
-            transform_fromhost_VkDebugMetadataGuestThreadNameGOOGLE(
-                resourceTracker,
-                reinterpret_cast<VkDebugMetadataGuestThreadNameGOOGLE*>(structExtension_out));
-            break;
-        }
-        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_THREAD_ID_GOOGLE: {
-            transform_fromhost_VkDebugMetadataGuestThreadIdGOOGLE(
-                resourceTracker,
-                reinterpret_cast<VkDebugMetadataGuestThreadIdGOOGLE*>(structExtension_out));
             break;
         }
 #endif
