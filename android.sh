@@ -210,6 +210,7 @@ python3 "$AOSP_DIR/external/python/meson/meson.py" setup \
     -Dgles-lib-suffix=_mesa \
     -Dopengl=false \
     -Dvideo-codecs= \
+    -Dzstd=disabled \
     ;
 
 # Meson build step.
