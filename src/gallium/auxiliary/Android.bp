@@ -440,4 +440,8 @@ cc_library_static {
     shared_libs: [
         "libdrm",
     ],
+    // Pinning the repo to C++17 to be consistent with meson.
+    // This fixes C++23 build errors caused due to swiftshader's
+    // LLVM 16 passing incomplete types to unique_ptr
+    cpp_std: "c++17",
 }
