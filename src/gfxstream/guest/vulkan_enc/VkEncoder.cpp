@@ -27745,6 +27745,59 @@ void VkEncoder::vkTraceAsyncGOOGLE(uint64_t id, uint32_t doLock) {
     if (!queueSubmitWithCommandsEnabled && doLock) this->unlock();
 }
 
+void VkEncoder::vkSetDebugMetadataAsyncGOOGLE(const VkDebugMetadataGOOGLE* pDebugMetadata,
+                                              uint32_t doLock) {
+    (void)doLock;
+    bool queueSubmitWithCommandsEnabled =
+        sFeatureBits & VULKAN_STREAM_FEATURE_QUEUE_SUBMIT_WITH_COMMANDS_BIT;
+    if (!queueSubmitWithCommandsEnabled && doLock) this->lock();
+    auto stream = mImpl->stream();
+    auto pool = mImpl->pool();
+    VkDebugMetadataGOOGLE* local_pDebugMetadata;
+    local_pDebugMetadata = nullptr;
+    if (pDebugMetadata) {
+        local_pDebugMetadata =
+            (VkDebugMetadataGOOGLE*)pool->alloc(sizeof(const VkDebugMetadataGOOGLE));
+        deepcopy_VkDebugMetadataGOOGLE(pool, VK_STRUCTURE_TYPE_MAX_ENUM, pDebugMetadata,
+                                       (VkDebugMetadataGOOGLE*)(local_pDebugMetadata));
+    }
+    if (local_pDebugMetadata) {
+        transform_tohost_VkDebugMetadataGOOGLE(sResourceTracker,
+                                               (VkDebugMetadataGOOGLE*)(local_pDebugMetadata));
+    }
+    size_t count = 0;
+    size_t* countPtr = &count;
+    {
+        count_VkDebugMetadataGOOGLE(sFeatureBits, VK_STRUCTURE_TYPE_MAX_ENUM,
+                                    (VkDebugMetadataGOOGLE*)(local_pDebugMetadata), countPtr);
+    }
+    uint32_t packetSize_vkSetDebugMetadataAsyncGOOGLE =
+        4 + 4 + (queueSubmitWithCommandsEnabled ? 4 : 0) + count;
+    uint8_t* streamPtr = stream->reserve(packetSize_vkSetDebugMetadataAsyncGOOGLE);
+    uint8_t** streamPtrPtr = &streamPtr;
+    uint32_t opcode_vkSetDebugMetadataAsyncGOOGLE = OP_vkSetDebugMetadataAsyncGOOGLE;
+    uint32_t seqno;
+    if (queueSubmitWithCommandsEnabled) seqno = ResourceTracker::nextSeqno();
+    memcpy(streamPtr, &opcode_vkSetDebugMetadataAsyncGOOGLE, sizeof(uint32_t));
+    streamPtr += sizeof(uint32_t);
+    memcpy(streamPtr, &packetSize_vkSetDebugMetadataAsyncGOOGLE, sizeof(uint32_t));
+    streamPtr += sizeof(uint32_t);
+    if (queueSubmitWithCommandsEnabled) {
+        memcpy(streamPtr, &seqno, sizeof(uint32_t));
+        streamPtr += sizeof(uint32_t);
+    }
+    reservedmarshal_VkDebugMetadataGOOGLE(stream, VK_STRUCTURE_TYPE_MAX_ENUM,
+                                          (VkDebugMetadataGOOGLE*)(local_pDebugMetadata),
+                                          streamPtrPtr);
+    stream->flush();
+    ++encodeCount;
+    if (0 == encodeCount % POOL_CLEAR_INTERVAL) {
+        pool->freeAll();
+        stream->clearPool();
+    }
+    if (!queueSubmitWithCommandsEnabled && doLock) this->unlock();
+}
+
 #endif
 }  // namespace vk
 }  // namespace gfxstream

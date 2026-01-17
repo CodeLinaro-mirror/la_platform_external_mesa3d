@@ -588,7 +588,6 @@ class ResourceTracker {
     void setupFeatures(const struct GfxStreamVkFeatureInfo* features);
     void setupCaps(uint32_t& noRenderControlEnc);
     void setupPlatformHelpers();
-
     void setThreadingCallbacks(const ThreadingCallbacks& callbacks);
     bool hostSupportsVulkan() const;
     bool usingDirectMapping() const;
@@ -959,6 +958,8 @@ class ResourceTracker {
     CoherentMemoryPtr freeCoherentMemoryLocked(VkDeviceMemory memory, VkDeviceMemory_Info& info);
 
     void EmitGuestAndHostTraceMarker(VkEncoder* encoder);
+
+    void sendGuestInfo(VkEncoder* encoder);
 
     std::recursive_mutex mLock;
 

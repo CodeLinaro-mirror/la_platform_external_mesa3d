@@ -5217,4 +5217,11 @@ void gfxstream_vk_TraceAsyncGOOGLE(uint64_t id) {
         vkEnc->vkTraceAsyncGOOGLE(id, true /* do lock */);
     }
 }
+void gfxstream_vk_SetDebugMetadataAsyncGOOGLE(const VkDebugMetadataGOOGLE* pDebugMetadata) {
+    MESA_TRACE_SCOPE("vkSetDebugMetadataAsyncGOOGLE");
+    {
+        auto vkEnc = gfxstream::vk::ResourceTracker::getThreadLocalEncoder();
+        vkEnc->vkSetDebugMetadataAsyncGOOGLE(pDebugMetadata, true /* do lock */);
+    }
+}
 #endif
