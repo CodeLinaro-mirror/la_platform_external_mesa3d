@@ -7883,6 +7883,95 @@ void count_VkCreateBlobGOOGLE(uint32_t featureBits, VkStructureType rootType,
     *count += sizeof(uint64_t);
 }
 
+void count_VkDebugMetadataGuestProcessNameGOOGLE(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkDebugMetadataGuestProcessNameGOOGLE* toCount, size_t* count) {
+    (void)featureBits;
+    (void)rootType;
+    (void)toCount;
+    (void)count;
+    *count += sizeof(VkStructureType);
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = toCount->sType;
+    }
+    count_extension_struct(featureBits, rootType, toCount->pNext, count);
+    if (featureBits & VULKAN_STREAM_FEATURE_NULL_OPTIONAL_STRINGS_BIT) {
+        // WARNING PTR CHECK
+        *count += 8;
+        if (toCount->pName) {
+            *count += sizeof(uint32_t) + (toCount->pName ? strlen(toCount->pName) : 0);
+        }
+    } else {
+        *count += sizeof(uint32_t) + (toCount->pName ? strlen(toCount->pName) : 0);
+    }
+}
+
+void count_VkDebugMetadataGuestProcessIdGOOGLE(uint32_t featureBits, VkStructureType rootType,
+                                               const VkDebugMetadataGuestProcessIdGOOGLE* toCount,
+                                               size_t* count) {
+    (void)featureBits;
+    (void)rootType;
+    (void)toCount;
+    (void)count;
+    *count += sizeof(VkStructureType);
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = toCount->sType;
+    }
+    count_extension_struct(featureBits, rootType, toCount->pNext, count);
+    *count += sizeof(uint64_t);
+}
+
+void count_VkDebugMetadataGuestThreadNameGOOGLE(uint32_t featureBits, VkStructureType rootType,
+                                                const VkDebugMetadataGuestThreadNameGOOGLE* toCount,
+                                                size_t* count) {
+    (void)featureBits;
+    (void)rootType;
+    (void)toCount;
+    (void)count;
+    *count += sizeof(VkStructureType);
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = toCount->sType;
+    }
+    count_extension_struct(featureBits, rootType, toCount->pNext, count);
+    if (featureBits & VULKAN_STREAM_FEATURE_NULL_OPTIONAL_STRINGS_BIT) {
+        // WARNING PTR CHECK
+        *count += 8;
+        if (toCount->pName) {
+            *count += sizeof(uint32_t) + (toCount->pName ? strlen(toCount->pName) : 0);
+        }
+    } else {
+        *count += sizeof(uint32_t) + (toCount->pName ? strlen(toCount->pName) : 0);
+    }
+}
+
+void count_VkDebugMetadataGuestThreadIdGOOGLE(uint32_t featureBits, VkStructureType rootType,
+                                              const VkDebugMetadataGuestThreadIdGOOGLE* toCount,
+                                              size_t* count) {
+    (void)featureBits;
+    (void)rootType;
+    (void)toCount;
+    (void)count;
+    *count += sizeof(VkStructureType);
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = toCount->sType;
+    }
+    count_extension_struct(featureBits, rootType, toCount->pNext, count);
+    *count += sizeof(uint64_t);
+}
+
+void count_VkDebugMetadataGOOGLE(uint32_t featureBits, VkStructureType rootType,
+                                 const VkDebugMetadataGOOGLE* toCount, size_t* count) {
+    (void)featureBits;
+    (void)rootType;
+    (void)toCount;
+    (void)count;
+    *count += sizeof(VkStructureType);
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = toCount->sType;
+    }
+    count_extension_struct(featureBits, rootType, toCount->pNext, count);
+}
+
 #endif
 #ifdef VK_EXT_image_compression_control_swapchain
 void count_VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT(
@@ -9369,6 +9458,34 @@ void count_extension_struct(uint32_t featureBits, VkStructureType rootType,
             count_VkCreateBlobGOOGLE(featureBits, rootType,
                                      reinterpret_cast<const VkCreateBlobGOOGLE*>(structExtension),
                                      count);
+            break;
+        }
+        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_PROCESS_NAME_GOOGLE: {
+            count_VkDebugMetadataGuestProcessNameGOOGLE(
+                featureBits, rootType,
+                reinterpret_cast<const VkDebugMetadataGuestProcessNameGOOGLE*>(structExtension),
+                count);
+            break;
+        }
+        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_PROCESS_ID_GOOGLE: {
+            count_VkDebugMetadataGuestProcessIdGOOGLE(
+                featureBits, rootType,
+                reinterpret_cast<const VkDebugMetadataGuestProcessIdGOOGLE*>(structExtension),
+                count);
+            break;
+        }
+        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_THREAD_NAME_GOOGLE: {
+            count_VkDebugMetadataGuestThreadNameGOOGLE(
+                featureBits, rootType,
+                reinterpret_cast<const VkDebugMetadataGuestThreadNameGOOGLE*>(structExtension),
+                count);
+            break;
+        }
+        case VK_STRUCTURE_TYPE_DEBUG_METADATA_GUEST_THREAD_ID_GOOGLE: {
+            count_VkDebugMetadataGuestThreadIdGOOGLE(
+                featureBits, rootType,
+                reinterpret_cast<const VkDebugMetadataGuestThreadIdGOOGLE*>(structExtension),
+                count);
             break;
         }
 #endif

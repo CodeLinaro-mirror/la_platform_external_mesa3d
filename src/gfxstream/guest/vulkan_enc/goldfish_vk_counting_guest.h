@@ -2005,6 +2005,25 @@ void count_VkImportBufferGOOGLE(uint32_t featureBits, VkStructureType rootType,
 void count_VkCreateBlobGOOGLE(uint32_t featureBits, VkStructureType rootType,
                               const VkCreateBlobGOOGLE* toCount, size_t* count);
 
+void count_VkDebugMetadataGuestProcessNameGOOGLE(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkDebugMetadataGuestProcessNameGOOGLE* toCount, size_t* count);
+
+void count_VkDebugMetadataGuestProcessIdGOOGLE(uint32_t featureBits, VkStructureType rootType,
+                                               const VkDebugMetadataGuestProcessIdGOOGLE* toCount,
+                                               size_t* count);
+
+void count_VkDebugMetadataGuestThreadNameGOOGLE(uint32_t featureBits, VkStructureType rootType,
+                                                const VkDebugMetadataGuestThreadNameGOOGLE* toCount,
+                                                size_t* count);
+
+void count_VkDebugMetadataGuestThreadIdGOOGLE(uint32_t featureBits, VkStructureType rootType,
+                                              const VkDebugMetadataGuestThreadIdGOOGLE* toCount,
+                                              size_t* count);
+
+void count_VkDebugMetadataGOOGLE(uint32_t featureBits, VkStructureType rootType,
+                                 const VkDebugMetadataGOOGLE* toCount, size_t* count);
+
 #endif
 #ifdef VK_EXT_image_compression_control_swapchain
 void count_VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT(
