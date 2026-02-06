@@ -3546,6 +3546,16 @@ void transform_fromhost_VkPipelineColorWriteCreateInfoEXT(
     ResourceTracker* resourceTracker, VkPipelineColorWriteCreateInfoEXT* toTransform);
 
 #endif
+#ifdef VK_EXT_primitives_generated_query
+void transform_tohost_VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT(
+    ResourceTracker* resourceTracker,
+    VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT* toTransform);
+
+void transform_fromhost_VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT(
+    ResourceTracker* resourceTracker,
+    VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT* toTransform);
+
+#endif
 #ifdef VK_GOOGLE_gfxstream
 void transform_tohost_VkImportColorBufferGOOGLE(ResourceTracker* resourceTracker,
                                                 VkImportColorBufferGOOGLE* toTransform);

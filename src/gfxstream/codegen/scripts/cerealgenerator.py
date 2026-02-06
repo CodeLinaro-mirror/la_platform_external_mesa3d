@@ -142,6 +142,7 @@ SUPPORTED_FEATURES = [
     "VK_EXT_fragment_density_map",
     # b/349122558 Zink
     "VK_EXT_color_write_enable",
+    "VK_EXT_primitives_generated_query",
 ]
 
 HOST_MODULES = ["goldfish_vk_extension_structs", "goldfish_vk_marshaling",
