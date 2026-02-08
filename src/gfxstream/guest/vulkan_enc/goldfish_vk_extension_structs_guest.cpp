@@ -710,6 +710,11 @@ size_t goldfish_vk_extension_struct_size(VkStructureType rootType, const void* s
             return sizeof(VkPipelineColorWriteCreateInfoEXT);
         }
 #endif
+#ifdef VK_EXT_primitives_generated_query
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVES_GENERATED_QUERY_FEATURES_EXT: {
+            return sizeof(VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT);
+        }
+#endif
 #ifdef VK_GOOGLE_gfxstream
         case VK_STRUCTURE_TYPE_IMPORT_COLOR_BUFFER_GOOGLE: {
             return sizeof(VkImportColorBufferGOOGLE);
@@ -1421,6 +1426,11 @@ size_t goldfish_vk_extension_struct_size_with_stream_features(uint32_t streamFea
         }
         case VK_STRUCTURE_TYPE_PIPELINE_COLOR_WRITE_CREATE_INFO_EXT: {
             return sizeof(VkPipelineColorWriteCreateInfoEXT);
+        }
+#endif
+#ifdef VK_EXT_primitives_generated_query
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVES_GENERATED_QUERY_FEATURES_EXT: {
+            return sizeof(VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT);
         }
 #endif
 #ifdef VK_GOOGLE_gfxstream

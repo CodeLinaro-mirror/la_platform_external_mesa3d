@@ -7949,6 +7949,25 @@ void count_VkPipelineColorWriteCreateInfoEXT(uint32_t featureBits, VkStructureTy
 }
 
 #endif
+#ifdef VK_EXT_primitives_generated_query
+void count_VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT* toCount, size_t* count) {
+    (void)featureBits;
+    (void)rootType;
+    (void)toCount;
+    (void)count;
+    *count += sizeof(VkStructureType);
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = toCount->sType;
+    }
+    count_extension_struct(featureBits, rootType, toCount->pNext, count);
+    *count += sizeof(VkBool32);
+    *count += sizeof(VkBool32);
+    *count += sizeof(VkBool32);
+}
+
+#endif
 #ifdef VK_GOOGLE_gfxstream
 void count_VkImportColorBufferGOOGLE(uint32_t featureBits, VkStructureType rootType,
                                      const VkImportColorBufferGOOGLE* toCount, size_t* count) {
@@ -9590,6 +9609,16 @@ void count_extension_struct(uint32_t featureBits, VkStructureType rootType,
             count_VkPipelineColorWriteCreateInfoEXT(
                 featureBits, rootType,
                 reinterpret_cast<const VkPipelineColorWriteCreateInfoEXT*>(structExtension), count);
+            break;
+        }
+#endif
+#ifdef VK_EXT_primitives_generated_query
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVES_GENERATED_QUERY_FEATURES_EXT: {
+            count_VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT(
+                featureBits, rootType,
+                reinterpret_cast<const VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT*>(
+                    structExtension),
+                count);
             break;
         }
 #endif
