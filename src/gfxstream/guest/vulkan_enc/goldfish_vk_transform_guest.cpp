@@ -8466,6 +8466,28 @@ void transform_fromhost_VkPipelineColorWriteCreateInfoEXT(
 }
 
 #endif
+#ifdef VK_EXT_primitives_generated_query
+void transform_tohost_VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT(
+    ResourceTracker* resourceTracker,
+    VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT* toTransform) {
+    (void)resourceTracker;
+    (void)toTransform;
+    if (toTransform->pNext) {
+        transform_tohost_extension_struct(resourceTracker, (void*)(toTransform->pNext));
+    }
+}
+
+void transform_fromhost_VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT(
+    ResourceTracker* resourceTracker,
+    VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT* toTransform) {
+    (void)resourceTracker;
+    (void)toTransform;
+    if (toTransform->pNext) {
+        transform_fromhost_extension_struct(resourceTracker, (void*)(toTransform->pNext));
+    }
+}
+
+#endif
 #ifdef VK_GOOGLE_gfxstream
 void transform_tohost_VkImportColorBufferGOOGLE(ResourceTracker* resourceTracker,
                                                 VkImportColorBufferGOOGLE* toTransform) {
@@ -9849,6 +9871,15 @@ void transform_tohost_extension_struct(ResourceTracker* resourceTracker,
             break;
         }
 #endif
+#ifdef VK_EXT_primitives_generated_query
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVES_GENERATED_QUERY_FEATURES_EXT: {
+            transform_tohost_VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT(
+                resourceTracker,
+                reinterpret_cast<VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT*>(
+                    structExtension_out));
+            break;
+        }
+#endif
 #ifdef VK_GOOGLE_gfxstream
         case VK_STRUCTURE_TYPE_IMPORT_COLOR_BUFFER_GOOGLE: {
             transform_tohost_VkImportColorBufferGOOGLE(
@@ -11117,6 +11148,15 @@ void transform_fromhost_extension_struct(ResourceTracker* resourceTracker,
             transform_fromhost_VkPipelineColorWriteCreateInfoEXT(
                 resourceTracker,
                 reinterpret_cast<VkPipelineColorWriteCreateInfoEXT*>(structExtension_out));
+            break;
+        }
+#endif
+#ifdef VK_EXT_primitives_generated_query
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVES_GENERATED_QUERY_FEATURES_EXT: {
+            transform_fromhost_VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT(
+                resourceTracker,
+                reinterpret_cast<VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT*>(
+                    structExtension_out));
             break;
         }
 #endif

@@ -2017,6 +2017,12 @@ void count_VkPipelineColorWriteCreateInfoEXT(uint32_t featureBits, VkStructureTy
                                              size_t* count);
 
 #endif
+#ifdef VK_EXT_primitives_generated_query
+void count_VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT(
+    uint32_t featureBits, VkStructureType rootType,
+    const VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT* toCount, size_t* count);
+
+#endif
 #ifdef VK_GOOGLE_gfxstream
 void count_VkImportColorBufferGOOGLE(uint32_t featureBits, VkStructureType rootType,
                                      const VkImportColorBufferGOOGLE* toCount, size_t* count);

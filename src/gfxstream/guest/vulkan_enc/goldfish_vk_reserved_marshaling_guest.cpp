@@ -9906,6 +9906,29 @@ void reservedmarshal_VkPipelineColorWriteCreateInfoEXT(
 }
 
 #endif
+#ifdef VK_EXT_primitives_generated_query
+void reservedmarshal_VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT* forMarshaling, uint8_t** ptr) {
+    (void)vkStream;
+    (void)rootType;
+    memcpy(*ptr, (VkStructureType*)&forMarshaling->sType, sizeof(VkStructureType));
+    *ptr += sizeof(VkStructureType);
+    if (rootType == VK_STRUCTURE_TYPE_MAX_ENUM) {
+        rootType = forMarshaling->sType;
+    }
+    reservedmarshal_extension_struct(vkStream, rootType, forMarshaling->pNext, ptr);
+    memcpy(*ptr, (VkBool32*)&forMarshaling->primitivesGeneratedQuery, sizeof(VkBool32));
+    *ptr += sizeof(VkBool32);
+    memcpy(*ptr, (VkBool32*)&forMarshaling->primitivesGeneratedQueryWithRasterizerDiscard,
+           sizeof(VkBool32));
+    *ptr += sizeof(VkBool32);
+    memcpy(*ptr, (VkBool32*)&forMarshaling->primitivesGeneratedQueryWithNonZeroStreams,
+           sizeof(VkBool32));
+    *ptr += sizeof(VkBool32);
+}
+
+#endif
 #ifdef VK_GOOGLE_gfxstream
 void reservedmarshal_VkImportColorBufferGOOGLE(VulkanStreamGuest* vkStream,
                                                VkStructureType rootType,
@@ -11576,6 +11599,16 @@ void reservedmarshal_extension_struct(VulkanStreamGuest* vkStream, VkStructureTy
             reservedmarshal_VkPipelineColorWriteCreateInfoEXT(
                 vkStream, rootType,
                 reinterpret_cast<const VkPipelineColorWriteCreateInfoEXT*>(structExtension), ptr);
+            break;
+        }
+#endif
+#ifdef VK_EXT_primitives_generated_query
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVES_GENERATED_QUERY_FEATURES_EXT: {
+            reservedmarshal_VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT(
+                vkStream, rootType,
+                reinterpret_cast<const VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT*>(
+                    structExtension),
+                ptr);
             break;
         }
 #endif

@@ -2207,6 +2207,12 @@ void reservedmarshal_VkPipelineColorWriteCreateInfoEXT(
     const VkPipelineColorWriteCreateInfoEXT* forMarshaling, uint8_t** ptr);
 
 #endif
+#ifdef VK_EXT_primitives_generated_query
+void reservedmarshal_VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT(
+    VulkanStreamGuest* vkStream, VkStructureType rootType,
+    const VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT* forMarshaling, uint8_t** ptr);
+
+#endif
 #ifdef VK_GOOGLE_gfxstream
 void reservedmarshal_VkImportColorBufferGOOGLE(VulkanStreamGuest* vkStream,
                                                VkStructureType rootType,
