@@ -202,7 +202,7 @@ python3 "$AOSP_DIR/external/python/meson/meson.py" setup \
     -Dandroid-stub=true \
     -Dandroid-libbacktrace=disabled \
     -Dgallium-drivers=virgl \
-    -Dvulkan-drivers= \
+    -Dvulkan-drivers=virtio \
     -Degl=enabled \
     -Dgles1=enabled \
     -Dgles2=enabled \

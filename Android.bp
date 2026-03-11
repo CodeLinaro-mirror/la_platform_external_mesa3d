@@ -33,6 +33,7 @@ cc_genrule {
         "libGLESv2_mesa.so",
         "libgallium_dri.so",
         "libglapi.so",
+        "libvulkan_virtio.so",
     ],
     cmd: "bash $(location) $$CC_ARCH $(genDir) $(location :libdrm) $(location :libz)",
 }
@@ -54,6 +55,7 @@ cc_prebuilt_library_shared {
         "libm",
         "libdl",
         "libc",
+        "vulkan.virtio",
     ],
     required: [
         "libGLESv1_CM_mesa",
@@ -105,6 +107,24 @@ cc_prebuilt_library_shared {
     vendor: true,
     srcs: [":mesa_meson{libglapi.so}"],
     shared_libs: [
+        "libc",
+    ],
+}
+
+cc_prebuilt_library_shared {
+    name: "vulkan.virtio",
+    vendor: true,
+    srcs: [":mesa_meson{libvulkan_virtio.so}"],
+    relative_install_path: "hw",
+    shared_libs: [
+        "libcutils",
+        "libhardware",
+        "liblog",
+        "libnativewindow",
+        "libsync",
+        "libdrm",
+        "libm",
+        "libdl",
         "libc",
     ],
 }
