@@ -162,7 +162,7 @@ printf '%s\n' \
     "c_ld = 'lld'" \
     "cpp_ld = 'lld'" \
     "strip = '$AOSP_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip'" \
-    "pkg-config = '/usr/bin/pkg-config'" \
+    "pkgconfig = ['env', 'PKG_CONFIG_LIBDIR=' + '$(call relative-to-absolute,$(MESON_DIR))', '/usr/bin/pkg-config']" \
     "" \
     "[built-in options]" \
     "cpp_link_args = ['-static-libstdc++']" \
