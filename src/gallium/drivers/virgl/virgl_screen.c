@@ -799,6 +799,9 @@ virgl_is_format_supported( struct pipe_screen *screen,
    if (util_format_is_intensity(format))
       return false;
 
+   if (util_format_is_pure_integer(format) && sample_count > 1)
+	   return false;
+
    if (sample_count > 1) {
       if (!caps->v1.bset.texture_multisample)
          return false;
