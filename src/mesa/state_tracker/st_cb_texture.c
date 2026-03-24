@@ -3450,6 +3450,11 @@ st_texture_storage(struct gl_context *ctx,
       bindings |= PIPE_BIND_SHARED;
    }
 
+   bool is_integer = _mesa_is_format_integer(texImage->TexFormat);
+
+   unsigned max_samples = is_integer ? ctx->Const.MaxIntegerSamples
+                                     : ctx->Const.MaxSamples;
+
    if (num_samples > 0) {
       /* Find msaa sample count which is actually supported.  For example,
        * if the user requests 1x but only 4x or 8x msaa is supported, we'll
@@ -3458,12 +3463,12 @@ st_texture_storage(struct gl_context *ctx,
       enum pipe_texture_target ptarget = gl_target_to_pipe(texObj->Target);
       bool found = false;
 
-      if (ctx->Const.MaxSamples > 1 && num_samples == 1) {
+      if (!is_integer && ctx->Const.MaxSamples > 1 && num_samples == 1) {
          /* don't try num_samples = 1 with drivers that support real msaa */
          num_samples = 2;
       }
 
-      for (; num_samples <= ctx->Const.MaxSamples; num_samples++) {
+      for (; num_samples <= max_samples; num_samples++) {
          if (screen->is_format_supported(screen, fmt, ptarget,
                                          num_samples, num_samples,
                                          PIPE_BIND_SAMPLER_VIEW)) {
