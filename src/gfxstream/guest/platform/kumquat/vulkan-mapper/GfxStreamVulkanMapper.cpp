@@ -12,13 +12,10 @@
 
 #include "util/detect_os.h"
 #include "util/log.h"
-#include "util/os_misc.h"
 #include "virtgpu_kumquat_ffi.h"
 
 #if DETECT_OS_WINDOWS
 #include <io.h>
-
-#include "vulkan/vulkan_win32.h"
 #define VK_LIBNAME "vulkan-1.dll"
 #else
 #include <unistd.h>
@@ -31,7 +28,7 @@
 #endif
 #endif
 
-constexpr char VK_DRIVER_FILES[] = "VK_DRIVER_FILES";
+const char* VK_ICD_FILENAMES = "VK_ICD_FILENAMES";
 constexpr uint32_t kNvidiaVendorId = 0x10de;
 
 #define GET_PROC_ADDR_INSTANCE_LOCAL(x) \
@@ -42,7 +39,7 @@ std::unique_ptr<GfxStreamVulkanMapper> sVkMapper;
 GfxStreamVulkanMapper::GfxStreamVulkanMapper() {}
 GfxStreamVulkanMapper::~GfxStreamVulkanMapper() {}
 
-static uint32_t chooseGfxQueueFamily(vk_uncompacted_dispatch_table* vk, VkPhysicalDevice phys_dev) {
+uint32_t chooseGfxQueueFamily(vk_uncompacted_dispatch_table* vk, VkPhysicalDevice phys_dev) {
     uint32_t family_idx = UINT32_MAX;
     uint32_t nProps = 0;
 
@@ -205,12 +202,11 @@ GfxStreamVulkanMapper* GfxStreamVulkanMapper::getInstance(std::optional<DeviceId
         // up. The Nvidia ICD should be loaded.
         //
         // This is mostly useful for developers.  For AOSP hermetic gfxstream end2end
-        // testing, VK_DRIVER_FILES shouldn't be defined.  For deqp-vk, this is
+        // testing, VK_ICD_FILENAMES shouldn't be defined.  For deqp-vk, this is
         // useful, but not safe for multi-threaded tests.  For now, since this is only
         // used for end2end tests, we should be good.
-        char* driver = os_get_option_dup(VK_DRIVER_FILES);
-
-        os_unset_option(VK_DRIVER_FILES);
+        const char* driver = getenv(VK_ICD_FILENAMES);
+        unsetenv(VK_ICD_FILENAMES);
         sVkMapper = std::make_unique<GfxStreamVulkanMapper>();
         if (!sVkMapper->initialize(*deviceIdOpt)) {
             sVkMapper = nullptr;
@@ -218,9 +214,8 @@ GfxStreamVulkanMapper* GfxStreamVulkanMapper::getInstance(std::optional<DeviceId
         }
 
         if (driver) {
-            os_set_option(VK_DRIVER_FILES, driver, true);
+            setenv(VK_ICD_FILENAMES, driver, 1);
         }
-        free(driver);
     }
 
     return sVkMapper.get();
@@ -238,16 +233,15 @@ int32_t GfxStreamVulkanMapper::map(struct VulkanMapperData* mapData) {
         VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR,
         0,
         VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT,
-        reinterpret_cast<HANDLE>(mapData->handle),
+        static_cast<HANDLE>(mapData->handle),
         L"",
     };
 
 #elif DETECT_OS_LINUX
-    VkExternalMemoryHandleTypeFlagBits flagBits;
+    VkExternalMemoryHandleTypeFlagBits flagBits = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     if (mapData->handleType == VIRTGPU_KUMQUAT_HANDLE_TYPE_MEM_DMABUF) {
-        flagBits = (enum VkExternalMemoryHandleTypeFlagBits)(uint32_t(VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT));
-    } else {
-        flagBits = (enum VkExternalMemoryHandleTypeFlagBits)(uint32_t(VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT));
+        flagBits = (enum VkExternalMemoryHandleTypeFlagBits)(
+            uint32_t(flagBits) | uint32_t(VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT));
     }
 
     VkImportMemoryFdInfoKHR importInfo{

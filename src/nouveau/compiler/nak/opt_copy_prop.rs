@@ -53,12 +53,12 @@ enum CopyPropEntry {
 }
 
 struct CopyPropPass<'a> {
-    sm: &'a ShaderModelInfo,
+    sm: &'a dyn ShaderModel,
     ssa_map: FxHashMap<SSAValue, CopyPropEntry>,
 }
 
 impl<'a> CopyPropPass<'a> {
-    pub fn new(sm: &'a ShaderModelInfo) -> Self {
+    pub fn new(sm: &'a dyn ShaderModel) -> Self {
         CopyPropPass {
             sm: sm,
             ssa_map: Default::default(),
@@ -190,14 +190,11 @@ impl<'a> CopyPropPass<'a> {
         }
     }
 
-    fn prop_to_ssa_values(
-        &self,
-        src_ssa: &mut [SSAValue],
-        same_file: bool,
-    ) -> bool {
+    fn prop_to_ssa_ref(&self, src_ssa: &mut SSARef) -> bool {
         let mut progress = false;
 
-        for c_ssa in src_ssa {
+        for c in 0..src_ssa.comps() {
+            let c_ssa = &mut src_ssa[usize::from(c)];
             let Some(CopyPropEntry::Copy(entry)) = self.get_copy(c_ssa) else {
                 continue;
             };
@@ -205,11 +202,6 @@ impl<'a> CopyPropPass<'a> {
             if entry.src.is_unmodified() {
                 if let SrcRef::SSA(entry_ssa) = &entry.src.src_ref {
                     assert!(entry_ssa.comps() == 1);
-
-                    if same_file && (c_ssa.file() != entry_ssa[0].file()) {
-                        continue;
-                    }
-
                     *c_ssa = entry_ssa[0];
                     progress = true;
                 }
@@ -217,21 +209,6 @@ impl<'a> CopyPropPass<'a> {
         }
 
         progress
-    }
-
-    fn prop_to_ssa_ref(&self, src_ssa: &mut SSARef) -> bool {
-        self.prop_to_ssa_values(&mut src_ssa[..], false)
-    }
-
-    fn prop_to_cbuf_ref(&self, cbuf: &mut CBufRef) {
-        match cbuf.buf {
-            CBuf::BindlessSSA(ref mut ssa_values) => loop {
-                if !self.prop_to_ssa_values(&mut ssa_values[..], true) {
-                    break;
-                }
-            },
-            _ => (),
-        }
     }
 
     fn prop_to_ssa_src(&self, src: &mut Src) {
@@ -509,13 +486,6 @@ impl<'a> CopyPropPass<'a> {
             }
             SrcType::Carry | SrcType::Bar => (),
         }
-
-        match &mut src.src_ref {
-            SrcRef::CBuf(cbuf) => {
-                self.prop_to_cbuf_ref(cbuf);
-            }
-            _ => (),
-        }
     }
 
     fn try_add_instr(&mut self, bi: usize, instr: &Instr) {
@@ -525,7 +495,7 @@ impl<'a> CopyPropPass<'a> {
                 assert!(dst.comps() == 1);
                 let dst = dst[0];
 
-                if !add.saturate && !add.ftz {
+                if !add.saturate {
                     if add.srcs[0].is_fneg_zero(SrcType::F16v2) {
                         self.add_copy(
                             bi,
@@ -548,7 +518,7 @@ impl<'a> CopyPropPass<'a> {
                 assert!(dst.comps() == 1);
                 let dst = dst[0];
 
-                if !add.saturate && !add.ftz {
+                if !add.saturate {
                     if add.srcs[0].is_fneg_zero(SrcType::F32) {
                         self.add_copy(
                             bi,

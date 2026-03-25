@@ -119,8 +119,7 @@ driCreateContextAttribs(struct dri_screen *psp, int api,
                         unsigned num_attribs,
                         const uint32_t *attribs,
                         unsigned *error,
-                        void *data,
-                        bool thread_safe);
+                        void *data);
 
 extern uint32_t
 driImageFormatToSizedInternalGLFormat(uint32_t image_format);
@@ -141,8 +140,7 @@ driSwapBuffers(struct dri_drawable *drawable);
 PUBLIC void
 driSwapBuffersWithDamage(struct dri_drawable *drawable, int nrects, const int *rects);
 PUBLIC struct dri_context *
-driCreateNewContext(struct dri_screen *screen, const struct dri_config *config,
-                    struct dri_context *shared, void *data, bool thread_safe);
+driCreateNewContext(struct dri_screen *screen, const struct dri_config *config, struct dri_context *shared, void *data);
 PUBLIC int
 driCopyContext(struct dri_context *dest, struct dri_context *src, unsigned long mask);
 PUBLIC void

@@ -260,10 +260,10 @@ impl<K> BitSet<K> {
         added_bits
     }
 
-    pub fn s(
-        &self,
+    pub fn s<'a>(
+        &'a self,
         _: RangeFull,
-    ) -> BitSetStream<impl '_ + BitSetStreamTrait, K> {
+    ) -> BitSetStream<impl 'a + BitSetStreamTrait, K> {
         BitSetStream(
             BitSetStreamFromBitSet {
                 iter: self.words.iter().copied(),
@@ -292,7 +292,6 @@ impl FromIterator<usize> for BitSet {
     }
 }
 
-#[expect(clippy::len_without_is_empty)]
 pub trait BitSetStreamTrait {
     /// Get the next word
     ///
@@ -574,7 +573,7 @@ mod tests {
     fn test_or() {
         let a: BitSet = vec![9, 23, 18, 72].into_iter().collect();
         let b: BitSet = vec![7, 23, 1337].into_iter().collect();
-        let expected = [7, 9, 18, 23, 72, 1337];
+        let expected = vec![7, 9, 18, 23, 72, 1337];
 
         assert_eq!(to_vec(&(a.s(..) | b.s(..)).into()), &expected[..]);
         assert_eq!(to_vec(&(b.s(..) | a.s(..)).into()), &expected[..]);
@@ -588,13 +587,13 @@ mod tests {
         assert_eq!(to_vec(&actual_2), &expected[..]);
 
         let mut actual_3 = a.clone();
-        assert!(!actual_3.union_with(a.s(..)));
-        assert!(actual_3.union_with(b.s(..)));
+        assert_eq!(actual_3.union_with(a.s(..)), false);
+        assert_eq!(actual_3.union_with(b.s(..)), true);
         assert_eq!(to_vec(&actual_3), &expected[..]);
 
         let mut actual_4 = b.clone();
-        assert!(!actual_4.union_with(b.s(..)));
-        assert!(actual_4.union_with(a.s(..)));
+        assert_eq!(actual_4.union_with(b.s(..)), false);
+        assert_eq!(actual_4.union_with(a.s(..)), true);
         assert_eq!(to_vec(&actual_4), &expected[..]);
     }
 
@@ -602,7 +601,7 @@ mod tests {
     fn test_and() {
         let a: BitSet = vec![1337, 42, 7, 1].into_iter().collect();
         let b: BitSet = vec![42, 783, 2, 7].into_iter().collect();
-        let expected = [7, 42];
+        let expected = vec![7, 42];
 
         assert_eq!(to_vec(&(a.s(..) & b.s(..)).into()), &expected[..]);
         assert_eq!(to_vec(&(b.s(..) & a.s(..)).into()), &expected[..]);
@@ -620,7 +619,7 @@ mod tests {
     fn test_xor() {
         let a: BitSet = vec![1337, 42, 7, 1].into_iter().collect();
         let b: BitSet = vec![42, 127, 2, 7].into_iter().collect();
-        let expected = [1, 2, 127, 1337];
+        let expected = vec![1, 2, 127, 1337];
 
         assert_eq!(to_vec(&(a.s(..) ^ b.s(..)).into()), &expected[..]);
         assert_eq!(to_vec(&(b.s(..) ^ a.s(..)).into()), &expected[..]);
@@ -638,8 +637,8 @@ mod tests {
     fn test_sub() {
         let a: BitSet = vec![1337, 42, 7, 1].into_iter().collect();
         let b: BitSet = vec![42, 127, 2, 7].into_iter().collect();
-        let expected_1 = [1, 1337];
-        let expected_2 = [2, 127];
+        let expected_1 = vec![1, 1337];
+        let expected_2 = vec![2, 127];
 
         assert_eq!(to_vec(&(a.s(..) - b.s(..)).into()), &expected_1[..]);
         assert_eq!(to_vec(&(b.s(..) - a.s(..)).into()), &expected_2[..]);

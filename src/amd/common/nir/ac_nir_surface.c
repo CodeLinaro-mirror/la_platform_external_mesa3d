@@ -9,7 +9,7 @@
 #include "nir_builder.h"
 #include "sid.h"
 
-static nir_def *gfx10_nir_meta_addr_from_coord(nir_builder *b, uint32_t gb_addr_config,
+static nir_def *gfx10_nir_meta_addr_from_coord(nir_builder *b, const struct radeon_info *info,
                                                const struct gfx9_meta_equation *equation,
                                                int blkSizeBias, unsigned blkStart,
                                                nir_def *meta_pitch, nir_def *meta_slice_size,
@@ -19,6 +19,8 @@ static nir_def *gfx10_nir_meta_addr_from_coord(nir_builder *b, uint32_t gb_addr_
 {
    nir_def *zero = nir_imm_int(b, 0);
    nir_def *one = nir_imm_int(b, 1);
+
+   assert(info->gfx_level >= GFX10);
 
    unsigned meta_block_width_log2 = util_logbase2(equation->meta_block_width);
    unsigned meta_block_height_log2 = util_logbase2(equation->meta_block_height);
@@ -45,8 +47,8 @@ static nir_def *gfx10_nir_meta_addr_from_coord(nir_builder *b, uint32_t gb_addr_
    }
 
    unsigned blkMask = (1 << blkSizeLog2) - 1;
-   unsigned pipeMask = (1 << G_0098F8_NUM_PIPES(gb_addr_config)) - 1;
-   unsigned m_pipeInterleaveLog2 = 8 + G_0098F8_PIPE_INTERLEAVE_SIZE_GFX9(gb_addr_config);
+   unsigned pipeMask = (1 << G_0098F8_NUM_PIPES(info->gb_addr_config)) - 1;
+   unsigned m_pipeInterleaveLog2 = 8 + G_0098F8_PIPE_INTERLEAVE_SIZE_GFX9(info->gb_addr_config);
    nir_def *xb = nir_ushr_imm(b, x, meta_block_width_log2);
    nir_def *yb = nir_ushr_imm(b, y, meta_block_height_log2);
    nir_def *pb = nir_ushr_imm(b, meta_pitch, meta_block_width_log2);
@@ -62,7 +64,7 @@ static nir_def *gfx10_nir_meta_addr_from_coord(nir_builder *b, uint32_t gb_addr_
                    nir_ixor(b, nir_ushr(b, address, one), pipeXor));
 }
 
-static nir_def *gfx9_nir_meta_addr_from_coord(nir_builder *b, uint32_t gb_addr_config,
+static nir_def *gfx9_nir_meta_addr_from_coord(nir_builder *b, const struct radeon_info *info,
                                               const struct gfx9_meta_equation *equation,
                                               nir_def *meta_pitch, nir_def *meta_height,
                                               nir_def *x, nir_def *y, nir_def *z,
@@ -72,11 +74,13 @@ static nir_def *gfx9_nir_meta_addr_from_coord(nir_builder *b, uint32_t gb_addr_c
    nir_def *zero = nir_imm_int(b, 0);
    nir_def *one = nir_imm_int(b, 1);
 
+   assert(info->gfx_level >= GFX9);
+
    unsigned meta_block_width_log2 = util_logbase2(equation->meta_block_width);
    unsigned meta_block_height_log2 = util_logbase2(equation->meta_block_height);
    unsigned meta_block_depth_log2 = util_logbase2(equation->meta_block_depth);
 
-   unsigned m_pipeInterleaveLog2 = 8 + G_0098F8_PIPE_INTERLEAVE_SIZE_GFX9(gb_addr_config);
+   unsigned m_pipeInterleaveLog2 = 8 + G_0098F8_PIPE_INTERLEAVE_SIZE_GFX9(info->gb_addr_config);
    unsigned numPipeBits = equation->u.gfx9.num_pipe_bits;
    nir_def *pitchInBlock = nir_ushr_imm(b, meta_pitch, meta_block_width_log2);
    nir_def *sliceSizeInBlock = nir_imul(b, nir_ushr_imm(b, meta_height, meta_block_height_log2),
@@ -127,29 +131,27 @@ static nir_def *gfx9_nir_meta_addr_from_coord(nir_builder *b, uint32_t gb_addr_c
                    nir_ishl_imm(b, pipeXor, m_pipeInterleaveLog2));
 }
 
-nir_def *ac_nir_dcc_addr_from_coord(nir_builder *b, enum amd_gfx_level gfx_level,
-                                    uint32_t gb_addr_config,
+nir_def *ac_nir_dcc_addr_from_coord(nir_builder *b, const struct radeon_info *info,
                                     unsigned bpe, const struct gfx9_meta_equation *equation,
                                     nir_def *dcc_pitch, nir_def *dcc_height,
                                     nir_def *dcc_slice_size,
                                     nir_def *x, nir_def *y, nir_def *z,
                                     nir_def *sample, nir_def *pipe_xor)
 {
-   if (gfx_level >= GFX10) {
+   if (info->gfx_level >= GFX10) {
       unsigned bpp_log2 = util_logbase2(bpe);
 
-      return gfx10_nir_meta_addr_from_coord(b, gb_addr_config, equation, bpp_log2 - 8, 1,
+      return gfx10_nir_meta_addr_from_coord(b, info, equation, bpp_log2 - 8, 1,
                                             dcc_pitch, dcc_slice_size,
                                             x, y, z, pipe_xor, NULL);
    } else {
-      return gfx9_nir_meta_addr_from_coord(b, gb_addr_config, equation, dcc_pitch,
+      return gfx9_nir_meta_addr_from_coord(b, info, equation, dcc_pitch,
                                            dcc_height, x, y, z,
                                            sample, pipe_xor, NULL);
    }
 }
 
-nir_def *ac_nir_cmask_addr_from_coord(nir_builder *b, enum amd_gfx_level gfx_level,
-                                      uint32_t gb_addr_config,
+nir_def *ac_nir_cmask_addr_from_coord(nir_builder *b, const struct radeon_info *info,
                                       const struct gfx9_meta_equation *equation,
                                       nir_def *cmask_pitch, nir_def *cmask_height,
                                       nir_def *cmask_slice_size,
@@ -159,27 +161,25 @@ nir_def *ac_nir_cmask_addr_from_coord(nir_builder *b, enum amd_gfx_level gfx_lev
 {
    nir_def *zero = nir_imm_int(b, 0);
 
-   if (gfx_level >= GFX10) {
-      return gfx10_nir_meta_addr_from_coord(b, gb_addr_config, equation, -7, 1,
+   if (info->gfx_level >= GFX10) {
+      return gfx10_nir_meta_addr_from_coord(b, info, equation, -7, 1,
                                             cmask_pitch, cmask_slice_size,
                                             x, y, z, pipe_xor, bit_position);
    } else {
-      return gfx9_nir_meta_addr_from_coord(b, gb_addr_config, equation, cmask_pitch,
+      return gfx9_nir_meta_addr_from_coord(b, info, equation, cmask_pitch,
                                            cmask_height, x, y, z, zero,
                                            pipe_xor, bit_position);
    }
 }
 
-nir_def *ac_nir_htile_addr_from_coord(nir_builder *b, enum amd_gfx_level gfx_level,
-                                      uint32_t gb_addr_config,
+nir_def *ac_nir_htile_addr_from_coord(nir_builder *b, const struct radeon_info *info,
                                       const struct gfx9_meta_equation *equation,
                                       nir_def *htile_pitch,
                                       nir_def *htile_slice_size,
                                       nir_def *x, nir_def *y, nir_def *z,
                                       nir_def *pipe_xor)
 {
-   assert(gfx_level >= GFX10);
-   return gfx10_nir_meta_addr_from_coord(b, gb_addr_config, equation, -4, 2,
+   return gfx10_nir_meta_addr_from_coord(b, info, equation, -4, 2,
                                             htile_pitch, htile_slice_size,
                                             x, y, z, pipe_xor, NULL);
 }

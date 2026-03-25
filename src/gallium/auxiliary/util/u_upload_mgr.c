@@ -54,6 +54,7 @@ struct u_upload_mgr {
    unsigned buffer_size; /* Same as buffer->width0. */
    unsigned offset; /* Aligned offset to the upload buffer, pointing
                      * at the first unused byte. */
+   int buffer_private_refcount;
 };
 
 
@@ -150,6 +151,16 @@ u_upload_release_buffer(struct u_upload_mgr *upload)
 {
    /* Unmap and unreference the upload buffer. */
    upload_unmap_internal(upload, true);
+   if (upload->buffer_private_refcount) {
+      /* Subtract the remaining private references before unreferencing
+       * the buffer. The mega comment below explains it.
+       */
+      assert(upload->buffer_private_refcount > 0);
+      p_atomic_add(&upload->buffer->reference.count,
+                   -upload->buffer_private_refcount);
+      upload->buffer_private_refcount = 0;
+   }
+   pipe_resource_reference(&upload->buffer, NULL);
    upload->buffer_size = 0;
 }
 
@@ -158,13 +169,12 @@ void
 u_upload_destroy(struct u_upload_mgr *upload)
 {
    u_upload_release_buffer(upload);
-   pipe_resource_release(upload->pipe, upload->buffer);
    FREE(upload);
 }
 
 /* Return the allocated buffer size or 0 if it failed. */
 static unsigned
-u_upload_alloc_buffer(struct u_upload_mgr *upload, unsigned min_size, struct pipe_resource **releasebuf)
+u_upload_alloc_buffer(struct u_upload_mgr *upload, unsigned min_size)
 {
    struct pipe_screen *screen = upload->pipe->screen;
    struct pipe_resource buffer;
@@ -173,8 +183,6 @@ u_upload_alloc_buffer(struct u_upload_mgr *upload, unsigned min_size, struct pip
    /* Release the old buffer, if present:
     */
    u_upload_release_buffer(upload);
-   *releasebuf = upload->buffer;
-   upload->buffer = NULL;
 
    /* Allocate a new one:
     */
@@ -200,33 +208,45 @@ u_upload_alloc_buffer(struct u_upload_mgr *upload, unsigned min_size, struct pip
    if (upload->buffer == NULL)
       return 0;
 
+   /* Since atomic operations are very very slow when 2 threads are not
+    * sharing the same L3 cache (which happens on AMD Zen), eliminate all
+    * atomics in u_upload_alloc as follows:
+    *
+    * u_upload_alloc has to return a buffer reference to the caller.
+    * Instead of atomic_inc for every call, it does all possible future
+    * increments in advance here. The maximum number of times u_upload_alloc
+    * can be called per upload buffer is "size", because the minimum
+    * allocation size is 1, thus u_upload_alloc can only return "size" number
+    * of suballocations at most, so we will never need more. This is
+    * the number that is added to reference.count here.
+    *
+    * buffer_private_refcount tracks how many buffer references we can return
+    * without using atomics. If the buffer is full and there are still
+    * references left, they are atomically subtracted from reference.count
+    * before the buffer is unreferenced.
+    *
+    * This technique can increase CPU performance by 10%.
+    *
+    * The caller of u_upload_alloc_buffer will consume min_size bytes,
+    * so init the buffer_private_refcount to 1 + size - min_size, instead
+    * of size to avoid overflowing reference.count when size is huge.
+    */
+   upload->buffer_private_refcount = 1 + (size - min_size);
+   assert(upload->buffer_private_refcount < INT32_MAX / 2);
+   p_atomic_add(&upload->buffer->reference.count, upload->buffer_private_refcount);
+
    /* Map the new buffer. */
    upload->map = pipe_buffer_map_range(upload->pipe, upload->buffer,
                                        0, size, upload->map_flags,
                                        &upload->transfer);
    if (upload->map == NULL) {
       u_upload_release_buffer(upload);
-      pipe_resource_release(upload->pipe, upload->buffer);
       return 0;
    }
 
    upload->buffer_size = size;
    upload->offset = 0;
    return size;
-}
-
-#if MESA_DEBUG
-DEBUG_GET_ONCE_BOOL_OPTION(force_reallocate, "U_UPLOAD_FORCE_REALLOCATE", false)
-#endif
-
-static inline bool
-force_reallocate(void)
-{
-#if MESA_DEBUG
-   return debug_get_option_force_reallocate();
-#else
-   return false;
-#endif
 }
 
 void
@@ -236,7 +256,6 @@ u_upload_alloc(struct u_upload_mgr *upload,
                unsigned alignment,
                unsigned *out_offset,
                struct pipe_resource **outbuf,
-               struct pipe_resource **releasebuf,
                void **ptr)
 {
    unsigned buffer_size = upload->buffer_size;
@@ -247,19 +266,17 @@ u_upload_alloc(struct u_upload_mgr *upload,
    /* Make sure we have enough space in the upload buffer
     * for the sub-allocation.
     */
-   if (force_reallocate() || unlikely(offset + size > buffer_size)) {
+   if (unlikely(offset + size > buffer_size)) {
       /* Allocate a new buffer and set the offset to the smallest one. */
       offset = align(min_out_offset, alignment);
-      buffer_size = u_upload_alloc_buffer(upload, offset + size, releasebuf);
+      buffer_size = u_upload_alloc_buffer(upload, offset + size);
 
       if (unlikely(!buffer_size)) {
          *out_offset = ~0;
+         pipe_resource_reference(outbuf, NULL);
          *ptr = NULL;
-         *releasebuf = NULL;
          return;
       }
-   } else {
-      *releasebuf = NULL;
    }
 
    if (unlikely(!upload->map)) {
@@ -271,8 +288,8 @@ u_upload_alloc(struct u_upload_mgr *upload,
       if (unlikely(!upload->map)) {
          upload->transfer = NULL;
          *out_offset = ~0;
+         pipe_resource_reference(outbuf, NULL);
          *ptr = NULL;
-         *releasebuf = NULL;
          return;
       }
 
@@ -286,26 +303,15 @@ u_upload_alloc(struct u_upload_mgr *upload,
    /* Emit the return values: */
    *ptr = upload->map + offset;
    *out_offset = offset;
-   *outbuf = upload->buffer;
+
+   if (*outbuf != upload->buffer) {
+      pipe_resource_reference(outbuf, NULL);
+      *outbuf = upload->buffer;
+      assert (upload->buffer_private_refcount > 0);
+      upload->buffer_private_refcount--;
+   }
 
    upload->offset = offset + size;
-}
-
-void
-u_upload_alloc_ref(struct u_upload_mgr *upload,
-               unsigned min_out_offset,
-               unsigned size,
-               unsigned alignment,
-               unsigned *out_offset,
-               struct pipe_resource **outbuf,
-               void **ptr)
-{
-   struct pipe_resource *pres = NULL;
-   struct pipe_resource *releasebuf = NULL;
-
-   u_upload_alloc(upload, min_out_offset, size, alignment, out_offset, &pres, &releasebuf, ptr);
-   pipe_resource_release(upload->pipe, releasebuf);
-   pipe_resource_reference(outbuf, pres);
 }
 
 void
@@ -315,31 +321,13 @@ u_upload_data(struct u_upload_mgr *upload,
               unsigned alignment,
               const void *data,
               unsigned *out_offset,
-              struct pipe_resource **outbuf,
-              struct pipe_resource **releasebuf)
+              struct pipe_resource **outbuf)
 {
    uint8_t *ptr;
 
    u_upload_alloc(upload, min_out_offset, size, alignment,
-                  out_offset, outbuf, releasebuf,
+                  out_offset, outbuf,
                   (void**)&ptr);
    if (ptr)
       memcpy(ptr, data, size);
-}
-
-void
-u_upload_data_ref(struct u_upload_mgr *upload,
-              unsigned min_out_offset,
-              unsigned size,
-              unsigned alignment,
-              const void *data,
-              unsigned *out_offset,
-              struct pipe_resource **outbuf)
-{
-   struct pipe_resource *pres = NULL;
-   struct pipe_resource *releasebuf = NULL;
-
-   u_upload_data(upload, min_out_offset, size, alignment, data, out_offset, &pres, &releasebuf);
-   pipe_resource_release(upload->pipe, releasebuf);
-   pipe_resource_reference(outbuf, pres);
 }

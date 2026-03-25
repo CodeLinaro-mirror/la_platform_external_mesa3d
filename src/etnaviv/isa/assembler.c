@@ -55,11 +55,12 @@ int
 main(int argc, char *argv[])
 {
    bool show_disasm = false;
+   bool dual_16_mode = false;
    const char *in = NULL;
    const char *out = NULL;
 
    int opt = 0;
-   while ((opt = getopt(argc, argv, "i:o:s")) != -1) {
+   while ((opt = getopt(argc, argv, "i:o:sd")) != -1) {
       switch (opt) {
       case 'i':
          in = optarg;
@@ -69,6 +70,9 @@ main(int argc, char *argv[])
          break;
       case 's':
          show_disasm = true;
+         break;
+      case 'd':
+         dual_16_mode = true;
          break;
       default:
          print_usage();
@@ -82,7 +86,7 @@ main(int argc, char *argv[])
       return EXIT_FAILURE;
    }
 
-   struct etna_asm_result *result = isa_parse_file(in);
+   struct etna_asm_result *result = isa_parse_file(in, dual_16_mode);
 
    if (!result->success) {
       fprintf(stderr, "Failed to parse %s\n%s\n", in, result->error);
@@ -91,13 +95,14 @@ main(int argc, char *argv[])
       return EXIT_FAILURE;
    }
 
-   struct util_dynarray bin = UTIL_DYNARRAY_INIT;
+   struct util_dynarray bin;
+   util_dynarray_init(&bin, NULL);
 
    for (unsigned int i = 0; i < result->num_instr; i++) {
       struct encoded_instr encoded;
 
       isa_assemble_instruction(encoded.word, &result->instr[i]);
-      util_dynarray_append(&bin, encoded);
+      util_dynarray_append(&bin, struct encoded_instr, encoded);
    }
 
    unsigned int num = util_dynarray_num_elements(&bin, struct encoded_instr);

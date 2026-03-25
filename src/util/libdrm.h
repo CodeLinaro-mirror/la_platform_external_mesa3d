@@ -27,9 +27,6 @@
  * the proliferation of #ifdef'ery to support environments without libdrm.
  */
 
-#ifndef LIBDRM_H
-#define LIBDRM_H
-
 #ifdef HAVE_LIBDRM
 #include <xf86drm.h>
 #else
@@ -148,7 +145,5 @@ drmGetVersion(int fd) { return NULL; }
 
 static inline void
 drmFreeVersion(struct _drmVersion *v) {}
-
-#endif
 
 #endif

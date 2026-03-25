@@ -7,7 +7,7 @@ set -e
 
 set -o xtrace
 
-section_start debian_setup "Base Debian system setup"
+uncollapsed_section_start debian_setup "Base Debian system setup"
 
 export DEBIAN_FRONTEND=noninteractive
 : "${LLVM_VERSION:?llvm version not set!}"
@@ -50,6 +50,7 @@ EPHEMERAL=(
     patch
     pkgconf
     python-is-python3
+    python3-distutils
     xz-utils
 )
 
@@ -123,7 +124,7 @@ fi
 
 ############### Uninstall the build software
 
-section_switch debian_cleanup "Cleaning up base Debian system"
+uncollapsed_section_switch debian_cleanup "Cleaning up base Debian system"
 
 apt-get purge -y "${EPHEMERAL[@]}"
 

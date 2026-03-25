@@ -3,7 +3,6 @@
 
 #include "nouveau_private.h"
 #include "nv_device_info.h"
-#include "drm-uapi/nouveau_drm.h"
 #include "util/simple_mtx.h"
 
 #include <stddef.h>
@@ -28,8 +27,6 @@ struct nouveau_ws_device {
    struct hash_table *bos;
 
    bool has_vm_bind;
-
-   uint32_t nouveau_version;
 };
 
 struct nouveau_ws_device *nouveau_ws_device_new(struct _drmDevice *drm_device);

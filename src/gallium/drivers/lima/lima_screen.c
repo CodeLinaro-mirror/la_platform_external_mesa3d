@@ -45,8 +45,6 @@
 
 #include "xf86drm.h"
 
-#include "pan_props.h"
-
 int lima_plb_max_blk = 0;
 int lima_plb_pp_stream_cache_size = 0;
 
@@ -101,7 +99,7 @@ static void
 lima_init_shader_caps(struct pipe_screen *screen)
 {
    struct pipe_shader_caps *caps =
-      (struct pipe_shader_caps *)&screen->shader_caps[MESA_SHADER_VERTEX];
+      (struct pipe_shader_caps *)&screen->shader_caps[PIPE_SHADER_VERTEX];
 
    caps->max_instructions =
    caps->max_alu_instructions =
@@ -116,7 +114,7 @@ lima_init_shader_caps(struct pipe_screen *screen)
    caps->max_const_buffers = 1;
    caps->max_temps = 256; /* need investigate */
 
-   caps = (struct pipe_shader_caps *)&screen->shader_caps[MESA_SHADER_FRAGMENT];
+   caps = (struct pipe_shader_caps *)&screen->shader_caps[PIPE_SHADER_FRAGMENT];
 
    caps->max_instructions =
    caps->max_alu_instructions =
@@ -170,7 +168,7 @@ lima_init_screen_caps(struct pipe_screen *screen)
    caps->max_texture_3d_levels =
    caps->max_texture_cube_levels = LIMA_MAX_MIP_LEVELS;
 
-   caps->vendor_id = ARM_VENDOR_ID;
+   caps->vendor_id = 0x13B5;
 
    caps->video_memory = 0;
 
@@ -212,7 +210,6 @@ lima_init_screen_caps(struct pipe_screen *screen)
    caps->max_point_size =
    caps->max_point_size_aa = 100.0f;
 
-   caps->anisotropic_filter = true;
    caps->max_texture_anisotropy = 16.0f;
 
    caps->max_texture_lod_bias = 15.0f;

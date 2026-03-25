@@ -100,8 +100,6 @@ struct hud_context {
       unsigned buffer_size;
    } text, bg, whitelines;
 
-   int record_device_x, record_device_y;
-
    bool has_srgb;
 };
 

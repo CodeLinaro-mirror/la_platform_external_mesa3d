@@ -53,6 +53,9 @@ struct _egl_global {
 
    _EGLDevice *DeviceList;
 
+   EGLint NumAtExitCalls;
+   void (*AtExitCalls[10])(void);
+
    /*
     * Under libglvnd, the client extension string has to be split into two
     * strings, one for platform extensions, and one for everything else.
@@ -70,9 +73,6 @@ struct _egl_global {
 };
 
 extern struct _egl_global _eglGlobal;
-
-extern void
-_eglRegisterAtExit(void);
 
 extern void
 _eglAddAtExitCall(void (*func)(void));

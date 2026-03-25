@@ -3,7 +3,6 @@
 
 use crate::ir::*;
 use crate::opt_instr_sched_common::*;
-use crate::reg_tracker::RegRefIterable;
 use crate::reg_tracker::RegTracker;
 use std::cmp::max;
 use std::cmp::Reverse;
@@ -32,7 +31,7 @@ impl<T: Clone> RegUse<T> {
     }
 }
 
-fn generate_dep_graph(sm: &ShaderModelInfo, instrs: &[Instr]) -> DepGraph {
+fn generate_dep_graph(sm: &dyn ShaderModel, instrs: &[Box<Instr>]) -> DepGraph {
     let mut g = DepGraph::new((0..instrs.len()).map(|_| Default::default()));
 
     // Maps registers to RegUse<ip, src_dst_idx>.  Predicates are
@@ -89,10 +88,12 @@ fn generate_dep_graph(sm: &ShaderModelInfo, instrs: &[Instr]) -> DepGraph {
                 } else {
                     sm.raw_latency(&instr.op, i, &instrs[r_ip].op, r_src_idx)
                 };
-
-                latency =
-                    max(latency, estimate_variable_latency(sm, &instr.op));
-
+                if sm.op_needs_scoreboard(&instr.op) {
+                    latency = max(
+                        latency,
+                        estimate_variable_latency(sm.sm(), &instr.op),
+                    );
+                }
                 g.add_edge(ip, r_ip, EdgeLabel { latency });
             }
         });
@@ -124,11 +125,11 @@ fn generate_dep_graph(sm: &ShaderModelInfo, instrs: &[Instr]) -> DepGraph {
             .map(|i| sm.worst_latency(&instr.op, i))
             .max()
             .unwrap_or(0);
-
-        let var_latency = estimate_variable_latency(sm, &instr.op)
-            + sm.exec_latency(&instrs[instrs.len() - 1].op);
-        ready_cycle = max(ready_cycle, var_latency);
-
+        if sm.op_needs_scoreboard(&instr.op) {
+            let var_latency = estimate_variable_latency(sm.sm(), &instr.op)
+                + sm.exec_latency(&instrs[instrs.len() - 1].op);
+            ready_cycle = max(ready_cycle, var_latency);
+        }
         let label = &mut g.nodes[ip].label;
         label.exec_latency = sm.exec_latency(&instr.op);
         label.ready_cycle = ready_cycle;
@@ -140,14 +141,14 @@ fn generate_dep_graph(sm: &ShaderModelInfo, instrs: &[Instr]) -> DepGraph {
 fn generate_order(
     g: &mut DepGraph,
     init_ready_list: Vec<usize>,
-) -> (Vec<usize>, u64) {
+) -> (Vec<usize>, u32) {
     let mut ready_instrs: BinaryHeap<ReadyInstr> = BinaryHeap::new();
     let mut future_ready_instrs: BinaryHeap<FutureReadyInstr> = init_ready_list
         .into_iter()
         .map(|i| FutureReadyInstr::new(g, i))
         .collect();
 
-    let mut current_cycle = 0u32;
+    let mut current_cycle = 0;
     let mut instr_order = Vec::with_capacity(g.nodes.len());
     loop {
         // Move ready instructions to the ready list
@@ -197,13 +198,13 @@ fn generate_order(
         }
     }
 
-    (instr_order, u64::from(current_cycle))
+    (instr_order, current_cycle)
 }
 
 fn sched_buffer(
-    sm: &ShaderModelInfo,
-    instrs: Vec<Instr>,
-) -> (impl Iterator<Item = Instr> + use<>, u64) {
+    sm: &dyn ShaderModel,
+    instrs: Vec<Box<Instr>>,
+) -> (impl Iterator<Item = Box<Instr>>, u32) {
     let mut g = generate_dep_graph(sm, &instrs);
     let init_ready_list = calc_statistics(&mut g);
     // save_graphviz(&instrs, &g).unwrap();
@@ -211,7 +212,8 @@ fn sched_buffer(
     let (new_order, cycle_count) = generate_order(&mut g, init_ready_list);
 
     // Apply the new instruction order
-    let mut instrs: Vec<Option<Instr>> = instrs.into_iter().map(Some).collect();
+    let mut instrs: Vec<Option<Box<Instr>>> =
+        instrs.into_iter().map(|instr| Some(instr)).collect();
     let instrs = new_order.into_iter().rev().map(move |i| {
         std::mem::take(&mut instrs[i]).expect("Instruction scheduled twice")
     });
@@ -219,8 +221,8 @@ fn sched_buffer(
 }
 
 impl Function {
-    pub fn opt_instr_sched_postpass(&mut self, sm: &ShaderModelInfo) -> u64 {
-        let mut num_static_cycles = 0u64;
+    pub fn opt_instr_sched_postpass(&mut self, sm: &dyn ShaderModel) -> u32 {
+        let mut num_static_cycles = 0;
         for i in 0..self.blocks.len() {
             let block = &mut self.blocks[i];
 
@@ -230,12 +232,8 @@ impl Function {
             block.instrs = instrs.collect();
             assert_eq!(orig_instr_count, block.instrs.len());
 
-            let block_weight = estimate_block_weight(&self.blocks, i);
-            num_static_cycles = cycle_count
-                .checked_mul(block_weight)
-                .expect("Cycle count estimate overflow")
-                .checked_add(num_static_cycles)
-                .expect("Cycle count estimate overflow");
+            num_static_cycles +=
+                cycle_count * estimate_block_weight(&self.blocks, i);
         }
         num_static_cycles
     }

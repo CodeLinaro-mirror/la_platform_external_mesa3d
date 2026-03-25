@@ -135,8 +135,7 @@ st_DrawTex(struct gl_context *ctx, GLfloat x, GLfloat y, GLfloat z,
    st_flush_bitmap_cache(st);
    st_invalidate_readpix_cache(st);
 
-   ST_PIPELINE_META_STATE_MASK(mask);
-   st_validate_state(st, mask);
+   st_validate_state(st, ST_PIPELINE_META_STATE_MASK);
 
    /* determine if we need vertex color */
    if (ctx->FragmentProgram._Current->info.inputs_read & VARYING_BIT_COL0)
@@ -157,7 +156,6 @@ st_DrawTex(struct gl_context *ctx, GLfloat x, GLfloat y, GLfloat z,
    numAttribs = 1 + emitColor + numTexCoords;
 
    /* load vertex buffer */
-   struct pipe_resource *releasebuf = NULL;
    {
 #define SET_ATTRIB(VERT, ATTR, X, Y, Z, W)                              \
       do {                                                              \
@@ -175,7 +173,7 @@ st_DrawTex(struct gl_context *ctx, GLfloat x, GLfloat y, GLfloat z,
 
       u_upload_alloc(pipe->stream_uploader, 0,
                      numAttribs * 4 * 4 * sizeof(GLfloat), 4,
-                     &offset, &vbuffer, &releasebuf, (void **) &vbuf);
+                     &offset, &vbuffer, (void **) &vbuf);
       if (!vbuffer) {
          return;
       }
@@ -252,7 +250,6 @@ st_DrawTex(struct gl_context *ctx, GLfloat x, GLfloat y, GLfloat z,
                         CSO_BIT_TESSCTRL_SHADER |
                         CSO_BIT_TESSEVAL_SHADER |
                         CSO_BIT_GEOMETRY_SHADER |
-                        CSO_BIT_MESH_SHADER |
                         CSO_BIT_VERTEX_ELEMENTS));
 
    {
@@ -262,7 +259,6 @@ st_DrawTex(struct gl_context *ctx, GLfloat x, GLfloat y, GLfloat z,
    cso_set_tessctrl_shader_handle(cso, NULL);
    cso_set_tesseval_shader_handle(cso, NULL);
    cso_set_geometry_shader_handle(cso, NULL);
-   cso_set_mesh_shader_handle(cso, NULL);
 
    for (i = 0; i < numAttribs; i++) {
       velems.velems[i].src_offset = i * 4 * sizeof(float);
@@ -298,17 +294,15 @@ st_DrawTex(struct gl_context *ctx, GLfloat x, GLfloat y, GLfloat z,
    }
 
    util_draw_vertex_buffer(pipe, cso, vbuffer,
-                           offset,
+                           offset, true,
                            MESA_PRIM_TRIANGLE_FAN,
                            4,  /* verts */
                            numAttribs); /* attribs/vert */
 
-   pipe_resource_release(pipe, releasebuf);
-
    /* restore state */
    cso_restore_state(cso, 0);
    ctx->Array.NewVertexElements = true;
-   ST_SET_STATE(ctx->NewDriverState, ST_NEW_VERTEX_ARRAYS);
+   ctx->NewDriverState |= ST_NEW_VERTEX_ARRAYS;
 }
 
 /**

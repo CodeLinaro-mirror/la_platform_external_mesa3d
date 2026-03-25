@@ -153,12 +153,8 @@ update_foz_index(struct foz_db *foz_db, FILE *db_idx, unsigned file_idx)
           header->payload_size != sizeof(uint64_t))
          break;
 
-      static_assert(FOSSILIZE_BLOB_HASH_LENGTH <= SHA1_DIGEST_STRING_LENGTH, "");
-      char hash_str[SHA1_DIGEST_STRING_LENGTH] = {0};
+      char hash_str[FOSSILIZE_BLOB_HASH_LENGTH + 1] = {0};
       memcpy(hash_str, bytes_to_read, FOSSILIZE_BLOB_HASH_LENGTH);
-      /* Fill the rest of the key string with zeros. */
-      memset(hash_str + FOSSILIZE_BLOB_HASH_LENGTH, '0',
-             SHA1_DIGEST_STRING_LENGTH - 1 - FOSSILIZE_BLOB_HASH_LENGTH);
 
       /* read cache item offset from index file */
       uint64_t cache_offset;
@@ -283,7 +279,7 @@ fail:
 }
 
 static void
-load_foz_dbs_ro(struct foz_db *foz_db, const char *foz_dbs_ro)
+load_foz_dbs_ro(struct foz_db *foz_db, char *foz_dbs_ro)
 {
    uint8_t file_idx = 1;
    char *filename = NULL;
@@ -458,7 +454,7 @@ foz_dbs_list_updater_thrd(void *data)
 }
 
 static bool
-foz_dbs_list_updater_init(struct foz_db *foz_db, const char *list_filename)
+foz_dbs_list_updater_init(struct foz_db *foz_db, char *list_filename)
 {
    struct foz_dbs_list_updater *updater = &foz_db->updater;
 
@@ -530,13 +526,13 @@ foz_prepare(struct foz_db *foz_db, char *cache_path)
          goto fail;
    }
 
-   const char *foz_dbs_ro = os_get_option("MESA_DISK_CACHE_READ_ONLY_FOZ_DBS");
+   char *foz_dbs_ro = getenv("MESA_DISK_CACHE_READ_ONLY_FOZ_DBS");
    if (foz_dbs_ro)
       load_foz_dbs_ro(foz_db, foz_dbs_ro);
 
 #ifdef FOZ_DB_UTIL_DYNAMIC_LIST
-   const char *foz_dbs_list =
-      os_get_option("MESA_DISK_CACHE_READ_ONLY_FOZ_DBS_DYNAMIC_LIST");
+   char *foz_dbs_list =
+      getenv("MESA_DISK_CACHE_READ_ONLY_FOZ_DBS_DYNAMIC_LIST");
    if (foz_dbs_list)
       foz_dbs_list_updater_init(foz_db, foz_dbs_list);
 #endif
@@ -697,7 +693,7 @@ foz_write_entry(struct foz_db *foz_db, const uint8_t *cache_key_160bit,
    fseek(foz_db->file[0], 0, SEEK_END);
 
    /* Write hash header to db */
-   char hash_str[SHA1_DIGEST_STRING_LENGTH];
+   char hash_str[FOSSILIZE_BLOB_HASH_LENGTH + 1]; /* 40 digits + null */
    _mesa_sha1_format(hash_str, cache_key_160bit);
    if (fwrite(hash_str, 1, FOSSILIZE_BLOB_HASH_LENGTH, foz_db->file[0]) !=
        FOSSILIZE_BLOB_HASH_LENGTH)

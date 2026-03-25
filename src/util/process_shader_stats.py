@@ -76,8 +76,7 @@ TYPE_MAP = {
     'i64': ('int64_t', 'i64', '" PRId64 "'),
     'u64': ('uint64_t', 'u64', '" PRIu64 "'),
     'float': ('float', 'f64', 'f'),
-    'bool': ('bool', 'bool', 'u'),
-    'str': ('const char *', 'str', 's'),
+    'bool': ('bool', 'bool', 'u')
 }
 
 class Stat:
@@ -86,9 +85,7 @@ class Stat:
 
         self.name = el.attrib['name']
         self.display = el.attrib.get('display', self.name)
-        self.hidden = el.attrib.get('hidden', False)
-        self.hash = el.attrib.get('hash', False)
-        self.description = textwrap.dedent(el.text or '').replace('\n', ' ').strip()
+        self.description = textwrap.dedent(el.text).replace('\n', ' ').strip()
         self.count = int(el.attrib.get('count', 1))
         self.c_name = safe_name(self.display).lower()
         self.c_type, self.vk_type, format_specifier = TYPE_MAP[type_]
@@ -109,10 +106,9 @@ class ISA:
         # Derive a the format string to print statistics in GL (report.py)
         # format. report.py has a weird special case for spills/fills, which we
         # need to fix up here.
-        external_stats = [stat for stat in self.stats if not (stat.hidden or stat.hash)]
-        fmt = ', '.join([x for stat in external_stats for x in stat.format_strings])
+        fmt = ', '.join([x for stat in self.stats for x in stat.format_strings])
         self.format_string = fmt.replace('%" PRIu32 " spills, %" PRIu32 " fills', '%" PRIu32 ":%" PRIu32 " spills:fills')
-        self.format_args = ', '.join([x for stat in external_stats for x in stat.format_args])
+        self.format_args = ', '.join([x for stat in self.stats for x in stat.format_args])
 
 class Family:
     def __init__(self, el):
@@ -178,7 +174,6 @@ ${isa.c_name}_stats_util_debug(struct util_debug_callback *debug, const char *pr
 
 #define vk_add_${isa.c_name}_stats(out, stats) do { ${'\\\\'}
 % for stat in isa.stats:
-% if not stat.hidden:
 % for i in range(stat.count):
 % if stat.count > 1:
    vk_add_exec_statistic_${stat.vk_type}(out, "${stat.name.replace('#', str(i))}", "${stat.description.replace('#', str(i))}", (stats)->${stat.c_name}[${i}]); ${'\\\\'}
@@ -186,7 +181,6 @@ ${isa.c_name}_stats_util_debug(struct util_debug_callback *debug, const char *pr
    vk_add_exec_statistic_${stat.vk_type}(out, "${stat.name}", "${stat.description}", (stats)->${stat.c_name}); ${'\\\\'}
 % endif
 % endfor
-% endif
 % endfor
 } while(0)
 

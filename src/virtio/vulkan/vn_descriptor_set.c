@@ -47,9 +47,49 @@ vn_descriptor_set_destroy(struct vn_device *dev,
    vk_free(alloc, set);
 }
 
+/* Map VkDescriptorType to contiguous enum vn_descriptor_type */
+static enum vn_descriptor_type
+vn_descriptor_type(VkDescriptorType type)
+{
+   switch (type) {
+   case VK_DESCRIPTOR_TYPE_SAMPLER:
+      return VN_DESCRIPTOR_TYPE_SAMPLER;
+   case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+      return VN_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+   case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+      return VN_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+   case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+      return VN_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+   case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+      return VN_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+   case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+      return VN_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+   case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+      return VN_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+   case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+      return VN_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+   case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+      return VN_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+   case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+      return VN_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+   case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+      return VN_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+   case VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK:
+      return VN_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK;
+   case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+      return VN_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+   case VK_DESCRIPTOR_TYPE_MUTABLE_EXT:
+      return VN_DESCRIPTOR_TYPE_MUTABLE_EXT;
+   default:
+      break;
+   }
+
+   UNREACHABLE("bad VkDescriptorType");
+}
+
 /* descriptor set layout commands */
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_GetDescriptorSetLayoutSupport(
    VkDevice device,
    const VkDescriptorSetLayoutCreateInfo *pCreateInfo,
@@ -153,7 +193,7 @@ vn_descriptor_set_layout_init(
                                         create_info, NULL, &layout_handle);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateDescriptorSetLayout(
    VkDevice device,
    const VkDescriptorSetLayoutCreateInfo *pCreateInfo,
@@ -217,7 +257,7 @@ vn_CreateDescriptorSetLayout(
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyDescriptorSetLayout(VkDevice device,
                               VkDescriptorSetLayout descriptorSetLayout,
                               const VkAllocationCallbacks *pAllocator)
@@ -234,7 +274,7 @@ vn_DestroyDescriptorSetLayout(VkDevice device,
 
 /* descriptor pool commands */
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateDescriptorPool(VkDevice device,
                         const VkDescriptorPoolCreateInfo *pCreateInfo,
                         const VkAllocationCallbacks *pAllocator,
@@ -358,7 +398,7 @@ vn_CreateDescriptorPool(VkDevice device,
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyDescriptorPool(VkDevice device,
                          VkDescriptorPool descriptorPool,
                          const VkAllocationCallbacks *pAllocator)
@@ -534,11 +574,12 @@ vn_descriptor_pool_reset_descriptors(struct vn_descriptor_pool *pool)
       pool->mutable_states[i].used = 0;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_ResetDescriptorPool(VkDevice device,
                        VkDescriptorPool descriptorPool,
                        VkDescriptorPoolResetFlags flags)
 {
+   VN_TRACE_FUNC();
    struct vn_device *dev = vn_device_from_handle(device);
    struct vn_descriptor_pool *pool =
       vn_descriptor_pool_from_handle(descriptorPool);
@@ -567,7 +608,7 @@ vn_ResetDescriptorPool(VkDevice device,
 
 /* descriptor set commands */
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_AllocateDescriptorSets(VkDevice device,
                           const VkDescriptorSetAllocateInfo *pAllocateInfo,
                           VkDescriptorSet *pDescriptorSets)
@@ -712,7 +753,7 @@ fail:
    return vn_error(dev->instance, result);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_FreeDescriptorSets(VkDevice device,
                       VkDescriptorPool descriptorPool,
                       uint32_t descriptorSetCount,
@@ -845,7 +886,7 @@ vn_descriptor_set_get_writes(uint32_t write_count,
    return local->writes;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_UpdateDescriptorSets(VkDevice device,
                         uint32_t descriptorWriteCount,
                         const VkWriteDescriptorSet *pDescriptorWrites,
@@ -918,7 +959,7 @@ vn_descriptor_update_template_init(
    }
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateDescriptorUpdateTemplate(
    VkDevice device,
    const VkDescriptorUpdateTemplateCreateInfo *pCreateInfo,
@@ -958,7 +999,7 @@ vn_CreateDescriptorUpdateTemplate(
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyDescriptorUpdateTemplate(
    VkDevice device,
    VkDescriptorUpdateTemplate descriptorUpdateTemplate,
@@ -1097,7 +1138,7 @@ vn_descriptor_set_fill_update_with_template(
    }
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_UpdateDescriptorSetWithTemplate(
    VkDevice device,
    VkDescriptorSet descriptorSet,

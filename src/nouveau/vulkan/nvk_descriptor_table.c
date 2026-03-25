@@ -27,8 +27,10 @@ nvk_descriptor_table_grow_locked(struct nvk_device *dev,
 
    assert((table->alloc % BITSET_WORDBITS) == 0);
    assert((new_alloc % BITSET_WORDBITS) == 0);
-   const size_t old_in_use_size = BITSET_BYTES(table->alloc);
-   const size_t new_in_use_size = BITSET_BYTES(new_alloc);
+   const size_t old_in_use_size =
+      BITSET_WORDS(table->alloc) * sizeof(BITSET_WORD);
+   const size_t new_in_use_size =
+      BITSET_WORDS(new_alloc) * sizeof(BITSET_WORD);
    new_in_use = vk_realloc(&dev->vk.alloc, table->in_use,
                            new_in_use_size, sizeof(BITSET_WORD),
                            VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
@@ -119,7 +121,6 @@ nvk_descriptor_table_write_locked(struct nvk_descriptor_table *table,
 
    assert(desc_size == table->desc_size);
    memcpy(map, desc_data, table->desc_size);
-   nvk_mem_arena_set_map_dirty(&table->arena);
 }
 
 static void
@@ -129,7 +130,6 @@ nvk_descriptor_table_clear_locked(struct nvk_descriptor_table *table,
    void *map = nvk_descriptor_table_map_locked(table, index);
 
    memset(map, 0, table->desc_size);
-   nvk_mem_arena_set_map_dirty(&table->arena);
 }
 
 static VkResult

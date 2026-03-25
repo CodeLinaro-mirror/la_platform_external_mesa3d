@@ -287,7 +287,6 @@ done:
 HRESULT
 MFAttachPipeResourceAsSampleExtension( struct pipe_context *pPipeContext,
                                        struct pipe_resource *pPipeRes,
-                                       UINT PipeResourceReconstructedPictureSubresource,
                                        ID3D12CommandQueue *pSyncObjectQueue,
                                        REFGUID guidExtension,
                                        IMFSample *pSample )
@@ -312,11 +311,7 @@ MFAttachPipeResourceAsSampleExtension( struct pipe_context *pPipeContext,
 
    ID3D12Resource *pD3D12Res = static_cast<ID3D12Resource *>( whandle.com_obj );
    ComPtr<IMFMediaBuffer> spMediaBuffer;
-   HRESULT hr = MFCreateDXGISurfaceBuffer( __uuidof( ID3D12Resource ),
-                                           pD3D12Res,
-                                           PipeResourceReconstructedPictureSubresource,
-                                           FALSE,
-                                           &spMediaBuffer );
+   HRESULT hr = MFCreateDXGISurfaceBuffer( __uuidof( ID3D12Resource ), pD3D12Res, 0, FALSE, &spMediaBuffer );
 
    if( FAILED( hr ) )
    {

@@ -38,6 +38,7 @@ pub struct VirtGpuResource {
     size: usize,
     handle: MesaHandle,
     attached_fences: Vec<MesaHandle>,
+    #[allow(dead_code)]
     vulkan_info: VulkanInfo,
     system_mapping: Option<MemoryMapping>,
 }
@@ -118,7 +119,7 @@ impl VirtGpuKumquat {
                 _ => return Err(MesaError::Unsupported),
             };
 
-            capset_mask |= 1u64 << resp_capset_info.capset_id;
+            capset_mask = 1u64 << resp_capset_info.capset_id | capset_mask;
             capsets.insert(resp_capset_info.capset_id, capset);
         }
 
@@ -133,7 +134,7 @@ impl VirtGpuKumquat {
     }
 
     pub fn allocate_id(&mut self) -> u32 {
-        self.id_allocator += 1;
+        self.id_allocator = self.id_allocator + 1;
         self.id_allocator
     }
 
@@ -153,7 +154,7 @@ impl VirtGpuKumquat {
     pub fn get_caps(&self, capset_id: u32, slice: &mut [u8]) -> MesaResult<()> {
         let caps = self.capsets.get(&capset_id).ok_or(MesaError::Unsupported)?;
         let length = min(slice.len(), caps.len());
-        slice[0..length].copy_from_slice(&caps[0..length]);
+        slice.copy_from_slice(&caps[0..length]);
         Ok(())
     }
 
@@ -232,7 +233,7 @@ impl VirtGpuKumquat {
         create_blob: &mut VirtGpuResourceCreateBlob,
         blob_cmd: &[u8],
     ) -> MesaResult<()> {
-        if !blob_cmd.is_empty() {
+        if blob_cmd.len() != 0 {
             let submit_command = kumquat_gpu_protocol_cmd_submit {
                 hdr: kumquat_gpu_protocol_ctrl_hdr {
                     type_: KUMQUAT_GPU_PROTOCOL_SUBMIT_3D,
@@ -438,7 +439,7 @@ impl VirtGpuKumquat {
         }
 
         let need_fence =
-            !bo_handles.is_empty() || (flags & VIRTGPU_KUMQUAT_EXECBUF_FENCE_FD_OUT) != 0;
+            bo_handles.len() != 0 || (flags & VIRTGPU_KUMQUAT_EXECBUF_FENCE_FD_OUT) != 0;
 
         let actual_fence = (flags & VIRTGPU_KUMQUAT_EXECBUF_SHAREABLE_OUT) != 0
             && (flags & VIRTGPU_KUMQUAT_EXECBUF_FENCE_FD_OUT) != 0;
@@ -544,10 +545,10 @@ impl VirtGpuKumquat {
             )?;
             let mesa_mapping = mapping.as_mesa_mapping();
 
-            let slice: &mut [u8] = unsafe {
+            let mut slice: &mut [u8] = unsafe {
                 from_raw_parts_mut(mesa_mapping.ptr as *mut u8, VIRTGPU_KUMQUAT_PAGE_SIZE)
             };
-            let mut writer = Writer::new(slice);
+            let mut writer = Writer::new(&mut slice);
             writer.write_obj(resource.resource_id)?;
 
             // Opaque to users of this API, shared memory internally
@@ -577,10 +578,10 @@ impl VirtGpuKumquat {
 
         let mesa_mapping = mapping.as_mesa_mapping();
 
-        let slice: &mut [u8] =
+        let mut slice: &mut [u8] =
             unsafe { from_raw_parts_mut(mesa_mapping.ptr as *mut u8, VIRTGPU_KUMQUAT_PAGE_SIZE) };
 
-        let mut reader = Reader::new(slice);
+        let mut reader = Reader::new(&mut slice);
         *resource_handle = reader.read_obj()?;
 
         let attach_resource = kumquat_gpu_protocol_ctx_resource {

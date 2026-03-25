@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#define FD_BO_NO_HARDPIN 1
+
 #include "pipe/p_state.h"
 
 #include "freedreno_batch.h"

@@ -1,6 +1,3 @@
-// Copyright 2020 Red Hat.
-// SPDX-License-Identifier: MIT
-
 use crate::api::icd::*;
 use crate::api::types::DeleteContextCB;
 use crate::api::util::bit_check;
@@ -13,10 +10,8 @@ use crate::core::util::*;
 use crate::impl_cl_type_trait;
 
 use mesa_rust::pipe::context::RWFlags;
-use mesa_rust::pipe::fence::FenceFd;
 use mesa_rust::pipe::resource::*;
 use mesa_rust::pipe::screen::ResourceType;
-use mesa_rust::util;
 use mesa_rust_gen::*;
 use mesa_rust_util::conversion::*;
 use mesa_rust_util::properties::Properties;
@@ -117,7 +112,6 @@ pub struct Context {
     >,
     svm: Mutex<SVMContext>,
     pub gl_ctx_manager: Option<GLCtxManager>,
-    pub worker_queue: util::queue::Queue,
 }
 
 impl_cl_type_trait!(cl_context, Context, CL_INVALID_CONTEXT);
@@ -128,9 +122,6 @@ impl Context {
         properties: Properties<cl_context_properties>,
         gl_ctx_manager: Option<GLCtxManager>,
     ) -> Arc<Context> {
-        let worker_count = u32::max(util::cpu_count() / 2, 1);
-        let max_job_count = worker_count * 8;
-
         Arc::new(Self {
             base: CLObjectBase::new(RusticlTypes::Context),
             devs: devs,
@@ -141,7 +132,6 @@ impl Context {
                 svm_ptrs: TrackedPointers::new(),
             }),
             gl_ctx_manager: gl_ctx_manager,
-            worker_queue: util::queue::Queue::new(c"clctxworker", max_job_count, worker_count),
         })
     }
 
@@ -152,7 +142,7 @@ impl Context {
         copy: bool,
         bda: bool,
         res_type: ResourceType,
-    ) -> CLResult<HashMap<&'static Device, PipeResourceOwned>> {
+    ) -> CLResult<HashMap<&'static Device, PipeResource>> {
         let adj_size: u32 = size.try_into_with_err(CL_OUT_OF_HOST_MEMORY)?;
         let mut res = HashMap::new();
         let mut pipe_flags = 0;
@@ -208,7 +198,7 @@ impl Context {
         user_ptr: *mut c_void,
         copy: bool,
         res_type: ResourceType,
-    ) -> CLResult<HashMap<&'static Device, PipeResourceOwned>> {
+    ) -> CLResult<HashMap<&'static Device, PipeResource>> {
         let pipe_format = format.to_pipe_format().unwrap();
 
         let width = desc.image_width.try_into_with_err(CL_OUT_OF_HOST_MEMORY)?;
@@ -420,7 +410,7 @@ impl Context {
         &self,
         ctx: &QueueContext,
         ptr: usize,
-    ) -> CLResult<Option<PipeResourceOwned>> {
+    ) -> CLResult<Option<PipeResource>> {
         let svm = self.svm.lock().unwrap();
 
         let Some(alloc) = svm.svm_ptrs.find_alloc_precise(ptr) else {
@@ -462,6 +452,7 @@ impl Context {
         let src = svm.svm_ptrs.find_alloc(src_addr);
         let dst = svm.svm_ptrs.find_alloc(dst_addr);
 
+        #[allow(clippy::collapsible_else_if)]
         if let Some((src_base, src_alloc)) = src {
             let src_res = src_alloc.alloc.get_res_for_access(ctx, RWFlags::RD)?;
             let src_offset = src_addr - src_base;
@@ -521,7 +512,7 @@ impl Context {
             ctx.clear_buffer(res, &pattern, offset as u32, size as u32);
         } else {
             let slice = unsafe {
-                slice::from_raw_parts_mut(svm_ptr as *mut _, size / size_of_val(&pattern))
+                slice::from_raw_parts_mut(svm_ptr as *mut _, size / mem::size_of_val(&pattern))
             };
 
             slice.fill(pattern);
@@ -630,7 +621,7 @@ impl Context {
         gl_target: cl_GLenum,
         format: cl_image_format,
         gl_props: GLMemProps,
-    ) -> CLResult<HashMap<&'static Device, PipeResourceOwned>> {
+    ) -> CLResult<HashMap<&'static Device, PipeResource>> {
         let mut res = HashMap::new();
         let target = cl_mem_type_to_texture_target_gl(image_type, gl_target);
         let pipe_format = if image_type == CL_MEM_OBJECT_BUFFER {
@@ -666,11 +657,6 @@ impl Context {
         }
 
         Ok(res)
-    }
-
-    pub fn flush_gl_mem_objects(&self, mem_objects: &[Mem]) -> CLResult<Option<FenceFd>> {
-        let gl_ctx = self.gl_ctx_manager.as_ref().ok_or(CL_INVALID_CONTEXT)?;
-        gl_ctx.flush(mem_objects)
     }
 }
 

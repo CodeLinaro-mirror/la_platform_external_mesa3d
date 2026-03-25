@@ -30,9 +30,6 @@
 #include "vulkan/wsi/wsi_common.h"
 #include "vk_android.h"
 
-#define V3D_VERSION 42
-#include "v3dv_format_table.h"
-
 /**
  * Computes the HW's UIFblock padding for a given height/cpp.
  *
@@ -96,8 +93,8 @@ v3d_get_dimension_mpad(uint32_t dimension, uint32_t level, uint32_t block_dimens
 }
 
 static bool
-v3d_setup_plane_slices(struct v3dv_device *device, struct v3dv_image *image,
-                       uint8_t plane, uint32_t plane_offset,
+v3d_setup_plane_slices(struct v3dv_image *image, uint8_t plane,
+                       uint32_t plane_offset,
                        const VkSubresourceLayout *plane_layouts)
 {
    assert(image->planes[plane].cpp > 0);
@@ -245,17 +242,6 @@ v3d_setup_plane_slices(struct v3dv_device *device, struct v3dv_image *image,
                (2 * v3d_utile_height(image->planes[plane].cpp));
       }
 
-#if USE_V3D_SIMULATOR
-      /* Ensure stride alignment matches the one required by the GPU that
-       * drives the display.
-       */
-      if (image->from_wsi) {
-         slice->stride =
-            align(slice->stride,
-                  v3d_simulator_get_raster_stride_align(device->pdevice->render_fd));
-      }
-#endif
-
       slice->size = level_height * slice->stride;
       uint32_t slice_total_size = slice->size * level_depth;
 
@@ -341,8 +327,8 @@ v3d_setup_plane_slices(struct v3dv_device *device, struct v3dv_image *image,
 }
 
 static VkResult
-v3d_setup_slices(struct v3dv_device *device, struct v3dv_image *image,
-                 bool disjoint, const VkSubresourceLayout *plane_layouts)
+v3d_setup_slices(struct v3dv_image *image, bool disjoint,
+                 const VkSubresourceLayout *plane_layouts)
 {
    if (disjoint && image->plane_count == 1)
       disjoint = false;
@@ -350,7 +336,7 @@ v3d_setup_slices(struct v3dv_device *device, struct v3dv_image *image,
    uint64_t offset = 0;
    for (uint8_t plane = 0; plane < image->plane_count; plane++) {
       offset = disjoint ? 0 : offset;
-      if (!v3d_setup_plane_slices(device, image, plane, offset, plane_layouts)) {
+      if (!v3d_setup_plane_slices(image, plane, offset, plane_layouts)) {
          assert(plane_layouts);
          return VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT;
       }
@@ -401,7 +387,7 @@ v3dv_update_image_layout(struct v3dv_device *device,
 
    image->vk.drm_format_mod = modifier;
 
-   return v3d_setup_slices(device, image, disjoint,
+   return v3d_setup_slices(image, disjoint,
                            explicit_mod_info ? explicit_mod_info->pPlaneLayouts :
                                                NULL);
 }
@@ -438,10 +424,6 @@ v3dv_image_init(struct v3dv_device *device,
       explicit_mod_info = &eci;
       modifier = eci.drmFormatModifier;
    }
-
-   const struct wsi_image_create_info *wsi_info =
-      vk_find_struct_const(pCreateInfo->pNext, WSI_IMAGE_CREATE_INFO_MESA);
-   image->from_wsi = wsi_info != NULL;
 
    if (tiling == VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT) {
       mod_info =
@@ -536,11 +518,16 @@ create_image(struct v3dv_device *device,
              const VkAllocationCallbacks *pAllocator,
              VkImage *pImage)
 {
-   if (wsi_common_is_swapchain_image(pCreateInfo)) {
+#if !DETECT_OS_ANDROID
+   const VkImageSwapchainCreateInfoKHR *swapchain_info =
+      vk_find_struct_const(pCreateInfo->pNext, IMAGE_SWAPCHAIN_CREATE_INFO_KHR);
+   if (swapchain_info && swapchain_info->swapchain != VK_NULL_HANDLE) {
       return wsi_common_create_swapchain_image(&device->pdevice->wsi_device,
                                                pCreateInfo,
+                                               swapchain_info->swapchain,
                                                pImage);
    }
+#endif
 
    VkResult result;
    struct v3dv_image *image = NULL;
@@ -653,14 +640,15 @@ v3dv_GetDeviceImageSubresourceLayoutKHR(VkDevice vk_device,
 
    memset(&pLayout->subresourceLayout, 0, sizeof(pLayout->subresourceLayout));
 
-   struct v3dv_image image = { 0 };
-   vk_image_init(&device->vk, &image.vk, pInfo->pCreateInfo);
+   VkImage vk_image = VK_NULL_HANDLE;
+   VkResult result = create_image(device, pInfo->pCreateInfo, NULL, &vk_image);
+   if (result != VK_SUCCESS)
+      return;
 
-   ASSERTED VkResult result =
-      v3dv_image_init(device, pInfo->pCreateInfo, NULL, &image);
-   assert(result == VK_SUCCESS);
+   struct v3dv_image *image = v3dv_image_from_handle(vk_image);
+   get_image_subresource_layout(device, image, pInfo->pSubresource, pLayout);
 
-   get_image_subresource_layout(device, &image, pInfo->pSubresource, pLayout);
+   v3dv_DestroyImage(vk_device, vk_image, NULL);
 }
 
 VKAPI_ATTR void VKAPI_CALL
@@ -708,6 +696,7 @@ v3dv_image_type_to_view_type(VkImageType type)
 
 static VkResult
 create_image_view(struct v3dv_device *device,
+                  bool driver_internal,
                   const VkImageViewCreateInfo *pCreateInfo,
                   const VkAllocationCallbacks *pAllocator,
                   VkImageView *pView)
@@ -715,7 +704,7 @@ create_image_view(struct v3dv_device *device,
    V3DV_FROM_HANDLE(v3dv_image, image, pCreateInfo->image);
    struct v3dv_image_view *iview;
 
-   iview = vk_image_view_create(&device->vk, pCreateInfo,
+   iview = vk_image_view_create(&device->vk, driver_internal, pCreateInfo,
                                 pAllocator, sizeof(*iview));
    if (iview == NULL)
       return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
@@ -814,8 +803,7 @@ v3dv_create_image_view(struct v3dv_device *device,
                        const VkImageViewCreateInfo *pCreateInfo,
                        VkImageView *pView)
 {
-   assert(pCreateInfo->flags & VK_IMAGE_VIEW_CREATE_DRIVER_INTERNAL_BIT_MESA);
-   return create_image_view(device, pCreateInfo, NULL, pView);
+   return create_image_view(device, true, pCreateInfo, NULL, pView);
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL
@@ -826,7 +814,7 @@ v3dv_CreateImageView(VkDevice _device,
 {
    V3DV_FROM_HANDLE(v3dv_device, device, _device);
 
-   return create_image_view(device, pCreateInfo, pAllocator, pView);
+   return create_image_view(device, false, pCreateInfo, pAllocator, pView);
 }
 
 VKAPI_ATTR void VKAPI_CALL

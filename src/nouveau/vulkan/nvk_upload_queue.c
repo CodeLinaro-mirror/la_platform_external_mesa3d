@@ -32,8 +32,7 @@ nvk_upload_queue_init(struct nvk_device *dev,
    if (result != VK_SUCCESS)
       goto fail_ctx;
 
-   nv_push_init(&queue->push, queue->push_data, ARRAY_SIZE(queue->push_data),
-                nvk_queue_subchannels_from_engines(NVKMD_ENGINE_COPY));
+   nv_push_init(&queue->push, queue->push_data, ARRAY_SIZE(queue->push_data));
 
    return VK_SUCCESS;
 
@@ -78,8 +77,7 @@ nvk_upload_queue_flush_locked(struct nvk_device *dev,
    if (result != VK_SUCCESS)
       return result;
 
-   nv_push_init(&queue->push, queue->push_data, ARRAY_SIZE(queue->push_data),
-                nvk_queue_subchannels_from_engines(NVKMD_ENGINE_COPY));
+   nv_push_init(&queue->push, queue->push_data, ARRAY_SIZE(queue->push_data));
 
    if (time_point_out != NULL)
       *time_point_out = queue->last_time_point;

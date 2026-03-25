@@ -441,7 +441,7 @@ static void
 make_cache_file_directory(struct disk_cache *cache, const cache_key key)
 {
    char *dir;
-   char buf[SHA1_DIGEST_STRING_LENGTH];
+   char buf[41];
 
    _mesa_sha1_format(buf, key);
    if (asprintf(&dir, "%s/%c%c", cache->path, buf[0], buf[1]) == -1)
@@ -624,7 +624,8 @@ parse_and_validate_cache_item(struct disk_cache *cache, void *cache_item,
    return uncompressed_data;
 
  fail:
-   free(uncompressed_data);
+   if (uncompressed_data)
+      free(uncompressed_data);
 
    return NULL;
 }
@@ -663,8 +664,10 @@ disk_cache_load_item(struct disk_cache *cache, char *filename, size_t *size)
    return uncompressed_data;
 
  fail:
-   free(data);
-   free(filename);
+   if (data)
+      free(data);
+   if (filename)
+      free(filename);
    if (fd != -1)
       close(fd);
 
@@ -678,7 +681,7 @@ disk_cache_load_item(struct disk_cache *cache, char *filename, size_t *size)
 char *
 disk_cache_get_cache_filename(struct disk_cache *cache, const cache_key key)
 {
-   char buf[SHA1_DIGEST_STRING_LENGTH];
+   char buf[41];
    char *filename;
 
    if (cache->path_init_failed)
@@ -890,7 +893,7 @@ disk_cache_write_item_to_disk(struct disk_cache_put_job *dc_job,
  * If the mkdir param is set we create the directory if it doesn't already
  * exist, if it does not exist and the param is false NULL will be returned.
  */
-const char *
+char *
 disk_cache_generate_cache_dir(void *mem_ctx, const char *gpu_name,
                               const char *driver_id,
                               const char *cache_dir_name_custom,
@@ -910,10 +913,10 @@ disk_cache_generate_cache_dir(void *mem_ctx, const char *gpu_name,
          cache_dir_name = CACHE_DIR_NAME_DB;
    }
 
-   const char *path = os_get_option_secure("MESA_SHADER_CACHE_DIR");
+   char *path = secure_getenv("MESA_SHADER_CACHE_DIR");
 
    if (!path) {
-      path = os_get_option_secure("MESA_GLSL_CACHE_DIR");
+      path = secure_getenv("MESA_GLSL_CACHE_DIR");
       if (path)
          fprintf(stderr,
                  "*** MESA_GLSL_CACHE_DIR is deprecated; "
@@ -927,7 +930,7 @@ disk_cache_generate_cache_dir(void *mem_ctx, const char *gpu_name,
    }
 
    if (path == NULL) {
-      const char *xdg_cache_home = os_get_option_secure("XDG_CACHE_HOME");
+      char *xdg_cache_home = secure_getenv("XDG_CACHE_HOME");
 
       if (xdg_cache_home) {
          path = concatenate_and_mkdir(mem_ctx, xdg_cache_home, cache_dir_name,
@@ -938,7 +941,7 @@ disk_cache_generate_cache_dir(void *mem_ctx, const char *gpu_name,
    }
 
    if (!path) {
-      const char *home = os_get_option("HOME");
+      char *home = getenv("HOME");
 
       if (home) {
          path = concatenate_and_mkdir(mem_ctx, home, ".cache", mkdir);
@@ -1002,33 +1005,30 @@ disk_cache_generate_cache_dir(void *mem_ctx, const char *gpu_name,
 bool
 disk_cache_enabled()
 {
+   /* Disk cache is not enabled for android, but android's EGL layer
+    * uses EGL_ANDROID_blob_cache to manage the cache itself:
+    */
+   if (DETECT_OS_ANDROID)
+      return false;
+
    /* If running as a users other than the real user disable cache */
    if (!__normal_user())
       return false;
 
-   /* At user request, disable shader cache entirely.
-    * Disk cache is not enabled by default for android, for most
-    * applications the EGL layer uses EGL_ANDROID_blob_cache to manage
-    * the cache itself, however those that wish to use the cache directly
-    * can set `mesa.shader.cache.disable=false` property.
-    * Don't forget to also set the shader cache path to something readable
-    * and writable by the application via `mesa.shader.cache.dir`.
-    */
-#if defined(SHADER_CACHE_DISABLE_BY_DEFAULT) || DETECT_OS_ANDROID
+   /* At user request, disable shader cache entirely. */
+#ifdef SHADER_CACHE_DISABLE_BY_DEFAULT
    bool disable_by_default = true;
 #else
    bool disable_by_default = false;
 #endif
    char *envvar_name = "MESA_SHADER_CACHE_DISABLE";
-#if !DETECT_OS_ANDROID
-   if (!os_get_option(envvar_name)) {
+   if (!getenv(envvar_name)) {
       envvar_name = "MESA_GLSL_CACHE_DISABLE";
-      if (os_get_option(envvar_name))
+      if (getenv(envvar_name))
          fprintf(stderr,
                  "*** MESA_GLSL_CACHE_DISABLE is deprecated; "
                  "use MESA_SHADER_CACHE_DISABLE instead ***\n");
    }
-#endif
 
    if (debug_get_bool_option(envvar_name, disable_by_default) ||
        /* MESA_GLSL_DISABLE_IO_OPT must disable the cache to get expected
@@ -1102,12 +1102,13 @@ disk_cache_touch_cache_user_marker(char *path)
 }
 
 bool
-disk_cache_mmap_cache_index(void *mem_ctx, struct disk_cache *cache)
+disk_cache_mmap_cache_index(void *mem_ctx, struct disk_cache *cache,
+                            char *path)
 {
    int fd = -1;
    bool mapped = false;
 
-   char *path = ralloc_asprintf(mem_ctx, "%s/index", cache->path);
+   path = ralloc_asprintf(mem_ctx, "%s/index", cache->path);
    if (path == NULL)
       goto path_fail;
 
@@ -1126,15 +1127,8 @@ disk_cache_mmap_cache_index(void *mem_ctx, struct disk_cache *cache)
       /* posix_fallocate() ensures disk space is allocated otherwise it
        * fails if there is not enough space on the disk.
        */
-      int ret = posix_fallocate(fd, 0, size);
-      if (ret != 0) {
-         if (ret == EOPNOTSUPP) {
-            if (ftruncate(fd, size) == -1)
-               goto path_fail;
-         } else {
-            goto path_fail;
-         }
-      }
+      if (posix_fallocate(fd, 0, size) != 0)
+         goto path_fail;
 #else
       /* ftruncate() allocates disk space lazily. If the disk is full
        * and it is unable to allocate disk space when accessed via
@@ -1262,8 +1256,8 @@ void
 disk_cache_delete_old_cache(void)
 {
    void *ctx = ralloc_context(NULL);
-   const char *dirname = disk_cache_generate_cache_dir(ctx, NULL, NULL, NULL,
-                                                       DISK_CACHE_MULTI_FILE, false);
+   char *dirname = disk_cache_generate_cache_dir(ctx, NULL, NULL, NULL,
+                                                 DISK_CACHE_MULTI_FILE, false);
    if (!dirname)
       goto finish;
 

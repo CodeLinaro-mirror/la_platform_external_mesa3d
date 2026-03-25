@@ -3,6 +3,8 @@
 
 files_libzink = files(
   'zink_lower_cubemap_to_array.c',
+  'nir_to_spirv/nir_to_spirv.c',
+  'nir_to_spirv/spirv_builder.c',
   'zink_batch.c',
   'zink_blit.c',
   'zink_bo.c',
@@ -84,29 +86,22 @@ if host_machine.system() == 'darwin'
 
 endif
 
-subdir('nir_to_spirv')
-
 libzink = static_library(
   'zink',
   [files_libzink, zink_device_info, zink_instance, zink_nir_algebraic_c, vk_dispatch_table, spirv_info_h],
   gnu_symbol_visibility : 'hidden',
-  include_directories : [inc_include, inc_src, inc_gallium, inc_gallium_aux, inc_vulkan_util, inc_zink_vk],
+  include_directories : [inc_include, inc_src, inc_mapi, inc_mesa, inc_gallium, inc_gallium_aux, inc_vulkan_util, inc_zink_vk],
   link_args : [ld_args_build_id],
   dependencies: [
     idep_nir_headers, idep_mesautil, idep_vulkan_util_headers,
-    idep_vulkan_wsi_defines, idep_vulkan_util, dep_libdrm, vulkan_wsi_deps, idep_ntv,
+    idep_vulkan_wsi_defines, idep_vulkan_util, dep_libdrm, vulkan_wsi_deps
   ],
   c_args: zink_c_args,
 )
 
-zink_deps = [libzink]
-if not with_platform_windows
-  zink_deps += libzinkwinsys
-endif
-
 driver_zink = declare_dependency(
   compile_args : '-DGALLIUM_ZINK',
-  link_with : zink_deps,
+  link_with : [libzink],
 )
 
 if with_tests
@@ -120,8 +115,4 @@ if with_tests
     ),
     suite : ['zink'],
   )
-endif
-
-if with_tools.contains('zink')
-  subdir('check_requirements')
 endif

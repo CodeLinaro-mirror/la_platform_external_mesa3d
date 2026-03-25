@@ -48,8 +48,7 @@ dri_create_context(struct dri_screen *screen,
                    const struct __DriverContextConfig *ctx_config,
                    unsigned *error,
                    struct dri_context *sharedContextPrivate,
-                   void *loaderPrivate,
-                   bool thread_safe)
+                   void *loaderPrivate)
 {
    struct dri_context *ctx = NULL;
    struct st_context *st_share = NULL;
@@ -220,7 +219,7 @@ dri_create_context(struct dri_screen *screen,
       /* if set (not -1), apply the app setting */
       enable_glthread = app_enable_glthread == 1;
    }
-   if (os_get_option("mesa_glthread")) {
+   if (getenv("mesa_glthread")) {
       /* only apply the env var if set */
       bool user_enable_glthread = debug_get_bool_option("mesa_glthread", false);
       if (user_enable_glthread != enable_glthread) {
@@ -229,10 +228,6 @@ dri_create_context(struct dri_screen *screen,
       }
       enable_glthread = user_enable_glthread;
    }
-
-   if (!thread_safe)
-      enable_glthread = false;
-
    /* Do this last. */
    if (enable_glthread)
       _mesa_glthread_init(ctx->st->ctx);

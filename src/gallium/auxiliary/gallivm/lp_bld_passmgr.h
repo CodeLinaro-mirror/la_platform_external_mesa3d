@@ -28,8 +28,7 @@
 #ifndef LP_BLD_PASSMGR_H
 #define LP_BLD_PASSMGR_H
 
-#include <stdbool.h>
-
+#include "lp_bld.h"
 #include <llvm-c/ExecutionEngine.h>
 
 #ifdef __cplusplus

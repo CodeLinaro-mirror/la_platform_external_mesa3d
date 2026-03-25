@@ -117,7 +117,7 @@ shade_quads(struct lp_rasterizer_task *task,
                                    GET_DADY(inputs),
                                    cbufs,
                                    NULL,
-                                   mask, 0,
+                                   mask,
                                    &task->thread_data,
                                    strides, 0, 0, 0);
    END_JIT_CALL();

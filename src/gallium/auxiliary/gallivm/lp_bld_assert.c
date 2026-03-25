@@ -26,9 +26,11 @@
  **************************************************************************/
 
 #include "util/u_debug.h"
+#include "util/u_memory.h"
 #include "lp_bld_assert.h"
 #include "lp_bld_init.h"
 #include "lp_bld_const.h"
+#include "lp_bld_printf.h"
 
 
 /**

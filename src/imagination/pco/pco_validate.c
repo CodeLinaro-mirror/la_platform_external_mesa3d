@@ -303,7 +303,6 @@ static inline bool ref_is_in_map(pco_ref ref, enum pco_ref_map ref_maps)
 
          CHECK_IO(FT0, ref)
          CHECK_IO(FT1, ref)
-         CHECK_IO(FT1_INVERT, ref)
          CHECK_IO(FT2, ref)
          CHECK_IO(FTE, ref)
          CHECK_IO(FT3, ref)

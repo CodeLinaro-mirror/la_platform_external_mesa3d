@@ -4,9 +4,7 @@
 extern crate bitview;
 extern crate nvidia_headers;
 
-use crate::ir::{
-    ShaderInfo, ShaderIoInfo, ShaderModel, ShaderModelInfo, ShaderStageInfo,
-};
+use crate::ir::{ShaderInfo, ShaderIoInfo, ShaderModel, ShaderStageInfo};
 use bitview::{
     BitMutView, BitMutViewable, BitView, BitViewable, SetBit, SetField,
 };
@@ -32,7 +30,7 @@ pub enum ShaderType {
 impl From<&ShaderStageInfo> for ShaderType {
     fn from(value: &ShaderStageInfo) -> Self {
         match value {
-            ShaderStageInfo::Vertex(_) => ShaderType::Vertex,
+            ShaderStageInfo::Vertex => ShaderType::Vertex,
             ShaderStageInfo::Fragment(_) => ShaderType::Fragment,
             ShaderStageInfo::Geometry(_) => ShaderType::Geometry,
             ShaderStageInfo::TessellationInit(_) => {
@@ -233,15 +231,6 @@ impl ShaderProgramHeader {
     }
 
     #[inline]
-    pub fn set_isbe_space_sharing_enable(
-        &mut self,
-        isbe_space_sharing_enable: bool,
-    ) {
-        assert!(self.shader_type == ShaderType::Vertex);
-        self.set_bit(25, isbe_space_sharing_enable);
-    }
-
-    #[inline]
     pub fn set_does_load_or_store(&mut self, does_load_or_store: bool) {
         self.set_field(SPHV3_T1_DOES_LOAD_OR_STORE, does_load_or_store);
     }
@@ -303,6 +292,7 @@ impl ShaderProgramHeader {
     }
 
     #[inline]
+    #[allow(dead_code)]
     pub fn set_shader_local_memory_crs_size(
         &mut self,
         shader_local_memory_crs_size: u32,
@@ -441,6 +431,7 @@ impl ShaderProgramHeader {
     }
 
     #[inline]
+    #[allow(dead_code)]
     pub fn set_uses_underestimate(&mut self, uses_underestimate: bool) {
         assert!(self.shader_type == ShaderType::Fragment);
         self.set_bit(611, uses_underestimate);
@@ -464,7 +455,7 @@ impl ShaderProgramHeader {
 }
 
 pub fn encode_header(
-    sm: &ShaderModelInfo,
+    sm: &dyn ShaderModel,
     shader_info: &ShaderInfo,
     fs_key: Option<&nak_fs_key>,
 ) -> [u32; CURRENT_MAX_SHADER_HEADER_SIZE] {
@@ -544,9 +535,6 @@ pub fn encode_header(
     }
 
     match &shader_info.stage {
-        ShaderStageInfo::Vertex(stage) => {
-            sph.set_isbe_space_sharing_enable(stage.isbe_space_sharing_enable);
-        }
         ShaderStageInfo::Fragment(stage) => {
             let zs_self_dep = fs_key.is_some_and(|key| key.zs_self_dep);
             sph.set_kills_pixels(stage.uses_kill || zs_self_dep);

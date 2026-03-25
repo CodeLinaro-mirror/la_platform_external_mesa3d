@@ -112,6 +112,7 @@
 #include <mesa/main/stencil.h>
 #include <mesa/main/syncobj.h>
 #include <mesa/main/texcompress.h>
+#include <mesa/main/texcompress_astc.h>
 #include <mesa/main/texcompress_bptc.h>
 #include <mesa/main/texcompress_cpal.h>
 #include <mesa/main/texcompress_etc.h>
@@ -177,6 +178,7 @@
 #include <mesa/state_tracker/st_shader_cache.h>
 #include <mesa/state_tracker/st_texture.h>
 #include <mesa/state_tracker/st_util.h>
+#include <mesa/state_tracker/st_vdpau.h>
 #include <mesa/vbo/vbo.h>
 #include <mesa/vbo/vbo_attrib.h>
 #include <mesa/vbo/vbo_exec.h>
@@ -256,7 +258,6 @@
 #include <util/string_buffer.h>
 #include <util/strndup.h>
 #include <util/strtod.h>
-#include <util/texcompress_astc.h>
 #include <util/timespec.h>
 #include <util/u_atomic.h>
 #include <util/u_call_once.h>

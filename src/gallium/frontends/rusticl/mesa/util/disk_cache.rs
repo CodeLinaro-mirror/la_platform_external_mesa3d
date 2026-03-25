@@ -1,6 +1,3 @@
-// Copyright 2022 Red Hat.
-// SPDX-License-Identifier: MIT
-
 use libc_rust_gen::free;
 use mesa_rust_gen::*;
 
@@ -38,7 +35,7 @@ impl DiskCacheBorrowed {
         }
     }
 
-    pub fn get(&self, key: &mut cache_key) -> Option<DiskCacheEntry<'_>> {
+    pub fn get(&self, key: &mut cache_key) -> Option<DiskCacheEntry> {
         let mut size = 0;
 
         unsafe {

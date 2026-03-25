@@ -1,0 +1,52 @@
+import sys
+import tomllib
+###
+########################################################################################################################
+###
+### Pull in the definitions meson is expecting
+###
+from meson_common import *
+from meson_to_hermetic.meson_to_hermetic import *
+###
+########################################################################################################################
+{{ meson_options }}
+###
+### Process command line arguments for setting options
+config_path = ''
+
+if __name__ == "__main__":
+  for arg in sys.argv[1:]:
+    flag, value = arg.split('=')  # args form follows a: -flag=value
+    match flag:
+      case ('--config' | '-c'):
+        if not value.endswith('.toml'):
+          exit(f'File format for {value} not supported. Please provide a valid file (toml).')
+        with open(value, 'rb') as f:
+          data = tomllib.load(f)
+          config_path = value
+          # Data entry point of meson_translator global
+          load_meson_data(config_path)
+          meson_options = meson_translator.config.meson_options
+          for key in meson_options:
+            set_option(key, meson_options[key])
+      case _:
+        exit(f'Unhandled arg={flag} with value={value}')
+
+###
+### These definitions must be inside the module
+def get_variable(name: str):
+  return globals()[name]
+
+
+meson = impl.Meson(meson_translator.generator)
+host_machine = impl.Machine(meson_translator.host_machine, meson_translator.config.cpu, meson_translator.config.cpu_family)
+build_machine = impl.Machine(meson_translator.build_machine, meson_translator.config.cpu, meson_translator.config.cpu_family)
+
+### Load dependencies
+load_dependencies()
+
+
+{{ meson_build }}
+### Close the build definition file
+meson_translator.generator.generate(meson_translator)
+{# Newline Placeholder #}

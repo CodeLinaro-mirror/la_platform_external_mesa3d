@@ -26,7 +26,6 @@
  *
  */
 
-#include "util/detect_arch.h"
 #include "util/streaming-load-memcpy.h"
 #include "util/u_cpu_detect.h"
 #include "util/u_math.h"
@@ -43,7 +42,7 @@ util_streaming_load_memcpy(void *restrict dst, void *restrict src, size_t len)
    char *restrict d = dst;
    char *restrict s = src;
 
-#if defined(USE_SSE41) || (DETECT_ARCH_AARCH64 && DETECT_CC_GCC)
+#if defined(USE_SSE41) || defined(USE_AARCH64_ASM)
    /* If dst and src are not co-aligned, or if non-temporal load instructions
     * are not present, fallback to memcpy(). */
    if (((uintptr_t)d & 15) != ((uintptr_t)s & 15)
@@ -92,7 +91,7 @@ util_streaming_load_memcpy(void *restrict dst, void *restrict src, size_t len)
       len -= 64;
    }
 
-#elif DETECT_ARCH_AARCH64 && DETECT_CC_GCC
+#elif defined(USE_AARCH64_ASM)
    if (len >= 64) {
       __asm__ volatile(
          /* Memory barrier for loads completion in the non-shareable domain:

@@ -1,10 +1,6 @@
-// Copyright 2020 Red Hat.
-// SPDX-License-Identifier: MIT
-
 use mesa_rust_gen::*;
 
 use std::{
-    borrow::Borrow,
     marker::PhantomData,
     mem,
     num::NonZeroU64,
@@ -15,18 +11,15 @@ use super::context::PipeContext;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct PipeResourceOwned {
+pub struct PipeResource {
     pipe: NonNull<pipe_resource>,
 }
-
-#[repr(transparent)]
-pub struct PipeResource(pipe_resource);
 
 const PIPE_RESOURCE_FLAG_RUSTICL_IS_USER: u32 = PIPE_RESOURCE_FLAG_FRONTEND_PRIV;
 
 // SAFETY: pipe_resource is considered a thread safe type
-unsafe impl Send for PipeResourceOwned {}
-unsafe impl Sync for PipeResourceOwned {}
+unsafe impl Send for PipeResource {}
+unsafe impl Sync for PipeResource {}
 
 /// A thread safe wrapper around [pipe_image_view]. It's purpose is to increase the reference count
 /// on the [pipe_resource] this view belongs to.
@@ -78,7 +71,7 @@ impl AppImgInfo {
     }
 }
 
-impl PipeResourceOwned {
+impl PipeResource {
     pub(super) fn new(res: *mut pipe_resource, is_user: bool) -> Option<Self> {
         let mut res = NonNull::new(res)?;
 
@@ -117,7 +110,7 @@ impl PipeResourceOwned {
         self.as_ref().width0
     }
 
-    pub fn height(&self) -> u32 {
+    pub fn height(&self) -> u16 {
         self.as_ref().height0
     }
 
@@ -302,49 +295,10 @@ impl PipeResourceOwned {
     }
 }
 
-impl Borrow<PipeResource> for PipeResourceOwned {
-    fn borrow(&self) -> &PipeResource {
-        PipeResource::from_raw(self.as_ref())
-    }
-}
-
-impl Drop for PipeResourceOwned {
+impl Drop for PipeResource {
     fn drop(&mut self) {
         unsafe {
             pipe_resource_reference(&mut self.pipe.as_ptr(), ptr::null_mut());
-        }
-    }
-}
-
-impl PipeResource {
-    pub(super) fn slice_as_mut_ptr_slice(this: &mut [&PipeResource]) -> *mut *const pipe_resource {
-        // `PipeResource`` is transparent over `pipe_resource`. So we can simply cast a
-        // `*mut &PipeResource` into a `*mut *mut pipe_resource`.
-        this.as_mut_ptr().cast()
-    }
-
-    fn as_mut_ptr(&self) -> *mut pipe_resource {
-        (&self.0 as *const pipe_resource).cast_mut()
-    }
-
-    pub fn from_raw(res: &pipe_resource) -> &Self {
-        // SAFETY: `PipeResource` is transparent over `pipe_resource`, so we can simply transmute
-        //         a ref as we don't impose any further restrictions on the type.
-        unsafe { mem::transmute(res) }
-    }
-}
-
-impl ToOwned for PipeResource {
-    type Owned = PipeResourceOwned;
-
-    fn to_owned(&self) -> Self::Owned {
-        let mut res = ptr::null_mut();
-        // SAFETY: pipe_resource_reference will copy the ptr from src to dest, therefore ptr can't
-        //         be NULL.
-        unsafe { pipe_resource_reference(&mut res, self.as_mut_ptr()) };
-
-        PipeResourceOwned {
-            pipe: unsafe { NonNull::new_unchecked(res) },
         }
     }
 }
@@ -353,16 +307,17 @@ impl ToOwned for PipeResource {
 ///
 /// It deals with the refcounting and frees the object automatically if not needed anymore.
 #[repr(transparent)]
-pub struct PipeSamplerView<'c> {
+pub struct PipeSamplerView<'c, 'r> {
     view: NonNull<pipe_sampler_view>,
     // the pipe_sampler_view object references both a context and a resource.
     _ctx: PhantomData<&'c PipeContext>,
+    _res: PhantomData<&'r PipeResource>,
 }
 
-impl<'c> PipeSamplerView<'c> {
+impl<'c, 'r> PipeSamplerView<'c, 'r> {
     pub fn new(
         ctx: &'c PipeContext,
-        res: &PipeResourceOwned,
+        res: &'r PipeResource,
         template: &pipe_sampler_view,
     ) -> Option<Self> {
         let view = unsafe {
@@ -377,12 +332,12 @@ impl<'c> PipeSamplerView<'c> {
         unsafe {
             debug_assert_eq!(view.as_ref().context, ctx.pipe().as_ptr());
             debug_assert_eq!(view.as_ref().texture, res.pipe());
-            pipe_resource_reference(&mut ptr::null_mut(), res.pipe());
         }
 
         Some(Self {
             view: view,
             _ctx: PhantomData,
+            _res: PhantomData,
         })
     }
 
@@ -392,12 +347,10 @@ impl<'c> PipeSamplerView<'c> {
     }
 }
 
-impl Drop for PipeSamplerView<'_> {
+impl Drop for PipeSamplerView<'_, '_> {
     fn drop(&mut self) {
         unsafe {
-            let mut res = self.view.as_ref().texture;
-            pipe_sampler_view_release(self.view.as_ptr());
-            pipe_resource_reference(&mut res, ptr::null_mut());
+            pipe_sampler_view_reference(&mut self.view.as_ptr(), ptr::null_mut());
         }
     }
 }

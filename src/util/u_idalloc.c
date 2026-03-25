@@ -65,7 +65,8 @@ util_idalloc_init(struct util_idalloc *buf, unsigned initial_num_ids)
 void
 util_idalloc_fini(struct util_idalloc *buf)
 {
-   free(buf->data);
+   if (buf->data)
+      free(buf->data);
 }
 
 unsigned

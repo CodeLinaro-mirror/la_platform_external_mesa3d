@@ -22,7 +22,6 @@
 
 import argparse
 import json
-import os
 import re
 import xml.etree.ElementTree as et
 
@@ -49,10 +48,8 @@ if __name__ == '__main__':
                         help='Vulkan registry XML for patch version')
     parser.add_argument('--sizeof-pointer', required=False, type=int,
                         help='sizeof(void*) on the host cpu')
-    parser.add_argument('--icd-lib-path', required=True,
-                        help='Folder of icd lib_path to installed library')
-    parser.add_argument('--icd-filename', required=True,
-                        help='Filename of icd lib_path to installed library')
+    parser.add_argument('--lib-path', required=True,
+                        help='Path to installed library')
     parser.add_argument('--out', required=False,
                         help='Output json file.')
     parser.add_argument('--use-backslash', action='store_true',
@@ -66,12 +63,7 @@ if __name__ == '__main__':
     else:
         re.match(r'\d+\.\d+\.\d+', version)
 
-    lib_path = args.icd_filename
-    if args.out and len(os.path.basename(args.out).split('.')) == 3:
-        # The output filename is the form of '${icd_id}.${host_machine.cpu()}.json',
-        # that means vulkan_manifest_per_architecture are true.
-        lib_path = args.icd_lib_path + '/' + args.icd_filename
-
+    lib_path = args.lib_path
     if args.use_backslash:
         lib_path = lib_path.replace('/', '\\')
 
@@ -83,7 +75,7 @@ if __name__ == '__main__':
         },
     }
 
-    if args.sizeof_pointer and ('/' in lib_path or '\\' in lib_path):
+    if args.sizeof_pointer:
         bit_width = args.sizeof_pointer * 8
         if bit_width in [32, 64]:
             json_data['ICD']['library_arch'] = str(bit_width)

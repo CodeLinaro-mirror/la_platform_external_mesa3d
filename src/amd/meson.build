@@ -3,10 +3,6 @@
 
 inc_amd = include_directories('.')
 
-if with_tools.contains('drm-shim')
-  subdir('drm-shim')
-endif
-
 if with_amd_vk or with_gallium_radeonsi
   subdir('addrlib')
   subdir('common')
@@ -23,6 +19,10 @@ if with_amd_vk
   if with_aco_tests
     subdir('compiler/tests')
   endif
+endif
+
+if with_tools.contains('drm-shim')
+  subdir('drm-shim')
 endif
 
 if with_gallium_radeonsi

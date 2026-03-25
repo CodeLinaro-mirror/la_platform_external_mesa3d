@@ -103,8 +103,7 @@ struct rc_sub_instruction {
    rc_omod_op Omod;
 };
 
-typedef enum { RC_INSTRUCTION_NORMAL = 0,
-               RC_INSTRUCTION_PAIR } rc_instruction_type;
+typedef enum { RC_INSTRUCTION_NORMAL = 0, RC_INSTRUCTION_PAIR } rc_instruction_type;
 
 struct rc_instruction {
    struct rc_instruction *Prev;

@@ -26,7 +26,6 @@
 #define H_LIMA_CONTEXT
 
 #include "util/list.h"
-#include "util/sha1/sha1.h"
 #include "util/slab.h"
 #include "util/u_debug.h"
 
@@ -57,11 +56,11 @@ struct lima_fs_compiled_shader {
 
 struct lima_fs_uncompiled_shader {
    struct pipe_shader_state base;
-   unsigned char nir_sha1[SHA1_DIGEST_LENGTH];
+   unsigned char nir_sha1[20];
 };
 
 struct lima_fs_key {
-   unsigned char nir_sha1[SHA1_DIGEST_LENGTH];
+   unsigned char nir_sha1[20];
    struct {
       uint8_t swizzle[4];
    } tex[PIPE_MAX_SAMPLERS];
@@ -95,11 +94,11 @@ struct lima_vs_compiled_shader {
 
 struct lima_vs_uncompiled_shader {
    struct pipe_shader_state base;
-   unsigned char nir_sha1[SHA1_DIGEST_LENGTH];
+   unsigned char nir_sha1[20];
 };
 
 struct lima_vs_key {
-   unsigned char nir_sha1[SHA1_DIGEST_LENGTH];
+   unsigned char nir_sha1[20];
 };
 
 struct lima_rasterizer_state {
@@ -227,7 +226,7 @@ struct lima_context {
    struct lima_blend_state *blend;
    struct pipe_stencil_ref stencil_ref;
    struct pipe_clip_state clip;
-   struct lima_context_constant_buffer const_buffer[MESA_SHADER_STAGES];
+   struct lima_context_constant_buffer const_buffer[PIPE_SHADER_TYPES];
    struct lima_texture_stateobj tex_stateobj;
    struct lima_pp_stream_state pp_stream;
 

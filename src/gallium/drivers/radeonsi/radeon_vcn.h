@@ -7,7 +7,7 @@
 #ifndef RADEON_VCN_H
 #define RADEON_VCN_H
 
-#include "si_video.h"
+#include "radeon_video.h"
 
 #include "ac_vcn.h"
 

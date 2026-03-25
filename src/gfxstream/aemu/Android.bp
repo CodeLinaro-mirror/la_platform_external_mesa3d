@@ -1,12 +1,17 @@
 /*
- * Copyright (C) 2025-2026 The Magma GPU Project
- * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2024 The Android Open Source Project
  *
- * Generated via:
- *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Submit patches, do not hand-edit.
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package {
@@ -14,20 +19,24 @@ package {
     default_applicable_licenses: ["external_mesa3d_license"],
 }
 
-cc_library_static {
-    name: "aemu",
+cc_library_headers {
+    name: "mesa_gfxstream_aemu_headers",
     vendor: true,
-    cpp_std: "c++17",
     host_supported: true,
-    defaults: [
-        "aosp_mesa3d_cpp_link_args",
-        "aosp_mesa3d_cpp_project_args",
+    export_include_dirs: [
+        "include",
     ],
+}
+
+cc_library_static {
+    name: "mesa_gfxstream_aemu",
+    vendor: true,
+    host_supported: true,
     header_libs: [
-        "inc_aemu",
+        "mesa_gfxstream_aemu_headers",
     ],
     srcs: [
-        "Stream.cpp",
         "ring_buffer.cpp",
+        "Stream.cpp",
     ],
 }

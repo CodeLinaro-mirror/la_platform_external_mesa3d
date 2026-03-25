@@ -24,18 +24,13 @@
 #pragma once
 
 #include <vector>
-#include "hmft_entrypoints.h"
+#include "pipe_headers.h"
 
 class dpb_buffer_manager
 {
  public:
-   dpb_buffer_manager( void *logId,
-                       struct pipe_video_codec *codec,
-                       unsigned width,
-                       unsigned height,
-                       enum pipe_format buffer_format,
-                       unsigned pool_size,
-                       HRESULT &hr );
+   dpb_buffer_manager(
+      struct pipe_video_codec *codec, unsigned width, unsigned height, enum pipe_format buffer_format, unsigned pool_size );
    ~dpb_buffer_manager();
 
    // retrieve a buffer from the pool
@@ -44,9 +39,7 @@ class dpb_buffer_manager
    // release a buffer back to the pool
    void release_dpb_buffer( struct pipe_video_buffer *target );
 
-
  private:
-   const void *m_logId = {};
    struct pipe_video_codec *m_codec = NULL;
    struct pipe_video_buffer m_template = {};
 

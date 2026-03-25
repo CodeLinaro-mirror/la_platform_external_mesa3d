@@ -7,22 +7,21 @@ zink-lavapipe:
     - .test-piglit
     - .deqp-test
     - .zink-lavapipe-test
-  timeout: 15m  # base run time = 10m, but it's on the shared runners so it can go up
+  tags:
+    # FIXME: kvm is a hack, should not be needed
+    - $FDO_RUNNER_JOB_PRIORITY_TAG_X86_64_KVM
   variables:
     DEQP_SUITE: zink-lavapipe
+    DEQP_FRACTION: 8
     PIGLIT_NO_WINDOW: 1
     # Enable validation (except for on piglit, see deqp-zink-lavapipe.toml), logging
     # to stdout and aborting on unknown failures.
     ZINK_DEBUG: validation
-    VK_DRIVER: lvp
-  parallel: 2
+    XVFB_SCRIPT: "VK_DRIVER=lvp install/deqp-runner.sh"
   script: |
     export LD_LIBRARY_PATH="$CI_PROJECT_DIR/install/lib"
     export LIBGL_DRIVERS_PATH="$CI_PROJECT_DIR/install/lib/dri"
-    section_start weston "weston: prepare"
-    . "$CI_PROJECT_DIR/install/common/weston.sh"
-    section_end weston
-    $CI_PROJECT_DIR/install/deqp-runner.sh
+    xvfb-run --server-args='-noreset' bash -c ". $SCRIPTS_DIR/setup-test-env.sh && ${XVFB_SCRIPT}"
 
 zink-venus-lavapipe:
   extends:
@@ -42,13 +41,11 @@ zink-venus-lavapipe:
     LP_NUM_THREADS: 2
     CROSVM_MEMORY: 12288
     CROSVM_CPU: $FDO_CI_CONCURRENT
+    XVFB_SCRIPT: "./install/crosvm-runner.sh ./install/deqp-runner.sh"
   script: |
     export LD_LIBRARY_PATH="$CI_PROJECT_DIR/install/lib"
     export LIBGL_DRIVERS_PATH="$CI_PROJECT_DIR/install/lib/dri"
-    section_start weston "weston: prepare"
-    . "$CI_PROJECT_DIR/install/common/weston.sh"
-    section_end weston
-    $CI_PROJECT_DIR/install/crosvm-runner.sh $CI_PROJECT_DIR/install/deqp-runner.sh
+    xvfb-run --server-args='-noreset' bash -c ". $SCRIPTS_DIR/setup-test-env.sh && ${XVFB_SCRIPT}"
 
 zink-venus-lavapipe-full:
   extends:
@@ -66,13 +63,10 @@ zink-anv-adl:
     DEQP_SUITE: zink-anv-adl
     PIGLIT_NO_WINDOW: 1
     HWCI_START_WESTON: 1
-    ZINK_DESCRIPTORS: db
     # We use gbm because its a copy of tgl job
     PIGLIT_PLATFORM: gbm
     FDO_CI_CONCURRENT: 6 # higher is too much, and leads to OOM
-    # Xe regression in 6.19
-    # https://gitlab.freedesktop.org/drm/xe/kernel/-/issues/7584
-    KERNEL_TAG: "v6.17-mesa-ddf6"
+  timeout: 30m
   parallel: 4
 
 # Manual full run when you want to double-check the full status.
@@ -82,7 +76,7 @@ zink-anv-adl-full:
     - .zink-anv-manual-rules
     - .test-piglit
   variables:
-    DEQP_SUITE: zink-anv-full
+    DEQP_SUITE: zink-anv-adl-full
   timeout: 2h
   parallel: 5
 
@@ -90,7 +84,6 @@ zink-anv-adl-traces:
   extends:
     - .zink-anv-adl-trace-test
   variables:
-    ZINK_DESCRIPTORS: db
     PIGLIT_TRACES_FILE: traces-zink.yml
 
 zink-anv-adl-traces-restricted:
@@ -98,7 +91,6 @@ zink-anv-adl-traces-restricted:
     - .zink-anv-adl-trace-test
     - .zink-anv-rules-restricted
   variables:
-    ZINK_DESCRIPTORS: db
     PIGLIT_TRACES_FILE: traces-zink-restricted.yml
     PIGLIT_REPLAY_EXTRA_ARGS: --db-path ${CI_PROJECT_DIR}/replayer-db/ --minio_bucket=${S3_TRACIE_PRIVATE_BUCKET} --jwt-file=${S3_JWT_FILE}
   allow_failure: true
@@ -112,13 +104,13 @@ zink-anv-adl-traces-performance:
     - !reference [.piglit-performance-base, rules]
     - !reference [.zink-anv-manual-rules, rules]
   variables:
-    ZINK_DESCRIPTORS: db
     PIGLIT_TRACES_FILE: traces-zink.yml
 
 zink-anv-tgl:
   extends:
     - .zink-anv-tgl-test
     - .test-piglit
+  timeout: 30m
   variables:
     DEQP_SUITE: zink-anv-tgl
     PIGLIT_NO_WINDOW: 1
@@ -137,7 +129,7 @@ zink-anv-tgl-full:
     - .zink-anv-manual-rules
     - .test-piglit
   variables:
-    DEQP_SUITE: zink-anv-full
+    DEQP_SUITE: zink-anv-tgl-full
   timeout: 1h 45m
   parallel: 3
 
@@ -156,18 +148,6 @@ zink-anv-tgl-traces-restricted:
     PIGLIT_REPLAY_EXTRA_ARGS: --db-path ${CI_PROJECT_DIR}/replayer-db/ --minio_bucket=${S3_TRACIE_PRIVATE_BUCKET} --jwt-file=${S3_JWT_FILE}
   allow_failure: true
 
-zink-anv-cml-asan:
-  extends:
-    - .lava-x86_64-test-asan-gl
-    - .anv-test
-    - .lava-acer-chromebox-cxi4-puff:x86_64
-    - .zink-anv-rules
-    - .zink-test
-  variables:
-    GPU_VERSION: zink-anv-cml
-    DEQP_SUITE: zink-anv-cml
-  parallel: 10
-
 zink-tu-a618:
   extends:
     - .lava-arm64-test-gl
@@ -180,7 +160,6 @@ zink-tu-a618:
     HWCI_START_WESTON: 1
     GPU_VERSION: zink-tu-a618
     DRIVER_NAME: null  # Don't use freedreno skips
-    ZINK_DEBUG: validation
   parallel: 3
 
 zink-tu-a618-traces:
@@ -209,13 +188,12 @@ zink-tu-a618-traces-performance:
 zink-tu-a750:
   extends:
     - .tu-zink-test-valve
-    - .a750-kws
-    - .zink-turnip-valve-rules
+    - .a750-mupuf
+    - .zink-turnip-valve-manual-rules
     - .test-piglit
-  parallel: 2
-  timeout: 15m  # base runtime 6.5min of testing, 8min total
+  timeout: 30m  # base runtime 16min of testing, 18min total
   variables:
-    CI_TRON_TIMEOUT__OVERALL__MINUTES: 12
+    CI_TRON_TIMEOUT__OVERALL__MINUTES: 28
     DEQP_SUITE: zink-tu-a750
     GPU_VERSION: zink-tu-a750
     HWCI_START_WESTON: 1
@@ -229,7 +207,6 @@ zink-nvk-ga106-valve:
     - .zink-nvk-manual-rules
     - .nvk-ga106-valve
   variables:
-    HWCI_START_WESTON: 1
     GPU_VERSION: zink-nvk-ga106
     CI_TRON_TIMEOUT__OVERALL__MINUTES: 40  # usual run time: 32min
 
@@ -240,7 +217,6 @@ zink-nvk-ad106-valve:
     - .zink-nvk-manual-rules
     - .nvk-ad106-valve
   variables:
-    HWCI_START_WESTON: 1
     GPU_VERSION: zink-nvk-ad106
     CI_TRON_TIMEOUT__OVERALL__MINUTES: 40  # usual run time: 32min
 
@@ -251,7 +227,6 @@ zink-radv-polaris10-valve:
     - .zink-radv-valve-manual-rules
   timeout: 40m
   variables:
-    HWCI_START_WESTON: 1
     GPU_VERSION: zink-radv-polaris10
     ZINK_DEBUG: quiet
     CI_TRON_TIMEOUT__OVERALL__MINUTES: 30
@@ -263,7 +238,6 @@ zink-radv-navi10-valve:
     - .zink-radv-valve-manual-rules
   timeout: 40m
   variables:
-    HWCI_START_WESTON: 1
     CI_TRON_TIMEOUT__OVERALL__MINUTES: 30
     GPU_VERSION: zink-radv-navi10
     RADV_PERFTEST: hic
@@ -276,7 +250,6 @@ zink-radv-vangogh-valve:
     - .vangogh-test-valve
     - .zink-radv-valve-rules
   variables:
-    HWCI_START_WESTON: 1
     GPU_VERSION: zink-radv-vangogh
     CI_TRON_PATTERN__SESSION_REBOOT__REGEX: 'BUG: kernel NULL pointer dereference, address'
     CI_TRON_TIMEOUT__BOOT_CYCLE__RETRIES: 1
@@ -284,29 +257,20 @@ zink-radv-vangogh-valve:
     CI_TRON_TIMEOUT__OVERALL__MINUTES: 30
     FDO_CI_CONCURRENT: 6
     RADV_PERFTEST: hic
-
-zink-radv-vangogh-traces:
-  extends:
-    - zink-radv-vangogh-valve
-    - .zink-radv-valve-rules
-    - .zink-trace-test
-    - .piglit-traces-test
-  parallel: null
-  timeout: 10m
-  variables:
-    CI_TRON_TIMEOUT__OVERALL__MINUTES: 8  # normal runtime = 40-50 sec
-    PIGLIT_TRACES_FILE: traces-zink.yml
+  # Override the list of tags to drop `ci-tron:priority:low`
+  tags:
+    - farm:$RUNNER_FARM_LOCATION
+    - amdgpu:codename:VANGOGH
 
 zink-radv-navi31-valve:
   extends:
     - .radv-zink-test-valve
     - .navi31-test-valve
-    - .zink-radv-valve-rules
-  timeout: 15m
+    - .zink-radv-valve-manual-rules
+  timeout: 1h 20m
   variables:
-    HWCI_START_WESTON: 1
     GPU_VERSION: zink-radv-navi31
-    CI_TRON_TIMEOUT__OVERALL__MINUTES: 10
+    CI_TRON_TIMEOUT__OVERALL__MINUTES: 75
     RADV_PERFTEST: hic
 
 zink-radv-cezanne:
@@ -319,7 +283,6 @@ zink-radv-cezanne:
   parallel: 4
   variables:
     DEQP_SUITE: zink-radv
-    DRIVER_NAME: zink-radv
     GPU_VERSION: zink-radv-cezanne
     HWCI_START_WESTON: 1
 
@@ -327,21 +290,9 @@ zink-radv-gfx1201-valve:
   extends:
     - .radv-zink-test-valve
     - .gfx1201-test-valve
-    - .zink-radv-valve-rules
+    - .zink-radv-valve-manual-rules
   timeout: 15m
   variables:
-    HWCI_START_WESTON: 1
     GPU_VERSION: zink-radv-gfx1201
     CI_TRON_TIMEOUT__OVERALL__MINUTES: 10
     RADV_PERFTEST: hic
-
-zink-radv-gfx1201-traces:
-  extends:
-    - zink-radv-gfx1201-valve
-    - .zink-radv-valve-rules
-    - .zink-trace-test
-    - .piglit-traces-test
-  timeout: 10m
-  variables:
-    CI_TRON_TIMEOUT__OVERALL__MINUTES: 5  # normal runtime = 30-40 sec
-    PIGLIT_TRACES_FILE: traces-zink.yml

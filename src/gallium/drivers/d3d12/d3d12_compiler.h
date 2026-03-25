@@ -32,6 +32,7 @@
 #include "pipe/p_state.h"
 
 #include "compiler/shader_info.h"
+#include "program/prog_statevars.h"
 
 #include "nir.h"
 
@@ -98,7 +99,7 @@ struct d3d12_image_format_conversion_info_arr {
 
 struct d3d12_shader_key {
    uint32_t hash;
-   mesa_shader_stage stage;
+   enum pipe_shader_type stage;
 
    uint64_t next_varying_inputs;
    uint64_t prev_varying_outputs;
@@ -251,7 +252,7 @@ struct d3d12_tcs_variant_key
 };
 
 struct d3d12_shader_selector {
-   mesa_shader_stage stage;
+   enum pipe_shader_type stage;
    const nir_shader *initial;
    struct d3d12_varying_info *initial_output_vars;
    struct d3d12_varying_info *initial_input_vars;
@@ -279,7 +280,7 @@ struct d3d12_shader_selector {
 
 struct d3d12_shader_selector *
 d3d12_create_shader(struct d3d12_context *ctx,
-                    mesa_shader_stage stage,
+                    enum pipe_shader_type stage,
                     const struct pipe_shader_state *shader);
 
 struct d3d12_shader_selector *

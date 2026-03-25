@@ -128,11 +128,11 @@ static struct asm_instruction *asm_instruction_copy_ctor(
    } while(0)
 %}
 
-%define api.pure
+%pure-parser
 %locations
 %lex-param   { struct asm_parser_state *state }
 %parse-param { struct asm_parser_state *state }
-%define parse.error verbose
+%error-verbose
 
 %union {
    struct asm_instruction *inst;
@@ -2530,7 +2530,9 @@ yyerror(YYLTYPE *locp, struct asm_parser_state *state, const char *s)
                                locp->first_line, locp->first_column, s);
    _mesa_set_program_error(state->ctx, locp->position, err_str);
 
-   free(err_str);
+   if (err_str) {
+      free(err_str);
+   }
 }
 
 

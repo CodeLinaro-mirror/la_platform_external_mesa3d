@@ -11,13 +11,10 @@
 
 #include "util/list.h"
 
-struct nvk_image;
 struct nvkmd_mem;
 
 struct nvk_device_memory {
    struct vk_device_memory vk;
-
-   struct nvk_image *dedicated_image;
 
    struct nvkmd_mem *mem;
 };

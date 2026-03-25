@@ -4,7 +4,6 @@
 
 libpan_shader_files = files(
   'query_pool.cl',
-  'draw_helper.cl',
   'indirect_dispatch.cl',
 )
 

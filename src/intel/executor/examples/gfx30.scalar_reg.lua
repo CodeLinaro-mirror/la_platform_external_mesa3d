@@ -1,9 +1,7 @@
 -- Xe3 adds a new ARF to store scalar values.  It supports only a limited
 -- set of operations.
 
-if devinfo.ver < 30 then
-  error("Scalar register requires Gfx30+")
-end
+check_ver(30)
 
 local r = execute {
   src=[[

@@ -7,7 +7,6 @@
 #ifndef RADV_DESCRIPTOR_SET_H
 #define RADV_DESCRIPTOR_SET_H
 
-#include "util/list.h"
 #include "util/mesa-blake3.h"
 
 #include "radv_constants.h"
@@ -90,7 +89,6 @@ struct radv_descriptor_range {
 struct radv_descriptor_set_header {
    struct vk_object_base base;
    struct radv_descriptor_set_layout *layout;
-   uint32_t offset;
    uint32_t size;
    uint32_t buffer_count;
 
@@ -102,9 +100,6 @@ struct radv_descriptor_set_header {
 
 struct radv_descriptor_set {
    struct radv_descriptor_set_header header;
-
-   /* Link in radv_descriptor_pool::sets */
-   struct list_head link;
 
    struct radeon_winsys_bo *descriptors[];
 };
@@ -137,6 +132,6 @@ void radv_cmd_update_descriptor_sets(struct radv_device *device, struct radv_cmd
                                      const VkCopyDescriptorSet *pDescriptorCopies);
 
 void radv_descriptor_set_destroy(struct radv_device *device, struct radv_descriptor_pool *pool,
-                                 struct radv_descriptor_set *set);
+                                 struct radv_descriptor_set *set, bool free_bo);
 
 #endif /* RADV_DESCRIPTOR_SET_H */

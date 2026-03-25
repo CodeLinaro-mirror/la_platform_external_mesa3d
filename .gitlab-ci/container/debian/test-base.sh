@@ -3,7 +3,7 @@
 
 # When changing this file, you need to bump the following
 # .gitlab-ci/image-tags.yml tags:
-# DEBIAN_TEST_BASE_TAG
+# DEBIAN_BASE_TAG
 
 set -e
 
@@ -11,11 +11,11 @@ set -e
 
 set -o xtrace
 
-section_start debian_setup "Base Debian system setup"
+uncollapsed_section_start debian_setup "Base Debian system setup"
 
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get install -y curl ca-certificates gnupg2
+apt-get install -y curl ca-certificates gnupg2 software-properties-common
 
 sed -i -e 's/http:\/\/deb/https:\/\/deb/g' /etc/apt/sources.list.d/*
 
@@ -118,16 +118,15 @@ DEPS=(
     "libllvm${LLVM_VERSION}"
     liblz4-1
     libpixman-1-0
-    libpng16-16t64
+    libpng16-16
     libproc2-0
-    libpython3.13
-    libtirpc3t64
+    libpython3.11
+    libtirpc3
     libubsan1
     libvulkan1
     libwayland-client0
     libwayland-server0
     libxcb-composite0
-    libxcb-dri2-0
     libxcb-ewmh2
     libxcb-randr0
     libxcb-shm0
@@ -138,7 +137,6 @@ DEPS=(
     libxkbcommon0
     libxrandr2
     libxrender1
-    ntpsec-ntpdig
     libxshmfence1
     ocl-icd-libopencl1
     pciutils
@@ -152,6 +150,7 @@ DEPS=(
     python3-simplejson
     python3-six
     python3-yaml
+    sntp
     socat
     spirv-tools
     sysvinit-core
@@ -162,12 +161,14 @@ DEPS=(
     xserver-xorg-video-amdgpu
     xserver-xorg-video-ati
     xauth
+    xvfb
     zlib1g
 )
 
 HW_DEPS=(
     netcat-openbsd
     mount
+    python3-distutils
     python3-serial
     tzdata
     zstd
@@ -223,7 +224,7 @@ section_end debian_setup
 
 ############### Install Rust toolchain
 
-. .gitlab-ci/container/build-rust.sh test
+. .gitlab-ci/container/build-rust.sh
 
 ############### Build Crosvm
 
@@ -242,7 +243,7 @@ fi
 
 ############### Uninstall the build software
 
-section_switch debian_cleanup "Cleaning up base Debian system"
+uncollapsed_section_switch debian_cleanup "Cleaning up base Debian system"
 
 apt-get purge -y "${EPHEMERAL[@]}"
 

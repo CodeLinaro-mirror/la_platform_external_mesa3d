@@ -327,8 +327,7 @@ arb_output_attrib_string(GLuint index, unsigned stage)
       "result.color[4]",
       "result.color[5]",
       "result.color[6]",
-      "result.color[7]", /* MAX_DRAW_BUFFERS = 8 */
-      "result.dual_src_blend",
+      "result.color[7]" /* MAX_DRAW_BUFFERS = 8 */
    };
 
    /* sanity checks */

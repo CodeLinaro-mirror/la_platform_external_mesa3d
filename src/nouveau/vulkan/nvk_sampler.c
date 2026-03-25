@@ -334,26 +334,24 @@ nvk_CreateSampler(VkDevice device,
 
    {
       sampler->plane_count = 1;
-      if (dev->nvkmd) {
-         const struct nvk_sampler_header samp =
-            nvk_sampler_get_header(pdev, &state);
+      const struct nvk_sampler_header samp =
+         nvk_sampler_get_header(pdev, &state);
 
-         uint32_t desc_index = 0;
-         if (cap_info != NULL) {
-            desc_index = cap.planes[0].desc_index;
-            result = nvk_descriptor_table_insert(dev, &dev->samplers,
-                                                 desc_index, &samp, sizeof(samp));
-         } else {
-            result = nvk_descriptor_table_add(dev, &dev->samplers,
-                                              &samp, sizeof(samp), &desc_index);
-         }
-         if (result != VK_SUCCESS) {
-            vk_sampler_destroy(&dev->vk, pAllocator, &sampler->vk);
-            return result;
-         }
-
-         sampler->planes[0].desc_index = desc_index;
+      uint32_t desc_index = 0;
+      if (cap_info != NULL) {
+         desc_index = cap.planes[0].desc_index;
+         result = nvk_descriptor_table_insert(dev, &dev->samplers,
+                                              desc_index, &samp, sizeof(samp));
+      } else {
+         result = nvk_descriptor_table_add(dev, &dev->samplers,
+                                           &samp, sizeof(samp), &desc_index);
       }
+      if (result != VK_SUCCESS) {
+         vk_sampler_destroy(&dev->vk, pAllocator, &sampler->vk);
+         return result;
+      }
+
+      sampler->planes[0].desc_index = desc_index;
    }
 
    /* In order to support CONVERSION_SEPARATE_RECONSTRUCTION_FILTER_BIT, we
@@ -376,30 +374,28 @@ nvk_CreateSampler(VkDevice device,
          chroma_state.min_filter = chroma_filter;
 
          sampler->plane_count = 2;
-         if (dev->nvkmd) {
-            const struct nvk_sampler_header samp =
-               nvk_sampler_get_header(pdev, &chroma_state);
+         const struct nvk_sampler_header samp =
+            nvk_sampler_get_header(pdev, &chroma_state);
 
-            uint32_t desc_index = 0;
-            if (cap_info != NULL) {
-               desc_index = cap.planes[1].desc_index;
-               result = nvk_descriptor_table_insert(dev, &dev->samplers,
-                                                    desc_index,
-                                                    &samp, sizeof(samp));
-            } else {
-               result = nvk_descriptor_table_add(dev, &dev->samplers,
-                                                 &samp, sizeof(samp),
-                                                 &desc_index);
-            }
-            if (result != VK_SUCCESS) {
-               nvk_descriptor_table_remove(dev, &dev->samplers,
-                                           sampler->planes[0].desc_index);
-               vk_sampler_destroy(&dev->vk, pAllocator, &sampler->vk);
-               return result;
-            }
-
-            sampler->planes[1].desc_index = desc_index;
+         uint32_t desc_index = 0;
+         if (cap_info != NULL) {
+            desc_index = cap.planes[1].desc_index;
+            result = nvk_descriptor_table_insert(dev, &dev->samplers,
+                                                 desc_index,
+                                                 &samp, sizeof(samp));
+         } else {
+            result = nvk_descriptor_table_add(dev, &dev->samplers,
+                                              &samp, sizeof(samp),
+                                              &desc_index);
          }
+         if (result != VK_SUCCESS) {
+            nvk_descriptor_table_remove(dev, &dev->samplers,
+                                        sampler->planes[0].desc_index);
+            vk_sampler_destroy(&dev->vk, pAllocator, &sampler->vk);
+            return result;
+         }
+
+         sampler->planes[1].desc_index = desc_index;
       }
    }
 
@@ -419,13 +415,11 @@ nvk_DestroySampler(VkDevice device,
    if (!sampler)
       return;
 
-   if (dev->nvkmd) {
-      for (uint8_t plane = 0; plane < sampler->plane_count; plane++) {
-         nvk_descriptor_table_remove(dev, &dev->samplers,
-                                     sampler->planes[plane].desc_index);
-      }
-
+   for (uint8_t plane = 0; plane < sampler->plane_count; plane++) {
+      nvk_descriptor_table_remove(dev, &dev->samplers,
+                                  sampler->planes[plane].desc_index);
    }
+
    vk_sampler_destroy(&dev->vk, pAllocator, &sampler->vk);
 }
 

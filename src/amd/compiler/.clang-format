@@ -24,7 +24,7 @@ AllowShortLambdasOnASingleLine: All
 
 # Wrap before LambdaBody and disable SplitEmptyFunction
 BraceWrapping:
-  AfterControlStatement: Never
+  AfterControlStatement: false
   AfterEnum: false
   AfterFunction: true
   AfterStruct: false

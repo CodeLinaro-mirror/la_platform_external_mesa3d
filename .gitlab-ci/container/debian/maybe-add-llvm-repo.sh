@@ -3,7 +3,7 @@
 # Check to see if we need a separate repo to install LLVM.
 
 case "${FDO_DISTRIBUTION_VERSION%-*},${LLVM_VERSION}" in
-  trixie,19)
+  bookworm,15)
     NEED_LLVM_REPO="false"
     ;;
   *)

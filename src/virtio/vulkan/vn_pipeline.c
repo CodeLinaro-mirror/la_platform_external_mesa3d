@@ -244,7 +244,7 @@ struct vn_graphics_pipeline_fix_tmp {
 
 /* shader module commands */
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateShaderModule(VkDevice device,
                       const VkShaderModuleCreateInfo *pCreateInfo,
                       const VkAllocationCallbacks *pAllocator,
@@ -271,7 +271,7 @@ vn_CreateShaderModule(VkDevice device,
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyShaderModule(VkDevice device,
                        VkShaderModule shaderModule,
                        const VkAllocationCallbacks *pAllocator)
@@ -326,7 +326,7 @@ vn_pipeline_layout_unref(struct vn_device *dev,
       vn_pipeline_layout_destroy(dev, pipeline_layout);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreatePipelineLayout(VkDevice device,
                         const VkPipelineLayoutCreateInfo *pCreateInfo,
                         const VkAllocationCallbacks *pAllocator,
@@ -378,7 +378,7 @@ vn_CreatePipelineLayout(VkDevice device,
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyPipelineLayout(VkDevice device,
                          VkPipelineLayout pipelineLayout,
                          const VkAllocationCallbacks *pAllocator)
@@ -395,7 +395,7 @@ vn_DestroyPipelineLayout(VkDevice device,
 
 /* pipeline cache commands */
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreatePipelineCache(VkDevice device,
                        const VkPipelineCacheCreateInfo *pCreateInfo,
                        const VkAllocationCallbacks *pAllocator,
@@ -434,7 +434,7 @@ vn_CreatePipelineCache(VkDevice device,
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyPipelineCache(VkDevice device,
                         VkPipelineCache pipelineCache,
                         const VkAllocationCallbacks *pAllocator)
@@ -480,7 +480,7 @@ vn_get_target_ring(struct vn_device *dev)
    return ring;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_GetPipelineCacheData(VkDevice device,
                         VkPipelineCache pipelineCache,
                         size_t *pDataSize,
@@ -526,7 +526,7 @@ vn_GetPipelineCacheData(VkDevice device,
    return result;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_MergePipelineCaches(VkDevice device,
                        VkPipelineCache dstCache,
                        uint32_t srcCacheCount,
@@ -1667,7 +1667,7 @@ vn_pipeline_create_flags2(const void *pnext, VkPipelineCreateFlags flags)
    return flags2 ? flags2->flags : flags;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateGraphicsPipelines(VkDevice device,
                            VkPipelineCache pipelineCache,
                            uint32_t createInfoCount,
@@ -1760,7 +1760,7 @@ vn_CreateGraphicsPipelines(VkDevice device,
    return vn_result(dev->instance, result);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateComputePipelines(VkDevice device,
                           VkPipelineCache pipelineCache,
                           uint32_t createInfoCount,
@@ -1784,8 +1784,8 @@ vn_CreateComputePipelines(VkDevice device,
       struct vn_pipeline *pipeline = vn_pipeline_from_handle(pPipelines[i]);
       struct vn_pipeline_layout *layout =
          vn_pipeline_layout_from_handle(pCreateInfos[i].layout);
-      if (layout && (layout->push_descriptor_set_layout ||
-                     layout->has_push_constant_ranges)) {
+      if (layout->push_descriptor_set_layout ||
+          layout->has_push_constant_ranges) {
          pipeline->layout = vn_pipeline_layout_ref(dev, layout);
       }
 
@@ -1821,7 +1821,7 @@ vn_CreateComputePipelines(VkDevice device,
    return vn_result(dev->instance, result);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyPipeline(VkDevice device,
                    VkPipeline _pipeline,
                    const VkAllocationCallbacks *pAllocator)
@@ -1844,7 +1844,7 @@ vn_DestroyPipeline(VkDevice device,
    vk_free(alloc, pipeline);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateRayTracingPipelinesKHR(
    VkDevice device,
    VkDeferredOperationKHR deferredOperation,
@@ -1870,8 +1870,8 @@ vn_CreateRayTracingPipelinesKHR(
       struct vn_pipeline *pipeline = vn_pipeline_from_handle(pPipelines[i]);
       struct vn_pipeline_layout *layout =
          vn_pipeline_layout_from_handle(pCreateInfos[i].layout);
-      if (layout && (layout->push_descriptor_set_layout ||
-                     layout->has_push_constant_ranges)) {
+      if (layout->push_descriptor_set_layout ||
+          layout->has_push_constant_ranges) {
          pipeline->layout = vn_pipeline_layout_ref(dev, layout);
       }
 
@@ -1914,7 +1914,7 @@ vn_CreateRayTracingPipelinesKHR(
    return vn_result(dev->instance, result);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_GetRayTracingCaptureReplayShaderGroupHandlesKHR(VkDevice device,
                                                    VkPipeline pipeline,
                                                    uint32_t firstGroup,
@@ -1929,7 +1929,7 @@ vn_GetRayTracingCaptureReplayShaderGroupHandlesKHR(VkDevice device,
       pData);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_GetRayTracingShaderGroupHandlesKHR(VkDevice device,
                                       VkPipeline pipeline,
                                       uint32_t firstGroup,
@@ -1944,7 +1944,7 @@ vn_GetRayTracingShaderGroupHandlesKHR(VkDevice device,
       pData);
 }
 
-VKAPI_ATTR VkDeviceSize VKAPI_CALL
+VkDeviceSize
 vn_GetRayTracingShaderGroupStackSizeKHR(VkDevice device,
                                         VkPipeline pipeline,
                                         uint32_t group,

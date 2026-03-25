@@ -1,9 +1,3 @@
-/*
- * Copyright 2022 Red Hat.
- *
- * SPDX-License-Identifier: MIT
- */
-
 #include "nir.h"
 
 struct rusticl_lower_state {

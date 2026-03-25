@@ -48,15 +48,18 @@
 static void
 flush_vertices_for_program_constants(struct gl_context *ctx, GLenum target)
 {
-   unsigned stage = target == GL_FRAGMENT_PROGRAM_ARB ?
-      MESA_SHADER_FRAGMENT : MESA_SHADER_VERTEX;
+   uint64_t new_driver_state;
 
-   GLbitfield new_state =
-      BITSET_IS_EMPTY(ctx->DriverFlags.NewShaderConstants[stage]) ?
-      _NEW_PROGRAM_CONSTANTS : 0;
+   if (target == GL_FRAGMENT_PROGRAM_ARB) {
+      new_driver_state =
+         ctx->DriverFlags.NewShaderConstants[MESA_SHADER_FRAGMENT];
+   } else {
+      new_driver_state =
+         ctx->DriverFlags.NewShaderConstants[MESA_SHADER_VERTEX];
+   }
 
-   FLUSH_VERTICES(ctx, new_state, 0);
-   ST_SET_STATES(ctx->NewDriverState, ctx->DriverFlags.NewShaderConstants[stage]);
+   FLUSH_VERTICES(ctx, new_driver_state ? 0 : _NEW_PROGRAM_CONSTANTS, 0);
+   ctx->NewDriverState |= new_driver_state;
 }
 
 static struct gl_program*
@@ -388,7 +391,7 @@ set_program_string(struct gl_program *prog, GLenum target, GLenum format, GLsize
 #ifdef ENABLE_SHADER_CACHE
    GLcharARB *replacement;
 
-   mesa_shader_stage stage = _mesa_program_enum_to_shader_stage(target);
+   gl_shader_stage stage = _mesa_program_enum_to_shader_stage(target);
 
    blake3_hash blake3;
    _mesa_blake3_compute(string, len, blake3);

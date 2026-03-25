@@ -13,9 +13,7 @@ instruction as seen in the PRM.
 
 --]]
 
-if devinfo.ver < 12 then
-  error("DP4A instruction requires Gfx12+")
-end
+check_ver(12)
 
 function DP4A(a, b, c)
   local r = c

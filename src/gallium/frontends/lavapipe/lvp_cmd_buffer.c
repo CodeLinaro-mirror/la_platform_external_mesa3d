@@ -55,6 +55,8 @@ lvp_create_cmd_buffer(struct vk_command_pool *pool,
       return result;
    }
 
+   cmd_buffer->device = device;
+
    *cmd_buffer_out = &cmd_buffer->vk;
 
    return VK_SUCCESS;
@@ -77,7 +79,7 @@ VKAPI_ATTR VkResult VKAPI_CALL lvp_BeginCommandBuffer(
    VkCommandBuffer                             commandBuffer,
    const VkCommandBufferBeginInfo*             pBeginInfo)
 {
-   VK_FROM_HANDLE(lvp_cmd_buffer, cmd_buffer, commandBuffer);
+   LVP_FROM_HANDLE(lvp_cmd_buffer, cmd_buffer, commandBuffer);
 
    vk_command_buffer_begin(&cmd_buffer->vk, pBeginInfo);
 
@@ -87,7 +89,7 @@ VKAPI_ATTR VkResult VKAPI_CALL lvp_BeginCommandBuffer(
 VKAPI_ATTR VkResult VKAPI_CALL lvp_EndCommandBuffer(
    VkCommandBuffer                             commandBuffer)
 {
-   VK_FROM_HANDLE(lvp_cmd_buffer, cmd_buffer, commandBuffer);
+   LVP_FROM_HANDLE(lvp_cmd_buffer, cmd_buffer, commandBuffer);
 
    return vk_command_buffer_end(&cmd_buffer->vk);
 }

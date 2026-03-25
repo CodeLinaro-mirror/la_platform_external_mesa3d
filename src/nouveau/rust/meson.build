@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: MIT
 
 nouveau_rust_args = [
-  rust_global_args,
-  rust_2024_lint_args,
   '-Aclippy::identity_op',
   '-Aclippy::len_zero',
   '-Aclippy::manual_range_contains',

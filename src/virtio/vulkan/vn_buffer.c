@@ -19,69 +19,37 @@
 
 /* buffer commands */
 
-static uint64_t
+static inline uint64_t
 vn_buffer_get_cache_index(const VkBufferCreateInfo *create_info,
                           struct vn_buffer_reqs_cache *cache)
 {
-   /* No need to cache for size exceeding the limit. */
-   if (create_info->size > cache->max_buffer_size)
-      return 0;
-
-   /* Only 7 bits are taken for VkBufferCreateFlagBits as of spec 1.4.339. We
-    * preserve 12 bits for the create flags.
+   /* For simplicity, cache only when below conditions are met:
+    * - pNext is NULL
+    * - VK_SHARING_MODE_EXCLUSIVE or VK_SHARING_MODE_CONCURRENT across all
+    *
+    * Combine sharing mode, flags and usage bits to form a unique index.
+    *
+    * Btw, we assume VkBufferCreateFlagBits won't exhaust all 32bits, at least
+    * no earlier than VkBufferUsageFlagBits.
+    *
+    * TODO: extend cache to cover VkBufferUsageFlags2CreateInfo (introduced in
+    * VK_KHR_maintenance5 and promoted to 1.4).
     */
-   if (create_info->flags & 0xFFFFF000)
-      return 0;
+   assert(!(create_info->flags & 0x80000000));
 
-   /* VK_SHARING_MODE_EXCLUSIVE or VK_SHARING_MODE_CONCURRENT across all */
    const bool is_exclusive =
       create_info->sharingMode == VK_SHARING_MODE_EXCLUSIVE;
    const bool is_concurrent =
       create_info->sharingMode == VK_SHARING_MODE_CONCURRENT &&
       create_info->queueFamilyIndexCount == cache->queue_family_count;
-   if (!is_exclusive && !is_concurrent)
-      return 0;
-
-   /* Per spec:
-    *
-    * VkBufferCreateInfo:
-    * If the pNext chain includes a VkBufferUsageFlags2CreateInfo structure,
-    * VkBufferUsageFlags2CreateInfo::usage from that structure is used instead
-    * of usage from this structure.
-    *
-    * VUID-VkBufferCreateInfo-None-09500
-    * If the pNext chain does not include a VkBufferUsageFlags2CreateInfo
-    * structure, usage must not be 0
-    *
-    * VUID-VkBufferUsageFlags2CreateInfo-usage-requiredbitmask
-    * usage must not be 0
-    */
-   uint64_t usage = (uint64_t)create_info->usage;
-   vk_foreach_struct_const(pnext, create_info->pNext) {
-      switch (pnext->sType) {
-      case VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO: {
-         const VkBufferUsageFlags2CreateInfo *usage2 = (void *)pnext;
-         usage = (uint64_t)usage2->usage;
-         break;
-      }
-      default:
-         /* Other pNext structs are not cacheable. */
-         return 0;
-      }
+   if (create_info->size <= cache->max_buffer_size &&
+       create_info->pNext == NULL && (is_exclusive || is_concurrent)) {
+      return (uint64_t)is_concurrent << 63 |
+             (uint64_t)create_info->flags << 32 | create_info->usage;
    }
 
-   /* Only 34 bits are taken for VkBufferUsageFlagBits2 as of spec 1.4.339. We
-    * preserve 51 bits for the usage flags.
-    */
-   if (usage & 0xFFF8000000000000ULL)
-      return 0;
-
-   /* Combine sharing mode, flags and usage bits to form a unique index:
-    *
-    * | 63: concurrent | 51 ~ 62: create flags | 0 ~ 50: usage |
-    */
-   return (uint64_t)is_concurrent << 63 | (uint64_t)create_info->flags << 51 |
-          usage;
+   /* index being zero suggests uncachable since usage must not be zero */
+   return 0;
 }
 
 static inline uint64_t
@@ -374,7 +342,7 @@ vn_buffer_fix_create_info(
    return &local_info->create;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateBuffer(VkDevice device,
                 const VkBufferCreateInfo *pCreateInfo,
                 const VkAllocationCallbacks *pAllocator,
@@ -406,7 +374,7 @@ vn_CreateBuffer(VkDevice device,
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyBuffer(VkDevice device,
                  VkBuffer buffer,
                  const VkAllocationCallbacks *pAllocator)
@@ -425,7 +393,7 @@ vn_DestroyBuffer(VkDevice device,
    vk_free(alloc, buf);
 }
 
-VKAPI_ATTR VkDeviceAddress VKAPI_CALL
+VkDeviceAddress
 vn_GetBufferDeviceAddress(VkDevice device,
                           const VkBufferDeviceAddressInfo *pInfo)
 {
@@ -434,7 +402,7 @@ vn_GetBufferDeviceAddress(VkDevice device,
    return vn_call_vkGetBufferDeviceAddress(dev->primary_ring, device, pInfo);
 }
 
-VKAPI_ATTR uint64_t VKAPI_CALL
+uint64_t
 vn_GetBufferOpaqueCaptureAddress(VkDevice device,
                                  const VkBufferDeviceAddressInfo *pInfo)
 {
@@ -444,7 +412,7 @@ vn_GetBufferOpaqueCaptureAddress(VkDevice device,
                                                   pInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_GetBufferMemoryRequirements2(VkDevice device,
                                 const VkBufferMemoryRequirementsInfo2 *pInfo,
                                 VkMemoryRequirements2 *pMemoryRequirements)
@@ -455,7 +423,7 @@ vn_GetBufferMemoryRequirements2(VkDevice device,
                                       pMemoryRequirements);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_BindBufferMemory2(VkDevice device,
                      uint32_t bindInfoCount,
                      const VkBindBufferMemoryInfo *pBindInfos)
@@ -476,7 +444,7 @@ vn_BindBufferMemory2(VkDevice device,
 
 /* buffer view commands */
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateBufferView(VkDevice device,
                     const VkBufferViewCreateInfo *pCreateInfo,
                     const VkAllocationCallbacks *pAllocator,
@@ -503,7 +471,7 @@ vn_CreateBufferView(VkDevice device,
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyBufferView(VkDevice device,
                      VkBufferView bufferView,
                      const VkAllocationCallbacks *pAllocator)
@@ -522,7 +490,7 @@ vn_DestroyBufferView(VkDevice device,
    vk_free(alloc, view);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_GetDeviceBufferMemoryRequirements(
    VkDevice device,
    const VkDeviceBufferMemoryRequirements *pInfo,

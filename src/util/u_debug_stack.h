@@ -29,7 +29,6 @@
 #define U_DEBUG_STACK_H_
 
 #include <stdio.h>
-#include <stdint.h>
 
 #include "util/detect_os.h"
 

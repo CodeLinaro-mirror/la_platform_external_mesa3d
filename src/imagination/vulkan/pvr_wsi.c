@@ -24,45 +24,22 @@
  * SOFTWARE.
  */
 
-#include "pvr_wsi.h"
-
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <vulkan/vulkan.h>
-#include <xf86drm.h>
 
-#include "pvr_device.h"
-#include "pvr_entrypoints.h"
-#include "pvr_instance.h"
-#include "pvr_physical_device.h"
-#include "pvr_queue.h"
-
+#include "pvr_private.h"
 #include "util/u_atomic.h"
 #include "vk_object.h"
-#include "vk_instance.h"
 #include "wsi_common.h"
 
 static PFN_vkVoidFunction pvr_wsi_proc_addr(VkPhysicalDevice physicalDevice,
                                             const char *pName)
 {
-   VK_FROM_HANDLE(pvr_physical_device, pdevice, physicalDevice);
+   PVR_FROM_HANDLE(pvr_physical_device, pdevice, physicalDevice);
 
    return vk_instance_get_proc_addr_unchecked(&pdevice->instance->vk, pName);
-}
-
-static bool pvr_can_present_on_device(VkPhysicalDevice pdevice, int fd)
-{
-   drmDevicePtr device;
-   if (drmGetDevice2(fd, 0, &device) != 0)
-      return false;
-   /* Allow on-device presentation for all devices with bus type PLATFORM.
-    * Other device types such as PCI or USB should use the PRIME blit path. */
-   bool match = device->bustype == DRM_BUS_PLATFORM;
-
-   drmFreeDevice(&device);
-
-   return match;
 }
 
 VkResult pvr_wsi_init(struct pvr_physical_device *pdevice)
@@ -80,7 +57,6 @@ VkResult pvr_wsi_init(struct pvr_physical_device *pdevice)
       return result;
 
    pdevice->wsi_device.supports_modifiers = true;
-   pdevice->wsi_device.can_present_on_device = pvr_can_present_on_device;
    pdevice->vk.wsi_device = &pdevice->wsi_device;
 
    return VK_SUCCESS;
@@ -95,11 +71,13 @@ void pvr_wsi_finish(struct pvr_physical_device *pdevice)
 VkResult pvr_QueuePresentKHR(VkQueue _queue,
                              const VkPresentInfoKHR *pPresentInfo)
 {
-   VK_FROM_HANDLE(pvr_queue, queue, _queue);
+   PVR_FROM_HANDLE(pvr_queue, queue, _queue);
    VkResult result;
 
    result = wsi_common_queue_present(&queue->device->pdevice->wsi_device,
-                                     &queue->vk,
+                                     pvr_device_to_handle(queue->device),
+                                     _queue,
+                                     0,
                                      pPresentInfo);
    if (result != VK_SUCCESS)
       return result;

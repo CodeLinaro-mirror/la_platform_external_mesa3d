@@ -59,24 +59,9 @@ static const struct {
    { max_entries, size, rehash, \
       REMAINDER_MAGIC(size), REMAINDER_MAGIC(rehash) }
 
-   /* Starting with only 2 entries at initialization causes a lot of set
-    * reallocations and rehashing while growing the set.
-    *
-    * Below are results from counting reallocations when compiling
-    * my GLSL shader-db on radeonsi+ACO.
-    *
-    * 2 entries is the baseline.
-    * Starting with  4 entries reduces reallocations to 55%.
-    * Starting with  8 entries reduces reallocations to 37%.
-    * Starting with 16 entries reduces reallocations to 28%.
-    * Starting with 32 entries reduces reallocations to 23%.
-    * Starting with 64 entries reduces reallocations to 21%.
-    */
-#if 0 /* Start with 16 entries. */
    ENTRY(2,            5,            3            ),
    ENTRY(4,            7,            5            ),
    ENTRY(8,            13,           11           ),
-#endif
    ENTRY(16,           19,           17           ),
    ENTRY(32,           43,           41           ),
    ENTRY(64,           73,           71           ),
@@ -131,13 +116,12 @@ entry_is_present(struct set_entry *entry)
    return entry->key != NULL && entry->key != deleted_key;
 }
 
-void
+bool
 _mesa_set_init(struct set *ht, void *mem_ctx,
                  uint32_t (*key_hash_function)(const void *key),
                  bool (*key_equals_function)(const void *a,
                                              const void *b))
 {
-   ht->mem_ctx = mem_ctx;
    ht->size_index = 0;
    ht->size = hash_sizes[ht->size_index].size;
    ht->rehash = hash_sizes[ht->size_index].rehash;
@@ -146,20 +130,13 @@ _mesa_set_init(struct set *ht, void *mem_ctx,
    ht->max_entries = hash_sizes[ht->size_index].max_entries;
    ht->key_hash_function = key_hash_function;
    ht->key_equals_function = key_equals_function;
-   assert(ht->size == ARRAY_SIZE(ht->_initial_storage));
-   ht->table = ht->_initial_storage;
-   memset(ht->table, 0, sizeof(ht->_initial_storage));
+   ht->table = rzalloc_array(mem_ctx, struct set_entry, ht->size);
    ht->entries = 0;
    ht->deleted_entries = 0;
+
+   return ht->table != NULL;
 }
 
-void
-_mesa_pointer_set_init(struct set *ht, void *mem_ctx)
-{
-   _mesa_set_init(ht, mem_ctx, _mesa_hash_pointer, _mesa_key_pointer_equal);
-}
-
-/* It's preferred to use _mesa_set_init instead of this to skip ralloc. */
 struct set *
 _mesa_set_create(void *mem_ctx,
                  uint32_t (*key_hash_function)(const void *key),
@@ -172,7 +149,11 @@ _mesa_set_create(void *mem_ctx,
    if (ht == NULL)
       return NULL;
 
-   _mesa_set_init(ht, ht, key_hash_function, key_equals_function);
+   if (!_mesa_set_init(ht, ht, key_hash_function, key_equals_function)) {
+      ralloc_free(ht);
+      return NULL;
+   }
+
    return ht;
 }
 
@@ -189,43 +170,13 @@ key_u32_equals(const void *a, const void *b)
    return (uint32_t)(uintptr_t)a == (uint32_t)(uintptr_t)b;
 }
 
-void
-_mesa_u32_set_init(struct set *ht, void *mem_ctx)
-{
-   _mesa_set_init(ht, mem_ctx, key_u32_hash, key_u32_equals);
-}
-
 /* key == 0 and key == deleted_key are not allowed */
-/* It's preferred to use _mesa_u32_set_init instead of this to skip ralloc. */
 struct set *
 _mesa_set_create_u32_keys(void *mem_ctx)
 {
    return _mesa_set_create(mem_ctx, key_u32_hash, key_u32_equals);
 }
 
-/* Copy the set from src to dst. */
-bool
-_mesa_set_copy(struct set *dst, struct set *src, void *dst_mem_ctx)
-{
-   /* Copy the structure except the initial storage. */
-   memcpy(dst, src, offsetof(struct set, _initial_storage));
-   dst->mem_ctx = dst_mem_ctx;
-
-   if (src->table != src->_initial_storage) {
-      dst->table = ralloc_array(dst_mem_ctx, struct set_entry, dst->size);
-      if (dst->table == NULL)
-         return false;
-
-      memcpy(dst->table, src->table, dst->size * sizeof(struct set_entry));
-   } else {
-      dst->table = dst->_initial_storage;
-      memcpy(dst->table, src->_initial_storage, sizeof(src->_initial_storage));
-   }
-
-   return true;
-}
-
-/* It's preferred to use _mesa_set_copy instead of this to skip ralloc. */
 struct set *
 _mesa_set_clone(struct set *set, void *dst_mem_ctx)
 {
@@ -235,33 +186,17 @@ _mesa_set_clone(struct set *set, void *dst_mem_ctx)
    if (clone == NULL)
       return NULL;
 
-   if (!_mesa_set_copy(clone, set, dst_mem_ctx)) {
+   memcpy(clone, set, sizeof(struct set));
+
+   clone->table = ralloc_array(clone, struct set_entry, clone->size);
+   if (clone->table == NULL) {
       ralloc_free(clone);
       return NULL;
    }
 
-   return clone;
-}
+   memcpy(clone->table, set->table, clone->size * sizeof(struct set_entry));
 
-/**
- * Deallocates the internal table. This is optional and doesn't need to be
- * called when:
- * - you don't need to call delete_function
- * - the initial ralloc context is non-NULL, meaning it gets freed
- *   automatically when the ralloc parent is freed.
- */
-void
-_mesa_set_fini(struct set *ht,
-               void (*delete_function)(struct set_entry *entry))
-{
-   if (delete_function) {
-      set_foreach (ht, entry) {
-         delete_function(entry);
-      }
-   }
-   if (ht->table != ht->_initial_storage)
-      ralloc_free(ht->table);
-   ht->table = NULL;
+   return clone;
 }
 
 /**
@@ -276,7 +211,12 @@ _mesa_set_destroy(struct set *ht, void (*delete_function)(struct set_entry *entr
    if (!ht)
       return;
 
-   _mesa_set_fini(ht, delete_function);
+   if (delete_function) {
+      set_foreach (ht, entry) {
+         delete_function(entry);
+      }
+   }
+   ralloc_free(ht->table);
    ralloc_free(ht);
 }
 
@@ -402,19 +342,12 @@ set_rehash(struct set *ht, unsigned new_size_index)
    if (new_size_index >= ARRAY_SIZE(hash_sizes))
       return;
 
-   table = rzalloc_array(ht->mem_ctx, struct set_entry,
+   table = rzalloc_array(ralloc_parent(ht->table), struct set_entry,
                          hash_sizes[new_size_index].size);
    if (table == NULL)
       return;
 
-   if (ht->table == ht->_initial_storage) {
-      /* Copy the whole structure including the initial storage. */
-      old_ht = *ht;
-      old_ht.table = old_ht._initial_storage;
-   } else {
-      /* Copy everything except the initial storage. */
-      memcpy(&old_ht, ht, offsetof(struct set, _initial_storage));
-   }
+   old_ht = *ht;
 
    ht->table = table;
    ht->size_index = new_size_index;
@@ -432,8 +365,7 @@ set_rehash(struct set *ht, unsigned new_size_index)
 
    ht->entries = old_ht.entries;
 
-   if (old_ht.table != old_ht._initial_storage)
-      ralloc_free(old_ht.table);
+   ralloc_free(old_ht.table);
 }
 
 void
@@ -673,7 +605,6 @@ _mesa_set_next_entry(const struct set *ht, struct set_entry *entry)
 }
 
 /**
- * It's preferred to use _mesa_pointer_set_init instead of this to skip ralloc.
  * Helper to create a set with pointer keys.
  */
 struct set *

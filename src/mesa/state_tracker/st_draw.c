@@ -55,6 +55,7 @@
 
 #include "pipe/p_context.h"
 #include "pipe/p_defines.h"
+#include "util/u_cpu_detect.h"
 #include "util/u_inlines.h"
 #include "util/format/u_format.h"
 #include "util/u_prim.h"
@@ -72,7 +73,7 @@ static_assert(GL_TRIANGLE_STRIP_ADJACENCY == MESA_PRIM_TRIANGLE_STRIP_ADJACENCY,
 static_assert(GL_PATCHES == MESA_PRIM_PATCHES, "enum mismatch");
 
 void
-st_prepare_draw(struct gl_context *ctx, const st_state_bitset state_mask)
+st_prepare_draw(struct gl_context *ctx, uint64_t state_mask)
 {
    struct st_context *st = ctx->st;
 
@@ -86,7 +87,27 @@ st_prepare_draw(struct gl_context *ctx, const st_state_bitset state_mask)
 
    /* Validate state. */
    st_validate_state(st, state_mask);
-   st_context_add_work(st);
+
+   /* Apply our thread scheduling policy for better multithreading
+    * performance.
+    */
+   if (unlikely(st->pin_thread_counter != ST_THREAD_SCHEDULER_DISABLED &&
+                /* do it occasionally */
+                ++st->pin_thread_counter % 512 == 0)) {
+      st->pin_thread_counter = 0;
+
+      int cpu = util_get_current_cpu();
+      if (cpu >= 0) {
+         struct pipe_context *pipe = st->pipe;
+         uint16_t L3_cache = util_get_cpu_caps()->cpu_to_L3[cpu];
+
+         if (L3_cache != U_CPU_INVALID_L3) {
+            pipe->set_context_param(pipe,
+                                    PIPE_CONTEXT_PARAM_UPDATE_THREAD_SCHEDULING,
+                                    cpu);
+         }
+      }
+   }
 }
 
 void
@@ -122,6 +143,11 @@ st_draw_gallium_multimode(struct gl_context *ctx,
          info->mode = mode[first];
          cso_draw_vbo(cso, info, 0, NULL, &draws[first], i - first);
          first = i;
+
+         /* We can pass the reference only once. st_buffer_object keeps
+          * the reference alive for later draws.
+          */
+         info->take_index_buffer_ownership = false;
       }
    }
 }
@@ -160,8 +186,7 @@ st_indirect_draw_vbo(struct gl_context *ctx,
       return;
 
    assert(stride);
-   ST_PIPELINE_RENDER_STATE_MASK(mask);
-   st_prepare_draw(ctx, mask);
+   st_prepare_draw(ctx, ST_PIPELINE_RENDER_STATE_MASK);
 
    memset(&indirect, 0, sizeof(indirect));
    util_draw_init_info(&info);
@@ -187,7 +212,14 @@ st_indirect_draw_vbo(struct gl_context *ctx,
       /* indices are always in a real VBO */
       assert(bufobj);
 
-      info.index.resource = bufobj->buffer;
+      if (st->pipe->draw_vbo == tc_draw_vbo &&
+          (draw_count == 1 || st->has_multi_draw_indirect)) {
+         /* Fast path for u_threaded_context to eliminate atomics. */
+         info.index.resource = _mesa_get_bufferobj_reference(ctx, bufobj);
+         info.take_index_buffer_ownership = true;
+      } else {
+         info.index.resource = bufobj->buffer;
+      }
 
       /* No index buffer storage allocated - nothing to do. */
       if (!info.index.resource)
@@ -294,11 +326,10 @@ st_draw_quad(struct st_context *st,
 {
    struct pipe_vertex_buffer vb = {0};
    struct st_util_vertex *verts;
-   struct pipe_resource *releasebuf = NULL;
 
    u_upload_alloc(st->pipe->stream_uploader, 0,
                   4 * sizeof(struct st_util_vertex), 4,
-                  &vb.buffer_offset, &vb.buffer.resource, &releasebuf, (void **) &verts);
+                  &vb.buffer_offset, &vb.buffer.resource, (void **) &verts);
    if (!vb.buffer.resource) {
       return false;
    }
@@ -349,7 +380,7 @@ st_draw_quad(struct st_context *st,
 
    u_upload_unmap(st->pipe->stream_uploader);
 
-   cso_set_vertex_buffers(st->cso_context, 1, &vb);
+   cso_set_vertex_buffers(st->cso_context, 1, true, &vb);
 
    if (num_instances > 1) {
       cso_draw_arrays_instanced(st->cso_context, MESA_PRIM_TRIANGLE_FAN, 0, 4,
@@ -357,7 +388,6 @@ st_draw_quad(struct st_context *st,
    } else {
       cso_draw_arrays(st->cso_context, MESA_PRIM_TRIANGLE_FAN, 0, 4);
    }
-   pipe_resource_release(st->pipe, releasebuf);
 
    return true;
 }
@@ -371,18 +401,15 @@ st_hw_select_draw_gallium(struct gl_context *ctx,
                           unsigned num_draws)
 {
    struct st_context *st = st_context(ctx);
-   struct pipe_resource *releasebuf = NULL;
    enum mesa_prim old_mode = info->mode;
 
-   if (st_draw_hw_select_prepare_common(ctx, &releasebuf) &&
+   if (st_draw_hw_select_prepare_common(ctx) &&
        /* Removing "const" is fine because we restore the changed mode
         * at the end. */
        st_draw_hw_select_prepare_mode(ctx, ((struct pipe_draw_info*)info))) {
       cso_draw_vbo(st->cso_context, info, drawid_offset, indirect, draws,
                    num_draws);
    }
-
-   pipe_resource_release(st->pipe, releasebuf);
 
    ((struct pipe_draw_info*)info)->mode = old_mode;
 }
@@ -395,10 +422,9 @@ st_hw_select_draw_gallium_multimode(struct gl_context *ctx,
                                     unsigned num_draws)
 {
    struct st_context *st = st_context(ctx);
-   struct pipe_resource *releasebuf = NULL;
 
-   if (!st_draw_hw_select_prepare_common(ctx, &releasebuf))
-      goto out;
+   if (!st_draw_hw_select_prepare_common(ctx))
+      return;
 
    unsigned i, first;
    struct cso_context *cso = st->cso_context;
@@ -412,11 +438,13 @@ st_hw_select_draw_gallium_multimode(struct gl_context *ctx,
             cso_draw_vbo(cso, info, 0, NULL, &draws[first], i - first);
 
          first = i;
+
+         /* We can pass the reference only once. st_buffer_object keeps
+          * the reference alive for later draws.
+          */
+         info->take_index_buffer_ownership = false;
       }
    }
-
-out:
-   pipe_resource_release(st->pipe, releasebuf);
 }
 
 void

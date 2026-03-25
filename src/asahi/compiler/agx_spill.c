@@ -8,7 +8,6 @@
 #include "util/bitset.h"
 #include "util/hash_table.h"
 #include "util/ralloc.h"
-#include "util/sparse_bitset.h"
 #include "util/u_dynarray.h"
 #include "util/u_qsort.h"
 #include "agx_builder.h"
@@ -197,9 +196,6 @@ struct spill_ctx {
 
    /* Base memory index reserved for spilled indices */
    unsigned spill_base;
-
-   /* If true, we cannot use scratch and must only rematerialize. */
-   bool remat_only;
 };
 
 static inline struct spill_block *
@@ -308,8 +304,6 @@ static void
 insert_spill(agx_builder *b, struct spill_ctx *ctx, unsigned node)
 {
    if (!ctx->remat[node]) {
-      assert(!ctx->remat_only && "must have remat something");
-
       agx_index idx = reconstruct_index(ctx, node);
       agx_mov_to(b, agx_index_as_mem(idx, ctx->spill_base), idx);
 
@@ -635,7 +629,7 @@ calculate_local_next_use(struct spill_ctx *ctx, struct util_dynarray *out)
    struct spill_block *sb = spill_block(ctx, ctx->block);
    unsigned ip = sb->cycles;
 
-   *out = UTIL_DYNARRAY_INIT;
+   util_dynarray_init(out, NULL);
 
    struct next_uses nu;
    init_next_uses(&nu, NULL);
@@ -651,14 +645,14 @@ calculate_local_next_use(struct spill_ctx *ctx, struct util_dynarray *out)
          agx_foreach_ssa_src(I, s) {
             unsigned v = I->src[s].value;
 
-            util_dynarray_append(out, search_next_uses(&nu, v));
+            util_dynarray_append(out, dist_t, search_next_uses(&nu, v));
             set_next_use(&nu, v, ip);
          }
 
          agx_foreach_ssa_dest_rev(I, d) {
             unsigned v = I->dest[d].value;
 
-            util_dynarray_append(out, search_next_uses(&nu, v));
+            util_dynarray_append(out, dist_t, search_next_uses(&nu, v));
          }
       }
    }
@@ -850,7 +844,7 @@ compute_w_entry_loop_header(struct spill_ctx *ctx)
    agx_block *block = ctx->block;
    struct spill_block *sb = spill_block(ctx, block);
 
-   unsigned nP = u_sparse_bitset_count(&block->live_in);
+   unsigned nP = __bitset_count(block->live_in, BITSET_WORDS(ctx->n));
    struct candidate *candidates = calloc(nP, sizeof(struct candidate));
    unsigned j = 0;
 
@@ -997,12 +991,12 @@ compute_s_entry(struct spill_ctx *ctx)
       for (unsigned i = 0; i < sp->nS_exit; ++i) {
          v = sp->S_exit[i];
 
-         if (u_sparse_bitset_test(&ctx->block->live_in, v))
+         if (BITSET_TEST(ctx->block->live_in, v))
             BITSET_SET(ctx->S, v);
       }
    }
 
-   U_SPARSE_BITSET_FOREACH_SET(&ctx->block->live_in, v) {
+   BITSET_FOREACH_SET(v, ctx->block->live_in, ctx->n) {
       if (!BITSET_TEST(ctx->W, v))
          BITSET_SET(ctx->S, v);
    }
@@ -1143,32 +1137,34 @@ validate_next_use_info(UNUSED agx_context *ctx,
                        UNUSED struct spill_block *blocks)
 {
 #ifndef NDEBUG
+   int i;
+
    agx_foreach_block(ctx, blk) {
       struct spill_block *sb = &blocks[blk->index];
 
       /* Invariant: next-use distance is finite iff the node is live */
-      U_SPARSE_BITSET_FOREACH_SET(&blk->live_in, i)
+      BITSET_FOREACH_SET(i, blk->live_in, ctx->alloc)
          assert(search_next_uses(&sb->next_use_in, i) < DIST_INFINITY);
 
-      U_SPARSE_BITSET_FOREACH_SET(&blk->live_out, i)
+      BITSET_FOREACH_SET(i, blk->live_out, ctx->alloc)
          assert(search_next_uses(&sb->next_use_out, i) < DIST_INFINITY);
 
       foreach_next_use(&sb->next_use_in, i, _)
-         assert(u_sparse_bitset_test(&blk->live_in, i));
+         assert(BITSET_TEST(blk->live_in, i));
 
       foreach_next_use(&sb->next_use_out, i, _)
-         assert(u_sparse_bitset_test(&blk->live_out, i));
+         assert(BITSET_TEST(blk->live_out, i));
    }
 #endif
 }
 
 void
-agx_spill(agx_context *ctx, unsigned k, bool remat_only)
+agx_spill(agx_context *ctx, unsigned k)
 {
    void *memctx = ralloc_context(NULL);
 
    /* We need extra registers for memory-memory swaps */
-   k -= remat_only ? 2 : 8;
+   k -= 8;
 
    uint8_t *channels = rzalloc_array(memctx, uint8_t, ctx->alloc);
    dist_t *next_uses = rzalloc_array(memctx, dist_t, ctx->alloc);
@@ -1204,8 +1200,8 @@ agx_spill(agx_context *ctx, unsigned k, bool remat_only)
    BITSET_WORD *S = ralloc_array(memctx, BITSET_WORD, BITSET_WORDS(n));
 
    agx_foreach_block(ctx, block) {
-      memset(W, 0, BITSET_BYTES(n));
-      memset(S, 0, BITSET_BYTES(n));
+      memset(W, 0, BITSET_WORDS(n) * sizeof(BITSET_WORD));
+      memset(S, 0, BITSET_WORDS(n) * sizeof(BITSET_WORD));
 
       struct spill_ctx sctx = {
          .memctx = memctx,
@@ -1221,7 +1217,6 @@ agx_spill(agx_context *ctx, unsigned k, bool remat_only)
          .W = W,
          .S = S,
          .spill_base = n,
-         .remat_only = remat_only,
       };
 
       compute_w_entry(&sctx);

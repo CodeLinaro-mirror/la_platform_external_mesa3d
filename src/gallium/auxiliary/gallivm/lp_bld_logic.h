@@ -40,13 +40,12 @@
 extern "C" {
 #endif
 
-#include <llvm-c/Core.h>
+#include "gallivm/lp_bld.h"
 
 #include "pipe/p_defines.h" /* For PIPE_FUNC_xxx */
 
 
 struct lp_type;
-struct gallivm_state;
 struct lp_build_context;
 
 
@@ -97,12 +96,6 @@ LLVMValueRef
 lp_build_any_true_range(struct lp_build_context *bld,
                         unsigned real_length,
                         LLVMValueRef val);
-
-LLVMValueRef
-lp_build_any_true_range_n(struct lp_build_context *bld,
-                          unsigned real_length,
-                          unsigned num_channels,
-                          LLVMValueRef val);
 
 #ifdef __cplusplus
 }

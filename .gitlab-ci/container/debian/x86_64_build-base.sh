@@ -3,7 +3,7 @@
 
 # When changing this file, you need to bump the following
 # .gitlab-ci/image-tags.yml tags:
-# DEBIAN_BUILD_BASE_TAG
+# DEBIAN_BUILD_TAG
 
 set -e
 
@@ -55,6 +55,7 @@ DEPS=(
     libpciaccess-dev
     libunwind-dev
     libva-dev
+    libvdpau-dev
     libvulkan-dev
     libx11-dev
     libx11-xcb-dev
@@ -103,7 +104,7 @@ pip3 install --break-system-packages "ci-fairy[s3] @ git+https://gitlab.freedesk
 
 . .gitlab-ci/container/install-meson.sh
 
-. .gitlab-ci/container/build-rust.sh build
+. .gitlab-ci/container/build-rust.sh
 
 ############### Uninstall ephemeral packages
 

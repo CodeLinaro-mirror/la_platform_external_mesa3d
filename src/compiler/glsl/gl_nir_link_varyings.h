@@ -38,6 +38,7 @@
 #include "nir_defines.h"
 
 struct gl_shader_program;
+struct gl_shader_stage;
 struct gl_shader;
 struct gl_linked_shader;
 struct gl_type;
@@ -229,8 +230,8 @@ gl_assign_attribute_or_color_locations(const struct gl_constants *consts,
 bool
 gl_nir_validate_first_and_last_interface_explicit_locations(const struct gl_constants *consts,
                                                             struct gl_shader_program *prog,
-                                                            mesa_shader_stage first_stage,
-                                                            mesa_shader_stage last_stage);
+                                                            gl_shader_stage first_stage,
+                                                            gl_shader_stage last_stage);
 
 void
 gl_nir_cross_validate_outputs_to_inputs(const struct gl_constants *consts,

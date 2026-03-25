@@ -15,6 +15,7 @@ struct fd6_compute_state {
    void *hwcso;    /* ir3_shader_state */
    struct ir3_shader_variant *v;
    struct fd_ringbuffer *stateobj;
+   uint32_t user_consts_cmdstream_size;
 };
 
 template <chip CHIP>

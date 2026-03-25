@@ -1,5 +1,6 @@
 /*
  * Copyright © 2025 Valve Corporation
+ *
  * SPDX-License-Identifier: MIT
  */
 #include "helpers.h"

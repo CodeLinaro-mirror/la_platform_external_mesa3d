@@ -20,14 +20,7 @@ struct panvk_utrace_flush_data {
    struct vk_sync *sync;
    uint64_t wait_value;
 
-   struct panvk_utrace_buf *clone_cs_root;
-   bool free_self;
-};
-
-struct panvk_utrace_buf {
-   uint64_t dev;
-   uint64_t size;
-   void *host;
+   struct panvk_pool clone_pool;
 };
 
 void *panvk_utrace_create_buffer(struct u_trace_context *utctx,
@@ -52,17 +45,10 @@ struct panvk_cmd_buffer;
 
 struct panvk_utrace_cs_info {
    struct panvk_cmd_buffer *cmdbuf;
-   struct cs_async_op *ts_async_op;
-   bool capture_data_wait_for_ts;
+   uint32_t ts_wait_mask;
 };
 
-/* Special value indicating that an indirect capture should be of registers
- * rather than an address. */
-#define PANVK_UTRACE_CAPTURE_REGISTERS 0x1
-
-VkResult
-panvk_per_arch(utrace_context_init)(struct panvk_device *dev);
-
+void panvk_per_arch(utrace_context_init)(struct panvk_device *dev);
 void panvk_per_arch(utrace_context_fini)(struct panvk_device *dev);
 
 void panvk_per_arch(utrace_copy_buffer)(struct u_trace_context *utctx,
@@ -71,19 +57,18 @@ void panvk_per_arch(utrace_copy_buffer)(struct u_trace_context *utctx,
                                         uint64_t to_offset, uint64_t size_B);
 
 struct cs_builder;
-struct cs_buffer;
 
+void panvk_per_arch(utrace_clone_init_pool)(struct panvk_pool *pool,
+                                            struct panvk_device *dev);
 void panvk_per_arch(utrace_clone_init_builder)(struct cs_builder *b,
-                                               struct panvk_device *dev,
-                                               const struct cs_buffer *cs_root);
+                                               struct panvk_pool *pool);
 void panvk_per_arch(utrace_clone_finish_builder)(struct cs_builder *b);
 
 #else /* PAN_ARCH >= 10 */
 
-static inline VkResult
+static inline void
 panvk_per_arch(utrace_context_init)(struct panvk_device *dev)
 {
-   return VK_SUCCESS;
 }
 
 static inline void

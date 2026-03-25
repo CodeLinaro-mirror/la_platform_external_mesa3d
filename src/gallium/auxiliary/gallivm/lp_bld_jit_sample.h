@@ -28,8 +28,6 @@
 #ifndef LP_JIT_SAMPLE_H
 #define LP_JIT_SAMPLE_H
 
-#include "gallivm/lp_bld_sample.h"
-
 struct lp_sampler_static_state
 {
    /*

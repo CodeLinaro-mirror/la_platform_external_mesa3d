@@ -9,8 +9,7 @@
 #include "ir3_shader.h"
 
 static bool
-is_safe_conv(struct ir3_instruction *instr, type_t src_type, opc_t *src_opc,
-             struct ir3_instruction *src_instr)
+is_safe_conv(struct ir3_instruction *instr, type_t src_type, opc_t *src_opc)
 {
    if (instr->opc != OPC_MOV)
       return false;
@@ -67,12 +66,6 @@ is_safe_conv(struct ir3_instruction *instr, type_t src_type, opc_t *src_opc,
    if (type_size(instr->cat1.dst_type) < type_size(instr->cat1.src_type))
       return true;
 
-   /* Don't swap opcodes when the result is saturated as signed and unsigned
-    * saturation give different results.
-    */
-   if (src_instr->flags & IR3_INSTR_SAT)
-      return false;
-
    /* Try swapping the opcode: */
    bool can_swap = true;
    *src_opc = ir3_try_swap_signedness(*src_opc, &can_swap);
@@ -86,7 +79,7 @@ all_uses_safe_conv(struct ir3_instruction *conv_src, type_t src_type)
    bool first = true;
    foreach_ssa_use (use, conv_src) {
       opc_t new_opc = opc;
-      if (!is_safe_conv(use, src_type, &new_opc, conv_src))
+      if (!is_safe_conv(use, src_type, &new_opc))
          return false;
       /* Check if multiple uses have conflicting requirements on the opcode.
        */
@@ -199,7 +192,7 @@ try_conversion_folding(struct ir3_instruction *conv,
       /* Don't fold in a conversion to a half register on gens where that is
        * broken.
        */
-      if (compiler->info->props.mov_half_shared_quirk &&
+      if (compiler->mov_half_shared_quirk &&
           (conv->dsts[0]->flags & IR3_REG_HALF)) {
          return false;
       }

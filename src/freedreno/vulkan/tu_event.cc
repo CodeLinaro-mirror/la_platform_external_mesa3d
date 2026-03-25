@@ -9,8 +9,6 @@
 
 #include "tu_event.h"
 
-#include "vk_synchronization.h"
-
 #include "tu_cmd_buffer.h"
 #include "tu_rmv.h"
 
@@ -111,8 +109,14 @@ tu_CmdSetEvent2(VkCommandBuffer commandBuffer,
 {
    VK_FROM_HANDLE(tu_cmd_buffer, cmd, commandBuffer);
    VK_FROM_HANDLE(tu_event, event, _event);
-   VkPipelineStageFlags2 src_stage_mask =
-      vk_collect_dependency_info_src_stages(pDependencyInfo);
+   VkPipelineStageFlags2 src_stage_mask = 0;
+
+   for (uint32_t i = 0; i < pDependencyInfo->memoryBarrierCount; i++)
+      src_stage_mask |= pDependencyInfo->pMemoryBarriers[i].srcStageMask;
+   for (uint32_t i = 0; i < pDependencyInfo->bufferMemoryBarrierCount; i++)
+      src_stage_mask |= pDependencyInfo->pBufferMemoryBarriers[i].srcStageMask;
+   for (uint32_t i = 0; i < pDependencyInfo->imageMemoryBarrierCount; i++)
+      src_stage_mask |= pDependencyInfo->pImageMemoryBarriers[i].srcStageMask;
 
    tu_write_event<CHIP>(cmd, event, src_stage_mask, 1);
 }

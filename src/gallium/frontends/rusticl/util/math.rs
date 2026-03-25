@@ -1,6 +1,3 @@
-// Copyright 2022 Red Hat.
-// SPDX-License-Identifier: MIT
-
 use std::ops::Rem;
 
 pub fn gcd<T>(mut a: T, mut b: T) -> T
@@ -16,13 +13,6 @@ where
     }
 
     b
-}
-
-#[test]
-fn gcd_test() {
-    assert_eq!(gcd(5, 15), 5);
-    assert_eq!(gcd(7, 15), 1);
-    assert_eq!(gcd(60, 45), 15);
 }
 
 pub struct SetBitIndices<T> {

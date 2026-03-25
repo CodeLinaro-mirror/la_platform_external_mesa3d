@@ -24,7 +24,6 @@
 #include "v3d_context.h"
 #include "broadcom/common/v3d_tfu.h"
 #include "util/perf/cpu_trace.h"
-#include "v3dx_format_table.h"
 
 bool
 v3dX(tfu)(struct pipe_context *pctx,
@@ -56,11 +55,9 @@ v3dX(tfu)(struct pipe_context *pctx,
         if (pdst->target != PIPE_TEXTURE_2D || psrc->target != PIPE_TEXTURE_2D)
                 return false;
 
-#if V3D_VERSION == 42
         /* Can't write to raster. */
         if (dst_base_slice->tiling == V3D_TILING_RASTER)
                 return false;
-#endif
 
         /* When using TFU for blit, we are doing exact copies (both input and
          * output format must be the same, no scaling, etc), so there is no
@@ -80,12 +77,13 @@ v3dX(tfu)(struct pipe_context *pctx,
                 };
         }
 
-        enum V3DX(Texture_Data_Formats) tex_format = v3d_get_tex_format(&screen->devinfo, pformat);
+        uint32_t tex_format = v3d_get_tex_format(&screen->devinfo, pformat);
 
         if (!v3dX(tfu_supports_tex_format)(tex_format, for_mipmap)) {
                 assert(for_mipmap);
                 return false;
         }
+
         MESA_TRACE_FUNC();
 
         v3d_flush_jobs_writing_resource(v3d, psrc, V3D_FLUSH_DEFAULT, false);
@@ -172,13 +170,9 @@ v3dX(tfu)(struct pipe_context *pctx,
         if (last_level != base_level)
                 tfu.v71.ioc |= V3D71_TFU_IOC_DIMTW;
 
-        if (dst_base_slice->tiling == V3D_TILING_RASTER) {
-                tfu.v71.ioc |= V3D71_TFU_IOC_FORMAT_RASTER << V3D71_TFU_IOC_FORMAT_SHIFT;
-        } else {
-                tfu.v71.ioc |= ((V3D71_TFU_IOC_FORMAT_LINEARTILE +
-                                 (dst_base_slice->tiling - V3D_TILING_LINEARTILE)) <<
-                                V3D71_TFU_IOC_FORMAT_SHIFT);
-        }
+        tfu.v71.ioc |= ((V3D71_TFU_IOC_FORMAT_LINEARTILE +
+                         (dst_base_slice->tiling - V3D_TILING_LINEARTILE)) <<
+                        V3D71_TFU_IOC_FORMAT_SHIFT);
 
         switch (dst_base_slice->tiling) {
         case V3D_TILING_UIF_NO_XOR:
@@ -188,7 +182,7 @@ v3dX(tfu)(struct pipe_context *pctx,
                         V3D71_TFU_IOC_STRIDE_SHIFT;
                 break;
         case V3D_TILING_RASTER:
-                tfu.v71.ioc |= (dst_base_slice->stride / dst->cpp) <<
+                tfu.v71.ioc |= (dst_base_slice->padded_height / dst->cpp) <<
                         V3D71_TFU_IOC_STRIDE_SHIFT;
                 break;
         default:

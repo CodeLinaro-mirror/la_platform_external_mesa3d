@@ -35,9 +35,7 @@ DEPS=(
     cmake
     curl
     "clang-${LLVM_VERSION}"
-    dpkg-dev
     fastboot
-    file
     flatbuffers-compiler
     flex
     g++
@@ -115,7 +113,7 @@ arch=armhf
 
 . .gitlab-ci/container/build-libclc.sh
 
-. .gitlab-ci/container/build-rust.sh build
+. .gitlab-ci/container/build-rust.sh
 
 . .gitlab-ci/container/build-bindgen.sh
 

@@ -180,12 +180,24 @@ VkResult anv_AcquirePerformanceConfigurationINTEL(
       return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
 
    if (!INTEL_DEBUG(DEBUG_NO_OACONFIG)) {
-      config->config_id = intel_perf_get_configuration_id(device->physical->perf,
-                                                          INTEL_PERF_QUERY_GUID_MDAPI);
-      if (config->config_id == 0) {
+      config->register_config =
+         intel_perf_load_configuration(device->physical->perf, device->fd,
+                                     INTEL_PERF_QUERY_GUID_MDAPI);
+      if (!config->register_config) {
          vk_object_free(&device->vk, NULL, config);
          return VK_INCOMPLETE;
       }
+
+      uint64_t ret =
+         intel_perf_store_configuration(device->physical->perf, device->fd,
+                                      config->register_config, NULL /* guid */);
+      if (ret == 0) {
+         ralloc_free(config->register_config);
+         vk_object_free(&device->vk, NULL, config);
+         return VK_INCOMPLETE;
+      }
+
+      config->config_id = ret;
    }
 
    *pConfiguration = anv_performance_configuration_intel_to_handle(config);
@@ -202,6 +214,8 @@ VkResult anv_ReleasePerformanceConfigurationINTEL(
 
    if (!INTEL_DEBUG(DEBUG_NO_OACONFIG))
       intel_perf_remove_configuration(device->physical->perf, device->fd, config->config_id);
+
+   ralloc_free(config->register_config);
 
    vk_object_free(&device->vk, NULL, config);
 
@@ -311,7 +325,7 @@ VkResult anv_EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(
          counter->scope = VK_PERFORMANCE_COUNTER_SCOPE_COMMAND_KHR;
          counter->storage = intel_perf_counter_data_type_to_vk_storage[intel_counter->data_type];
 
-         unsigned char sha1_result[SHA1_DIGEST_LENGTH];
+         unsigned char sha1_result[20];
          _mesa_sha1_compute(intel_counter->symbol_name,
                             strlen(intel_counter->symbol_name),
                             sha1_result);

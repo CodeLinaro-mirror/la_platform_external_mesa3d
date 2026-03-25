@@ -155,12 +155,12 @@ dd_num_active_viewports(struct dd_draw_state *dstate)
    struct tgsi_shader_info info;
    const struct tgsi_token *tokens;
 
-   if (dstate->shaders[MESA_SHADER_GEOMETRY])
-      tokens = dstate->shaders[MESA_SHADER_GEOMETRY]->state.shader.tokens;
-   else if (dstate->shaders[MESA_SHADER_TESS_EVAL])
-      tokens = dstate->shaders[MESA_SHADER_TESS_EVAL]->state.shader.tokens;
-   else if (dstate->shaders[MESA_SHADER_VERTEX])
-      tokens = dstate->shaders[MESA_SHADER_VERTEX]->state.shader.tokens;
+   if (dstate->shaders[PIPE_SHADER_GEOMETRY])
+      tokens = dstate->shaders[PIPE_SHADER_GEOMETRY]->state.shader.tokens;
+   else if (dstate->shaders[PIPE_SHADER_TESS_EVAL])
+      tokens = dstate->shaders[PIPE_SHADER_TESS_EVAL]->state.shader.tokens;
+   else if (dstate->shaders[PIPE_SHADER_VERTEX])
+      tokens = dstate->shaders[PIPE_SHADER_VERTEX]->state.shader.tokens;
    else
       return 1;
 
@@ -259,23 +259,21 @@ dd_dump_render_condition(struct dd_draw_state *dstate, FILE *f)
 }
 
 static void
-dd_dump_shader(struct dd_draw_state *dstate, mesa_shader_stage sh, FILE *f)
+dd_dump_shader(struct dd_draw_state *dstate, enum pipe_shader_type sh, FILE *f)
 {
    int i;
-   const char *shader_str[MESA_SHADER_MESH_STAGES];
+   const char *shader_str[PIPE_SHADER_TYPES];
 
-   shader_str[MESA_SHADER_VERTEX] = "VERTEX";
-   shader_str[MESA_SHADER_TESS_CTRL] = "TESS_CTRL";
-   shader_str[MESA_SHADER_TESS_EVAL] = "TESS_EVAL";
-   shader_str[MESA_SHADER_GEOMETRY] = "GEOMETRY";
-   shader_str[MESA_SHADER_FRAGMENT] = "FRAGMENT";
-   shader_str[MESA_SHADER_COMPUTE] = "COMPUTE";
-   shader_str[MESA_SHADER_TASK] = "TASK";
-   shader_str[MESA_SHADER_MESH] = "MESH";
+   shader_str[PIPE_SHADER_VERTEX] = "VERTEX";
+   shader_str[PIPE_SHADER_TESS_CTRL] = "TESS_CTRL";
+   shader_str[PIPE_SHADER_TESS_EVAL] = "TESS_EVAL";
+   shader_str[PIPE_SHADER_GEOMETRY] = "GEOMETRY";
+   shader_str[PIPE_SHADER_FRAGMENT] = "FRAGMENT";
+   shader_str[PIPE_SHADER_COMPUTE] = "COMPUTE";
 
-   if (sh == MESA_SHADER_TESS_CTRL &&
-       !dstate->shaders[MESA_SHADER_TESS_CTRL] &&
-       dstate->shaders[MESA_SHADER_TESS_EVAL])
+   if (sh == PIPE_SHADER_TESS_CTRL &&
+       !dstate->shaders[PIPE_SHADER_TESS_CTRL] &&
+       dstate->shaders[PIPE_SHADER_TESS_EVAL])
       fprintf(f, "tess_state: {default_outer_level = {%f, %f, %f, %f}, "
               "default_inner_level = {%f, %f}}\n",
               dstate->tess_default_levels[0],
@@ -285,7 +283,7 @@ dd_dump_shader(struct dd_draw_state *dstate, mesa_shader_stage sh, FILE *f)
               dstate->tess_default_levels[4],
               dstate->tess_default_levels[5]);
 
-   if (sh == MESA_SHADER_FRAGMENT)
+   if (sh == PIPE_SHADER_FRAGMENT)
       if (dstate->rs) {
          unsigned num_viewports = dd_num_active_viewports(dstate);
 
@@ -405,7 +403,10 @@ dd_dump_draw_vbo(struct dd_draw_state *dstate, struct pipe_draw_info *info,
       }
 
    fprintf(f, "\n");
-   for (sh = 0; sh < MESA_SHADER_COMPUTE; sh++) {
+   for (sh = 0; sh < PIPE_SHADER_TYPES; sh++) {
+      if (sh == PIPE_SHADER_COMPUTE)
+         continue;
+
       dd_dump_shader(dstate, sh, f);
    }
 
@@ -445,7 +446,7 @@ dd_dump_launch_grid(struct dd_draw_state *dstate, struct pipe_grid_info *info, F
    DUMP(grid_info, info);
    fprintf(f, "\n");
 
-   dd_dump_shader(dstate, MESA_SHADER_COMPUTE, f);
+   dd_dump_shader(dstate, PIPE_SHADER_COMPUTE, f);
    fprintf(f, "\n");
 }
 
@@ -648,20 +649,6 @@ dd_dump_driver_state(struct dd_context *dctx, FILE *f, unsigned flags)
 }
 
 static void
-dd_dump_draw_mesh_tasks(struct dd_draw_state *dstate, struct pipe_grid_info *info,
-                        FILE *f)
-{
-   fprintf(f, "%s:\n", __func__+8);
-   DUMP(grid_info, info);
-   fprintf(f, "\n");
-
-   dd_dump_shader(dstate, MESA_SHADER_TASK, f);
-   dd_dump_shader(dstate, MESA_SHADER_MESH, f);
-   dd_dump_shader(dstate, MESA_SHADER_FRAGMENT, f);
-   fprintf(f, "\n");
-}
-
-static void
 dd_dump_call(FILE *f, struct dd_draw_state *state, struct dd_call *call)
 {
    switch (call->type) {
@@ -726,9 +713,6 @@ dd_dump_call(FILE *f, struct dd_draw_state *state, struct dd_call *call)
       break;
    case CALL_TEXTURE_SUBDATA:
       dd_dump_texture_subdata(&call->info.texture_subdata, f);
-      break;
-   case CALL_DRAW_MESH_TASKS:
-      dd_dump_draw_mesh_tasks(state, &call->info.launch_grid, f);
       break;
    }
 }
@@ -811,10 +795,6 @@ dd_unreference_copy_of_call(struct dd_call *dst)
    case CALL_TEXTURE_SUBDATA:
       pipe_resource_reference(&dst->info.texture_subdata.resource, NULL);
       break;
-   case CALL_DRAW_MESH_TASKS:
-      pipe_resource_reference(&dst->info.launch_grid.indirect, NULL);
-      pipe_resource_reference(&dst->info.launch_grid.indirect_draw_count, NULL);
-      break;
    }
 }
 
@@ -845,7 +825,7 @@ dd_init_copy_of_draw_state(struct dd_draw_state_copy *state)
 
    state->base.render_cond.query = &state->render_cond;
 
-   for (i = 0; i < MESA_SHADER_MESH_STAGES; i++) {
+   for (i = 0; i < PIPE_SHADER_TYPES; i++) {
       state->base.shaders[i] = &state->shaders[i];
       for (j = 0; j < PIPE_MAX_SAMPLERS; j++)
          state->base.sampler_states[i][j] = &state->sampler_states[i][j];
@@ -868,7 +848,7 @@ dd_unreference_copy_of_draw_state(struct dd_draw_state_copy *state)
    for (i = 0; i < ARRAY_SIZE(dst->so_targets); i++)
       pipe_so_target_reference(&dst->so_targets[i], NULL);
 
-   for (i = 0; i < MESA_SHADER_MESH_STAGES; i++) {
+   for (i = 0; i < PIPE_SHADER_TYPES; i++) {
       if (dst->shaders[i])
          tgsi_free_tokens(dst->shaders[i]->state.shader.tokens);
 
@@ -908,7 +888,7 @@ dd_copy_draw_state(struct dd_draw_state *dst, struct dd_draw_state *src)
       pipe_so_target_reference(&dst->so_targets[i], src->so_targets[i]);
    memcpy(dst->so_offsets, src->so_offsets, sizeof(src->so_offsets));
 
-   for (i = 0; i < MESA_SHADER_MESH_STAGES; i++) {
+   for (i = 0; i < PIPE_SHADER_TYPES; i++) {
       if (!src->shaders[i]) {
          dst->shaders[i] = NULL;
          continue;
@@ -1601,9 +1581,7 @@ dd_context_flush_resource(struct pipe_context *_pipe,
 }
 
 static void
-dd_context_clear(struct pipe_context *_pipe, unsigned buffers,
-                 uint32_t color_clear_mask, uint8_t stencil_clear_mask,
-                 const struct pipe_scissor_state *scissor_state,
+dd_context_clear(struct pipe_context *_pipe, unsigned buffers, const struct pipe_scissor_state *scissor_state,
                  const union pipe_color_union *color, double depth,
                  unsigned stencil)
 {
@@ -1613,8 +1591,6 @@ dd_context_clear(struct pipe_context *_pipe, unsigned buffers,
 
    record->call.type = CALL_CLEAR;
    record->call.info.clear.buffers = buffers;
-   record->call.info.clear.color_clear_mask = color_clear_mask;
-   record->call.info.clear.stencil_clear_mask = stencil_clear_mask;
    if (scissor_state)
       record->call.info.clear.scissor_state = *scissor_state;
    record->call.info.clear.color = *color;
@@ -1622,7 +1598,7 @@ dd_context_clear(struct pipe_context *_pipe, unsigned buffers,
    record->call.info.clear.stencil = stencil;
 
    dd_before_draw(dctx, record);
-   pipe->clear(pipe, buffers, color_clear_mask, stencil_clear_mask, scissor_state, color, depth, stencil);
+   pipe->clear(pipe, buffers, scissor_state, color, depth, stencil);
    dd_after_draw(dctx, record);
 }
 
@@ -1914,27 +1890,6 @@ dd_context_texture_subdata(struct pipe_context *_pipe,
       dd_after_draw(dctx, record);
 }
 
-static void
-dd_context_draw_mesh_tasks(struct pipe_context *_pipe,
-                           const struct pipe_grid_info *info)
-{
-   struct dd_context *dctx = dd_context(_pipe);
-   struct pipe_context *pipe = dctx->pipe;
-   struct dd_draw_record *record = dd_create_record(dctx);
-
-   record->call.type = CALL_DRAW_MESH_TASKS;
-   record->call.info.launch_grid = *info;
-   record->call.info.launch_grid.indirect = NULL;
-   pipe_resource_reference(&record->call.info.launch_grid.indirect, info->indirect);
-   record->call.info.launch_grid.indirect_draw_count = NULL;
-   pipe_resource_reference(&record->call.info.launch_grid.indirect_draw_count,
-                           info->indirect_draw_count);
-
-   dd_before_draw(dctx, record);
-   pipe->draw_mesh_tasks(pipe, info);
-   dd_after_draw(dctx, record);
-}
-
 void
 dd_init_draw_functions(struct dd_context *dctx)
 {
@@ -1960,5 +1915,4 @@ dd_init_draw_functions(struct dd_context *dctx)
    CTX_INIT(buffer_subdata);
    CTX_INIT(texture_subdata);
    CTX_INIT(draw_vertex_state);
-   CTX_INIT(draw_mesh_tasks);
 }

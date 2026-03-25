@@ -38,8 +38,7 @@
 void vpe_geometric_scaling_feature_skip(
     struct vpe_priv *vpe_priv, const struct vpe_build_param *param)
 {
-    if ((param->num_streams > 0) && (param->streams != NULL) &&
-        (param->streams->flags.geometric_scaling != 0)) {
+    if (param->streams && param->streams->flags.geometric_scaling) {
         /* copy input cs to output for skiping gamut and gamma conversion */
         vpe_priv->output_ctx.surface.cs.primaries = param->streams[0].surface_info.cs.primaries;
         vpe_priv->output_ctx.surface.cs.tf = param->streams[0].surface_info.cs.tf;
@@ -53,6 +52,7 @@ void vpe_geometric_scaling_feature_skip(
         /* disable blending */
         vpe_priv->stream_ctx[0].stream.blend_info.blending = false;
     }
+
 }
 
 /*

@@ -1,6 +1,3 @@
-// Copyright 2024 Red Hat.
-// SPDX-License-Identifier: MIT
-
 use std::{num::NonZeroU64, ops::DerefMut, pin::Pin};
 
 use mesa_rust_gen::*;

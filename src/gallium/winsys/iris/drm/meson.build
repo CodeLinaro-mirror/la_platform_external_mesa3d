@@ -9,6 +9,5 @@ libiriswinsys = static_library(
     inc_gallium, inc_gallium_aux, inc_gallium_drivers,
   ],
   gnu_symbol_visibility : 'hidden',
-  dependencies: [idep_intel_dev, idep_mesautil],
-  link_with : [libintel_dev],
+  dependencies: idep_mesautil,
 )

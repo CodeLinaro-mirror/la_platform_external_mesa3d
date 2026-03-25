@@ -38,6 +38,8 @@
 
 #include "util/u_handle_table.h"
 
+DEBUG_GET_ONCE_BOOL_OPTION(mpeg4, "VAAPI_MPEG4_ENABLED", false)
+
 VAStatus
 vlVaQueryConfigProfiles(VADriverContextP ctx, VAProfile *profile_list, int *num_profiles)
 {
@@ -52,6 +54,9 @@ vlVaQueryConfigProfiles(VADriverContextP ctx, VAProfile *profile_list, int *num_
 
    pscreen = VL_VA_PSCREEN(ctx);
    for (p = PIPE_VIDEO_PROFILE_MPEG2_SIMPLE; p < PIPE_VIDEO_PROFILE_MAX; ++p) {
+      if (u_reduce_video_profile(p) == PIPE_VIDEO_FORMAT_MPEG4 && !debug_get_option_mpeg4())
+         continue;
+
       if (vl_codec_supported(pscreen, p, false) ||
           vl_codec_supported(pscreen, p, true)) {
          vap = PipeToProfile(p);
@@ -85,7 +90,9 @@ vlVaQueryConfigEntrypoints(VADriverContextP ctx, VAProfile profile,
    }
 
    p = ProfileToPipe(profile);
-   if (p == PIPE_VIDEO_PROFILE_UNKNOWN)
+   if (p == PIPE_VIDEO_PROFILE_UNKNOWN ||
+      (u_reduce_video_profile(p) == PIPE_VIDEO_FORMAT_MPEG4 &&
+      !debug_get_option_mpeg4()))
       return VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
 
    pscreen = VL_VA_PSCREEN(ctx);
@@ -254,9 +261,6 @@ vlVaGetConfigAttributes(VADriverContextP ctx, VAProfile profile, VAEntrypoint en
             }
          } break;
 #endif
-         case VAConfigAttribDecProcessing:
-            value = 1;
-            break;
          default:
             value = VA_ATTRIB_NOT_SUPPORTED;
             break;
@@ -567,7 +571,7 @@ vlVaGetConfigAttributes(VADriverContextP ctx, VAProfile profile, VAEntrypoint en
 
          case VAConfigAttribEncROI:
          {
-            union pipe_enc_cap_roi roi_pipe_caps = { 0 };
+            union pipe_enc_cap_roi roi_pipe_caps = {};
             roi_pipe_caps.value = pscreen->get_video_param(pscreen, ProfileToPipe(profile),
                                              PIPE_VIDEO_ENTRYPOINT_ENCODE,
                                              PIPE_VIDEO_CAP_ENC_ROI);
@@ -575,7 +579,7 @@ vlVaGetConfigAttributes(VADriverContextP ctx, VAProfile profile, VAEntrypoint en
                value = VA_ATTRIB_NOT_SUPPORTED;
             else
             {
-               VAConfigAttribValEncROI roi_va_caps = { 0 };
+               VAConfigAttribValEncROI roi_va_caps = {};
                roi_va_caps.bits.num_roi_regions = roi_pipe_caps.bits.num_roi_regions;
                roi_va_caps.bits.roi_rc_priority_support = roi_pipe_caps.bits.roi_rc_priority_support;
                roi_va_caps.bits.roi_rc_qp_delta_support = roi_pipe_caps.bits.roi_rc_qp_delta_support;
@@ -661,7 +665,9 @@ vlVaCreateConfig(VADriverContextP ctx, VAProfile profile, VAEntrypoint entrypoin
    }
 
    p = ProfileToPipe(profile);
-   if (p == PIPE_VIDEO_PROFILE_UNKNOWN) {
+   if (p == PIPE_VIDEO_PROFILE_UNKNOWN  ||
+      (u_reduce_video_profile(p) == PIPE_VIDEO_FORMAT_MPEG4 &&
+      !debug_get_option_mpeg4())) {
       FREE(config);
       return VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
    }

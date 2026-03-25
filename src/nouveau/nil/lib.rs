@@ -12,7 +12,6 @@ mod image;
 mod modifiers;
 mod su_info;
 mod tiling;
-mod zcull;
 
 pub trait ILog2Ceil {
     fn ilog2_ceil(self) -> Self;

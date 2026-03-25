@@ -29,19 +29,7 @@ extern DWORD
 CalculateQualityFromQP( DWORD QP );
 
 HRESULT
-CDX12EncHMFT::UpdateAV1EncPictureDesc( pipe_av1_enc_picture_desc *pPicInfo )
-{
-   HRESULT hr = S_OK;
-   // done:
-   return hr;
-}
-
-HRESULT
-CDX12EncHMFT::PrepareForEncodeHelper( LPDX12EncodeContext pDX12EncodeContext,
-                                      bool dirtyRectFrameNumSet,
-                                      uint32_t dirtyRectFrameNum,
-                                      bool moveRegionFrameNumSet,
-                                      uint32_t moveRegionFrameNum )
+CDX12EncHMFT::PrepareForEncodeHelper( LPDX12EncodeContext pDX12EncodeContext, bool dirtyRectFrameNumSet, uint32_t dirtyRectFrameNum )
 {
    HRESULT hr = S_OK;
    // done:

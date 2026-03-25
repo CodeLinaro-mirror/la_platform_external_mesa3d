@@ -21,7 +21,6 @@
  * IN THE SOFTWARE.
  */
 
-#include "common/i915/intel_gem.h"
 #include "i915/anv_batch_chain.h"
 #include "anv_private.h"
 #include "anv_measure.h"
@@ -247,16 +246,27 @@ anv_execbuf_add_sync(struct anv_device *device,
    if ((sync->flags & VK_SYNC_IS_TIMELINE) && value == 0)
       return VK_SUCCESS;
 
-   assert(vk_sync_type_is_drm_syncobj(sync->type));
-   struct vk_drm_syncobj *syncobj = vk_sync_as_drm_syncobj(sync);
+   if (vk_sync_is_anv_bo_sync(sync)) {
+      struct anv_bo_sync *bo_sync =
+         container_of(sync, struct anv_bo_sync, sync);
 
-   if (!(sync->flags & VK_SYNC_IS_TIMELINE))
-      value = 0;
+      assert(is_signal == (bo_sync->state == ANV_BO_SYNC_STATE_RESET));
 
-   return anv_execbuf_add_syncobj(device, execbuf, syncobj->syncobj,
-                                  is_signal ? I915_EXEC_FENCE_SIGNAL :
-                                              I915_EXEC_FENCE_WAIT,
-                                  value);
+      return anv_execbuf_add_bo(device, execbuf, bo_sync->bo, NULL,
+                                is_signal ? EXEC_OBJECT_WRITE : 0);
+   } else if (vk_sync_type_is_drm_syncobj(sync->type)) {
+      struct vk_drm_syncobj *syncobj = vk_sync_as_drm_syncobj(sync);
+
+      if (!(sync->flags & VK_SYNC_IS_TIMELINE))
+         value = 0;
+
+      return anv_execbuf_add_syncobj(device, execbuf, syncobj->syncobj,
+                                     is_signal ? I915_EXEC_FENCE_SIGNAL :
+                                                 I915_EXEC_FENCE_WAIT,
+                                     value);
+   }
+
+   UNREACHABLE("Invalid sync type");
 }
 
 static VkResult
@@ -352,27 +362,6 @@ out:
    return result;
 }
 
-static VkResult
-pin_shader_heap(struct anv_device *device,
-                struct anv_execbuf *execbuf,
-                struct anv_shader_heap *heap)
-{
-   VkResult result = VK_SUCCESS;
-
-   simple_mtx_lock(&heap->mutex);
-
-   unsigned i;
-   BITSET_FOREACH_SET(i, heap->allocated_bos, ANV_SHADER_HEAP_MAX_BOS) {
-      result = anv_execbuf_add_bo(device, execbuf, heap->bos[i].bo, NULL, 0);
-      if (result != VK_SUCCESS)
-         goto out;
-   }
-
-out:
-   simple_mtx_unlock(&heap->mutex);
-   return result;
-}
-
 static uint32_t
 calc_batch_start_offset(struct anv_bo *bo)
 {
@@ -435,7 +424,7 @@ setup_execbuf_for_cmd_buffers(struct anv_execbuf *execbuf,
    if (result != VK_SUCCESS)
       return result;
 
-   result = pin_shader_heap(device, execbuf, &device->shader_heap);
+   result = pin_state_pool(device, execbuf, &device->instruction_state_pool);
    if (result != VK_SUCCESS)
       return result;
 
@@ -614,7 +603,7 @@ setup_async_execbuf(struct anv_execbuf *execbuf,
 #ifdef SUPPORT_INTEL_INTEGRATED_GPUS
       if (device->physical->memory.need_flush &&
           anv_bo_needs_host_cache_flush(bo->alloc_flags))
-         util_flush_range(bo->map, bo->size);
+         intel_flush_range(bo->map, bo->size);
 #endif
    }
 
@@ -691,20 +680,20 @@ setup_async_execbuf(struct anv_execbuf *execbuf,
    return VK_SUCCESS;
 }
 
-#define anv_gem_execbuffer(q, e) anv_gem_execbuffer_impl((q), (e), __func__, __LINE__)
-
-static VkResult
-anv_gem_execbuffer_impl(struct anv_queue *queue,
-                        struct drm_i915_gem_execbuffer2 *execbuf,
-                        const char *func, int line)
+static int
+anv_gem_execbuffer(struct anv_device *device,
+                   struct drm_i915_gem_execbuffer2 *execbuf)
 {
-   struct anv_device *device = queue->device;
+   int ret;
+   const unsigned long request = (execbuf->flags & I915_EXEC_FENCE_OUT) ?
+      DRM_IOCTL_I915_GEM_EXECBUFFER2_WR :
+      DRM_IOCTL_I915_GEM_EXECBUFFER2;
 
-   int ret = i915_gem_execbuf_ioctl(device->fd, device->info, execbuf);
-   if (ret)
-      return vk_queue_set_lost(&queue->vk, "%s(%d) failed: %m", func, line);
+   do {
+      ret = intel_ioctl(device->fd, request, execbuf);
+   } while (ret && errno == ENOMEM);
 
-   return VK_SUCCESS;
+   return ret;
 }
 
 static void
@@ -725,9 +714,9 @@ anv_i915_debug_submit(const struct anv_execbuf *execbuf)
    for (uint32_t i = 0; i < execbuf->bo_count; i++) {
       const struct anv_bo *bo = execbuf->bos[i];
 
-      fprintf(stderr, "   BO: addr=0x%016"PRIx64"-0x%016"PRIx64" map=%16p size=%7"PRIu64
+      fprintf(stderr, "   BO: addr=0x%016"PRIx64"-0x%016"PRIx64" size=%7"PRIu64
               "KB handle=%05u capture=%u vram_only=%u name=%s\n",
-              bo->offset, bo->offset + bo->size - 1, bo->map, bo->size / 1024,
+              bo->offset, bo->offset + bo->size - 1, bo->size / 1024,
               bo->gem_handle, (bo->flags & EXEC_OBJECT_CAPTURE) != 0,
               anv_bo_is_vram_only(bo), bo->name);
    }
@@ -762,7 +751,10 @@ i915_queue_exec_async(struct anv_async_submit *submit,
 
    ANV_RMV(bos_gtt_map, device, execbuf.bos, execbuf.bo_count);
 
-   result = anv_gem_execbuffer(queue, &execbuf.execbuf);
+   int ret = queue->device->info->no_hw ? 0 :
+      anv_gem_execbuffer(queue->device, &execbuf.execbuf);
+   if (ret)
+      result = vk_queue_set_lost(&queue->vk, "execbuf2 failed: %m");
 
    result = anv_queue_post_submit(queue, result);
 
@@ -823,9 +815,12 @@ i915_companion_rcs_queue_exec_locked(struct anv_queue *queue,
 
    ANV_RMV(bos_gtt_map, device, execbuf.bos, execbuf.bo_count);
 
-   result = anv_gem_execbuffer(queue, &execbuf.execbuf);
-   if (result != VK_SUCCESS)
+   int ret = queue->device->info->no_hw ? 0 :
+      anv_gem_execbuffer(queue->device, &execbuf.execbuf);
+   if (ret) {
       anv_i915_debug_submit(&execbuf);
+      result = vk_queue_set_lost(&queue->vk, "execbuf2 failed: %m");
+   }
 
  error:
    anv_execbuf_finish(&execbuf);
@@ -979,17 +974,19 @@ i915_queue_exec_locked(struct anv_queue *queue,
       };
       query_pass_execbuf.batch_start_offset += calc_batch_start_offset(pass_batch_bo);
 
-      VkResult tmp_result = anv_gem_execbuffer(queue, &query_pass_execbuf);
-      if (tmp_result != VK_SUCCESS)
-         result = tmp_result;
+      int ret = queue->device->info->no_hw ? 0 :
+         anv_gem_execbuffer(queue->device, &query_pass_execbuf);
+      if (ret)
+         result = vk_queue_set_lost(&queue->vk, "execbuf2 failed: %m");
    }
 
    ANV_RMV(bos_gtt_map, device, execbuf.bos, execbuf.bo_count);
 
-   if (result == VK_SUCCESS) {
-      result = anv_gem_execbuffer(queue, &execbuf.execbuf);
-      if (result != VK_SUCCESS)
+   if (result == VK_SUCCESS && !queue->device->info->no_hw) {
+      if (anv_gem_execbuffer(queue->device, &execbuf.execbuf)) {
          anv_i915_debug_submit(&execbuf);
+         result = vk_queue_set_lost(&queue->vk, "execbuf2 failed: %m");
+      }
    }
 
    if (cmd_buffer_count != 0 && cmd_buffers[0]->companion_rcs_cmd_buffer &&

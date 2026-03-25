@@ -47,7 +47,8 @@
 void util_set_vertex_buffers_mask(struct pipe_vertex_buffer *dst,
                                   uint32_t *enabled_buffers,
                                   const struct pipe_vertex_buffer *src,
-                                  unsigned count)
+                                  unsigned count,
+                                  bool take_ownership)
 {
    unsigned last_count = util_last_bit(*enabled_buffers);
    uint32_t bitmask = 0;
@@ -60,7 +61,10 @@ void util_set_vertex_buffers_mask(struct pipe_vertex_buffer *dst,
          if (src[i].buffer.resource)
             bitmask |= 1 << i;
 
-         pipe_vertex_buffer_reference(&dst[i], &src[i]);
+         pipe_vertex_buffer_unreference(&dst[i]);
+
+         if (!take_ownership && !src[i].is_user_buffer)
+            pipe_resource_reference(&dst[i].buffer.resource, src[i].buffer.resource);
       }
 
       /* Copy over the other members of pipe_vertex_buffer. */
@@ -80,7 +84,8 @@ void util_set_vertex_buffers_mask(struct pipe_vertex_buffer *dst,
 void util_set_vertex_buffers_count(struct pipe_vertex_buffer *dst,
                                    unsigned *dst_count,
                                    const struct pipe_vertex_buffer *src,
-                                   unsigned count)
+                                   unsigned count,
+                                   bool take_ownership)
 {
    uint32_t enabled_buffers = 0;
 
@@ -89,7 +94,8 @@ void util_set_vertex_buffers_count(struct pipe_vertex_buffer *dst,
          enabled_buffers |= (1ull << i);
    }
 
-   util_set_vertex_buffers_mask(dst, &enabled_buffers, src, count);
+   util_set_vertex_buffers_mask(dst, &enabled_buffers, src, count,
+                                take_ownership);
 
    *dst_count = util_last_bit(enabled_buffers);
 }
@@ -143,7 +149,7 @@ util_upload_index_buffer(struct pipe_context *pipe,
 {
    unsigned start_offset = draw->start * info->index_size;
 
-   u_upload_data_ref(pipe->stream_uploader, start_offset,
+   u_upload_data(pipe->stream_uploader, start_offset,
                  draw->count * info->index_size, alignment,
                  (char*)info->index.user + start_offset,
                  out_offset, out_buffer);
@@ -273,10 +279,7 @@ util_end_pipestat_query(struct pipe_context *ctx, struct pipe_query *q,
            "    ps_invocations = %"PRIu64"\n"
            "    hs_invocations = %"PRIu64"\n"
            "    ds_invocations = %"PRIu64"\n"
-           "    cs_invocations = %"PRIu64"\n"
-           "    ts_invocations = %"PRIu64"\n"
-           "    ms_invocations = %"PRIu64"\n"
-           "    ms_primitives = %"PRIu64"\n",
+           "    cs_invocations = %"PRIu64"\n",
            (unsigned)p_atomic_inc_return(&counter),
            stats.ia_vertices,
            stats.ia_primitives,
@@ -288,10 +291,7 @@ util_end_pipestat_query(struct pipe_context *ctx, struct pipe_query *q,
            stats.ps_invocations,
            stats.hs_invocations,
            stats.ds_invocations,
-           stats.cs_invocations,
-           stats.ts_invocations,
-           stats.ms_invocations,
-           stats.ms_primitives);
+           stats.cs_invocations);
 }
 
 /* This is a helper for profiling. Don't remove. */

@@ -64,11 +64,10 @@ struct vn_image {
    struct {
       bool is_prime_blit_src;
 
-      /* memory backing the prime blit dst buffer */
-      struct vn_device_memory *blit_mem;
+      struct vn_device_memory *memory;
 
       /* For VK_ANDROID_native_buffer, the WSI image owns the memory. */
-      struct vn_device_memory *anb_mem;
+      bool memory_owned;
    } wsi;
 };
 VK_DEFINE_NONDISP_HANDLE_CASTS(vn_image,

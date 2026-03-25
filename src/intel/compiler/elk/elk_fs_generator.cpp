@@ -1,6 +1,24 @@
 /*
  * Copyright © 2010 Intel Corporation
- * SPDX-License-Identifier: MIT
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 /** @file elk_fs_generator.cpp
@@ -172,7 +190,7 @@ elk_fs_generator::elk_fs_generator(const struct elk_compiler *compiler,
                            const struct elk_compile_params *params,
                            struct elk_stage_prog_data *prog_data,
                            bool runtime_check_aads_emit,
-                           mesa_shader_stage stage)
+                           gl_shader_stage stage)
 
    : compiler(compiler), params(params),
      devinfo(compiler->devinfo),
@@ -326,7 +344,7 @@ elk_fs_generator::fire_fb_write(elk_fs_inst *inst,
                             struct elk_reg implied_header,
                             GLuint nr)
 {
-   struct elk_fs_prog_data *prog_data = elk_fs_prog_data(this->prog_data);
+   struct elk_wm_prog_data *prog_data = elk_wm_prog_data(this->prog_data);
 
    if (devinfo->ver < 6) {
       elk_push_insn_state(p);
@@ -2188,8 +2206,8 @@ elk_fs_generator::generate_code(const elk_cfg_t *cfg, int dispatch_width,
    int after_size = p->next_insn_offset - start_offset;
 
    bool dump_shader_bin = elk_should_dump_shader_bin();
-   unsigned char sha1[SHA1_DIGEST_LENGTH + 1];
-   char sha1buf[SHA1_DIGEST_STRING_LENGTH];
+   unsigned char sha1[21];
+   char sha1buf[41];
 
    if (unlikely(debug_flag || dump_shader_bin)) {
       _mesa_sha1_compute(p->store + start_offset / sizeof(elk_inst),

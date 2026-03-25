@@ -714,8 +714,7 @@ v3dv_CreateDescriptorSetLayout(VkDevice _device,
 
    VkDescriptorSetLayoutBinding *bindings = NULL;
    VkResult result = vk_create_sorted_bindings(pCreateInfo->pBindings,
-                                               pCreateInfo->bindingCount, &bindings,
-                                               NULL, NULL);
+                                               pCreateInfo->bindingCount, &bindings);
    if (result != VK_SUCCESS) {
       v3dv_descriptor_set_layout_destroy(device, set_layout);
       return vk_error(device, result);
@@ -1339,7 +1338,7 @@ v3dv_GetDescriptorSetLayoutSupport(
    V3DV_FROM_HANDLE(v3dv_device, device, _device);
    VkDescriptorSetLayoutBinding *bindings = NULL;
    VkResult result = vk_create_sorted_bindings(
-      pCreateInfo->pBindings, pCreateInfo->bindingCount, &bindings, NULL, NULL);
+      pCreateInfo->pBindings, pCreateInfo->bindingCount, &bindings);
    if (result != VK_SUCCESS) {
       pSupport->supported = false;
       return;

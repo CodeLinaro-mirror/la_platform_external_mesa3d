@@ -29,11 +29,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include "util/detect_arch.h"
-#include "util/detect_cc.h"
 #include "util/u_cpu_detect.h"
 
-#if DETECT_ARCH_X86_64
+#if defined(USE_X86_64_ASM)
 #include <xmmintrin.h>
 #endif
 
@@ -43,7 +41,6 @@ extern "C" {
 
 #define FP16_ONE     ((uint16_t) 0x3c00)
 #define FP16_ZERO    ((uint16_t) 0)
-#define FP16_MAX_F   65504.0
 
 uint16_t _mesa_float_to_half_slow(float val);
 float _mesa_half_to_float_slow(uint16_t val);
@@ -60,7 +57,7 @@ uint16_t _mesa_float_to_float16_rtz_slow(float val);
 static inline uint16_t
 _mesa_float_to_half(float val)
 {
-#if DETECT_ARCH_X86_64 && DETECT_CC_GCC
+#if defined(USE_X86_64_ASM)
    if (util_get_cpu_caps()->has_f16c) {
       __m128 in = {val};
       __m128i out;
@@ -76,7 +73,7 @@ _mesa_float_to_half(float val)
 static inline float
 _mesa_half_to_float(uint16_t val)
 {
-#if DETECT_ARCH_X86_64 && DETECT_CC_GCC
+#if defined(USE_X86_64_ASM)
    if (util_get_cpu_caps()->has_f16c) {
       __m128i in = {val};
       __m128 out;
@@ -84,7 +81,7 @@ _mesa_half_to_float(uint16_t val)
       __asm volatile("vcvtph2ps %1, %0" : "=v"(out) : "v"(in));
       return out[0];
    }
-#elif DETECT_ARCH_AARCH64 && DETECT_CC_GCC
+#elif defined(USE_AARCH64_ASM)
    float result;
    uint16_t in = val;
 
@@ -101,7 +98,7 @@ _mesa_half_to_float(uint16_t val)
 static inline uint16_t
 _mesa_float_to_float16_rtz(float val)
 {
-#if DETECT_ARCH_X86_64 && DETECT_CC_GCC
+#if defined(USE_X86_64_ASM)
    if (util_get_cpu_caps()->has_f16c) {
       __m128 in = {val};
       __m128i out;
@@ -113,9 +110,6 @@ _mesa_float_to_float16_rtz(float val)
 #endif
    return _mesa_float_to_float16_rtz_slow(val);
 }
-
-uint16_t _mesa_float_to_float16_ru(float val);
-uint16_t _mesa_float_to_float16_rd(float val);
 
 static inline uint16_t
 _mesa_float_to_float16_rtne(float val)
@@ -132,9 +126,6 @@ _mesa_half_is_negative(uint16_t h)
 
 #ifdef __cplusplus
 
-namespace mesa
-{
-
 /* Helper class for disambiguating fp16 from uint16_t in C++ overloads */
 
 struct float16_t {
@@ -145,8 +136,6 @@ struct float16_t {
    static float16_t one() { return float16_t(FP16_ONE); }
    static float16_t zero() { return float16_t(FP16_ZERO); }
 };
-
-} /* namespace mesa */
 
 #endif
 

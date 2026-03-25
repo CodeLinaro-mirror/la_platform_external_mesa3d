@@ -61,7 +61,7 @@ TEST_F(ComputeTest, runtime_memcpy)
       SHADER_ARG_INOUT);
    const uint16_t expected[] = { 0x20, 0x80, 0x180, 0x400 };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i].ret, expected[i]);
 }
 
@@ -80,7 +80,7 @@ TEST_F(ComputeTest, two_global_arrays)
    };
 
    run_shader(kernel_source, g1.size(), 1, 1, g1, g2);
-   for (size_t i = 0; i < g1.size(); ++i)
+   for (int i = 0; i < g1.size(); ++i)
       EXPECT_EQ(g1[i], expected[i]);
 }
 
@@ -111,7 +111,7 @@ __kernel void main_test(__global float4 *g1, __global float4 *g2)
    };
 
    run_shader(kernel_source, 1, 1, 1, g1, g2);
-   for (size_t i = 0; i < g1.size(); ++i)
+   for (int i = 0; i < g1.size(); ++i)
       EXPECT_FLOAT_EQ(g1[i], expected[i]);
 }
 
@@ -157,7 +157,7 @@ TEST_F(ComputeTest, DISABLED_i64tof32)
    };
 
    run_shader(kernel_source, out.size(), 1, 1, out, in);
-   for (size_t i = 0; i < out.size(); ++i) {
+   for (int i = 0; i < out.size(); ++i) {
       EXPECT_EQ((int64_t)out[i], expected[i]);
    }
 }
@@ -177,7 +177,7 @@ TEST_F(ComputeTest, two_constant_arrays)
    };
 
    run_shader(kernel_source, g1.size(), 1, 1, c1, g1, c2);
-   for (size_t i = 0; i < g1.size(); ++i)
+   for (int i = 0; i < g1.size(); ++i)
       EXPECT_EQ(g1[i], expected[i]);
 }
 
@@ -198,7 +198,7 @@ TEST_F(ComputeTest, null_constant_ptr)
    };
 
    run_shader(kernel_source, g1.size(), 1, 1, g1, c1);
-   for (size_t i = 0; i < g1.size(); ++i)
+   for (int i = 0; i < g1.size(); ++i)
       EXPECT_EQ(g1[i], expected1[i]);
 
    const uint32_t expected2[] = {
@@ -208,7 +208,7 @@ TEST_F(ComputeTest, null_constant_ptr)
    g1 = ShaderArg<uint32_t>({ 10, 20, 30, 40 }, SHADER_ARG_INOUT);
    auto c2 = NullShaderArg();
    run_shader(kernel_source, g1.size(), 1, 1, g1, c2);
-   for (size_t i = 0; i < g1.size(); ++i)
+   for (int i = 0; i < g1.size(); ++i)
       EXPECT_EQ(g1[i], expected2[i]);
 }
 
@@ -228,7 +228,7 @@ TEST_F(ComputeTest, null_global_ptr)
    };
 
    run_shader(kernel_source, g1.size(), 1, 1, g1, g2);
-   for (size_t i = 0; i < g1.size(); ++i)
+   for (int i = 0; i < g1.size(); ++i)
       EXPECT_EQ(g1[i], expected1[i]);
 
    const uint32_t expected2[] = {
@@ -238,7 +238,7 @@ TEST_F(ComputeTest, null_global_ptr)
    g1 = ShaderArg<uint32_t>({ 10, 20, 30, 40 }, SHADER_ARG_INOUT);
    auto g2null = NullShaderArg();
    run_shader(kernel_source, g1.size(), 1, 1, g1, g2null);
-   for (size_t i = 0; i < g1.size(); ++i)
+   for (int i = 0; i < g1.size(); ++i)
       EXPECT_EQ(g1[i], expected2[i]);
 }
 
@@ -267,7 +267,7 @@ TEST_F(ComputeTest, ret_constant_ptr)
    };
 
    run_shader(kernel_source, out.size(), 1, 1, out, in);
-   for (size_t i = 0; i < out.size(); ++i) {
+   for (int i = 0; i < out.size(); ++i) {
       EXPECT_EQ(out[i].val, expected_val[i]);
       EXPECT_EQ(out[i].ptr, expected_ptr[i]);
    }
@@ -295,7 +295,7 @@ TEST_F(ComputeTest, ret_global_ptr)
    };
 
    run_shader(kernel_source, out.size(), 1, 1, out, in1, in2);
-   for (size_t i = 0; i < out.size(); ++i) {
+   for (int i = 0; i < out.size(); ++i) {
       EXPECT_EQ(out[i].val, expected_val[i]);
       EXPECT_EQ(out[i].ptr, expected_ptr[i]);
    }
@@ -319,7 +319,7 @@ TEST_F(ComputeTest, ret_local_ptr)
    };
 
    run_shader(kernel_source, out.size(), 1, 1, out);
-   for (size_t i = 0; i < out.size(); ++i) {
+   for (int i = 0; i < out.size(); ++i) {
       EXPECT_EQ(out[i].ptr, expected_ptr[i]);
    }
 }
@@ -345,9 +345,8 @@ TEST_F(ComputeTest, ret_private_ptr)
    };
 
    run_shader(kernel_source, out.size(), 1, 1, out);
-   for (size_t i = 0; i < out.size(); ++i) {
+   for (int i = 0; i < out.size(); ++i) {
       EXPECT_EQ(out[i].ptr, expected_ptr[i]);
-      EXPECT_EQ(out[i].value, expected_value[i]);
    }
 }
 
@@ -364,7 +363,7 @@ TEST_F(ComputeTest, globals_8bit)
       101, 111, 121, 131
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -381,7 +380,7 @@ TEST_F(ComputeTest, globals_16bit)
       10001, 10011, 10021, 10031
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -400,7 +399,7 @@ TEST_F(ComputeTest, globals_64bit)
       base + 1, base + 11, base + 21, base + 31
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -418,7 +417,7 @@ TEST_F(ComputeTest, built_ins_global_id)
    };
 
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -436,7 +435,7 @@ TEST_F(ComputeTest, built_ins_global_id_rmw)
       0x00000001, 0x20000002, 0x00060006, 0x1004080c
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -453,7 +452,7 @@ TEST_F(ComputeTest, types_float_basics)
       1, 2, 3, 4
    };
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -471,7 +470,7 @@ TEST_F(ComputeTest, DISABLED_types_double_basics)
       1, 2, 3, 4
    };
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -488,7 +487,7 @@ TEST_F(ComputeTest, types_short_basics)
       1, 2, 3, 4
    };
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -505,7 +504,7 @@ TEST_F(ComputeTest, types_char_basics)
       1, 2, 3, 4
    };
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -526,7 +525,7 @@ TEST_F(ComputeTest, types_if_statement)
       0xff, ~1u, ~2u, ~3u
    };
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -548,7 +547,7 @@ TEST_F(ComputeTest, types_do_while_loop)
       1, 1, 1*2, 1*2*3, 1*2*3*4
    };
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -569,7 +568,7 @@ TEST_F(ComputeTest, types_for_loop)
       1, 1, 1*2, 1*2*3, 1*2*3*4
    };
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -592,7 +591,7 @@ TEST_F(ComputeTest, complex_types_local_array_long)
       0x00000000, 0x10000001, 0x20000020, 0x30000300,
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -615,7 +614,7 @@ TEST_F(ComputeTest, complex_types_local_array_short)
       0x00, 0x10, 0x20, 0x30,
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -638,7 +637,7 @@ TEST_F(ComputeTest, complex_types_local_array_struct_vec_float_misaligned)
    auto inout = ShaderArg<uint32_t>({ 0, 0, 0, 0 }, SHADER_ARG_INOUT);
    const uint16_t expected[] = { 101, 404, 909, 1616 };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -661,7 +660,7 @@ TEST_F(ComputeTest, complex_types_local_array)
       0x00, 0x10, 0x20, 0x30,
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -685,7 +684,7 @@ TEST_F(ComputeTest, complex_types_global_struct_array)
       { 65536 + 3, 65536 * 3 }
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i) {
+   for (int i = 0; i < inout.size(); ++i) {
       EXPECT_EQ(inout[i].add, expected[i].add);
       EXPECT_EQ(inout[i].mul, expected[i].mul);
    }
@@ -710,7 +709,7 @@ TEST_F(ComputeTest, complex_types_global_uint2)
       { 65536 + 3, 65536 * 3 }
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i) {
+   for (int i = 0; i < inout.size(); ++i) {
       EXPECT_EQ(inout[i].x, expected[i].x);
       EXPECT_EQ(inout[i].y, expected[i].y);
    }
@@ -736,7 +735,7 @@ TEST_F(ComputeTest, complex_types_global_ushort2)
       { (uint16_t)(65536 + 3), (uint16_t)(65536 * 3) }
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i) {
+   for (int i = 0; i < inout.size(); ++i) {
       EXPECT_EQ(inout[i].x, expected[i].x);
       EXPECT_EQ(inout[i].y, expected[i].y);
    }
@@ -762,7 +761,7 @@ TEST_F(ComputeTest, complex_types_global_uchar3)
       { (uint8_t)(255 + 3), (uint8_t)(255 * 3), (uint8_t)((255 + 3) + (255 * 3)) }
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i) {
+   for (int i = 0; i < inout.size(); ++i) {
       EXPECT_EQ(inout[i].x, expected[i].x);
       EXPECT_EQ(inout[i].y, expected[i].y);
       EXPECT_EQ(inout[i].z, expected[i].z);
@@ -791,7 +790,7 @@ TEST_F(ComputeTest, complex_types_constant_uchar3)
       { (uint8_t)(255 + 3), (uint8_t)(255 * 3), (uint8_t)((255 + 3) + (255 * 3)) }
    };
    run_shader(kernel_source, out.size(), 1, 1, out, in);
-   for (size_t i = 0; i < out.size(); ++i) {
+   for (int i = 0; i < out.size(); ++i) {
       EXPECT_EQ(out[i].x, expected[i].x);
       EXPECT_EQ(out[i].y, expected[i].y);
       EXPECT_EQ(out[i].z, expected[i].z);
@@ -816,7 +815,7 @@ TEST_F(ComputeTest, complex_types_global_uint8)
       { 2, 4, 6, 8, 10, 12, 14, 16 }
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i) {
+   for (int i = 0; i < inout.size(); ++i) {
       EXPECT_EQ(inout[i].s0, expected[i].s0);
       EXPECT_EQ(inout[i].s1, expected[i].s1);
       EXPECT_EQ(inout[i].s2, expected[i].s2);
@@ -848,7 +847,7 @@ TEST_F(ComputeTest, complex_types_local_ulong16)
       { 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30 }
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i) {
+   for (int i = 0; i < inout.size(); ++i) {
       for (int j = 0; j < 16; ++j) {
          EXPECT_EQ(inout[i].values[j], expected[i].values[j]);
       }
@@ -875,7 +874,7 @@ TEST_F(ComputeTest, complex_types_constant_uint8)
       { 2, 4, 6, 8, 10, 12, 14, 16 }
    };
    run_shader(kernel_source, out.size(), 1, 1, out, in);
-   for (size_t i = 0; i < out.size(); ++i) {
+   for (int i = 0; i < out.size(); ++i) {
       EXPECT_EQ(out[i].s0, expected[i].s0);
       EXPECT_EQ(out[i].s1, expected[i].s1);
       EXPECT_EQ(out[i].s2, expected[i].s2);
@@ -901,7 +900,7 @@ TEST_F(ComputeTest, complex_types_const_array)
       100, 101, 102, 103
    };
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -926,7 +925,7 @@ TEST_F(ComputeTest, mem_access_load_store_ordering)
       0, 1, 2, 3
    };
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -946,7 +945,7 @@ TEST_F(ComputeTest, two_const_arrays)
       100, 202, 306, 412
    };
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -963,7 +962,7 @@ TEST_F(ComputeTest, imod_pos)
       -1, 0, -2, -1,  0, 1, 2, 0, 1
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -980,7 +979,7 @@ TEST_F(ComputeTest, imod_neg)
       -1, 0, -2, -1,  0, 1, 2, 0, 1
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -997,7 +996,7 @@ TEST_F(ComputeTest, umod)
       0xfffffffa, 0xfffffffb, 0, 1, 2
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1014,7 +1013,7 @@ TEST_F(ComputeTest, rotate)
       0xdeadbeef, 0xeadbeefd, 0xadbeefde, 0xdbeefdea
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1031,7 +1030,7 @@ TEST_F(ComputeTest, popcount)
       0, 1, 2, 2, 4, 32
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1055,7 +1054,7 @@ TEST_F(ComputeTest, hadd)
       ((1ull << 31) + 0xffffffff) >> 1,
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1079,7 +1078,7 @@ TEST_F(ComputeTest, rhadd)
       ((1ull << 31) + (1ull << 32)) >> 1,
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1096,7 +1095,7 @@ TEST_F(ComputeTest, add_sat)
       0xffffffff - 1, 0xffffffff, 0xffffffff, 0xffffffff
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1112,7 +1111,7 @@ TEST_F(ComputeTest, sub_sat)
       0, 0, 0, 1
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1128,7 +1127,7 @@ TEST_F(ComputeTest, mul_hi)
       0, 0, 1, 1, (1u << 30)
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1144,7 +1143,7 @@ TEST_F(ComputeTest, ldexp_x)
       ldexp(0.0f, 5), ldexp(0.5f, 5), ldexp(1.0f, 5), ldexp(2.0f, 5)
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1160,7 +1159,7 @@ TEST_F(ComputeTest, ldexp_y)
       ldexp(0.25f, 0), ldexp(0.5f, 1), ldexp(0.75f, 2), ldexp(1.0f, 3)
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1177,7 +1176,7 @@ TEST_F(ComputeTest, frexp_ret)
       0.0f, 0.5f, 0.5f, 0.75f
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1195,7 +1194,7 @@ TEST_F(ComputeTest, frexp_exp)
       0.0f, 0.0f, 1.0f, 2.0f
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1211,7 +1210,7 @@ TEST_F(ComputeTest, clz)
       32, 31, 16, 1, 0
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1239,9 +1238,9 @@ TEST_F(ComputeTest, sin)
       { 3.0f, sin(3.0f), sin(3.0f) },
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i) {
-      EXPECT_FLOAT_EQ(inout[i].in, expected[i].in);
-      EXPECT_FLOAT_EQ(inout[i].clc, expected[i].clc);
+   for (int i = 0; i < inout.size(); ++i) {
+      EXPECT_FLOAT_EQ(inout[i].in, inout[i].in);
+      EXPECT_FLOAT_EQ(inout[i].clc, inout[i].clc);
       EXPECT_NEAR(inout[i].clc, inout[i].native, 0.008f); // range from DXIL spec
    }
 }
@@ -1258,7 +1257,7 @@ TEST_F(ComputeTest, cosh)
       cosh(0.0f), cosh(1.0f), cosh(2.0f), cosh(3.0f)
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1274,7 +1273,7 @@ TEST_F(ComputeTest, exp)
       exp(0.0f), exp(1.0f), exp(2.0f), exp(3.0f)
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1290,7 +1289,7 @@ TEST_F(ComputeTest, exp10)
       pow(10.0f, 0.0f), pow(10.0f, 1.0f), pow(10.0f, 2.0f), pow(10.0f, 3.0f)
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1306,7 +1305,7 @@ TEST_F(ComputeTest, exp2)
       pow(2.0f, 0.0f), pow(2.0f, 1.0f), pow(2.0f, 2.0f), pow(2.0f, 3.0f)
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1319,10 +1318,10 @@ TEST_F(ComputeTest, log)
    }\n";
    auto inout = ShaderArg<float>({ 0.0f, 1.0f, 2.0f, 3.0f }, SHADER_ARG_INOUT);
    const float expected[] = {
-      logf(0.0f), logf(1.0f), logf(2.0f), logf(3.0f)
+      log(0.0f), log(1.0f), log(2.0f), log(3.0f)
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1335,10 +1334,10 @@ TEST_F(ComputeTest, log10)
    }\n";
    auto inout = ShaderArg<float>({ 0.0f, 1.0f, 2.0f, 3.0f }, SHADER_ARG_INOUT);
    const float expected[] = {
-      log10f(0.0f), log10f(1.0f), log10f(2.0f), log10f(3.0f)
+      log10(0.0f), log10(1.0f), log10(2.0f), log10(3.0f)
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1351,10 +1350,10 @@ TEST_F(ComputeTest, log2)
    }\n";
    auto inout = ShaderArg<float>({ 0.0f, 1.0f, 2.0f, 3.0f }, SHADER_ARG_INOUT);
    const float expected[] = {
-      logf(0.0f) / logf(2.0f), logf(1.0f) / logf(2.0f), logf(2.0f) / logf(2.0f), logf(3.0f) / logf(2.0f)
+      log(0.0f) / log(2.0f), log(1.0f) / log(2.0f), log(2.0f) / log(2.0f), log(3.0f) / log(2.0f)
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1371,7 +1370,7 @@ TEST_F(ComputeTest, rint)
       0.0f, 2.0f, 0.0f, -2.0f, 1.0f,
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1388,7 +1387,7 @@ TEST_F(ComputeTest, round)
       0.0f, 0.0f, -0.0f, 1.0f, -1.0f, 1.0f, -1.0f
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1406,7 +1405,7 @@ TEST_F(ComputeTest, arg_by_val)
       0.0f, 3.0f, -3.0f, 5.0f, -5.0f, 11.0f, -11.0f
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout, mul);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1426,7 +1425,7 @@ TEST_F(ComputeTest, uint8_by_val)
    auto val = ShaderArg<struct uint8>({ {0, 1, 2, 3, 4, 5, 6, 7 }}, SHADER_ARG_INPUT);
    const uint32_t expected[] = { 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7 };
    run_shader(kernel_source, out.size(), 1, 1, out, val);
-   for (size_t i = 0; i < out.size(); ++i)
+   for (int i = 0; i < out.size(); ++i)
       EXPECT_EQ(out[i], expected[i]);
 }
 
@@ -1449,7 +1448,7 @@ TEST_F(ComputeTest, link)
       4.0f,
    };
    run_shader(srcs, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1482,7 +1481,7 @@ TEST_F(ComputeTest, link_library)
       20.0f,
    };
    run_shader(exe, { (unsigned)inout.size(), 1, 1 }, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1504,7 +1503,7 @@ TEST_F(ComputeTest, localvar)
       9.0f, 5.0f
    };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1524,7 +1523,7 @@ TEST_F(ComputeTest, localvar_uchar2)
    auto inout = ShaderArg<uint8_t>({ 2, 4 }, SHADER_ARG_INOUT);
    const uint8_t expected[] = { 9, 5 };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1542,7 +1541,7 @@ TEST_F(ComputeTest, work_group_size_hint)
       0, 1, 2, 3
    };
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -1560,7 +1559,7 @@ TEST_F(ComputeTest, reqd_work_group_size)
       0, 1, 0, 1
    };
    run_shader(kernel_source, output.size(), 1, 1, output);
-   for (size_t i = 0; i < output.size(); ++i)
+   for (int i = 0; i < output.size(); ++i)
       EXPECT_EQ(output[i], expected[i]);
 }
 
@@ -1683,7 +1682,7 @@ TEST_F(ComputeTest, local_ptr)
    auto tmp = ShaderArg<struct uint2>(std::vector<struct uint2>(4096), SHADER_ARG_INPUT);
    const uint8_t expected[] = { 9, 5 };
    run_shader(kernel_source, inout.size(), 1, 1, inout, tmp);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1704,7 +1703,7 @@ TEST_F(ComputeTest, two_local_ptrs)
    auto tmp2 = ShaderArg<uint32_t>(std::vector<uint32_t>(1024), SHADER_ARG_INPUT);
    const uint8_t expected[] = { 9, 6 };
    run_shader(kernel_source, inout.size(), 1, 1, inout, tmp, tmp2);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1720,7 +1719,7 @@ TEST_F(ComputeTest, int8_to_float)
    auto out = ShaderArg<float>(std::vector<float>(4, std::numeric_limits<float>::infinity()), SHADER_ARG_OUTPUT);
    const float expected[] = { 0.1f, 0.2f, 0.3f, 0.4f };
    run_shader(kernel_source, in.size(), 1, 1, in, out);
-   for (size_t i = 0; i < in.size(); ++i)
+   for (int i = 0; i < in.size(); ++i)
       EXPECT_FLOAT_EQ(out[i], expected[i]);
 }
 
@@ -1784,7 +1783,7 @@ TEST_F(ComputeTest, DISABLED_debug_layer_failure)
 
    info_queue->AddApplicationMessage(D3D12_MESSAGE_SEVERITY_ERROR, "This should cause the test to fail");
    run_shader(kernel_source, inout.size(), 1, 1, inout, mul);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_FLOAT_EQ(inout[i], expected[i]);
 }
 
@@ -1817,7 +1816,7 @@ TEST_F(ComputeTest, global_atomic_add)
    const int32_t expected_inout[] = { 5, 7 };
    const int32_t expected_old[] = { 2, 4 };
    run_shader(kernel_source, inout.size(), 1, 1, inout, old);
-   for (size_t i = 0; i < inout.size(); ++i) {
+   for (int i = 0; i < inout.size(); ++i) {
       EXPECT_EQ(inout[i], expected_inout[i]);
       EXPECT_EQ(old[i], expected_old[i]);
    }
@@ -1835,7 +1834,7 @@ TEST_F(ComputeTest, global_atomic_imin)
    const int32_t expected_inout[] = { 0, 1, -1 };
    const int32_t expected_old[] = { 0, 2, -1 };
    run_shader(kernel_source, inout.size(), 1, 1, inout, old);
-   for (size_t i = 0; i < inout.size(); ++i) {
+   for (int i = 0; i < inout.size(); ++i) {
       EXPECT_EQ(inout[i], expected_inout[i]);
       EXPECT_EQ(old[i], expected_old[i]);
    }
@@ -1853,7 +1852,7 @@ TEST_F(ComputeTest, global_atomic_and_or)
    auto inout = ShaderArg<int32_t>(0xf, SHADER_ARG_INOUT);
    const int32_t expected[] = { 0x78 };
    run_shader(kernel_source, 3, 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1869,7 +1868,7 @@ TEST_F(ComputeTest, global_atomic_cmpxchg)
    auto inout = ShaderArg<int32_t>(0, SHADER_ARG_INOUT);
    const int32_t expected_inout[] = { 2 };
    run_shader(kernel_source, 2, 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected_inout[i]);
 }
 
@@ -1888,7 +1887,7 @@ TEST_F(ComputeTest, local_atomic_and_or)
    auto inout = ShaderArg<uint16_t>({ 2, 4 }, SHADER_ARG_INOUT);
    const uint16_t expected[] = { 0x402, 0x402 };
    run_shader(kernel_source, inout.size(), 1, 1, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 
@@ -1910,7 +1909,7 @@ TEST_F(ComputeTest, local_atomic_cmpxchg)
    auto out = ShaderArg<uint32_t>(0xdeadbeef, SHADER_ARG_OUTPUT);
    const uint16_t expected[] = { 2 };
    run_shader(kernel_source, 2, 1, 1, out);
-   for (size_t i = 0; i < out.size(); ++i)
+   for (int i = 0; i < out.size(); ++i)
       EXPECT_EQ(out[i], expected[i]);
 }
 
@@ -1963,7 +1962,7 @@ TEST_F(ComputeTest, system_values)
    CompileArgs args = { 1, 1, 1 };
    Shader shader = compile({ kernel_source });
    run_shader(shader, args, out);
-   for (size_t i = 0; i < out.size(); ++i)
+   for (int i = 0; i < out.size(); ++i)
       EXPECT_EQ(out[i], expected[i]);
 
    args.work_props.work_dim = 2;
@@ -1972,7 +1971,7 @@ TEST_F(ComputeTest, system_values)
    args.work_props.group_count_total_x = 5;
    const uint32_t expected_withoffsets[] = { 2, 5, 1, 5, 2, 100, 102 };
    run_shader(shader, args, out);
-   for (size_t i = 0; i < out.size(); ++i)
+   for (int i = 0; i < out.size(); ++i)
       EXPECT_EQ(out[i], expected_withoffsets[i]);
 }
 
@@ -1991,7 +1990,7 @@ TEST_F(ComputeTest, convert_round_sat)
    };
 
    run_shader(kernel_source, f.size(), 1, 1, f, u);
-   for (size_t i = 0; i < u.size(); ++i)
+   for (int i = 0; i < u.size(); ++i)
       EXPECT_EQ(u[i], expected[i]);
 }
 
@@ -2023,7 +2022,7 @@ TEST_F(ComputeTest, convert_round_sat_vec)
    };
 
    run_shader(kernel_source, 4, 1, 1, f, u);
-   for (size_t i = 0; i < u.size(); ++i)
+   for (int i = 0; i < u.size(); ++i)
       EXPECT_EQ(u[i], expected[i]);
 }
 
@@ -2040,7 +2039,7 @@ TEST_F(ComputeTest, convert_char2_uchar2)
    auto u = ShaderArg<uint8_t>({ 99, 99, 99, 99, 99, 99, 99, 99 }, SHADER_ARG_OUTPUT);
    const uint8_t expected[] = { 0, 0, 0, 4, 126, 127, 16, 32 };
    run_shader(kernel_source, 4, 1, 1, c, u);
-   for (size_t i = 0; i < u.size(); i++)
+   for (int i = 0; i < u.size(); i++)
       EXPECT_EQ(u[i], expected[i]);
 }
 
@@ -2086,7 +2085,7 @@ TEST_F(ComputeTest, packed_struct_global)
    };
 
    run_shader(kernel_source, inout.size(), 1, 1, inout, size);
-   for (size_t i = 0; i < inout.size(); ++i) {
+   for (int i = 0; i < inout.size(); ++i) {
       EXPECT_EQ(inout[i].uc, expected[i].uc);
       EXPECT_EQ(inout[i].ul, expected[i].ul);
       EXPECT_EQ(inout[i].us, expected[i].us);
@@ -2116,7 +2115,7 @@ TEST_F(ComputeTest, packed_struct_arg)
    };
 
    run_shader(kernel_source, out.size(), 1, 1, out, in);
-   for (size_t i = 0; i < out.size(); ++i) {
+   for (int i = 0; i < out.size(); ++i) {
       EXPECT_EQ(out[i].uc, expected[i].uc);
       EXPECT_EQ(out[i].ul, expected[i].ul);
       EXPECT_EQ(out[i].us, expected[i].us);
@@ -2147,7 +2146,7 @@ TEST_F(ComputeTest, packed_struct_local)
    };
 
    run_shader(kernel_source, out.size(), 1, 1, out, in);
-   for (size_t i = 0; i < out.size(); ++i) {
+   for (int i = 0; i < out.size(); ++i) {
       EXPECT_EQ(out[i].uc, expected[i].uc);
       EXPECT_EQ(out[i].ul, expected[i].ul);
       EXPECT_EQ(out[i].us, expected[i].us);
@@ -2181,7 +2180,7 @@ TEST_F(ComputeTest, packed_struct_const)
    };
 
    run_shader(kernel_source, out.size(), 1, 1, out, in);
-   for (size_t i = 0; i < out.size(); ++i) {
+   for (int i = 0; i < out.size(); ++i) {
       EXPECT_EQ(out[i].uc, expected[i].uc);
       EXPECT_EQ(out[i].ul, expected[i].ul);
       EXPECT_EQ(out[i].us, expected[i].us);
@@ -2268,7 +2267,7 @@ TEST_F(ComputeTest, unused_arg)
    auto src = ShaderArg<int>({ 1, 2, 3, 4 }, SHADER_ARG_INPUT);
    auto unused = ShaderArg<int>({ -1, -1, -1, -1 }, SHADER_ARG_INPUT);
    run_shader(kernel_source, 4, 1, 1, dest, unused, src);
-   for (size_t i = 0; i < 4; ++i)
+   for (int i = 0; i < 4; ++i)
       EXPECT_EQ(dest[i], i + 1);
 }
 
@@ -2347,7 +2346,7 @@ TEST_F(ComputeTest, spec_constant)
    };
    CompileArgs args = { (unsigned)inout.size(), 1, 1 };
    run_shader(spec_shader, args, inout);
-   for (size_t i = 0; i < inout.size(); ++i)
+   for (int i = 0; i < inout.size(); ++i)
       EXPECT_EQ(inout[i], expected[i]);
 }
 

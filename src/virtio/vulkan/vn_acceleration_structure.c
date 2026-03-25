@@ -9,7 +9,7 @@
 
 #include "vn_device.h"
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateAccelerationStructureKHR(
    VkDevice device,
    const VkAccelerationStructureCreateInfoKHR *pCreateInfo,
@@ -39,7 +39,7 @@ vn_CreateAccelerationStructureKHR(
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyAccelerationStructureKHR(
    VkDevice device,
    VkAccelerationStructureKHR accelerationStructure,
@@ -61,7 +61,7 @@ vn_DestroyAccelerationStructureKHR(
    vk_free(alloc, accel);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_GetAccelerationStructureBuildSizesKHR(
    VkDevice device,
    VkAccelerationStructureBuildTypeKHR buildType,
@@ -76,7 +76,7 @@ vn_GetAccelerationStructureBuildSizesKHR(
       pSizeInfo);
 }
 
-VKAPI_ATTR VkDeviceAddress VKAPI_CALL
+VkDeviceAddress
 vn_GetAccelerationStructureDeviceAddressKHR(
    VkDevice device, const VkAccelerationStructureDeviceAddressInfoKHR *pInfo)
 {
@@ -86,7 +86,7 @@ vn_GetAccelerationStructureDeviceAddressKHR(
       dev->primary_ring, device, pInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_GetDeviceAccelerationStructureCompatibilityKHR(
    VkDevice device,
    const VkAccelerationStructureVersionInfoKHR *pVersionInfo,
@@ -99,7 +99,7 @@ vn_GetDeviceAccelerationStructureCompatibilityKHR(
       dev->primary_ring, device, pVersionInfo, pCompatibility);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_BuildAccelerationStructuresKHR(
    VkDevice device,
    VkDeferredOperationKHR deferredOperation,
@@ -112,7 +112,7 @@ vn_BuildAccelerationStructuresKHR(
    return vn_error(dev->instance, VK_ERROR_FEATURE_NOT_PRESENT);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CopyAccelerationStructureKHR(
    VkDevice device,
    VkDeferredOperationKHR deferredOperation,
@@ -123,7 +123,7 @@ vn_CopyAccelerationStructureKHR(
    return vn_error(dev->instance, VK_ERROR_FEATURE_NOT_PRESENT);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CopyAccelerationStructureToMemoryKHR(
    VkDevice device,
    VkDeferredOperationKHR deferredOperation,
@@ -134,7 +134,7 @@ vn_CopyAccelerationStructureToMemoryKHR(
    return vn_error(dev->instance, VK_ERROR_FEATURE_NOT_PRESENT);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CopyMemoryToAccelerationStructureKHR(
    VkDevice device,
    VkDeferredOperationKHR deferredOperation,
@@ -145,7 +145,7 @@ vn_CopyMemoryToAccelerationStructureKHR(
    return vn_error(dev->instance, VK_ERROR_FEATURE_NOT_PRESENT);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_WriteAccelerationStructuresPropertiesKHR(
    VkDevice device,
    uint32_t accelerationStructureCount,

@@ -26,16 +26,15 @@
 #ifndef LP_BLD_NIR_H
 #define LP_BLD_NIR_H
 
-#include <llvm-c/Core.h>
-
+#include "gallivm/lp_bld.h"
+#include "gallivm/lp_bld_limits.h"
+#include "gallivm/lp_bld_flow.h"
 #include "lp_bld_type.h"
+
+#include "gallivm/lp_bld_tgsi.h"
 #include "nir.h"
 
-struct gallivm_state;
 struct nir_shader;
-struct lp_img_params;
-struct lp_build_tgsi_params;
-struct lp_build_sampler_aos;
 
 /*
  * 2 reserved functions args for each function call,
@@ -93,7 +92,7 @@ LLVMAtomicRMWBinOp
 lp_translate_atomic_op(nir_atomic_op op);
 
 uint32_t
-lp_build_nir_sample_key(mesa_shader_stage stage, nir_tex_instr *instr);
+lp_build_nir_sample_key(gl_shader_stage stage, nir_tex_instr *instr);
 
 
 void lp_img_op_from_intrinsic(struct lp_img_params *params, nir_intrinsic_instr *instr);

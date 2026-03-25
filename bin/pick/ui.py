@@ -224,7 +224,6 @@ class UI:
             if commit.nominated and commit.resolution is core.Resolution.UNRESOLVED:
                 b = urwid.AttrMap(CommitWidget(self, commit), None, focus_map='reversed')
                 self.commit_list.append(b)
-        self.mainloop.draw_screen()
         self.save()
 
     async def feedback(self, text: str) -> None:
@@ -237,7 +236,6 @@ class UI:
             if c.base_widget is commit:
                 del self.commit_list[i]
                 break
-        self.mainloop.draw_screen()
 
     def save(self):
         core.save(itertools.chain(self.new_commits, self.previous_commits))
@@ -248,7 +246,6 @@ class UI:
 
         def reset_cb(_) -> None:
             self.mainloop.widget = o
-            self.mainloop.draw_screen()
 
         async def apply_cb(edit: urwid.Edit) -> None:
             text: str = edit.get_edit_text()
@@ -266,7 +263,6 @@ class UI:
                 raise RuntimeError(f"Couldn't find {sha}")
 
             await commit.apply(self)
-            self.mainloop.draw_screen()
 
         q = urwid.Edit("Commit sha\n")
         ok_btn = urwid.Button('Ok')
@@ -283,14 +279,12 @@ class UI:
         self.mainloop.widget = urwid.Overlay(
             urwid.Filler(box), o, 'center', ('relative', 50), 'middle', ('relative', 50)
         )
-        self.mainloop.draw_screen()
 
     def chp_failed(self, commit: 'CommitWidget', err: str) -> None:
         o = self.mainloop.widget
 
         def reset_cb(_) -> None:
             self.mainloop.widget = o
-            self.mainloop.draw_screen()
 
         t = urwid.Text(textwrap.dedent(f"""
             Failed to apply {commit.commit.sha} {commit.commit.description} with the following error:
@@ -319,4 +313,3 @@ class UI:
         self.mainloop.widget = urwid.Overlay(
             urwid.Filler(box), o, 'center', ('relative', 50), 'middle', ('relative', 50)
         )
-        self.mainloop.draw_screen()

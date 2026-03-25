@@ -41,15 +41,11 @@
 #include <asm/ioctl.h>
 typedef unsigned int drm_handle_t;
 
-#else /* One of the BSDs or GNU */
+#else /* One of the BSDs */
 
 #include <stdint.h>
-#include <sys/types.h>
-#if defined(__GNU__)
-#include <sys/ioctl.h>
-#else
 #include <sys/ioccom.h>
-#endif
+#include <sys/types.h>
 typedef int8_t   __s8;
 typedef uint8_t  __u8;
 typedef int16_t  __s16;

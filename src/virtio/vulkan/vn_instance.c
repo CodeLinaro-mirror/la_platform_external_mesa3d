@@ -39,7 +39,6 @@ static const struct vk_instance_extension_table
 #ifdef VN_USE_WSI_PLATFORM
       .KHR_get_surface_capabilities2 = true,
       .KHR_surface = true,
-      .KHR_surface_maintenance1 = true,
       .KHR_surface_protected_capabilities = true,
       .EXT_surface_maintenance1 = true,
       .EXT_swapchain_colorspace = true,
@@ -237,14 +236,14 @@ out_renderer_destroy:
 
 /* instance commands */
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_EnumerateInstanceVersion(uint32_t *pApiVersion)
 {
    *pApiVersion = VN_MAX_API_VERSION;
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_EnumerateInstanceExtensionProperties(const char *pLayerName,
                                         uint32_t *pPropertyCount,
                                         VkExtensionProperties *pProperties)
@@ -256,7 +255,7 @@ vn_EnumerateInstanceExtensionProperties(const char *pLayerName,
       &vn_instance_supported_extensions, pPropertyCount, pProperties);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_EnumerateInstanceLayerProperties(uint32_t *pPropertyCount,
                                     VkLayerProperties *pProperties)
 {
@@ -264,11 +263,14 @@ vn_EnumerateInstanceLayerProperties(uint32_t *pPropertyCount,
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateInstance(const VkInstanceCreateInfo *pCreateInfo,
                   const VkAllocationCallbacks *pAllocator,
                   VkInstance *pInstance)
 {
+   vn_trace_init();
+   VN_TRACE_FUNC();
+
    const VkAllocationCallbacks *alloc =
       pAllocator ? pAllocator : vk_default_allocator();
    struct vn_instance *instance;
@@ -293,9 +295,6 @@ vn_CreateInstance(const VkInstanceCreateInfo *pCreateInfo,
       vk_free(alloc, instance);
       return vn_error(NULL, result);
    }
-
-   /* util_cpu_trace_init is called by vk_instance_init */
-   VN_TRACE_FUNC();
 
    VkInstance instance_handle = vn_instance_to_handle(instance);
    /* ring_idx = 0 reserved for CPU timeline */
@@ -411,7 +410,7 @@ out_mtx_destroy:
    return vn_error(NULL, result);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyInstance(VkInstance _instance,
                    const VkAllocationCallbacks *pAllocator)
 {
@@ -459,7 +458,7 @@ vn_DestroyInstance(VkInstance _instance,
    vk_free(alloc, instance);
 }
 
-VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL
+PFN_vkVoidFunction
 vn_GetInstanceProcAddr(VkInstance _instance, const char *pName)
 {
    struct vn_instance *instance = vn_instance_from_handle(_instance);

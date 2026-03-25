@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <amdgpu.h>
 #include "drm-uapi/amdgpu_drm.h"
 #include "drm-uapi/drm_fourcc.h"
 
@@ -24,7 +25,7 @@
 #include "util/mesa-sha1.h"
 #include "addrlib/inc/addrinterface.h"
 
-#include "ac_surface_test.h"
+#include "ac_fake_hw_db.h"
 
 /*
  * The main goal of this test is to validate that our dcc/htile addressing

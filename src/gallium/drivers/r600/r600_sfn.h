@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 void
-r600_finalize_nir(struct pipe_screen *screen, struct nir_shader *nir, bool optimize);
+r600_finalize_nir(struct pipe_screen *screen, struct nir_shader *nir);
 
 int
 r600_shader_from_nir(struct r600_context *rctx,

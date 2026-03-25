@@ -1,10 +1,6 @@
 %option yylineno
 %option nounput
 %{
-/*
- * Copyright © 2018 Intel Corporation
- * SPDX-License-Identifier: MIT
- */
 #include <string.h>
 #include "elk_asm.h"
 #undef ALIGN16

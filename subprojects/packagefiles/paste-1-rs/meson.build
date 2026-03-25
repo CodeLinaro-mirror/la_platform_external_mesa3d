@@ -3,15 +3,14 @@ project(
   'rust',
   version : '1.0.14',
   license : '(MIT or Apache-2.0)',
-  meson_version : '>= 1.7.0',
 )
 
+add_languages('rust', required: true)
 rust = import('rust')
 
 lib = rust.proc_macro(
   'paste',
-  files('src/lib.rs'),
-  override_options : ['rust_std=2018', 'build.rust_std=2018', 'warning_level=0']
+  files('src/lib.rs')
 )
 
 dep_paste = declare_dependency(

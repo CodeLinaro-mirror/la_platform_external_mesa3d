@@ -34,6 +34,7 @@
 #include "pvr_drm_bo.h"
 #include "pvr_drm_job_common.h"
 #include "pvr_drm_job_render.h"
+#include "pvr_private.h"
 #include "pvr_winsys.h"
 #include "pvr_winsys_helper.h"
 #include "util/macros.h"
@@ -143,20 +144,16 @@ void pvr_drm_winsys_free_list_destroy(struct pvr_winsys_free_list *free_list)
 }
 
 static void pvr_drm_render_ctx_static_state_init(
-   enum pvr_device_arch arch,
    struct pvr_winsys_render_ctx_create_info *create_info,
    uint8_t *stream_ptr_start,
    uint32_t *stream_len_ptr)
 {
-   /* TODO: handle non-rogue GPUs */
-   assert(arch == PVR_DEVICE_ARCH_ROGUE);
-   struct pvr_rogue_winsys_render_ctx_static_state *ws_static_state =
-      &create_info->static_state.rogue;
-
+   struct pvr_winsys_render_ctx_static_state *ws_static_state =
+      &create_info->static_state;
    uint64_t *stream_ptr = (uint64_t *)stream_ptr_start;
 
    /* Leave space for stream header. */
-   stream_ptr++;
+   stream_ptr += pvr_cmd_length(KMD_STREAM_HDR) / 2;
 
    *stream_ptr++ = ws_static_state->vdm_ctx_state_base_addr;
    /* geom_reg_vdm_context_state_resume_addr is unused and zeroed. */
@@ -181,7 +178,9 @@ static void pvr_drm_render_ctx_static_state_init(
 
    *stream_len_ptr = ((uint8_t *)stream_ptr - stream_ptr_start);
 
-   *((uint64_t *)stream_ptr_start) = *stream_len_ptr;
+   pvr_csb_pack ((uint64_t *)stream_ptr_start, KMD_STREAM_HDR, value) {
+      value.length = *stream_len_ptr;
+   }
 }
 
 struct pvr_drm_winsys_render_ctx {
@@ -199,7 +198,6 @@ struct pvr_drm_winsys_render_ctx {
 VkResult pvr_drm_winsys_render_ctx_create(
    struct pvr_winsys *ws,
    struct pvr_winsys_render_ctx_create_info *create_info,
-   const struct pvr_device_info *dev_info,
    struct pvr_winsys_render_ctx **const ctx_out)
 {
    uint8_t static_ctx_state_fw_stream[192];
@@ -235,8 +233,7 @@ VkResult pvr_drm_winsys_render_ctx_create(
       goto err_free_ctx;
    }
 
-   pvr_drm_render_ctx_static_state_init(dev_info->ident.arch,
-                                        create_info,
+   pvr_drm_render_ctx_static_state_init(create_info,
                                         static_ctx_state_fw_stream,
                                         &ctx_args.static_context_state_len);
 

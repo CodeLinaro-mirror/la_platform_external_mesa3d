@@ -311,8 +311,8 @@ virgl_vtest_winsys_resource_create(struct virgl_winsys *vws,
 
    if ((flags & (VIRGL_RESOURCE_FLAG_MAP_PERSISTENT |
                  VIRGL_RESOURCE_FLAG_MAP_COHERENT))) {
-      width = align(width, getpagesize());
-      size = align(size, getpagesize());
+      width = ALIGN(width, getpagesize());
+      size = ALIGN(size, getpagesize());
       new_handle = virgl_vtest_winsys_resource_create_blob(vws, target, format, bind,
                                                            width, height, depth,
                                                            array_size, last_level, nr_samples,

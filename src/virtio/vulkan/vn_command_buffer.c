@@ -12,7 +12,6 @@
 
 #include "venus-protocol/vn_protocol_driver_command_buffer.h"
 #include "venus-protocol/vn_protocol_driver_command_pool.h"
-#include "vk_synchronization.h"
 
 #include "vn_descriptor_set.h"
 #include "vn_device.h"
@@ -690,7 +689,7 @@ vn_cmd_end_rendering(struct vn_command_buffer *cmd)
 
 /* command pool commands */
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateCommandPool(VkDevice device,
                      const VkCommandPoolCreateInfo *pCreateInfo,
                      const VkAllocationCallbacks *pAllocator,
@@ -745,7 +744,7 @@ vn_cmd_reset(struct vn_command_buffer *cmd)
    }
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyCommandPool(VkDevice device,
                       VkCommandPool commandPool,
                       const VkAllocationCallbacks *pAllocator)
@@ -773,7 +772,7 @@ vn_DestroyCommandPool(VkDevice device,
    vk_free(alloc, pool);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_ResetCommandPool(VkDevice device,
                     VkCommandPool commandPool,
                     VkCommandPoolResetFlags flags)
@@ -804,7 +803,7 @@ vn_ResetCommandPool(VkDevice device,
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_TrimCommandPool(VkDevice device,
                    VkCommandPool commandPool,
                    VkCommandPoolTrimFlags flags)
@@ -831,7 +830,7 @@ static const struct vk_command_buffer_ops vn_cmd_ops = {
    .destroy = vn_cmd_destroy,
 };
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_AllocateCommandBuffers(VkDevice device,
                           const VkCommandBufferAllocateInfo *pAllocateInfo,
                           VkCommandBuffer *pCommandBuffers)
@@ -876,7 +875,7 @@ vn_AllocateCommandBuffers(VkDevice device,
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_FreeCommandBuffers(VkDevice device,
                       VkCommandPool commandPool,
                       uint32_t commandBufferCount,
@@ -904,7 +903,7 @@ vn_FreeCommandBuffers(VkDevice device,
    }
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_ResetCommandBuffer(VkCommandBuffer commandBuffer,
                       VkCommandBufferResetFlags flags)
 {
@@ -925,7 +924,6 @@ struct vn_command_buffer_begin_info {
    VkCommandBufferInheritanceInfo inheritance;
    VkCommandBufferInheritanceConditionalRenderingInfoEXT conditional_rendering;
    VkRenderingInputAttachmentIndexInfo riai;
-   VkCommandBufferInheritanceDescriptorHeapInfoEXT desc_heap;
 
    bool has_inherited_pass;
    bool in_render_pass;
@@ -1005,10 +1003,6 @@ vn_fix_command_buffer_begin_info(struct vn_command_buffer *cmd,
                 sizeof(VkRenderingInputAttachmentIndexInfo));
          pnext = &local->riai;
          break;
-      case VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_DESCRIPTOR_HEAP_INFO_EXT:
-         memcpy(&local->desc_heap, src, sizeof(local->desc_heap));
-         pnext = &local->desc_heap;
-         break;
       case VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO:
       case VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_LOCATION_INFO:
       default:
@@ -1029,7 +1023,7 @@ vn_fix_command_buffer_begin_info(struct vn_command_buffer *cmd,
    return &local->begin;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_BeginCommandBuffer(VkCommandBuffer commandBuffer,
                       const VkCommandBufferBeginInfo *pBeginInfo)
 {
@@ -1115,7 +1109,7 @@ vn_cmd_submit(struct vn_command_buffer *cmd)
    vn_cs_encoder_reset(&cmd->cs);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_EndCommandBuffer(VkCommandBuffer commandBuffer)
 {
    VN_TRACE_FUNC();
@@ -1145,7 +1139,7 @@ vn_EndCommandBuffer(VkCommandBuffer commandBuffer)
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBindPipeline(VkCommandBuffer commandBuffer,
                    VkPipelineBindPoint pipelineBindPoint,
                    VkPipeline pipeline)
@@ -1154,7 +1148,7 @@ vn_CmdBindPipeline(VkCommandBuffer commandBuffer,
                   pipeline);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetViewport(VkCommandBuffer commandBuffer,
                   uint32_t firstViewport,
                   uint32_t viewportCount,
@@ -1164,7 +1158,7 @@ vn_CmdSetViewport(VkCommandBuffer commandBuffer,
                   viewportCount, pViewports);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetScissor(VkCommandBuffer commandBuffer,
                  uint32_t firstScissor,
                  uint32_t scissorCount,
@@ -1174,13 +1168,13 @@ vn_CmdSetScissor(VkCommandBuffer commandBuffer,
                   pScissors);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetLineWidth(VkCommandBuffer commandBuffer, float lineWidth)
 {
    VN_CMD_ENQUEUE(vkCmdSetLineWidth, commandBuffer, lineWidth);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDepthBias(VkCommandBuffer commandBuffer,
                    float depthBiasConstantFactor,
                    float depthBiasClamp,
@@ -1190,14 +1184,14 @@ vn_CmdSetDepthBias(VkCommandBuffer commandBuffer,
                   depthBiasClamp, depthBiasSlopeFactor);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetBlendConstants(VkCommandBuffer commandBuffer,
                         const float blendConstants[4])
 {
    VN_CMD_ENQUEUE(vkCmdSetBlendConstants, commandBuffer, blendConstants);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDepthBounds(VkCommandBuffer commandBuffer,
                      float minDepthBounds,
                      float maxDepthBounds)
@@ -1206,7 +1200,7 @@ vn_CmdSetDepthBounds(VkCommandBuffer commandBuffer,
                   maxDepthBounds);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetStencilCompareMask(VkCommandBuffer commandBuffer,
                             VkStencilFaceFlags faceMask,
                             uint32_t compareMask)
@@ -1215,7 +1209,7 @@ vn_CmdSetStencilCompareMask(VkCommandBuffer commandBuffer,
                   compareMask);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetStencilWriteMask(VkCommandBuffer commandBuffer,
                           VkStencilFaceFlags faceMask,
                           uint32_t writeMask)
@@ -1224,7 +1218,7 @@ vn_CmdSetStencilWriteMask(VkCommandBuffer commandBuffer,
                   writeMask);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetStencilReference(VkCommandBuffer commandBuffer,
                           VkStencilFaceFlags faceMask,
                           uint32_t reference)
@@ -1233,7 +1227,7 @@ vn_CmdSetStencilReference(VkCommandBuffer commandBuffer,
                   reference);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBindDescriptorSets(VkCommandBuffer commandBuffer,
                          VkPipelineBindPoint pipelineBindPoint,
                          VkPipelineLayout layout,
@@ -1248,7 +1242,7 @@ vn_CmdBindDescriptorSets(VkCommandBuffer commandBuffer,
                   dynamicOffsetCount, pDynamicOffsets);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBindDescriptorSets2(
    VkCommandBuffer commandBuffer,
    const VkBindDescriptorSetsInfo *pBindDescriptorSetsInfo)
@@ -1257,7 +1251,7 @@ vn_CmdBindDescriptorSets2(
                   pBindDescriptorSetsInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBindIndexBuffer(VkCommandBuffer commandBuffer,
                       VkBuffer buffer,
                       VkDeviceSize offset,
@@ -1267,7 +1261,7 @@ vn_CmdBindIndexBuffer(VkCommandBuffer commandBuffer,
                   indexType);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBindIndexBuffer2(VkCommandBuffer commandBuffer,
                        VkBuffer buffer,
                        VkDeviceSize offset,
@@ -1278,7 +1272,7 @@ vn_CmdBindIndexBuffer2(VkCommandBuffer commandBuffer,
                   indexType);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBindVertexBuffers(VkCommandBuffer commandBuffer,
                         uint32_t firstBinding,
                         uint32_t bindingCount,
@@ -1289,7 +1283,7 @@ vn_CmdBindVertexBuffers(VkCommandBuffer commandBuffer,
                   bindingCount, pBuffers, pOffsets);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdDraw(VkCommandBuffer commandBuffer,
            uint32_t vertexCount,
            uint32_t instanceCount,
@@ -1300,7 +1294,7 @@ vn_CmdDraw(VkCommandBuffer commandBuffer,
                   firstVertex, firstInstance);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBeginRendering(VkCommandBuffer commandBuffer,
                      const VkRenderingInfo *pRenderingInfo)
 {
@@ -1310,7 +1304,7 @@ vn_CmdBeginRendering(VkCommandBuffer commandBuffer,
    VN_CMD_ENQUEUE(vkCmdBeginRendering, commandBuffer, pRenderingInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdEndRendering(VkCommandBuffer commandBuffer)
 {
    VN_CMD_ENQUEUE(vkCmdEndRendering, commandBuffer);
@@ -1318,7 +1312,7 @@ vn_CmdEndRendering(VkCommandBuffer commandBuffer)
    vn_cmd_end_rendering(vn_command_buffer_from_handle(commandBuffer));
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdDrawIndexed(VkCommandBuffer commandBuffer,
                   uint32_t indexCount,
                   uint32_t instanceCount,
@@ -1330,7 +1324,7 @@ vn_CmdDrawIndexed(VkCommandBuffer commandBuffer,
                   firstIndex, vertexOffset, firstInstance);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdDrawIndirect(VkCommandBuffer commandBuffer,
                    VkBuffer buffer,
                    VkDeviceSize offset,
@@ -1341,7 +1335,7 @@ vn_CmdDrawIndirect(VkCommandBuffer commandBuffer,
                   stride);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdDrawIndexedIndirect(VkCommandBuffer commandBuffer,
                           VkBuffer buffer,
                           VkDeviceSize offset,
@@ -1352,7 +1346,7 @@ vn_CmdDrawIndexedIndirect(VkCommandBuffer commandBuffer,
                   drawCount, stride);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdDrawIndirectCount(VkCommandBuffer commandBuffer,
                         VkBuffer buffer,
                         VkDeviceSize offset,
@@ -1365,7 +1359,7 @@ vn_CmdDrawIndirectCount(VkCommandBuffer commandBuffer,
                   countBuffer, countBufferOffset, maxDrawCount, stride);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdDrawIndexedIndirectCount(VkCommandBuffer commandBuffer,
                                VkBuffer buffer,
                                VkDeviceSize offset,
@@ -1379,7 +1373,7 @@ vn_CmdDrawIndexedIndirectCount(VkCommandBuffer commandBuffer,
                   stride);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdDispatch(VkCommandBuffer commandBuffer,
                uint32_t groupCountX,
                uint32_t groupCountY,
@@ -1389,7 +1383,7 @@ vn_CmdDispatch(VkCommandBuffer commandBuffer,
                   groupCountZ);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdDispatchIndirect(VkCommandBuffer commandBuffer,
                        VkBuffer buffer,
                        VkDeviceSize offset)
@@ -1397,7 +1391,7 @@ vn_CmdDispatchIndirect(VkCommandBuffer commandBuffer,
    VN_CMD_ENQUEUE(vkCmdDispatchIndirect, commandBuffer, buffer, offset);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdCopyBuffer(VkCommandBuffer commandBuffer,
                  VkBuffer srcBuffer,
                  VkBuffer dstBuffer,
@@ -1408,14 +1402,14 @@ vn_CmdCopyBuffer(VkCommandBuffer commandBuffer,
                   regionCount, pRegions);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdCopyBuffer2(VkCommandBuffer commandBuffer,
                   const VkCopyBufferInfo2 *pCopyBufferInfo)
 {
    VN_CMD_ENQUEUE(vkCmdCopyBuffer2, commandBuffer, pCopyBufferInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdCopyImage(VkCommandBuffer commandBuffer,
                 VkImage srcImage,
                 VkImageLayout srcImageLayout,
@@ -1428,14 +1422,14 @@ vn_CmdCopyImage(VkCommandBuffer commandBuffer,
                   dstImage, dstImageLayout, regionCount, pRegions);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdCopyImage2(VkCommandBuffer commandBuffer,
                  const VkCopyImageInfo2 *pCopyImageInfo)
 {
    VN_CMD_ENQUEUE(vkCmdCopyImage2, commandBuffer, pCopyImageInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBlitImage(VkCommandBuffer commandBuffer,
                 VkImage srcImage,
                 VkImageLayout srcImageLayout,
@@ -1449,14 +1443,14 @@ vn_CmdBlitImage(VkCommandBuffer commandBuffer,
                   dstImage, dstImageLayout, regionCount, pRegions, filter);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBlitImage2(VkCommandBuffer commandBuffer,
                  const VkBlitImageInfo2 *pBlitImageInfo)
 {
    VN_CMD_ENQUEUE(vkCmdBlitImage2, commandBuffer, pBlitImageInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdCopyBufferToImage(VkCommandBuffer commandBuffer,
                         VkBuffer srcBuffer,
                         VkImage dstImage,
@@ -1468,7 +1462,7 @@ vn_CmdCopyBufferToImage(VkCommandBuffer commandBuffer,
                   dstImageLayout, regionCount, pRegions);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdCopyBufferToImage2(
    VkCommandBuffer commandBuffer,
    const VkCopyBufferToImageInfo2 *pCopyBufferToImageInfo)
@@ -1477,7 +1471,7 @@ vn_CmdCopyBufferToImage2(
                   pCopyBufferToImageInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdCopyImageToBuffer(VkCommandBuffer commandBuffer,
                         VkImage srcImage,
                         VkImageLayout srcImageLayout,
@@ -1485,23 +1479,11 @@ vn_CmdCopyImageToBuffer(VkCommandBuffer commandBuffer,
                         uint32_t regionCount,
                         const VkBufferImageCopy *pRegions)
 {
-   struct vn_image *img = vn_image_from_handle(srcImage);
-   struct vn_buffer *buf = vn_buffer_from_handle(dstBuffer);
-
-   /* The prime blit dst buffer is internal to common wsi layer. Only the
-    * corresponding wsi image can blit to it.
-    */
-   if (buf->wsi.mem) {
-      assert(img->wsi.is_prime_blit_src);
-      assert(!img->wsi.blit_mem || img->wsi.blit_mem == buf->wsi.mem);
-      img->wsi.blit_mem = buf->wsi.mem;
-   }
-
    VN_CMD_ENQUEUE(vkCmdCopyImageToBuffer, commandBuffer, srcImage,
                   srcImageLayout, dstBuffer, regionCount, pRegions);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdCopyImageToBuffer2(
    VkCommandBuffer commandBuffer,
    const VkCopyImageToBufferInfo2 *pCopyImageToBufferInfo)
@@ -1510,7 +1492,7 @@ vn_CmdCopyImageToBuffer2(
                   pCopyImageToBufferInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdUpdateBuffer(VkCommandBuffer commandBuffer,
                    VkBuffer dstBuffer,
                    VkDeviceSize dstOffset,
@@ -1521,7 +1503,7 @@ vn_CmdUpdateBuffer(VkCommandBuffer commandBuffer,
                   dataSize, pData);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdFillBuffer(VkCommandBuffer commandBuffer,
                  VkBuffer dstBuffer,
                  VkDeviceSize dstOffset,
@@ -1532,7 +1514,7 @@ vn_CmdFillBuffer(VkCommandBuffer commandBuffer,
                   data);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdClearColorImage(VkCommandBuffer commandBuffer,
                       VkImage image,
                       VkImageLayout imageLayout,
@@ -1544,7 +1526,7 @@ vn_CmdClearColorImage(VkCommandBuffer commandBuffer,
                   pColor, rangeCount, pRanges);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdClearDepthStencilImage(VkCommandBuffer commandBuffer,
                              VkImage image,
                              VkImageLayout imageLayout,
@@ -1556,7 +1538,7 @@ vn_CmdClearDepthStencilImage(VkCommandBuffer commandBuffer,
                   imageLayout, pDepthStencil, rangeCount, pRanges);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdClearAttachments(VkCommandBuffer commandBuffer,
                        uint32_t attachmentCount,
                        const VkClearAttachment *pAttachments,
@@ -1567,7 +1549,7 @@ vn_CmdClearAttachments(VkCommandBuffer commandBuffer,
                   pAttachments, rectCount, pRects);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdResolveImage(VkCommandBuffer commandBuffer,
                    VkImage srcImage,
                    VkImageLayout srcImageLayout,
@@ -1580,14 +1562,14 @@ vn_CmdResolveImage(VkCommandBuffer commandBuffer,
                   dstImage, dstImageLayout, regionCount, pRegions);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdResolveImage2(VkCommandBuffer commandBuffer,
                     const VkResolveImageInfo2 *pResolveImageInfo)
 {
    VN_CMD_ENQUEUE(vkCmdResolveImage2, commandBuffer, pResolveImageInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetEvent(VkCommandBuffer commandBuffer,
                VkEvent event,
                VkPipelineStageFlags stageMask)
@@ -1598,7 +1580,24 @@ vn_CmdSetEvent(VkCommandBuffer commandBuffer,
                                 false);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+static VkPipelineStageFlags2
+vn_dependency_info_collect_src_stage_mask(const VkDependencyInfo *dep_info)
+{
+   VkPipelineStageFlags2 mask = 0;
+
+   for (uint32_t i = 0; i < dep_info->memoryBarrierCount; i++)
+      mask |= dep_info->pMemoryBarriers[i].srcStageMask;
+
+   for (uint32_t i = 0; i < dep_info->bufferMemoryBarrierCount; i++)
+      mask |= dep_info->pBufferMemoryBarriers[i].srcStageMask;
+
+   for (uint32_t i = 0; i < dep_info->imageMemoryBarrierCount; i++)
+      mask |= dep_info->pImageMemoryBarriers[i].srcStageMask;
+
+   return mask;
+}
+
+void
 vn_CmdSetEvent2(VkCommandBuffer commandBuffer,
                 VkEvent event,
                 const VkDependencyInfo *pDependencyInfo)
@@ -1612,12 +1611,12 @@ vn_CmdSetEvent2(VkCommandBuffer commandBuffer,
    VN_CMD_ENQUEUE(vkCmdSetEvent2, commandBuffer, event, pDependencyInfo);
 
    const VkPipelineStageFlags2 src_stage_mask =
-      vk_collect_dependency_info_src_stages(pDependencyInfo);
+      vn_dependency_info_collect_src_stage_mask(pDependencyInfo);
    vn_event_feedback_cmd_record(commandBuffer, event, src_stage_mask,
                                 VK_EVENT_SET, true);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdResetEvent(VkCommandBuffer commandBuffer,
                  VkEvent event,
                  VkPipelineStageFlags stageMask)
@@ -1628,7 +1627,7 @@ vn_CmdResetEvent(VkCommandBuffer commandBuffer,
                                 VK_EVENT_RESET, false);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdResetEvent2(VkCommandBuffer commandBuffer,
                   VkEvent event,
                   VkPipelineStageFlags2 stageMask)
@@ -1638,7 +1637,7 @@ vn_CmdResetEvent2(VkCommandBuffer commandBuffer,
                                 VK_EVENT_RESET, true);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdWaitEvents(VkCommandBuffer commandBuffer,
                  uint32_t eventCount,
                  const VkEvent *pEvents,
@@ -1672,7 +1671,7 @@ vn_CmdWaitEvents(VkCommandBuffer commandBuffer,
    }
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdWaitEvents2(VkCommandBuffer commandBuffer,
                   uint32_t eventCount,
                   const VkEvent *pEvents,
@@ -1688,7 +1687,7 @@ vn_CmdWaitEvents2(VkCommandBuffer commandBuffer,
                   pDependencyInfos);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdPipelineBarrier(VkCommandBuffer commandBuffer,
                       VkPipelineStageFlags srcStageMask,
                       VkPipelineStageFlags dstStageMask,
@@ -1713,7 +1712,7 @@ vn_CmdPipelineBarrier(VkCommandBuffer commandBuffer,
                   pImageMemoryBarriers);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdPipelineBarrier2(VkCommandBuffer commandBuffer,
                        const VkDependencyInfo *pDependencyInfo)
 {
@@ -1725,7 +1724,7 @@ vn_CmdPipelineBarrier2(VkCommandBuffer commandBuffer,
    VN_CMD_ENQUEUE(vkCmdPipelineBarrier2, commandBuffer, pDependencyInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBeginQuery(VkCommandBuffer commandBuffer,
                  VkQueryPool queryPool,
                  uint32_t query,
@@ -1781,7 +1780,7 @@ vn_cmd_record_query(VkCommandBuffer cmd_handle,
    list_addtail(&record->head, &cmd->builder.query_records);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdEndQuery(VkCommandBuffer commandBuffer,
                VkQueryPool queryPool,
                uint32_t query)
@@ -1792,7 +1791,7 @@ vn_CmdEndQuery(VkCommandBuffer commandBuffer,
    vn_cmd_record_query(commandBuffer, queryPool, query, query_count, true);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdResetQueryPool(VkCommandBuffer commandBuffer,
                      VkQueryPool queryPool,
                      uint32_t firstQuery,
@@ -1805,7 +1804,7 @@ vn_CmdResetQueryPool(VkCommandBuffer commandBuffer,
                        false);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdWriteTimestamp(VkCommandBuffer commandBuffer,
                      VkPipelineStageFlagBits pipelineStage,
                      VkQueryPool queryPool,
@@ -1818,7 +1817,7 @@ vn_CmdWriteTimestamp(VkCommandBuffer commandBuffer,
    vn_cmd_record_query(commandBuffer, queryPool, query, query_count, true);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdWriteTimestamp2(VkCommandBuffer commandBuffer,
                       VkPipelineStageFlagBits2 stage,
                       VkQueryPool queryPool,
@@ -1831,7 +1830,7 @@ vn_CmdWriteTimestamp2(VkCommandBuffer commandBuffer,
    vn_cmd_record_query(commandBuffer, queryPool, query, query_count, true);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdCopyQueryPoolResults(VkCommandBuffer commandBuffer,
                            VkQueryPool queryPool,
                            uint32_t firstQuery,
@@ -1846,7 +1845,7 @@ vn_CmdCopyQueryPoolResults(VkCommandBuffer commandBuffer,
                   flags);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdPushConstants(VkCommandBuffer commandBuffer,
                     VkPipelineLayout layout,
                     VkShaderStageFlags stageFlags,
@@ -1858,14 +1857,14 @@ vn_CmdPushConstants(VkCommandBuffer commandBuffer,
                   offset, size, pValues);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdPushConstants2(VkCommandBuffer commandBuffer,
                      const VkPushConstantsInfo *pPushConstantsInfo)
 {
    VN_CMD_ENQUEUE(vkCmdPushConstants2, commandBuffer, pPushConstantsInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBeginRenderPass(VkCommandBuffer commandBuffer,
                       const VkRenderPassBeginInfo *pRenderPassBegin,
                       VkSubpassContents contents)
@@ -1882,7 +1881,7 @@ vn_CmdBeginRenderPass(VkCommandBuffer commandBuffer,
                   contents);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents)
 {
    vn_cmd_next_subpass(vn_command_buffer_from_handle(commandBuffer));
@@ -1890,7 +1889,7 @@ vn_CmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents)
    VN_CMD_ENQUEUE(vkCmdNextSubpass, commandBuffer, contents);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdEndRenderPass(VkCommandBuffer commandBuffer)
 {
    VN_CMD_ENQUEUE(vkCmdEndRenderPass, commandBuffer);
@@ -1898,7 +1897,7 @@ vn_CmdEndRenderPass(VkCommandBuffer commandBuffer)
    vn_cmd_end_render_pass(vn_command_buffer_from_handle(commandBuffer));
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBeginRenderPass2(VkCommandBuffer commandBuffer,
                        const VkRenderPassBeginInfo *pRenderPassBegin,
                        const VkSubpassBeginInfo *pSubpassBeginInfo)
@@ -1915,7 +1914,7 @@ vn_CmdBeginRenderPass2(VkCommandBuffer commandBuffer,
                   pSubpassBeginInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdNextSubpass2(VkCommandBuffer commandBuffer,
                    const VkSubpassBeginInfo *pSubpassBeginInfo,
                    const VkSubpassEndInfo *pSubpassEndInfo)
@@ -1926,7 +1925,7 @@ vn_CmdNextSubpass2(VkCommandBuffer commandBuffer,
                   pSubpassEndInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdEndRenderPass2(VkCommandBuffer commandBuffer,
                      const VkSubpassEndInfo *pSubpassEndInfo)
 {
@@ -1935,7 +1934,7 @@ vn_CmdEndRenderPass2(VkCommandBuffer commandBuffer,
    vn_cmd_end_render_pass(vn_command_buffer_from_handle(commandBuffer));
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdExecuteCommands(VkCommandBuffer commandBuffer,
                       uint32_t commandBufferCount,
                       const VkCommandBuffer *pCommandBuffers)
@@ -1952,13 +1951,13 @@ vn_CmdExecuteCommands(VkCommandBuffer commandBuffer,
    }
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDeviceMask(VkCommandBuffer commandBuffer, uint32_t deviceMask)
 {
    VN_CMD_ENQUEUE(vkCmdSetDeviceMask, commandBuffer, deviceMask);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdDispatchBase(VkCommandBuffer commandBuffer,
                    uint32_t baseGroupX,
                    uint32_t baseGroupY,
@@ -1971,7 +1970,7 @@ vn_CmdDispatchBase(VkCommandBuffer commandBuffer,
                   baseGroupZ, groupCountX, groupCountY, groupCountZ);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetLineStipple(VkCommandBuffer commandBuffer,
                      uint32_t lineStippleFactor,
                      uint16_t lineStipplePattern)
@@ -1980,7 +1979,7 @@ vn_CmdSetLineStipple(VkCommandBuffer commandBuffer,
                   lineStipplePattern);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBeginQueryIndexedEXT(VkCommandBuffer commandBuffer,
                            VkQueryPool queryPool,
                            uint32_t query,
@@ -1991,7 +1990,7 @@ vn_CmdBeginQueryIndexedEXT(VkCommandBuffer commandBuffer,
                   flags, index);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdEndQueryIndexedEXT(VkCommandBuffer commandBuffer,
                          VkQueryPool queryPool,
                          uint32_t query,
@@ -2004,7 +2003,7 @@ vn_CmdEndQueryIndexedEXT(VkCommandBuffer commandBuffer,
    vn_cmd_record_query(commandBuffer, queryPool, query, query_count, true);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBindTransformFeedbackBuffersEXT(VkCommandBuffer commandBuffer,
                                       uint32_t firstBinding,
                                       uint32_t bindingCount,
@@ -2016,7 +2015,7 @@ vn_CmdBindTransformFeedbackBuffersEXT(VkCommandBuffer commandBuffer,
                   firstBinding, bindingCount, pBuffers, pOffsets, pSizes);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBeginTransformFeedbackEXT(VkCommandBuffer commandBuffer,
                                 uint32_t firstCounterBuffer,
                                 uint32_t counterBufferCount,
@@ -2028,7 +2027,7 @@ vn_CmdBeginTransformFeedbackEXT(VkCommandBuffer commandBuffer,
                   pCounterBufferOffsets);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdEndTransformFeedbackEXT(VkCommandBuffer commandBuffer,
                               uint32_t firstCounterBuffer,
                               uint32_t counterBufferCount,
@@ -2040,7 +2039,7 @@ vn_CmdEndTransformFeedbackEXT(VkCommandBuffer commandBuffer,
                   pCounterBufferOffsets);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdDrawIndirectByteCountEXT(VkCommandBuffer commandBuffer,
                                uint32_t instanceCount,
                                uint32_t firstInstance,
@@ -2054,7 +2053,7 @@ vn_CmdDrawIndirectByteCountEXT(VkCommandBuffer commandBuffer,
                   counterOffset, vertexStride);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBindVertexBuffers2(VkCommandBuffer commandBuffer,
                          uint32_t firstBinding,
                          uint32_t bindingCount,
@@ -2067,13 +2066,13 @@ vn_CmdBindVertexBuffers2(VkCommandBuffer commandBuffer,
                   bindingCount, pBuffers, pOffsets, pSizes, pStrides);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetCullMode(VkCommandBuffer commandBuffer, VkCullModeFlags cullMode)
 {
    VN_CMD_ENQUEUE(vkCmdSetCullMode, commandBuffer, cullMode);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDepthBoundsTestEnable(VkCommandBuffer commandBuffer,
                                VkBool32 depthBoundsTestEnable)
 {
@@ -2081,34 +2080,34 @@ vn_CmdSetDepthBoundsTestEnable(VkCommandBuffer commandBuffer,
                   depthBoundsTestEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDepthCompareOp(VkCommandBuffer commandBuffer,
                         VkCompareOp depthCompareOp)
 {
    VN_CMD_ENQUEUE(vkCmdSetDepthCompareOp, commandBuffer, depthCompareOp);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDepthTestEnable(VkCommandBuffer commandBuffer,
                          VkBool32 depthTestEnable)
 {
    VN_CMD_ENQUEUE(vkCmdSetDepthTestEnable, commandBuffer, depthTestEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDepthWriteEnable(VkCommandBuffer commandBuffer,
                           VkBool32 depthWriteEnable)
 {
    VN_CMD_ENQUEUE(vkCmdSetDepthWriteEnable, commandBuffer, depthWriteEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetFrontFace(VkCommandBuffer commandBuffer, VkFrontFace frontFace)
 {
    VN_CMD_ENQUEUE(vkCmdSetFrontFace, commandBuffer, frontFace);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetPrimitiveTopology(VkCommandBuffer commandBuffer,
                            VkPrimitiveTopology primitiveTopology)
 {
@@ -2116,7 +2115,7 @@ vn_CmdSetPrimitiveTopology(VkCommandBuffer commandBuffer,
                   primitiveTopology);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetScissorWithCount(VkCommandBuffer commandBuffer,
                           uint32_t scissorCount,
                           const VkRect2D *pScissors)
@@ -2125,7 +2124,7 @@ vn_CmdSetScissorWithCount(VkCommandBuffer commandBuffer,
                   pScissors);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetStencilOp(VkCommandBuffer commandBuffer,
                    VkStencilFaceFlags faceMask,
                    VkStencilOp failOp,
@@ -2137,7 +2136,7 @@ vn_CmdSetStencilOp(VkCommandBuffer commandBuffer,
                   depthFailOp, compareOp);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetStencilTestEnable(VkCommandBuffer commandBuffer,
                            VkBool32 stencilTestEnable)
 {
@@ -2145,7 +2144,7 @@ vn_CmdSetStencilTestEnable(VkCommandBuffer commandBuffer,
                   stencilTestEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetViewportWithCount(VkCommandBuffer commandBuffer,
                            uint32_t viewportCount,
                            const VkViewport *pViewports)
@@ -2154,20 +2153,20 @@ vn_CmdSetViewportWithCount(VkCommandBuffer commandBuffer,
                   pViewports);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDepthBiasEnable(VkCommandBuffer commandBuffer,
                          VkBool32 depthBiasEnable)
 {
    VN_CMD_ENQUEUE(vkCmdSetDepthBiasEnable, commandBuffer, depthBiasEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetLogicOpEXT(VkCommandBuffer commandBuffer, VkLogicOp logicOp)
 {
    VN_CMD_ENQUEUE(vkCmdSetLogicOpEXT, commandBuffer, logicOp);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetColorWriteEnableEXT(VkCommandBuffer commandBuffer,
                              uint32_t attachmentCount,
                              const VkBool32 *pColorWriteEnables)
@@ -2176,7 +2175,7 @@ vn_CmdSetColorWriteEnableEXT(VkCommandBuffer commandBuffer,
                   pColorWriteEnables);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetPatchControlPointsEXT(VkCommandBuffer commandBuffer,
                                uint32_t patchControlPoints)
 {
@@ -2184,7 +2183,7 @@ vn_CmdSetPatchControlPointsEXT(VkCommandBuffer commandBuffer,
                   patchControlPoints);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetPrimitiveRestartEnable(VkCommandBuffer commandBuffer,
                                 VkBool32 primitiveRestartEnable)
 {
@@ -2192,7 +2191,7 @@ vn_CmdSetPrimitiveRestartEnable(VkCommandBuffer commandBuffer,
                   primitiveRestartEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetRasterizerDiscardEnable(VkCommandBuffer commandBuffer,
                                  VkBool32 rasterizerDiscardEnable)
 {
@@ -2200,7 +2199,7 @@ vn_CmdSetRasterizerDiscardEnable(VkCommandBuffer commandBuffer,
                   rasterizerDiscardEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBeginConditionalRenderingEXT(
    VkCommandBuffer commandBuffer,
    const VkConditionalRenderingBeginInfoEXT *pConditionalRenderingBegin)
@@ -2209,13 +2208,13 @@ vn_CmdBeginConditionalRenderingEXT(
                   pConditionalRenderingBegin);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdEndConditionalRenderingEXT(VkCommandBuffer commandBuffer)
 {
    VN_CMD_ENQUEUE(vkCmdEndConditionalRenderingEXT, commandBuffer);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdDrawMultiEXT(VkCommandBuffer commandBuffer,
                    uint32_t drawCount,
                    const VkMultiDrawInfoEXT *pVertexInfo,
@@ -2227,7 +2226,7 @@ vn_CmdDrawMultiEXT(VkCommandBuffer commandBuffer,
                   instanceCount, firstInstance, stride);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdDrawMultiIndexedEXT(VkCommandBuffer commandBuffer,
                           uint32_t drawCount,
                           const VkMultiDrawIndexedInfoEXT *pIndexInfo,
@@ -2241,7 +2240,7 @@ vn_CmdDrawMultiIndexedEXT(VkCommandBuffer commandBuffer,
                   pVertexOffset);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdPushDescriptorSet(VkCommandBuffer commandBuffer,
                         VkPipelineBindPoint pipelineBindPoint,
                         VkPipelineLayout layout,
@@ -2268,7 +2267,7 @@ vn_CmdPushDescriptorSet(VkCommandBuffer commandBuffer,
    STACK_ARRAY_FINISH(img_infos);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdPushDescriptorSet2(VkCommandBuffer commandBuffer,
                          const VkPushDescriptorSetInfo *pPushDescriptorSetInfo)
 {
@@ -2295,7 +2294,7 @@ vn_CmdPushDescriptorSet2(VkCommandBuffer commandBuffer,
    STACK_ARRAY_FINISH(img_infos);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdPushDescriptorSetWithTemplate(
    VkCommandBuffer commandBuffer,
    VkDescriptorUpdateTemplate descriptorUpdateTemplate,
@@ -2337,7 +2336,7 @@ vn_CmdPushDescriptorSetWithTemplate(
    STACK_ARRAY_FINISH(accels);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdPushDescriptorSetWithTemplate2(VkCommandBuffer commandBuffer,
                                      const VkPushDescriptorSetWithTemplateInfo
                                         *pPushDescriptorSetWithTemplateInfo)
@@ -2410,7 +2409,7 @@ vn_CmdPushDescriptorSetWithTemplate2(VkCommandBuffer commandBuffer,
    STACK_ARRAY_FINISH(accels);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetVertexInputEXT(
    VkCommandBuffer commandBuffer,
    uint32_t vertexBindingDescriptionCount,
@@ -2424,7 +2423,7 @@ vn_CmdSetVertexInputEXT(
                   pVertexAttributeDescriptions);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetAlphaToCoverageEnableEXT(VkCommandBuffer commandBuffer,
                                   VkBool32 alphaToCoverageEnable)
 {
@@ -2432,7 +2431,7 @@ vn_CmdSetAlphaToCoverageEnableEXT(VkCommandBuffer commandBuffer,
                   alphaToCoverageEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetAlphaToOneEnableEXT(VkCommandBuffer commandBuffer,
                              VkBool32 alphaToOneEnable)
 {
@@ -2440,7 +2439,7 @@ vn_CmdSetAlphaToOneEnableEXT(VkCommandBuffer commandBuffer,
                   alphaToOneEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetColorBlendAdvancedEXT(
    VkCommandBuffer commandBuffer,
    uint32_t firstAttachment,
@@ -2451,7 +2450,7 @@ vn_CmdSetColorBlendAdvancedEXT(
                   firstAttachment, attachmentCount, pColorBlendAdvanced);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetColorBlendEnableEXT(VkCommandBuffer commandBuffer,
                              uint32_t firstAttachment,
                              uint32_t attachmentCount,
@@ -2461,7 +2460,7 @@ vn_CmdSetColorBlendEnableEXT(VkCommandBuffer commandBuffer,
                   attachmentCount, pColorBlendEnables);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetColorBlendEquationEXT(
    VkCommandBuffer commandBuffer,
    uint32_t firstAttachment,
@@ -2472,7 +2471,7 @@ vn_CmdSetColorBlendEquationEXT(
                   firstAttachment, attachmentCount, pColorBlendEquations);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetColorWriteMaskEXT(VkCommandBuffer commandBuffer,
                            uint32_t firstAttachment,
                            uint32_t attachmentCount,
@@ -2482,7 +2481,7 @@ vn_CmdSetColorWriteMaskEXT(VkCommandBuffer commandBuffer,
                   attachmentCount, pColorWriteMasks);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetConservativeRasterizationModeEXT(
    VkCommandBuffer commandBuffer,
    VkConservativeRasterizationModeEXT conservativeRasterizationMode)
@@ -2491,7 +2490,7 @@ vn_CmdSetConservativeRasterizationModeEXT(
                   conservativeRasterizationMode);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDepthClampEnableEXT(VkCommandBuffer commandBuffer,
                              VkBool32 depthClampEnable)
 {
@@ -2499,14 +2498,14 @@ vn_CmdSetDepthClampEnableEXT(VkCommandBuffer commandBuffer,
                   depthClampEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDepthClipEnableEXT(VkCommandBuffer commandBuffer,
                             VkBool32 depthClipEnable)
 {
    VN_CMD_ENQUEUE(vkCmdSetDepthClipEnableEXT, commandBuffer, depthClipEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDepthClipNegativeOneToOneEXT(VkCommandBuffer commandBuffer,
                                       VkBool32 negativeOneToOne)
 {
@@ -2514,7 +2513,7 @@ vn_CmdSetDepthClipNegativeOneToOneEXT(VkCommandBuffer commandBuffer,
                   negativeOneToOne);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetExtraPrimitiveOverestimationSizeEXT(
    VkCommandBuffer commandBuffer, float extraPrimitiveOverestimationSize)
 {
@@ -2522,7 +2521,7 @@ vn_CmdSetExtraPrimitiveOverestimationSizeEXT(
                   extraPrimitiveOverestimationSize);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetLineRasterizationModeEXT(
    VkCommandBuffer commandBuffer,
    VkLineRasterizationMode lineRasterizationMode)
@@ -2531,7 +2530,7 @@ vn_CmdSetLineRasterizationModeEXT(
                   lineRasterizationMode);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetLineStippleEnableEXT(VkCommandBuffer commandBuffer,
                               VkBool32 stippledLineEnable)
 {
@@ -2539,21 +2538,21 @@ vn_CmdSetLineStippleEnableEXT(VkCommandBuffer commandBuffer,
                   stippledLineEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetLogicOpEnableEXT(VkCommandBuffer commandBuffer,
                           VkBool32 logicOpEnable)
 {
    VN_CMD_ENQUEUE(vkCmdSetLogicOpEnableEXT, commandBuffer, logicOpEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetPolygonModeEXT(VkCommandBuffer commandBuffer,
                         VkPolygonMode polygonMode)
 {
    VN_CMD_ENQUEUE(vkCmdSetPolygonModeEXT, commandBuffer, polygonMode);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetProvokingVertexModeEXT(VkCommandBuffer commandBuffer,
                                 VkProvokingVertexModeEXT provokingVertexMode)
 {
@@ -2561,7 +2560,7 @@ vn_CmdSetProvokingVertexModeEXT(VkCommandBuffer commandBuffer,
                   provokingVertexMode);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetRasterizationSamplesEXT(VkCommandBuffer commandBuffer,
                                  VkSampleCountFlagBits rasterizationSamples)
 {
@@ -2569,7 +2568,7 @@ vn_CmdSetRasterizationSamplesEXT(VkCommandBuffer commandBuffer,
                   rasterizationSamples);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetRasterizationStreamEXT(VkCommandBuffer commandBuffer,
                                 uint32_t rasterizationStream)
 {
@@ -2577,7 +2576,7 @@ vn_CmdSetRasterizationStreamEXT(VkCommandBuffer commandBuffer,
                   rasterizationStream);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetSampleLocationsEnableEXT(VkCommandBuffer commandBuffer,
                                   VkBool32 sampleLocationsEnable)
 {
@@ -2585,7 +2584,7 @@ vn_CmdSetSampleLocationsEnableEXT(VkCommandBuffer commandBuffer,
                   sampleLocationsEnable);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetSampleMaskEXT(VkCommandBuffer commandBuffer,
                        VkSampleCountFlagBits samples,
                        const VkSampleMask *pSampleMask)
@@ -2593,7 +2592,7 @@ vn_CmdSetSampleMaskEXT(VkCommandBuffer commandBuffer,
    VN_CMD_ENQUEUE(vkCmdSetSampleMaskEXT, commandBuffer, samples, pSampleMask);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetTessellationDomainOriginEXT(VkCommandBuffer commandBuffer,
                                      VkTessellationDomainOrigin domainOrigin)
 {
@@ -2601,7 +2600,7 @@ vn_CmdSetTessellationDomainOriginEXT(VkCommandBuffer commandBuffer,
                   domainOrigin);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetFragmentShadingRateKHR(
    VkCommandBuffer commandBuffer,
    const VkExtent2D *pFragmentSize,
@@ -2611,7 +2610,7 @@ vn_CmdSetFragmentShadingRateKHR(
                   pFragmentSize, combinerOps);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetSampleLocationsEXT(
    VkCommandBuffer commandBuffer,
    const VkSampleLocationsInfoEXT *pSampleLocationsInfo)
@@ -2620,7 +2619,7 @@ vn_CmdSetSampleLocationsEXT(
                   pSampleLocationsInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetRenderingAttachmentLocations(
    VkCommandBuffer commandBuffer,
    const VkRenderingAttachmentLocationInfo *pLocationInfo)
@@ -2629,7 +2628,7 @@ vn_CmdSetRenderingAttachmentLocations(
                   pLocationInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetRenderingInputAttachmentIndices(
    VkCommandBuffer commandBuffer,
    const VkRenderingInputAttachmentIndexInfo *pInputAttachmentIndexInfo)
@@ -2638,7 +2637,7 @@ vn_CmdSetRenderingInputAttachmentIndices(
                   pInputAttachmentIndexInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBuildAccelerationStructuresIndirectKHR(
    VkCommandBuffer commandBuffer,
    uint32_t infoCount,
@@ -2652,7 +2651,7 @@ vn_CmdBuildAccelerationStructuresIndirectKHR(
                   pIndirectStrides, ppMaxPrimitiveCounts);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdBuildAccelerationStructuresKHR(
    VkCommandBuffer commandBuffer,
    uint32_t infoCount,
@@ -2663,7 +2662,7 @@ vn_CmdBuildAccelerationStructuresKHR(
                   infoCount, pInfos, ppBuildRangeInfos);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdCopyAccelerationStructureKHR(
    VkCommandBuffer commandBuffer,
    const VkCopyAccelerationStructureInfoKHR *pInfo)
@@ -2671,7 +2670,7 @@ vn_CmdCopyAccelerationStructureKHR(
    VN_CMD_ENQUEUE(vkCmdCopyAccelerationStructureKHR, commandBuffer, pInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdCopyAccelerationStructureToMemoryKHR(
    VkCommandBuffer commandBuffer,
    const VkCopyAccelerationStructureToMemoryInfoKHR *pInfo)
@@ -2680,7 +2679,7 @@ vn_CmdCopyAccelerationStructureToMemoryKHR(
                   pInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdCopyMemoryToAccelerationStructureKHR(
    VkCommandBuffer commandBuffer,
    const VkCopyMemoryToAccelerationStructureInfoKHR *pInfo)
@@ -2689,7 +2688,7 @@ vn_CmdCopyMemoryToAccelerationStructureKHR(
                   pInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdWriteAccelerationStructuresPropertiesKHR(
    VkCommandBuffer commandBuffer,
    uint32_t accelerationStructureCount,
@@ -2713,7 +2712,7 @@ vn_CmdWriteAccelerationStructuresPropertiesKHR(
                        accelerationStructureCount, true);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetRayTracingPipelineStackSizeKHR(VkCommandBuffer commandBuffer,
                                         uint32_t pipelineStackSize)
 {
@@ -2721,7 +2720,7 @@ vn_CmdSetRayTracingPipelineStackSizeKHR(VkCommandBuffer commandBuffer,
                   pipelineStackSize);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdTraceRaysIndirectKHR(
    VkCommandBuffer commandBuffer,
    const VkStridedDeviceAddressRegionKHR *pRaygenShaderBindingTable,
@@ -2736,7 +2735,7 @@ vn_CmdTraceRaysIndirectKHR(
                   indirectDeviceAddress);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdTraceRaysKHR(
    VkCommandBuffer commandBuffer,
    const VkStridedDeviceAddressRegionKHR *pRaygenShaderBindingTable,
@@ -2752,7 +2751,7 @@ vn_CmdTraceRaysKHR(
                   pCallableShaderBindingTable, width, height, depth);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdTraceRaysIndirect2KHR(VkCommandBuffer commandBuffer,
                             VkDeviceAddress indirectDeviceAddress)
 {
@@ -2760,14 +2759,14 @@ vn_CmdTraceRaysIndirect2KHR(VkCommandBuffer commandBuffer,
                   indirectDeviceAddress);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDepthBias2EXT(VkCommandBuffer commandBuffer,
                        const VkDepthBiasInfoEXT *pDepthBiasInfo)
 {
    VN_CMD_ENQUEUE(vkCmdSetDepthBias2EXT, commandBuffer, pDepthBiasInfo);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetDepthClampRangeEXT(VkCommandBuffer commandBuffer,
                             VkDepthClampModeEXT depthClampMode,
                             const VkDepthClampRangeEXT *pDepthClampRange)
@@ -2776,66 +2775,10 @@ vn_CmdSetDepthClampRangeEXT(VkCommandBuffer commandBuffer,
                   pDepthClampRange);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_CmdSetAttachmentFeedbackLoopEnableEXT(VkCommandBuffer commandBuffer,
                                          VkImageAspectFlags aspectMask)
 {
    VN_CMD_ENQUEUE(vkCmdSetAttachmentFeedbackLoopEnableEXT, commandBuffer,
                   aspectMask);
-}
-
-VKAPI_ATTR void VKAPI_CALL
-vn_CmdDrawMeshTasksEXT(VkCommandBuffer commandBuffer,
-                       uint32_t groupCountX,
-                       uint32_t groupCountY,
-                       uint32_t groupCountZ)
-{
-   VN_CMD_ENQUEUE(vkCmdDrawMeshTasksEXT, commandBuffer, groupCountX,
-                  groupCountY, groupCountZ);
-}
-
-VKAPI_ATTR void VKAPI_CALL
-vn_CmdDrawMeshTasksIndirectEXT(VkCommandBuffer commandBuffer,
-                               VkBuffer buffer,
-                               VkDeviceSize offset,
-                               uint32_t drawCount,
-                               uint32_t stride)
-{
-   VN_CMD_ENQUEUE(vkCmdDrawMeshTasksIndirectEXT, commandBuffer, buffer,
-                  offset, drawCount, stride);
-}
-
-VKAPI_ATTR void VKAPI_CALL
-vn_CmdDrawMeshTasksIndirectCountEXT(VkCommandBuffer commandBuffer,
-                                    VkBuffer buffer,
-                                    VkDeviceSize offset,
-                                    VkBuffer countBuffer,
-                                    VkDeviceSize countBufferOffset,
-                                    uint32_t maxDrawCount,
-                                    uint32_t stride)
-{
-   VN_CMD_ENQUEUE(vkCmdDrawMeshTasksIndirectCountEXT, commandBuffer, buffer,
-                  offset, countBuffer, countBufferOffset, maxDrawCount,
-                  stride);
-}
-
-VKAPI_ATTR void VKAPI_CALL
-vn_CmdBindResourceHeapEXT(VkCommandBuffer commandBuffer,
-                          const VkBindHeapInfoEXT *pBindInfo)
-{
-   VN_CMD_ENQUEUE(vkCmdBindResourceHeapEXT, commandBuffer, pBindInfo);
-}
-
-VKAPI_ATTR void VKAPI_CALL
-vn_CmdBindSamplerHeapEXT(VkCommandBuffer commandBuffer,
-                         const VkBindHeapInfoEXT *pBindInfo)
-{
-   VN_CMD_ENQUEUE(vkCmdBindSamplerHeapEXT, commandBuffer, pBindInfo);
-}
-
-VKAPI_ATTR void VKAPI_CALL
-vn_CmdPushDataEXT(VkCommandBuffer commandBuffer,
-                  const VkPushDataInfoEXT *pPushDataInfo)
-{
-   VN_CMD_ENQUEUE(vkCmdPushDataEXT, commandBuffer, pPushDataInfo);
 }

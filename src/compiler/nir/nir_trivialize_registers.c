@@ -116,7 +116,7 @@ trivialize_src(nir_src *src, void *state_)
 {
    struct trivialize_src_state *state = state_;
 
-   nir_instr *parent = nir_def_instr(src->ssa);
+   nir_instr *parent = src->ssa->parent_instr;
    if (parent->type != nir_instr_type_intrinsic)
       return true;
 
@@ -136,7 +136,8 @@ trivialize_loads(nir_function_impl *impl, nir_block *block)
 {
    struct trivialize_src_state state = {
       .block = block,
-      .trivial_loads = BITSET_CALLOC(impl->ssa_alloc),
+      .trivial_loads = calloc(BITSET_WORDS(impl->ssa_alloc),
+                              sizeof(BITSET_WORD)),
    };
 
    nir_foreach_instr_safe(instr, block) {
@@ -429,7 +430,7 @@ trivialize_stores(nir_function_impl *impl, nir_block *block)
             nontrivial |= !list_is_singular(&value->uses);
 
             /* SSA-only instruction types */
-            nir_instr *parent = nir_def_instr(value);
+            nir_instr *parent = value->parent_instr;
             nontrivial |= (parent->type == nir_instr_type_load_const) ||
                           (parent->type == nir_instr_type_undef);
 

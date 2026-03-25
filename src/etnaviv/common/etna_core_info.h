@@ -11,8 +11,6 @@
 #include "util/bitset.h"
 
 enum etna_feature {
-   ETNA_FEATURE_CORE_GPU,
-   ETNA_FEATURE_CORE_NPU,
    ETNA_FEATURE_FAST_CLEAR,
    ETNA_FEATURE_PIPE_3D,
    ETNA_FEATURE_32_BIT_INDICES,
@@ -70,11 +68,13 @@ enum etna_feature {
    ETNA_FEATURE_NN_XYDP0,
    ETNA_FEATURE_YUV420_TILER,
    ETNA_FEATURE_MSAA_FRAGMENT_OPERATION,
-   ETNA_FEATURE_S8,
-   ETNA_FEATURE_HWTFB,
-   ETNA_FEATURE_BLT_64BPP_MASKED_CLEAR_FIX,
-   ETNA_FEATURE_WIDELINE_TRIANGLE_EMU,
    ETNA_FEATURE_NUM,
+};
+
+enum etna_core_type {
+   ETNA_CORE_NOT_SUPPORTED = 0,
+   ETNA_CORE_GPU,
+   ETNA_CORE_NPU,
 };
 
 struct etna_core_gpu_info {
@@ -109,8 +109,12 @@ struct etna_core_info {
 
    int8_t halti; /* HALTI (gross architecture) level. -1 for pre-HALTI. */
 
-   struct etna_core_gpu_info gpu;
-   struct etna_core_npu_info npu;
+   enum etna_core_type type;
+
+   union {
+      struct etna_core_gpu_info gpu;
+      struct etna_core_npu_info npu;
+   };
 
    BITSET_DECLARE(feature, ETNA_FEATURE_NUM);
 };

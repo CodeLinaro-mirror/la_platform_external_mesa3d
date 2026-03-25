@@ -1,5 +1,4 @@
 #include <vndk/window.h>
-#include <vndk/hardware_buffer.h>
 
 extern "C" {
 

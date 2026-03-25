@@ -34,24 +34,21 @@ phi_srcs_equal(nir_def *a, nir_def *b)
    if (a == b)
       return true;
 
-   nir_instr *a_instr = nir_def_instr(a);
-   nir_instr *b_instr = nir_def_instr(b);
-
-   if (a_instr->type != b_instr->type)
+   if (a->parent_instr->type != b->parent_instr->type)
       return false;
 
-   if (a_instr->type != nir_instr_type_alu &&
-       a_instr->type != nir_instr_type_load_const)
+   if (a->parent_instr->type != nir_instr_type_alu &&
+       a->parent_instr->type != nir_instr_type_load_const)
       return false;
 
-   if (!nir_instrs_equal(a_instr, b_instr))
+   if (!nir_instrs_equal(a->parent_instr, b->parent_instr))
       return false;
 
-   /* nir_instrs_equal ignores fp_math_ctrl */
-   if (a_instr->type == nir_instr_type_alu) {
+   /* nir_instrs_equal ignores exact/fast_math */
+   if (a->parent_instr->type == nir_instr_type_alu) {
       nir_alu_instr *a_alu = nir_def_as_alu(a);
       nir_alu_instr *b_alu = nir_def_as_alu(b);
-      if (a_alu->fp_math_ctrl != b_alu->fp_math_ctrl)
+      if (a_alu->exact != b_alu->exact || a_alu->fp_fast_math != b_alu->fp_fast_math)
          return false;
    }
 
@@ -68,9 +65,9 @@ src_dominates_block(nir_src *src, void *state)
 static bool
 can_rematerialize_phi_src(nir_block *imm_dom, nir_def *def)
 {
-   if (nir_def_is_alu(def)) {
-      return nir_foreach_src(nir_def_instr(def), src_dominates_block, imm_dom);
-   } else if (nir_def_is_const(def)) {
+   if (def->parent_instr->type == nir_instr_type_alu) {
+      return nir_foreach_src(def->parent_instr, src_dominates_block, imm_dom);
+   } else if (def->parent_instr->type == nir_instr_type_load_const) {
       return true;
    }
    return false;
@@ -97,7 +94,6 @@ remove_phis_instr(nir_builder *b, nir_phi_instr *phi, void *unused)
    nir_block *block = phi->instr.block;
    nir_def *def = NULL;
    bool needs_remat = false;
-   nir_phi_instr *nested_phi = NULL;
 
    /* Skip unreachable phis, they should be removed by nir_opt_dead_cf. */
    if (nir_block_is_unreachable(block))
@@ -108,7 +104,7 @@ remove_phis_instr(nir_builder *b, nir_phi_instr *phi, void *unused)
        * sources from backedges that point back to the destination of the
        * same phi, i.e. something like:
        *
-       * b = phi(a, b)
+       * a = phi(a, b, ...)
        *
        * We can safely ignore these sources, since if all of the normal
        * sources point to the same definition, then that definition must
@@ -122,15 +118,6 @@ remove_phis_instr(nir_builder *b, nir_phi_instr *phi, void *unused)
       if (nir_src_is_undef(src->src))
          continue;
 
-      /* This src is from a loop back-edge and itself is another phi. */
-      if (src->pred->index > block->index && nir_src_is_phi(src->src)) {
-         if (nested_phi)
-            return false;
-
-         nested_phi = nir_src_as_phi(src->src);
-         continue;
-      }
-
       if (def == NULL) {
          def = src->src.ssa;
          if (!nir_block_dominates(nir_def_block(def), block->imm_dom)) {
@@ -143,31 +130,13 @@ remove_phis_instr(nir_builder *b, nir_phi_instr *phi, void *unused)
       }
    }
 
-   if (nested_phi) {
-      if (!def)
-         return false;
-
-      /* For phi-sources from loop back-edges, if the source is another phi,
-       * check if the source-phi only uses this phi's definition or equal
-       * sources, i.e. something like:
-       *
-       * b = phi (a, c)
-       * ...
-       * c = phi (b, a)
-       */
-      nir_foreach_phi_src(src, nested_phi) {
-         if (src->src.ssa != &phi->def && !phi_srcs_equal(src->src.ssa, def))
-            return false;
-      }
-   }
-
    if (!def) {
       /* In this case, the phi had no non undef sources. So turn it into an undef. */
       b->cursor = nir_after_phis(block);
       def = nir_undef(b, phi->def.num_components, phi->def.bit_size);
    } else if (needs_remat) {
       b->cursor = nir_after_block_before_jump(block->imm_dom);
-      nir_instr *remat = nir_instr_clone(b->shader, nir_def_instr(def));
+      nir_instr *remat = nir_instr_clone(b->shader, def->parent_instr);
       nir_builder_instr_insert(b, remat);
       def = nir_instr_def(remat);
    }
@@ -189,7 +158,7 @@ nir_opt_remove_phis(nir_shader *shader)
 bool
 nir_remove_single_src_phis_block(nir_block *block)
 {
-   assert(block->predecessors.entries <= 1);
+   assert(block->predecessors->entries <= 1);
    bool progress = false;
    nir_foreach_phi_safe(phi, block) {
       nir_def *def = NULL;

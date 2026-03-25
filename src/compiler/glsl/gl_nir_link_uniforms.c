@@ -27,7 +27,6 @@
 #include "linker_util.h"
 #include "util/u_dynarray.h"
 #include "util/u_math.h"
-#include "util/u_range_remap.h"
 #include "main/consts_exts.h"
 #include "main/shader_types.h"
 
@@ -142,7 +141,7 @@ mark_array_elements_referenced(const struct array_deref_range *dr,
          BITSET_SET(bits, dr[0].index);
       } else {
          /* Accessed by non-constant index so set everything as referenced */
-         BITSET_SET_COUNT(bits, 0, dr[0].size);
+         BITSET_SET_RANGE(bits, 0, dr[0].size - 1);
       }
 
       return;
@@ -223,7 +222,7 @@ update_array_sizes(struct gl_shader_program *prog, nir_variable *var,
    struct uniform_array_info *ainfo = NULL;
    int words = BITSET_WORDS(glsl_array_size(var->type));
    int max_array_size = 0;
-   for (unsigned stage = 0; stage < MESA_SHADER_MESH_STAGES; stage++) {
+   for (unsigned stage = 0; stage < MESA_SHADER_STAGES; stage++) {
       struct gl_linked_shader *sh = prog->_LinkedShaders[stage];
       if (!sh)
          continue;
@@ -281,12 +280,17 @@ setup_uniform_remap_tables(const struct gl_constants *consts,
     * that we can keep track of unused uniforms with explicit locations.
     */
    assert(!prog->data->spirv ||
-          (prog->data->spirv && list_is_empty(&prog->UniformRemapTable->r_list)));
+          (prog->data->spirv && !prog->UniformRemapTable));
+   if (!prog->UniformRemapTable) {
+      prog->UniformRemapTable = rzalloc_array(prog,
+                                              struct gl_uniform_storage *,
+                                              prog->NumUniformRemapTable);
+   }
 
    union gl_constant_value *data =
       rzalloc_array(prog->data,
                     union gl_constant_value, prog->data->NumUniformDataSlots);
-   if (!data) {
+   if (!prog->UniformRemapTable || !data) {
       linker_error(prog, "Out of memory during linking.\n");
       return;
    }
@@ -317,17 +321,19 @@ setup_uniform_remap_tables(const struct gl_constants *consts,
       unsigned num_slots = glsl_get_component_slots(uniform->type);
 
       uniform->storage = &data[data_pos];
-      data_pos += num_slots * entries;
 
-      /* Set remap table entry to the correct gl_uniform_storage. */
-      util_range_insert_remap(uniform->remap_location,
-                              uniform->remap_location + entries - 1,
-                              prog->UniformRemapTable, uniform);
+      /* Set remap table entries point to correct gl_uniform_storage. */
+      for (unsigned j = 0; j < entries; j++) {
+         unsigned element_loc = uniform->remap_location + j;
+         prog->UniformRemapTable[element_loc] = uniform;
+
+         data_pos += num_slots;
+      }
    }
 
    /* Reserve locations for rest of the uniforms. */
    if (prog->data->spirv)
-      link_util_update_empty_uniform_locations(consts, prog);
+      link_util_update_empty_uniform_locations(prog);
 
    for (unsigned i = 0; i < prog->data->NumUniformStorage; i++) {
       struct gl_uniform_storage *uniform = &prog->data->UniformStorage[i];
@@ -359,27 +365,36 @@ setup_uniform_remap_tables(const struct gl_constants *consts,
 
       unsigned location =
          link_util_find_empty_block(prog, &prog->data->UniformStorage[i]);
-      if (location == -1) {
-         linker_error(prog, "Unable to find empty block for %u entries",
-                      MAX2(1, prog->data->UniformStorage[i].array_elements));
-      }
 
-      unsigned num_slots = glsl_get_component_slots(uniform->type);
-      if (uniform->block_index == -1) {
-         uniform->storage = &data[data_pos];
-         data_pos += num_slots * entries;
+      if (location == -1) {
+         location = prog->NumUniformRemapTable;
+
+         /* resize remap table to fit new entries */
+         prog->UniformRemapTable =
+            reralloc(prog,
+                     prog->UniformRemapTable,
+                     struct gl_uniform_storage *,
+                     prog->NumUniformRemapTable + entries);
+         prog->NumUniformRemapTable += entries;
       }
 
       /* set the base location in remap table for the uniform */
       uniform->remap_location = location;
 
-      /* Set remap table entry to the correct gl_uniform_storage. */
-      util_range_insert_remap(uniform->remap_location,
-                              uniform->remap_location + entries - 1,
-                              prog->UniformRemapTable, uniform);
-   }
+      unsigned num_slots = glsl_get_component_slots(uniform->type);
 
-   util_range_switch_to_sorted_array(prog->UniformRemapTable);
+      if (uniform->block_index == -1)
+         uniform->storage = &data[data_pos];
+
+      /* Set remap table entries point to correct gl_uniform_storage. */
+      for (unsigned j = 0; j < entries; j++) {
+         unsigned element_loc = uniform->remap_location + j;
+         prog->UniformRemapTable[element_loc] = uniform;
+
+         if (uniform->block_index == -1)
+            data_pos += num_slots;
+      }
+   }
 
    /* Verify that total amount of entries for explicit and implicit locations
     * is less than MAX_UNIFORM_LOCATIONS.
@@ -567,7 +582,7 @@ add_var_use_deref(nir_deref_instr *deref, struct hash_table *live,
       ainfo = ralloc(live, struct uniform_array_info);
 
       unsigned num_bits = MAX2(1, glsl_get_aoa_size(deref->var->type));
-      ainfo->indices = BITSET_RZALLOC(live, num_bits);
+      ainfo->indices = rzalloc_array(live, BITSET_WORD, BITSET_WORDS(num_bits));
 
       ainfo->deref_list = ralloc(live, struct util_dynarray);
       util_dynarray_init(ainfo->deref_list, live);
@@ -588,7 +603,7 @@ add_var_use_deref(nir_deref_instr *deref, struct hash_table *live,
       mark_array_elements_referenced(*derefs, num_derefs, array_depth,
                                      ainfo->indices);
 
-      util_dynarray_append(ainfo->deref_list, deref);
+      util_dynarray_append(ainfo->deref_list, nir_deref_instr *, deref);
    }
 
    assert(deref->modes == deref->var->data.mode);
@@ -725,7 +740,7 @@ struct nir_link_uniforms_state {
    int top_level_array_stride;
 
    struct type_tree_entry *current_type;
-   struct hash_table *referenced_uniforms[MESA_SHADER_MESH_STAGES];
+   struct hash_table *referenced_uniforms[MESA_SHADER_STAGES];
    struct hash_table *uniform_hash;
 };
 
@@ -1291,7 +1306,7 @@ static int
 nir_link_uniform(const struct gl_constants *consts,
                  struct gl_shader_program *prog,
                  struct gl_program *stage_program,
-                 mesa_shader_stage stage,
+                 gl_shader_stage stage,
                  const struct glsl_type *type,
                  unsigned index_in_parent,
                  int location,
@@ -1635,7 +1650,7 @@ gl_nir_link_uniforms(const struct gl_constants *consts,
 
    if (!prog->data->spirv) {
       /* Gather information on uniform use */
-      for (unsigned stage = 0; stage < MESA_SHADER_MESH_STAGES; stage++) {
+      for (unsigned stage = 0; stage < MESA_SHADER_STAGES; stage++) {
          struct gl_linked_shader *sh = prog->_LinkedShaders[stage];
          if (!sh)
             continue;
@@ -1650,7 +1665,7 @@ gl_nir_link_uniforms(const struct gl_constants *consts,
 
       if(!consts->DisableUniformArrayResize) {
          /* Resize uniform arrays based on the maximum array index */
-         for (unsigned stage = 0; stage < MESA_SHADER_MESH_STAGES; stage++) {
+         for (unsigned stage = 0; stage < MESA_SHADER_STAGES; stage++) {
             struct gl_linked_shader *sh = prog->_LinkedShaders[stage];
             if (!sh)
                continue;
@@ -1666,7 +1681,7 @@ gl_nir_link_uniforms(const struct gl_constants *consts,
    if (!prog->data->spirv) {
       struct set *storage_counted =
          _mesa_set_create(NULL, _mesa_hash_string, _mesa_key_string_equal);
-      for (unsigned stage = 0; stage < MESA_SHADER_MESH_STAGES; stage++) {
+      for (unsigned stage = 0; stage < MESA_SHADER_STAGES; stage++) {
          struct gl_linked_shader *sh = prog->_LinkedShaders[stage];
          if (!sh)
             continue;
@@ -1702,7 +1717,7 @@ gl_nir_link_uniforms(const struct gl_constants *consts,
    state.uniform_hash = _mesa_hash_table_create(NULL, _mesa_hash_string,
                                                 _mesa_key_string_equal);
 
-   for (unsigned shader_type = 0; shader_type < MESA_SHADER_MESH_STAGES; shader_type++) {
+   for (unsigned shader_type = 0; shader_type < MESA_SHADER_STAGES; shader_type++) {
       struct gl_linked_shader *sh = prog->_LinkedShaders[shader_type];
       if (!sh)
          continue;
@@ -2017,6 +2032,9 @@ gl_nir_link_uniforms(const struct gl_constants *consts,
    prog->data->NumUniformDataSlots = state.num_values;
 
    assert(prog->data->spirv || prog->data->NumUniformStorage == storage_size);
+
+   if (prog->data->spirv)
+      prog->NumUniformRemapTable = state.max_uniform_location;
 
    setup_uniform_remap_tables(consts, prog);
    gl_nir_set_uniform_initializers(consts, prog);

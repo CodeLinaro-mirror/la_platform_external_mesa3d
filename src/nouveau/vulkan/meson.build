@@ -67,8 +67,6 @@ nvk_files = files(
   'nvk_upload_queue.h',
   'nvk_wsi.c',
   'nvk_wsi.h',
-  'layers/nvk_app_workarounds.c',
-  'layers/nvk_app_workarounds.h',
   'nvkmd/nouveau/nvkmd_nouveau.h',
   'nvkmd/nouveau/nvkmd_nouveau_ctx.c',
   'nvkmd/nouveau/nvkmd_nouveau_dev.c',
@@ -81,7 +79,6 @@ nvk_files = files(
 
 nvkcl_files = files(
   'cl/nvk_query.cl',
-  'cl/nvk_copy_indirect.cl',
 )
 
 nvk_entrypoints = custom_target(
@@ -96,20 +93,19 @@ nvk_entrypoints = custom_target(
   depend_files : vk_entrypoints_gen_depend_files,
 )
 
+relative_dir = fs.relative_to(meson.global_source_root(), meson.global_build_root())
+
 nvkcl_spv = custom_target(
-  input : [nvkcl_files, libnvidia_headers],
+  input : nvkcl_files,
   output : 'nvkcl.spv',
   command : [
     prog_mesa_clc, '-o', '@OUTPUT@', '--depfile', '@DEPFILE@', nvkcl_files, '--',
     '-I' + join_paths(meson.project_source_root(), 'src/compiler/libcl'),
     '-I' + join_paths(meson.current_source_dir(), '.'),
     '-I' + join_paths(meson.project_source_root(), 'src'),
-    '-I' + join_paths(meson.project_source_root(), 'src/nouveau/headers'),
-    '-I' + join_paths(meson.project_source_root(), 'src/nouveau/headers/nvidia/classes'),
-    '-I' + join_paths(meson.project_build_root(), 'src/nouveau/headers'),
     cl_args,
     ],
-  depfile : 'nvkcl.spv.d',
+  depfile : '@PLAINNAME@.d',
 )
 
 nvkcl = custom_target(
@@ -136,6 +132,8 @@ nvk_deps = [
 nvk_flags = []
 
 if with_platform_android
+  nvk_deps += [dep_android]
+  nvk_flags += '-DVK_USE_PLATFORM_ANDROID_KHR'
   nvk_files += files('nvk_android.c')
 endif
 
@@ -149,6 +147,8 @@ libnvk = static_library(
     sha1_h,
   ],
   include_directories : [
+    inc_gallium,
+    inc_gallium_aux,
     inc_include,
     inc_src,
   ],
@@ -165,18 +165,22 @@ libvulkan_nouveau = shared_library(
   install : true,
 )
 
-icd_file_name = libname_prefix + 'vulkan_nouveau.' + libname_suffix
+icd_lib_path = join_paths(get_option('prefix'), get_option('libdir'))
+icd_file_name = 'libvulkan_nouveau.so'
+if with_platform_windows
+  icd_lib_path = import('fs').relative_to(get_option('bindir'), with_vulkan_icd_dir)
+  icd_file_name = 'vulkan_nouveau.dll'
+endif
 
 nouveau_icd = custom_target(
   'nouveau_icd',
   input : [vk_icd_gen, vk_api_xml],
-  output : 'nouveau_icd.' + vulkan_manifest_suffix,
+  output : 'nouveau_icd.@0@.json'.format(host_machine.cpu()),
   command : [
     prog_python, '@INPUT0@',
     '--api-version', '1.4', '--xml', '@INPUT1@',
     '--sizeof-pointer', sizeof_pointer,
-    '--icd-lib-path', vulkan_icd_lib_path,
-    '--icd-filename', icd_file_name,
+    '--lib-path', join_paths(icd_lib_path, icd_file_name),
     '--out', '@OUTPUT@',
   ],
   build_by_default : true,
@@ -186,7 +190,7 @@ nouveau_icd = custom_target(
 )
 
 _dev_icdname = 'nouveau_devenv_icd.@0@.json'.format(host_machine.cpu())
-_dev_icd = custom_target(
+custom_target(
   'nouveau_devenv_icd',
   input : [vk_icd_gen, vk_api_xml],
   output : _dev_icdname,
@@ -194,14 +198,15 @@ _dev_icd = custom_target(
     prog_python, '@INPUT0@',
     '--api-version', '1.4', '--xml', '@INPUT1@',
     '--sizeof-pointer', sizeof_pointer,
-    '--icd-lib-path', meson.current_build_dir(),
-    '--icd-filename', icd_file_name,
+    '--lib-path', meson.current_build_dir() / icd_file_name,
     '--out', '@OUTPUT@',
   ],
   build_by_default : true,
 )
 
-devenv.append('VK_DRIVER_FILES', _dev_icd.full_path())
+devenv.append('VK_DRIVER_FILES', meson.current_build_dir() / _dev_icdname)
+# Deprecated: replaced by VK_DRIVER_FILES above
+devenv.append('VK_ICD_FILENAMES', meson.current_build_dir() / _dev_icdname)
 
 if with_tests and not with_platform_android
   test(
@@ -211,7 +216,6 @@ if with_tests and not with_platform_android
       files('test_nvk_mme.c'),
       dependencies : [nvk_deps],
       link_with : [libnvk],
-    ),
-    suite : ['nouveau'],
+    )
   )
 endif

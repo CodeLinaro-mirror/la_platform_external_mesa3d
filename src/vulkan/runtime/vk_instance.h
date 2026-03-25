@@ -23,7 +23,6 @@
 #ifndef VK_INSTANCE_H
 #define VK_INSTANCE_H
 
-#include "vk_debug_report.h"
 #include "vk_dispatch_table.h"
 #include "vk_extensions.h"
 #include "vk_object.h"
@@ -33,9 +32,7 @@
 #include "util/simple_mtx.h"
 #include "util/u_debug.h"
 
-#if HAVE_RENDERDOC_INTEGRATION
 #include "renderdoc_app.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -111,7 +108,10 @@ struct vk_instance {
    struct vk_instance_dispatch_table dispatch_table;
 
    /* VK_EXT_debug_report debug callbacks */
-   struct vk_debug_report debug_report;
+   struct {
+      mtx_t callbacks_mutex;
+      struct list_head callbacks;
+   } debug_report;
 
    /* VK_EXT_debug_utils */
    struct {
@@ -175,16 +175,14 @@ struct vk_instance {
    uint64_t trace_mode;
 
    uint32_t trace_frame;
-   const char *trace_trigger_file;
+   char *trace_trigger_file;
 
    /** Whether the capture mode is per-submit. */
    bool trace_per_submit;
 
-#if HAVE_RENDERDOC_INTEGRATION
    /** For triggering renderdoc captures from inside the driver. */
    simple_mtx_t renderdoc_mtx;
    RENDERDOC_API_1_0_0 *renderdoc_api;
-#endif
 };
 
 VK_DEFINE_HANDLE_CASTS(vk_instance, base, VkInstance,

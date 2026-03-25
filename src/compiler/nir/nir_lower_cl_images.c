@@ -144,10 +144,12 @@ nir_lower_cl_images(nir_shader *shader, bool lower_image_derefs, bool lower_samp
    }
    shader->info.num_textures = num_rd_images;
    BITSET_ZERO(shader->info.textures_used);
-   BITSET_SET_COUNT(shader->info.textures_used, 0, num_rd_images);
+   if (num_rd_images)
+      BITSET_SET_RANGE(shader->info.textures_used, 0, num_rd_images - 1);
 
    BITSET_ZERO(shader->info.images_used);
-   BITSET_SET_COUNT(shader->info.images_used, 0, num_wr_images);
+   if (num_wr_images)
+      BITSET_SET_RANGE(shader->info.images_used, 0, num_wr_images - 1);
    shader->info.num_images = num_wr_images;
 
    last_loc = -1;
@@ -165,7 +167,8 @@ nir_lower_cl_images(nir_shader *shader, bool lower_image_derefs, bool lower_samp
       }
    }
    BITSET_ZERO(shader->info.samplers_used);
-   BITSET_SET_COUNT(shader->info.samplers_used, 0, num_samplers);
+   if (num_samplers)
+      BITSET_SET_RANGE(shader->info.samplers_used, 0, num_samplers - 1);
 
    nir_builder b = nir_builder_create(impl);
 

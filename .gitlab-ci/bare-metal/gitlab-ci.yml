@@ -31,6 +31,7 @@
       optional: true
     - job: debian-arm32
       artifacts: false
+    - !reference [.required-for-hardware-jobs, needs]
 
 # ARM64 testing of bare-metal boards attached to an x86 gitlab-runner system
 .baremetal-test-arm64-gl:
@@ -45,6 +46,7 @@
       optional: true
     - job: debian-arm64
       artifacts: false
+    - !reference [.required-for-hardware-jobs, needs]
 
 # ARM64 testing of bare-metal boards attached to an x86 gitlab-runner system
 .baremetal-test-arm64-vk:
@@ -59,6 +61,7 @@
       optional: true
     - job: debian-arm64
       artifacts: false
+    - !reference [.required-for-hardware-jobs, needs]
 
 # ARM32/64 testing of bare-metal boards attached to an x86 gitlab-runner system, using an asan mesa build
 .baremetal-arm32-asan-test-gl:
@@ -70,6 +73,7 @@
       optional: true
     - job: debian-arm32-asan
       artifacts: false
+    - !reference [.required-for-hardware-jobs, needs]
 
 .baremetal-arm64-asan-test-gl:
   variables:
@@ -80,6 +84,7 @@
       optional: true
     - job: debian-arm64-asan
       artifacts: false
+    - !reference [.required-for-hardware-jobs, needs]
 
 .baremetal-arm64-asan-test-vk:
   variables:
@@ -90,6 +95,7 @@
       optional: true
     - job: debian-arm64-asan
       artifacts: false
+    - !reference [.required-for-hardware-jobs, needs]
 
 .baremetal-arm64-ubsan-test-gl:
   extends:
@@ -102,6 +108,7 @@
       optional: true
     - job: debian-arm64-ubsan
       artifacts: false
+    - !reference [.required-for-hardware-jobs, needs]
 
 .baremetal-arm64-ubsan-test-vk:
   extends:
@@ -114,6 +121,7 @@
       optional: true
     - job: debian-arm64-ubsan
       artifacts: false
+    - !reference [.required-for-hardware-jobs, needs]
 
 .baremetal-deqp-test:
   variables:

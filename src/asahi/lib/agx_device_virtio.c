@@ -124,7 +124,7 @@ agx_virtio_bo_bind(struct agx_device *dev, struct drm_asahi_gem_bind_op *ops,
 
    *req = (struct asahi_ccmd_vm_bind_req){
       .hdr.cmd = ASAHI_CCMD_VM_BIND,
-      .hdr.len = req_len,
+      .hdr.len = sizeof(struct asahi_ccmd_vm_bind_req),
       .vm_id = dev->vm_id,
       .stride = sizeof(*ops),
       .count = count,
@@ -133,7 +133,6 @@ agx_virtio_bo_bind(struct agx_device *dev, struct drm_asahi_gem_bind_op *ops,
    memcpy(req->payload, ops, payload_size);
 
    int ret = vdrm_send_req(dev->vdrm, &req->hdr, false);
-   free(req);
    if (ret) {
       fprintf(stderr, "ASAHI_CCMD_GEM_BIND failed: %d\n", ret);
    }
@@ -216,8 +215,12 @@ agx_virtio_get_params(struct agx_device *dev, void *buf, size_t size)
                         sizeof(struct asahi_ccmd_get_params_rsp) + size);
 
    int ret = vdrm_send_req(vdrm, &req.hdr, true);
-   if (ret || rsp->ret)
-      return ret ? ret : rsp->ret;
+   if (!ret)
+      return ret;
+
+   ret = rsp->ret;
+   if (ret)
+      return ret;
 
    memcpy(buf, &rsp->payload, size);
    return size;
@@ -262,7 +265,8 @@ agx_virtio_submit(struct agx_device *dev, struct drm_asahi_submit *submit,
    }
 
    struct vdrm_execbuf_params p = {
-      .ring_idx = virt->ring_idx,
+      /* Signal the host we want to wait for the command to complete */
+      .ring_idx = 1,
       .req = &req->hdr,
       .num_in_syncobjs = submit->in_sync_count,
       .in_syncobjs = vdrm_syncs,
@@ -292,7 +296,7 @@ agx_virtio_open_device(struct agx_device *dev)
 {
    struct vdrm_device *vdrm;
 
-   vdrm = vdrm_device_connect(dev->fd, 4);
+   vdrm = vdrm_device_connect(dev->fd, 2);
    if (!vdrm) {
       fprintf(stderr, "could not connect vdrm\n");
       return false;

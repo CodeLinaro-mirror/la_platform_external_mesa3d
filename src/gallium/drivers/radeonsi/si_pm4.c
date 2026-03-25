@@ -41,7 +41,9 @@ void si_pm4_emit_commands(struct si_context *sctx, struct ac_pm4_state *state)
 {
    struct radeon_cmdbuf *cs = &sctx->gfx_cs;
 
-   ac_pm4_emit_commands(&cs->current, state);
+   radeon_begin(cs);
+   radeon_emit_array(state->pm4, state->ndw);
+   radeon_end();
 }
 
 void si_pm4_emit_state(struct si_context *sctx, unsigned index)

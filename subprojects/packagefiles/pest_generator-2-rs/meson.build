@@ -3,7 +3,6 @@ project(
   'rust',
   version : '2.8.0',
   license : 'MIT OR Apache-2.0',
-  meson_version : '>= 1.7.0',
 )
 
 pest = subproject('pest-2-rs').get_variable('lib')
@@ -20,7 +19,7 @@ lib = static_library(
   'pest_generator',
   'src/lib.rs',
   rust_args : rust_args,
-  override_options : ['rust_std=2021', 'build.rust_std=2021', 'warning_level=0'],
+  override_options : ['rust_std=2021', 'build.rust_std=2021'],
   link_with : [pest, pest_meta, pm2, quote, syn],
   rust_abi : 'rust',
   native : true,

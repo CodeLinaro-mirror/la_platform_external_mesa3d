@@ -27,7 +27,6 @@ struct rnndecaddrinfo {
 	struct rnntypeinfo *typeinfo;
 	int width;
 	char *name;
-	char *usage;
 };
 
 struct rnndeccontext *rnndec_newcontext(struct rnndb *db);

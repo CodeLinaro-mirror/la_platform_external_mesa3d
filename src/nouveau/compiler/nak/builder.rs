@@ -4,12 +4,12 @@
 use crate::ir::*;
 
 pub trait Builder {
-    fn push_instr(&mut self, instr: Instr) -> &mut Instr;
+    fn push_instr(&mut self, instr: Box<Instr>) -> &mut Instr;
 
     fn sm(&self) -> u8;
 
     fn push_op(&mut self, op: impl Into<Op>) -> &mut Instr {
-        self.push_instr(Instr::new(op))
+        self.push_instr(Instr::new_boxed(op))
     }
 
     fn predicate(&mut self, pred: Pred) -> PredicatedBuilder<'_, Self>
@@ -238,42 +238,6 @@ pub trait SSABuilder: Builder {
             data_type: if signed { IntType::I64 } else { IntType::U64 },
             dst_high: true,
         });
-        dst
-    }
-
-    fn urol(&mut self, x: Src, shift: Src) -> SSAValue {
-        let dst = self.alloc_ssa(RegFile::GPR);
-        assert!(self.sm() >= 32);
-
-        self.push_op(OpShf {
-            dst: dst.into(),
-            low: x.clone(),
-            high: x,
-            shift: shift,
-            right: false,
-            wrap: true,
-            data_type: IntType::U32,
-            dst_high: true,
-        });
-
-        dst
-    }
-
-    fn uror(&mut self, x: Src, shift: Src) -> SSAValue {
-        let dst = self.alloc_ssa(RegFile::GPR);
-        assert!(self.sm() >= 32);
-
-        self.push_op(OpShf {
-            dst: dst.into(),
-            low: x.clone(),
-            high: x,
-            shift: shift,
-            right: true,
-            wrap: true,
-            data_type: IntType::U32,
-            dst_high: false,
-        });
-
         dst
     }
 
@@ -764,7 +728,7 @@ pub trait SSABuilder: Builder {
                 op: RroOp::SinCos,
                 src,
             });
-            tmp
+            tmp.into()
         };
         self.mufu(MuFuOp::Sin, tmp.into())
     }
@@ -780,7 +744,7 @@ pub trait SSABuilder: Builder {
                 op: RroOp::SinCos,
                 src,
             });
-            tmp
+            tmp.into()
         };
         self.mufu(MuFuOp::Cos, tmp.into())
     }
@@ -897,11 +861,11 @@ pub trait SSABuilder: Builder {
             self.alloc_ssa(RegFile::GPR)
         };
         self.copy_to(dst.into(), src);
-        dst
+        dst.into()
     }
 
     fn bmov_to_bar(&mut self, src: Src) -> SSAValue {
-        assert!(src.src_ref.as_ssa().unwrap().file() == RegFile::GPR);
+        assert!(src.src_ref.as_ssa().unwrap().file() == Some(RegFile::GPR));
         let dst = self.alloc_ssa(RegFile::Bar);
         self.push_op(OpBMov {
             dst: dst.into(),
@@ -912,7 +876,7 @@ pub trait SSABuilder: Builder {
     }
 
     fn bmov_to_gpr(&mut self, src: Src) -> SSAValue {
-        assert!(src.src_ref.as_ssa().unwrap().file() == RegFile::Bar);
+        assert!(src.src_ref.as_ssa().unwrap().file() == Some(RegFile::Bar));
         let dst = self.alloc_ssa(RegFile::GPR);
         self.push_op(OpBMov {
             dst: dst.into(),
@@ -925,11 +889,11 @@ pub trait SSABuilder: Builder {
 
 pub struct InstrBuilder<'a> {
     instrs: MappedInstrs,
-    sm: &'a ShaderModelInfo,
+    sm: &'a dyn ShaderModel,
 }
 
 impl<'a> InstrBuilder<'a> {
-    pub fn new(sm: &'a ShaderModelInfo) -> Self {
+    pub fn new(sm: &'a dyn ShaderModel) -> Self {
         Self {
             instrs: MappedInstrs::None,
             sm,
@@ -938,7 +902,7 @@ impl<'a> InstrBuilder<'a> {
 }
 
 impl InstrBuilder<'_> {
-    pub fn into_vec(self) -> Vec<Instr> {
+    pub fn into_vec(self) -> Vec<Box<Instr>> {
         match self.instrs {
             MappedInstrs::None => Vec::new(),
             MappedInstrs::One(i) => vec![i],
@@ -952,9 +916,9 @@ impl InstrBuilder<'_> {
 }
 
 impl Builder for InstrBuilder<'_> {
-    fn push_instr(&mut self, instr: Instr) -> &mut Instr {
+    fn push_instr(&mut self, instr: Box<Instr>) -> &mut Instr {
         self.instrs.push(instr);
-        self.instrs.last_mut().unwrap()
+        self.instrs.last_mut().unwrap().as_mut()
     }
 
     fn sm(&self) -> u8 {
@@ -969,7 +933,7 @@ pub struct SSAInstrBuilder<'a> {
 
 impl<'a> SSAInstrBuilder<'a> {
     pub fn new(
-        sm: &'a ShaderModelInfo,
+        sm: &'a dyn ShaderModel,
         alloc: &'a mut SSAValueAllocator,
     ) -> Self {
         Self {
@@ -980,17 +944,18 @@ impl<'a> SSAInstrBuilder<'a> {
 }
 
 impl SSAInstrBuilder<'_> {
-    pub fn into_vec(self) -> Vec<Instr> {
+    pub fn into_vec(self) -> Vec<Box<Instr>> {
         self.b.into_vec()
     }
 
+    #[allow(dead_code)]
     pub fn into_mapped_instrs(self) -> MappedInstrs {
         self.b.into_mapped_instrs()
     }
 }
 
 impl Builder for SSAInstrBuilder<'_> {
-    fn push_instr(&mut self, instr: Instr) -> &mut Instr {
+    fn push_instr(&mut self, instr: Box<Instr>) -> &mut Instr {
         self.b.push_instr(instr)
     }
 
@@ -1015,7 +980,7 @@ pub struct PredicatedBuilder<'a, T: Builder> {
 }
 
 impl<T: Builder> Builder for PredicatedBuilder<'_, T> {
-    fn push_instr(&mut self, instr: Instr) -> &mut Instr {
+    fn push_instr(&mut self, instr: Box<Instr>) -> &mut Instr {
         let mut instr = instr;
         assert!(instr.pred.is_true());
         instr.pred = self.pred;
@@ -1049,7 +1014,7 @@ impl<'a, T: Builder> UniformBuilder<'a, T> {
 }
 
 impl<T: Builder> Builder for UniformBuilder<'_, T> {
-    fn push_instr(&mut self, instr: Instr) -> &mut Instr {
+    fn push_instr(&mut self, instr: Box<Instr>) -> &mut Instr {
         self.b.push_instr(instr)
     }
 

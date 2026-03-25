@@ -6,7 +6,6 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <getopt.h>
-#include <libgen.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -21,8 +20,8 @@
 #include "drm-uapi/i915_drm.h"
 #include "drm-uapi/xe_drm.h"
 
-#include "intel/compiler/brw/brw_asm.h"
-#include "intel/compiler/brw/brw_isa_info.h"
+#include "intel/compiler/brw_asm.h"
+#include "intel/compiler/brw_isa_info.h"
 #include "intel/common/intel_gem.h"
 #include "intel/common/xe/intel_engine.h"
 #include "intel/decoder/intel_decoder.h"
@@ -40,7 +39,7 @@ enum {
    EXECUTOR_BO_SIZE = 10 * 1024 * 1024,
 };
 
-const char usage_line[] = "usage: executor [-d DEVICE] FILENAME [ARGS...]";
+const char usage_line[] = "usage: executor [-d DEVICE] FILENAME";
 
 static void
 open_manual()
@@ -66,7 +65,7 @@ open_manual()
       "",
       ".SH SYNOPSIS",
       "",
-      "executor [-d DEVICE] FILENAME [ARGS...]",
+      "executor [-d DEVICE] FILENAME",
       "",
       "executor -d list",
       "",
@@ -96,17 +95,14 @@ open_manual()
       "  values.  The function returns an ARRAY with the contents of the data buffer",
       "  after the shader completes.",
       "",
-      "- arg",
-      "  Table containing the command line arguments passed to the script, arg[0]",
-      "  is the script filename, followed by the ARGS.  Arguments consumed by",
-      "  executor itself are not in this table.",
-      "",
       "- dump(ARRAY, COUNT)",
       "  Pretty print the COUNT first elements of an array of 32-bit values.",
       "",
-      "- devinfo",
-      "  Table containing device information:",
-      "    - ver, verx10: Gfx version and detailed Gfx version",
+      "- check_ver(V, ...), check_verx10(V, ...)",
+      "  Exit if the Gfx version being executed isn't in the arguments list.",
+      "",
+      "- ver, verx10",
+      "  Variables containing the Gfx version being executed.",
       "",
       ".SH ASSEMBLY MACROS",
       "",
@@ -210,9 +206,8 @@ print_help()
       "\n"
       "SCRIPTING ENVIRONMENT:\n"
       "- execute({src=STR, data=ARRAY}) -> ARRAY\n"
-      "- arg (table with command line arguments)\n"
       "- dump(ARRAY, COUNT)\n"
-      "- devinfo = { ver, verx10 }\n"
+      "- check_ver(V, ...), check_verx10(V, ...), ver, verx10\n"
       "\n"
       "ASSEMBLY MACROS:\n"
       "- @eot, @syncnop\n"
@@ -731,15 +726,6 @@ executor_context_dispatch(executor_context *ec)
       err = intel_ioctl(ec->fd, DRM_IOCTL_SYNCOBJ_WAIT, &wait);
       if (err)
          failf("syncobj_wait");
-
-      for (int i = 0; i < ARRAY_SIZE(sync_handles); i++) {
-         struct drm_syncobj_destroy sync_destroy = {
-            .handle = sync_handles[i],
-         };
-         err = intel_ioctl(ec->fd, DRM_IOCTL_SYNCOBJ_DESTROY, &sync_destroy);
-         if (err)
-            failf("syncobj_destroy");
-      }
    }
 }
 
@@ -889,6 +875,35 @@ l_dump(lua_State *L)
    return 0;
 }
 
+static int
+l_check_ver(lua_State *L)
+{
+   int top = lua_gettop(L);
+   for (int i = 1; i <= top; i++) {
+      lua_Integer v = luaL_checknumber(L, i);
+      if (E.devinfo.ver == v) {
+         return 0;
+      }
+   }
+   failf("script doesn't support version=%d verx10=%d\n",
+         E.devinfo.ver, E.devinfo.verx10);
+   return 0;
+}
+
+static int
+l_check_verx10(lua_State *L)
+{
+   int top = lua_gettop(L);
+   for (int i = 1; i <= top; i++) {
+      lua_Integer v = luaL_checknumber(L, i);
+      if (E.devinfo.verx10 == v) {
+         return 0;
+      }
+   }
+   failf("script doesn't support version=%d verx10=%d\n",
+         E.devinfo.ver, E.devinfo.verx10);
+   return 0;
+}
 
 /* TODO: Review numeric limits in the code, specially around Lua integer
  * conversion.
@@ -906,10 +921,7 @@ main(int argc, char *argv[])
        {},
    };
 
-   /* The `+` ensures that arguments are not reordered (the default), since
-    * the arguments after the script name are made available to the script.
-    */
-   while ((opt = getopt_long(argc, argv, "+d:h", long_options, NULL)) != -1) {
+   while ((opt = getopt_long(argc, argv, "d:h", long_options, NULL)) != -1) {
       switch (opt) {
       case 'd':
          if (!strcmp(optarg, "list")) {
@@ -936,8 +948,6 @@ main(int argc, char *argv[])
       return 1;
    }
 
-   void *mem_ctx = ralloc_context(NULL);
-
    const char *filename = argv[optind];
 
    process_intel_debug_variable();
@@ -962,57 +972,23 @@ main(int argc, char *argv[])
 
    luaL_openlibs(L);
 
-   /* Command line arguments starting from the script name are
-    * available to the script to use.
-    */
-   lua_newtable(L);
-   for (int i = optind; i < argc; i++) {
-      lua_pushstring(L, argv[i]);
-      lua_seti(L, -2, i - optind);
-   }
-   lua_setglobal(L, "arg");
+   lua_pushinteger(L, E.devinfo.ver);
+   lua_setglobal(L, "ver");
 
-   /* Add the script's directory to package.path so scripts can require()
-    * files from the same directory.
-    */
-   {
-      char *script = ralloc_strdup(mem_ctx, filename);
-      const char *script_dir = dirname(script);
-
-      lua_getglobal(L, "package");
-      lua_getfield(L, -1, "path");
-      const char *original_path = lua_tostring(L, -1);
-
-      const char *new_path =
-         ralloc_asprintf(mem_ctx, "%s/?.lua;%s", script_dir, original_path);
-
-      lua_pop(L, 1);
-      lua_pushstring(L, new_path);
-      lua_setfield(L, -2, "path");
-      lua_pop(L, 1);
-   }
-
-   lua_newtable(L);
-   {
-      lua_pushinteger(L, E.devinfo.ver);
-      lua_setfield(L, -2, "ver");
-
-      lua_pushinteger(L, E.devinfo.verx10);
-      lua_setfield(L, -2, "verx10");
-
-      lua_pushboolean(L, E.devinfo.cooperative_matrix_configurations[0].scope != INTEL_CMAT_SCOPE_NONE);
-      lua_setfield(L, -2, "has_dpas");
-
-      lua_pushboolean(L, E.devinfo.has_bfloat16);
-      lua_setfield(L, -2, "has_bfloat16");
-   }
-   lua_setglobal(L, "devinfo");
+   lua_pushinteger(L, E.devinfo.verx10);
+   lua_setglobal(L, "verx10");
 
    lua_pushcfunction(L, l_execute);
    lua_setglobal(L, "execute");
 
    lua_pushcfunction(L, l_dump);
    lua_setglobal(L, "dump");
+
+   lua_pushcfunction(L, l_check_ver);
+   lua_setglobal(L, "check_ver");
+
+   lua_pushcfunction(L, l_check_verx10);
+   lua_setglobal(L, "check_verx10");
 
    int err = luaL_loadfile(L, filename);
    if (err)
@@ -1024,8 +1000,6 @@ main(int argc, char *argv[])
 
    lua_close(L);
    close(E.fd);
-
-   ralloc_free(mem_ctx);
 
    return 0;
 }

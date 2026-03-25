@@ -20,7 +20,7 @@ struct si_shader_context {
    struct si_shader *shader;
    struct si_screen *screen;
 
-   mesa_shader_stage stage;
+   gl_shader_stage stage;
 
    struct si_shader_args *args;
    struct ac_shader_abi abi;

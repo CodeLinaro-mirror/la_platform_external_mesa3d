@@ -34,19 +34,15 @@ radv_wsi_set_memory_ownership(VkDevice _device, VkDeviceMemory _mem, VkBool32 ow
    }
 }
 
-static struct vk_queue *
+static VkQueue
 radv_wsi_get_prime_blit_queue(VkDevice _device)
 {
    VK_FROM_HANDLE(radv_device, device, _device);
    struct radv_physical_device *pdev = radv_device_physical(device);
    const struct radv_instance *instance = radv_physical_device_instance(pdev);
 
-   simple_mtx_lock(&device->blit_queue_mtx);
-
-   if (device->private_sdma_queue != VK_NULL_HANDLE) {
-      simple_mtx_unlock(&device->blit_queue_mtx);
-      return &device->private_sdma_queue->vk;
-   }
+   if (device->private_sdma_queue != VK_NULL_HANDLE)
+      return vk_queue_to_handle(&device->private_sdma_queue->vk);
 
    if (pdev->info.gfx_level >= GFX9 && !(instance->debug_flags & RADV_DEBUG_NO_DMA_BLIT)) {
 
@@ -62,16 +58,13 @@ radv_wsi_get_prime_blit_queue(VkDevice _device)
 
       VkResult result = radv_queue_init(device, device->private_sdma_queue, 0, &queue_create, NULL);
       if (result == VK_SUCCESS) {
-         simple_mtx_unlock(&device->blit_queue_mtx);
-         return &device->private_sdma_queue->vk;
+         return vk_queue_to_handle(&device->private_sdma_queue->vk);
       } else {
          vk_free(&device->vk.alloc, device->private_sdma_queue);
          device->private_sdma_queue = VK_NULL_HANDLE;
       }
    }
-
-   simple_mtx_unlock(&device->blit_queue_mtx);
-   return NULL;
+   return VK_NULL_HANDLE;
 }
 
 VkResult

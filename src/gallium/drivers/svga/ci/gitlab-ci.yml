@@ -11,6 +11,7 @@ include:
     VISIBILITY_GROUP: "mesa-ci"
     EGL_PLATFORM: "surfaceless"
     PIGLIT_TRACES_FILE: traces-vmware.yml
+    PIGLIT_REPLAY_EXTRA_ARGS: "--download-caching-proxy-url=${FDO_HTTP_CACHE_URI}"
     PIGLIT_REPLAY_DEVICE_NAME: "gl-vmware-llvmpipe"
     PIGLIT_RESULTS: "llvmpipe-replay"
     FARM: vmware
@@ -36,5 +37,6 @@ vmware-vmx-piglit:x86_64:
     RUNNER_TAG: mesa-ci-x86-64-lava-vmware
     DEVICE_TYPE: x86
     BOOT_METHOD: ipxe
-    HWCI_KERNEL_MODULES: vmwgfx
+    KERNEL_REPO: "blu/linux"
+    KERNEL_TAG: "1106ba88b"
     FDO_CI_CONCURRENT: 2

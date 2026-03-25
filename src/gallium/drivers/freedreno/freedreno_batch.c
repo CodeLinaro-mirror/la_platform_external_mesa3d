@@ -119,19 +119,18 @@ fd_batch_create(struct fd_context *ctx, bool nondraw)
 
    fd_reset_wfi(batch);
 
-   batch->draw_patches = UTIL_DYNARRAY_INIT;
-   batch->fb_read_patches = UTIL_DYNARRAY_INIT;
+   util_dynarray_init(&batch->draw_patches, NULL);
+   util_dynarray_init(&(batch->fb_read_patches), NULL);
 
    if (is_a2xx(ctx->screen)) {
-      batch->shader_patches = UTIL_DYNARRAY_INIT;
-      batch->gmem_patches = UTIL_DYNARRAY_INIT;
+      util_dynarray_init(&batch->shader_patches, NULL);
+      util_dynarray_init(&batch->gmem_patches, NULL);
    }
 
-   if (is_a3xx(ctx->screen)) {
-      batch->rbrc_patches = UTIL_DYNARRAY_INIT;
-   }
+   if (is_a3xx(ctx->screen))
+      util_dynarray_init(&batch->rbrc_patches, NULL);
 
-   batch->samples = UTIL_DYNARRAY_INIT;
+   util_dynarray_init(&batch->samples, NULL);
 
    u_trace_init(&batch->trace, &ctx->trace_context);
    batch->last_timestamp_cmd = NULL;
@@ -210,9 +209,6 @@ cleanup_submit(struct fd_batch *batch)
 }
 
 static void
-batch_flush(struct fd_batch *batch, bool last_batch) assert_dt;
-
-static void
 batch_flush_dependencies(struct fd_batch *batch) assert_dt
 {
    struct fd_batch_cache *cache = &batch->ctx->screen->batch_cache;
@@ -220,7 +216,7 @@ batch_flush_dependencies(struct fd_batch *batch) assert_dt
 
    foreach_batch (dep, cache, batch->dependents_mask) {
       assert(dep->ctx == batch->ctx);
-      batch_flush(dep, false);
+      fd_batch_flush(dep);
       fd_batch_reference(&dep, NULL);
    }
 
@@ -340,8 +336,7 @@ fd_batch_get_prologue(struct fd_batch *batch)
 
 /* Only called from fd_batch_flush() */
 static void
-batch_flush(struct fd_batch *batch, bool last_batch)
-  assert_dt
+batch_flush(struct fd_batch *batch) assert_dt
 {
    DBG("%p: needs_flush=%d", batch, batch->needs_flush);
 
@@ -376,15 +371,6 @@ batch_flush(struct fd_batch *batch, bool last_batch)
       fd_batch_reference_locked(&batch->ctx->batch_nondraw, NULL);
 
    fd_screen_unlock(batch->ctx->screen);
-
-   /* Make sure there is a fence attached to the last batch in a sequence
-    * of dependencies, so that fd_context_flush() has a ctx->last_fence
-    * to find if there is nothing else to flush.  We don't want to attach
-    * a fence to dependent batches, because we are hoping the dependent
-    * batches and this one get merged into a single submit ioctl.
-    */
-   if (last_batch && !batch->fence)
-      batch->fence = fd_pipe_fence_create(batch);
 
    if (batch->fence)
       fd_pipe_fence_ref(&batch->ctx->last_fence, batch->fence);
@@ -432,7 +418,7 @@ fd_batch_flush(struct fd_batch *batch)
     * up used_resources
     */
    fd_batch_reference(&tmp, batch);
-   batch_flush(tmp, true);
+   batch_flush(tmp);
    fd_batch_reference(&tmp, NULL);
 }
 
@@ -555,7 +541,7 @@ fd_batch_resource_write(struct fd_batch *batch, struct fd_resource *rsc)
 
       foreach_batch (dep, cache, track->batch_mask) {
          struct fd_batch *b = NULL;
-         if ((dep == batch) || !check_batch(dep, batch->ctx))
+         if ((dep == batch) || (dep->ctx != batch->ctx))
             continue;
          /* note that batch_add_dep could flush and unref dep, so
           * we need to hold a reference to keep it live for the

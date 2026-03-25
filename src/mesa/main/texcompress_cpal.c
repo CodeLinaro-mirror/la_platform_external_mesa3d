@@ -78,10 +78,10 @@ get_palette_entry(const struct cpal_format_info *info, const GLubyte *palette,
  */
 static void
 paletted_to_color(const struct cpal_format_info *info, const GLubyte *palette,
-                  const void *indices, size_t num_pixels, GLubyte *image)
+                  const void *indices, GLuint num_pixels, GLubyte *image)
 {
    GLubyte *pix = image;
-   GLuint remain;
+   GLuint remain, i;
 
    if (info->palette_size == 16) {
       /* 4 bits per index */
@@ -89,8 +89,6 @@ paletted_to_color(const struct cpal_format_info *info, const GLubyte *palette,
 
       /* two pixels per iteration */
       remain = num_pixels % 2;
-
-      size_t i;
       for (i = 0; i < num_pixels / 2; i++) {
          pix += get_palette_entry(info, palette, (ind[i] >> 4) & 0xf, pix);
          pix += get_palette_entry(info, palette, ind[i] & 0xf, pix);
@@ -102,20 +100,19 @@ paletted_to_color(const struct cpal_format_info *info, const GLubyte *palette,
    else {
       /* 8 bits per index */
       const GLubyte *ind = (const GLubyte *) indices;
-      for (size_t i = 0; i < num_pixels; i++)
+      for (i = 0; i < num_pixels; i++)
          pix += get_palette_entry(info, palette, ind[i], pix);
    }
 }
 
-size_t
+unsigned
 _mesa_cpal_compressed_size(int level, GLenum internalFormat,
 			   unsigned width, unsigned height)
 {
    const struct cpal_format_info *info;
    const int num_levels = -level + 1;
    int lvl;
-   unsigned w, h;
-   size_t expect_size;
+   unsigned w, h, expect_size;
 
    if (internalFormat < GL_PALETTE4_RGB8_OES
        || internalFormat > GL_PALETTE8_RGB5_A1_OES) {
@@ -135,9 +132,9 @@ _mesa_cpal_compressed_size(int level, GLenum internalFormat,
          h = 1;
 
       if (info->palette_size == 16)
-         expect_size += ((size_t)w * h + 1) / 2;
+         expect_size += (w * h  + 1) / 2;
       else
-         expect_size += (size_t)w * h;
+         expect_size += w * h;
    }
 
    return expect_size;
@@ -152,7 +149,7 @@ void
 _mesa_cpal_compressed_teximage2d(GLenum target, GLint level,
 				 GLenum internalFormat,
 				 GLsizei width, GLsizei height,
-				 const void *palette)
+				 GLsizei imageSize, const void *palette)
 {
    const struct cpal_format_info *info;
    GLint lvl, num_levels;
@@ -177,7 +174,7 @@ _mesa_cpal_compressed_teximage2d(GLenum target, GLint level,
 
    for (lvl = 0; lvl < num_levels; lvl++) {
       GLsizei w, h;
-      size_t num_texels;
+      GLuint num_texels;
       GLubyte *image = NULL;
 
       w = width >> lvl;
@@ -186,7 +183,7 @@ _mesa_cpal_compressed_teximage2d(GLenum target, GLint level,
       h = height >> lvl;
       if (!h)
          h = 1;
-      num_texels = (size_t)w * h;
+      num_texels = w * h;
       if (w * info->size % align) {
          _mesa_PixelStorei(GL_UNPACK_ALIGNMENT, 1);
          align = 1;

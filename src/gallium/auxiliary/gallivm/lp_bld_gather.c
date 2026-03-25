@@ -26,8 +26,10 @@
  **************************************************************************/
 
 
+#include "util/u_debug.h"
 #include "util/u_cpu_detect.h"
-#include "util/bitscan.h"
+#include "util/u_math.h"
+#include "lp_bld_debug.h"
 #include "lp_bld_const.h"
 #include "lp_bld_format.h"
 #include "lp_bld_gather.h"

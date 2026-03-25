@@ -227,6 +227,7 @@ TEST_P(rgba, pack)
 
    nir_lower_undef_to_zero(b->shader);
    ASSERT_TRUE(nir_opt_constant_folding(b->shader));
+   ASSERT_TRUE(nir_opt_dce(b->shader));
 
    for (unsigned i = 0; i < NUM_COLORS; i++) {
       char expected[16] = { 0, };
@@ -234,7 +235,7 @@ TEST_P(rgba, pack)
 
       nir_def *packed_ssa = uses[i]->src[0].ssa;
       const nir_const_value *packed =
-         nir_def_as_load_const(packed_ssa)->value;
+         nir_instr_as_load_const(packed_ssa->parent_instr)->value;
       if (packed_ssa->num_components == 1) {
          switch (packed_ssa->bit_size) {
          case 8:
@@ -288,6 +289,7 @@ TEST_P(rgba, unpack)
 
    nir_lower_undef_to_zero(b->shader);
    ASSERT_TRUE(nir_opt_constant_folding(b->shader));
+   ASSERT_TRUE(nir_opt_dce(b->shader));
 
    for (unsigned i = 0; i < NUM_COLORS; i++) {
       char expected[16] = { 0, };
@@ -297,7 +299,8 @@ TEST_P(rgba, unpack)
       assert(rgba_ssa->bit_size == 32);
       assert(rgba_ssa->num_components == 4);
 
-      const nir_const_value *rgba = nir_def_as_load_const(rgba_ssa)->value;
+      const nir_const_value *rgba =
+         nir_instr_as_load_const(rgba_ssa->parent_instr)->value;
 
       if (util_format_is_pure_integer(format)) {
          uint32_t *exp_u32 = (uint32_t *)expected;

@@ -56,12 +56,13 @@ import os
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--out', required=True,
-                        help='Output H file')
+    parser.add_argument('--outdir', required=True,
+                        help='Directory to put the generated files in')
 
     args = parser.parse_args()
 
-    with open(args.out, 'w', encoding='utf-8') as f:
+    path = os.path.join(args.outdir, 'nir_intrinsics.h')
+    with open(path, 'w', encoding='utf-8') as f:
         f.write(Template(template).render(INTR_OPCODES=INTR_OPCODES, INTR_INDICES=INTR_INDICES))
 
 if __name__ == '__main__':

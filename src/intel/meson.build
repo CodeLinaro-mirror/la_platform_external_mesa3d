@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: MIT
 
 inc_intel = include_directories('.')
-inc_intel_compiler = include_directories('compiler')
 
 with_intel_elk = get_option('intel-elk')
 
@@ -15,7 +14,6 @@ else
   endif
 endif
 
-subdir('mda')
 subdir('genxml')
 subdir('dev')
 if with_intel_hasvk or with_intel_vk or with_gallium_crocus or with_gallium_iris

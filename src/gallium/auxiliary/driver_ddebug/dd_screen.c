@@ -310,6 +310,17 @@ dd_screen_resource_get_param(struct pipe_screen *_screen,
                                      level, param, handle_usage, value);
 }
 
+static void
+dd_screen_resource_get_info(struct pipe_screen *_screen,
+                            struct pipe_resource *resource,
+                            unsigned *stride,
+                            unsigned *offset)
+{
+   struct pipe_screen *screen = dd_screen(_screen)->screen;
+
+   screen->resource_get_info(screen, resource, stride, offset);
+}
+
 static bool
 dd_screen_check_resource_capability(struct pipe_screen *_screen,
                                     struct pipe_resource *resource,
@@ -442,25 +453,16 @@ dd_screen_memobj_destroy(struct pipe_screen *_screen,
 
    screen->memobj_destroy(screen, memobj);
 }
-
-static struct pipe_fence_handle *
-dd_screen_semaphore_create(struct pipe_screen *_screen)
-{
-   struct pipe_screen *screen = dd_screen(_screen)->screen;
-
-   return screen->semaphore_create(screen);
-}
 /********************************************************************
  * screen
  */
 
 static void
-dd_screen_finalize_nir(struct pipe_screen *_screen, struct nir_shader *nir,
-                       bool optimize)
+dd_screen_finalize_nir(struct pipe_screen *_screen, struct nir_shader *nir)
 {
    struct pipe_screen *screen = dd_screen(_screen)->screen;
 
-   screen->finalize_nir(screen, nir, optimize);
+   screen->finalize_nir(screen, nir);
 }
 
 static void
@@ -642,6 +644,7 @@ ddebug_screen_create(struct pipe_screen *screen)
    SCR_INIT(check_resource_capability);
    dscreen->base.resource_get_handle = dd_screen_resource_get_handle;
    SCR_INIT(resource_get_param);
+   SCR_INIT(resource_get_info);
    SCR_INIT(resource_changed);
    dscreen->base.resource_destroy = dd_screen_resource_destroy;
    SCR_INIT(flush_frontbuffer);
@@ -661,7 +664,6 @@ ddebug_screen_create(struct pipe_screen *screen)
    dscreen->base.get_driver_pipe_screen = dd_get_driver_pipe_screen;
    SCR_INIT(is_dmabuf_modifier_supported);
    SCR_INIT(get_dmabuf_modifier_planes);
-   SCR_INIT(semaphore_create);
 
    /* copy all caps */
    *(struct pipe_caps *)&dscreen->base.caps = screen->caps;

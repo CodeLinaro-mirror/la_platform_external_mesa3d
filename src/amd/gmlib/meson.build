@@ -16,6 +16,7 @@ c_args_gm = cc.get_supported_arguments([
   '-Werror=override-init',
   '-Werror=enum-conversion',
   '-Werror=enum-compare',
+  '-Werror=maybe-uninitialized',
 ])
 
 c_args_gm += [

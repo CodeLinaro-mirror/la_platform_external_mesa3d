@@ -40,8 +40,6 @@ enum fd_lrz_direction {
    FD_LRZ_GREATER,
 };
 
-#define FD_BIND_GLOBAL_BUFFER         (1 << 31)
-
 /**
  * State related to batch/resource tracking.
  *
@@ -325,8 +323,7 @@ fd_resource_nr_samples(const struct pipe_resource *prsc)
 }
 
 static inline struct fdl_image_params
-fd_image_params(const struct pipe_resource *prsc, bool ubwc,
-		unsigned tile_mode, uint32_t plane)
+fd_image_params(const struct pipe_resource *prsc, bool ubwc, unsigned tile_mode)
 {
    return (struct fdl_image_params) {
       .format = prsc->format,
@@ -339,7 +336,6 @@ fd_image_params(const struct pipe_resource *prsc, bool ubwc,
       .tile_mode = tile_mode,
       .ubwc = ubwc,
       .is_3d = (prsc->target == PIPE_TEXTURE_3D),
-      .plane = plane,
    };
 }
 
@@ -434,7 +430,7 @@ fd_dirty_resource(struct fd_context *ctx, struct pipe_resource *prsc,
 
 static inline void
 fd_dirty_shader_resource(struct fd_context *ctx, struct pipe_resource *prsc,
-                         mesa_shader_stage shader,
+                         enum pipe_shader_type shader,
                          BITMASK_ENUM(fd_dirty_shader_state) dirty,
                          bool write)
    assert_dt

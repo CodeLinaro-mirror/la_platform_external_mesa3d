@@ -26,16 +26,13 @@ if [ -n "$CI" ] && [ ! -s "${S3_JWT_FILE}" ]; then
   exit 1
 fi
 
-# shellcheck disable=SC2034 # S3_BASE_PATH is used in find_s3_project_artifact
-S3_BASE_PATH="${S3_HOST}/${S3_ANDROID_BUCKET}"
-ARTIFACTS_PATH="${ANDROID_LLVM_ARTIFACT_NAME}.tar.zst"
-
-if ARTIFACTS_URL="$(find_s3_project_artifact "${ARTIFACTS_PATH}")"; then
+if curl -s -o /dev/null -I -L -f --retry 4 --retry-delay 15 "https://${S3_HOST}/${S3_ANDROID_BUCKET}/${CI_PROJECT_PATH}/${ANDROID_LLVM_ARTIFACT_NAME}.tar.zst"; then
   echo "Artifact ${ANDROID_LLVM_ARTIFACT_NAME}.tar.zst already exists, skip re-building."
 
   # Download prebuilt LLVM libraries for Android when they have not changed,
   # to save some time
-  curl-with-retry -o "/${ANDROID_LLVM_ARTIFACT_NAME}.tar.zst" "${ARTIFACTS_URL}"
+  curl -L --retry 4 -f --retry-all-errors --retry-delay 60 \
+    -o "/${ANDROID_LLVM_ARTIFACT_NAME}.tar.zst" "https://${S3_HOST}/${S3_ANDROID_BUCKET}/${CI_PROJECT_PATH}/${ANDROID_LLVM_ARTIFACT_NAME}.tar.zst"
   tar -C / --zstd -xf "/${ANDROID_LLVM_ARTIFACT_NAME}.tar.zst"
   rm "/${ANDROID_LLVM_ARTIFACT_NAME}.tar.zst"
 
@@ -54,8 +51,9 @@ ANDROID_NDK="android-ndk-${ANDROID_NDK_VERSION}"
 ANDROID_NDK_ROOT="/${ANDROID_NDK}"
 if [ ! -d "$ANDROID_NDK_ROOT" ];
 then
-  curl-with-retry -o "${ANDROID_NDK}.zip" \
-   "https://dl.google.com/android/repository/${ANDROID_NDK}-linux.zip"
+  curl -L --retry 4 -f --retry-all-errors --retry-delay 60 \
+    -o "${ANDROID_NDK}.zip" \
+    "https://dl.google.com/android/repository/${ANDROID_NDK}-linux.zip"
   unzip -d / "${ANDROID_NDK}.zip" "$ANDROID_NDK/source.properties" "$ANDROID_NDK/build/cmake/*" "$ANDROID_NDK/toolchains/llvm/*"
   rm "${ANDROID_NDK}.zip"
 fi

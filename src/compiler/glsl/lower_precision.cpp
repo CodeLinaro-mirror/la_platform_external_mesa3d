@@ -27,7 +27,6 @@
 
 #include "main/macros.h"
 #include "main/consts_exts.h"
-#include "pipe/p_screen.h"
 #include "compiler/glsl_types.h"
 #include "ir.h"
 #include "ir_builder.h"
@@ -42,8 +41,7 @@ namespace {
 
 class find_precision_visitor : public ir_rvalue_enter_visitor {
 public:
-   find_precision_visitor(const struct pipe_screen *screen,
-                          mesa_shader_stage stage);
+   find_precision_visitor(const struct gl_shader_compiler_options *options);
    find_precision_visitor(const find_precision_visitor &) = delete;
    ~find_precision_visitor();
    find_precision_visitor & operator=(const find_precision_visitor &) = delete;
@@ -51,7 +49,7 @@ public:
    virtual void handle_rvalue(ir_rvalue **rvalue);
    virtual ir_visitor_status visit_enter(ir_call *ir);
 
-   ir_function_signature *map_builtin(linear_ctx *linalloc, ir_function_signature *sig);
+   ir_function_signature *map_builtin(ir_function_signature *sig);
 
    /* Set of rvalues that can be lowered. This will be filled in by
     * find_lowerable_rvalues_visitor. Only the root node of a lowerable section
@@ -69,8 +67,9 @@ public:
     */
    struct hash_table *clone_ht;
 
-   const struct pipe_screen *screen;
-   mesa_shader_stage stage;
+   void *lowered_builtin_mem_ctx;
+
+   const struct gl_shader_compiler_options *options;
 };
 
 class find_lowerable_rvalues_visitor : public ir_hierarchical_visitor {
@@ -107,8 +106,7 @@ public:
    };
 
    find_lowerable_rvalues_visitor(struct set *result,
-                                  const struct pipe_screen *screen,
-                                  mesa_shader_stage stage);
+                                  const struct gl_shader_compiler_options *options);
 
    static void stack_enter(class ir_instruction *ir, void *data);
    static void stack_leave(class ir_instruction *ir, void *data);
@@ -130,10 +128,9 @@ public:
    static parent_relation get_parent_relation(ir_instruction *parent,
                                               ir_instruction *child);
 
-   const struct pipe_screen *screen;
-   mesa_shader_stage stage;
    std::vector<stack_entry> stack;
    struct set *lowerable_rvalues;
+   const struct gl_shader_compiler_options *options;
 
    void pop_stack_entry();
    void add_lowerable_children(const stack_entry &entry);
@@ -150,7 +147,7 @@ public:
 };
 
 static bool
-can_lower_type(const struct pipe_screen *screen, mesa_shader_stage stage,
+can_lower_type(const struct gl_shader_compiler_options *options,
                const glsl_type *type)
 {
    /* Don’t lower any expressions involving non-float types except bool and
@@ -170,11 +167,11 @@ can_lower_type(const struct pipe_screen *screen, mesa_shader_stage stage,
       return true;
 
    case GLSL_TYPE_FLOAT:
-      return screen->shader_caps[stage].fp16;
+      return options->LowerPrecisionFloat16;
 
    case GLSL_TYPE_UINT:
    case GLSL_TYPE_INT:
-      return screen->shader_caps[stage].int16;
+      return options->LowerPrecisionInt16;
 
    default:
       return false;
@@ -182,12 +179,10 @@ can_lower_type(const struct pipe_screen *screen, mesa_shader_stage stage,
 }
 
 find_lowerable_rvalues_visitor::find_lowerable_rvalues_visitor(struct set *res,
-                                 const struct pipe_screen *screen,
-                                 mesa_shader_stage stage)
+                                 const struct gl_shader_compiler_options *opts)
 {
-   this->screen = screen;
-   this->stage = stage;
    lowerable_rvalues = res;
+   options = opts;
    callback_enter = stack_enter;
    callback_leave = stack_leave;
    data_enter = this;
@@ -295,7 +290,7 @@ enum find_lowerable_rvalues_visitor::can_lower_state
 find_lowerable_rvalues_visitor::handle_precision(const glsl_type *type,
                                                  int precision) const
 {
-   if (!can_lower_type(screen, stage, type))
+   if (!can_lower_type(options, type))
       return CANT_LOWER;
 
    switch (precision) {
@@ -337,7 +332,7 @@ find_lowerable_rvalues_visitor::visit(ir_constant *ir)
 {
    stack_enter(ir, this);
 
-   if (!can_lower_type(screen, stage, ir->type))
+   if (!can_lower_type(options, ir->type))
       stack.back().state = CANT_LOWER;
 
    stack_leave(ir, this);
@@ -398,11 +393,11 @@ find_lowerable_rvalues_visitor::visit_enter(ir_expression *ir)
 {
    ir_hierarchical_visitor::visit_enter(ir);
 
-   if (!can_lower_type(screen, stage, ir->type))
+   if (!can_lower_type(options, ir->type))
       stack.back().state = CANT_LOWER;
 
    /* Don't lower precision for derivative calculations */
-   if (!screen->shader_caps[stage].fp16_derivatives &&
+   if (!options->LowerPrecisionDerivatives &&
        (ir->operation == ir_unop_dFdx ||
         ir->operation == ir_unop_dFdx_coarse ||
         ir->operation == ir_unop_dFdx_fine ||
@@ -417,7 +412,7 @@ find_lowerable_rvalues_visitor::visit_enter(ir_expression *ir)
 
 static unsigned
 handle_call(ir_call *ir, const struct set *lowerable_rvalues,
-            const struct pipe_screen *screen, mesa_shader_stage stage)
+            const struct gl_shader_compiler_options *options)
 {
    /* The intrinsic call is inside the wrapper imageLoad function that will
     * be inlined. We have to handle both of them.
@@ -447,7 +442,7 @@ handle_call(ir_call *ir, const struct set *lowerable_rvalues,
 
       assert(i >= 0);
 
-      if (!screen->shader_caps[stage].glsl_16bit_load_dst)
+      if (!options->LowerPrecision16BitLoadDst)
          mediump = false;
       else if (desc->channel[i].pure_integer ||
                desc->channel[i].type == UTIL_FORMAT_TYPE_FLOAT)
@@ -481,7 +476,7 @@ handle_call(ir_call *ir, const struct set *lowerable_rvalues,
           * in the compiler as textureGatherOffsets will end up being passed
           * a temp when its expecting a constant as required by the spec.
           */
-         if (!screen->shader_caps[stage].glsl_16bit_load_dst ||
+         if (!options->LowerPrecision16BitLoadDst ||
              !strcmp(ir->callee_name(), "textureGatherOffsets"))
             return GLSL_PRECISION_HIGH;
 
@@ -560,8 +555,7 @@ find_lowerable_rvalues_visitor::visit_leave(ir_call *ir)
 
    assert(var->data.mode == ir_var_temporary);
 
-   unsigned return_precision = handle_call(ir, lowerable_rvalues, screen,
-                                           stage);
+   unsigned return_precision = handle_call(ir, lowerable_rvalues, options);
 
    can_lower_state lower_state =
       handle_precision(var->type, return_precision);
@@ -609,13 +603,12 @@ find_lowerable_rvalues_visitor::visit_leave(ir_assignment *ir)
    return visit_continue;
 }
 
-static void
-find_lowerable_rvalues(const struct pipe_screen *screen,
-                       mesa_shader_stage stage,
+void
+find_lowerable_rvalues(const struct gl_shader_compiler_options *options,
                        ir_exec_list *instructions,
                        struct set *result)
 {
-   find_lowerable_rvalues_visitor v(result, screen, stage);
+   find_lowerable_rvalues_visitor v(result, options);
 
    visit_list_elements(&v, instructions);
 
@@ -717,7 +710,8 @@ convert_precision(bool up, ir_rvalue *ir)
    }
 
    const glsl_type *desired_type = convert_type(up, ir->type);
-   return new(ir->node_linalloc) ir_expression(op, desired_type, ir, NULL);
+   void *mem_ctx = ralloc_parent(ir);
+   return new(mem_ctx) ir_expression(op, desired_type, ir, NULL);
 }
 
 void
@@ -885,7 +879,7 @@ find_precision_visitor::visit_enter(ir_call *ir)
         return_var->data.precision != GLSL_PRECISION_LOW))
       return visit_continue;
 
-   ir->callee = map_builtin(ir->node_linalloc, ir->callee);
+   ir->callee = map_builtin(ir->callee);
    ir->generate_inline(ir);
    ir->remove();
 
@@ -893,11 +887,12 @@ find_precision_visitor::visit_enter(ir_call *ir)
 }
 
 ir_function_signature *
-find_precision_visitor::map_builtin(linear_ctx *linalloc, ir_function_signature *sig)
+find_precision_visitor::map_builtin(ir_function_signature *sig)
 {
    if (lowered_builtins == NULL) {
       lowered_builtins = _mesa_pointer_hash_table_create(NULL);
       clone_ht =_mesa_pointer_hash_table_create(NULL);
+      lowered_builtin_mem_ctx = ralloc_context(NULL);
    } else {
       struct hash_entry *entry = _mesa_hash_table_search(lowered_builtins, sig);
       if (entry)
@@ -905,7 +900,7 @@ find_precision_visitor::map_builtin(linear_ctx *linalloc, ir_function_signature 
    }
 
    ir_function_signature *lowered_sig =
-      sig->clone(linalloc, clone_ht);
+      sig->clone(lowered_builtin_mem_ctx, clone_ht);
 
    /* If we're lowering the output precision of the function, then also lower
     * the precision of its inputs unless they have a specific qualifier.  The
@@ -921,7 +916,7 @@ find_precision_visitor::map_builtin(linear_ctx *linalloc, ir_function_signature 
       }
    }
 
-   lower_precision(screen, stage, &lowered_sig->body);
+   lower_precision(options, &lowered_sig->body);
 
    _mesa_hash_table_clear(clone_ht, NULL);
 
@@ -930,13 +925,12 @@ find_precision_visitor::map_builtin(linear_ctx *linalloc, ir_function_signature 
    return lowered_sig;
 }
 
-find_precision_visitor::find_precision_visitor(const struct pipe_screen *screen,
-                                               mesa_shader_stage stage)
+find_precision_visitor::find_precision_visitor(const struct gl_shader_compiler_options *options)
    : lowerable_rvalues(_mesa_pointer_set_create(NULL)),
      lowered_builtins(NULL),
      clone_ht(NULL),
-     screen(screen),
-     stage(stage)
+     lowered_builtin_mem_ctx(NULL),
+     options(options)
 {
 }
 
@@ -947,6 +941,7 @@ find_precision_visitor::~find_precision_visitor()
    if (lowered_builtins) {
       _mesa_hash_table_destroy(lowered_builtins, NULL);
       _mesa_hash_table_destroy(clone_ht, NULL);
+      ralloc_free(lowered_builtin_mem_ctx);
    }
 }
 
@@ -960,9 +955,8 @@ find_precision_visitor::~find_precision_visitor()
  */
 class lower_variables_visitor : public ir_rvalue_enter_visitor {
 public:
-   lower_variables_visitor(const struct pipe_screen *screen,
-                           mesa_shader_stage stage)
-      : screen(screen), stage(stage) {
+   lower_variables_visitor(const struct gl_shader_compiler_options *options)
+      : options(options) {
       lower_vars = _mesa_pointer_set_create(NULL);
    }
 
@@ -984,8 +978,7 @@ public:
    void convert_split_assignment(ir_dereference *lhs, ir_rvalue *rhs,
                                  bool insert_before);
 
-   const struct pipe_screen *screen;
-   mesa_shader_stage stage;
+   const struct gl_shader_compiler_options *options;
    set *lower_vars;
 };
 
@@ -1027,30 +1020,30 @@ lower_variables_visitor::visit(ir_variable *var)
         /* Lower uniforms but not UBOs. */
         (var->data.mode != ir_var_uniform ||
          var->is_in_buffer_block() ||
-         !(screen->shader_caps[stage].fp16_const_buffers &&
+         !(options->LowerPrecisionFloat16Uniforms &&
            glsl_without_array(var->type)->base_type == GLSL_TYPE_FLOAT))) ||
        !glsl_type_is_32bit(glsl_without_array(var->type)) ||
        (var->data.precision != GLSL_PRECISION_MEDIUM &&
         var->data.precision != GLSL_PRECISION_LOW) ||
-       !can_lower_type(screen, stage, var->type))
+       !can_lower_type(options, var->type))
       return visit_continue;
 
    /* Lower constant initializers. */
    if (var->constant_value &&
        var->type == var->constant_value->type) {
-      if (!screen->shader_caps[stage].glsl_16bit_consts)
+      if (!options->LowerPrecisionConstants)
          return visit_continue;
       var->constant_value =
-         var->constant_value->clone(var->node_linalloc, NULL);
+         var->constant_value->clone(ralloc_parent(var), NULL);
       lower_constant(var->constant_value);
    }
 
    if (var->constant_initializer &&
        var->type == var->constant_initializer->type) {
-      if (!screen->shader_caps[stage].glsl_16bit_consts)
+      if (!options->LowerPrecisionConstants)
          return visit_continue;
       var->constant_initializer =
-         var->constant_initializer->clone(var->node_linalloc, NULL);
+         var->constant_initializer->clone(ralloc_parent(var), NULL);
       lower_constant(var->constant_initializer);
    }
 
@@ -1083,16 +1076,16 @@ lower_variables_visitor::convert_split_assignment(ir_dereference *lhs,
                                                   ir_rvalue *rhs,
                                                   bool insert_before)
 {
-   linear_ctx *linalloc = lhs->node_linalloc;
+   void *mem_ctx = ralloc_parent(lhs);
 
    if (glsl_type_is_array(lhs->type)) {
       for (unsigned i = 0; i < lhs->type->length; i++) {
          ir_dereference *l, *r;
 
-         l = new(linalloc) ir_dereference_array(lhs->clone(linalloc, NULL),
-                                               new(linalloc) ir_constant(i));
-         r = new(linalloc) ir_dereference_array(rhs->clone(linalloc, NULL),
-                                               new(linalloc) ir_constant(i));
+         l = new(mem_ctx) ir_dereference_array(lhs->clone(mem_ctx, NULL),
+                                               new(mem_ctx) ir_constant(i));
+         r = new(mem_ctx) ir_dereference_array(rhs->clone(mem_ctx, NULL),
+                                               new(mem_ctx) ir_constant(i));
          convert_split_assignment(l, r, insert_before);
       }
       return;
@@ -1103,7 +1096,7 @@ lower_variables_visitor::convert_split_assignment(ir_dereference *lhs,
    assert(glsl_type_is_16bit(lhs->type) != glsl_type_is_16bit(rhs->type));
 
    ir_assignment *assign =
-      new(linalloc) ir_assignment(lhs, convert_precision(glsl_type_is_32bit(lhs->type), rhs));
+      new(mem_ctx) ir_assignment(lhs, convert_precision(glsl_type_is_32bit(lhs->type), rhs));
 
    if (insert_before)
       base_ir->insert_before(assign);
@@ -1195,7 +1188,7 @@ lower_variables_visitor::visit_enter(ir_assignment *ir)
 ir_visitor_status
 lower_variables_visitor::visit_enter(ir_return *ir)
 {
-   linear_ctx *linalloc = ir->node_linalloc;
+   void *mem_ctx = ralloc_parent(ir);
 
    ir_dereference *deref = ir->value ? ir->value->as_dereference() : NULL;
    if (deref) {
@@ -1207,16 +1200,16 @@ lower_variables_visitor::visit_enter(ir_return *ir)
           glsl_type_is_32bit(glsl_without_array(deref->type))) {
          /* Create a 32-bit temporary variable. */
          ir_variable *new_var =
-            new(linalloc) ir_variable(deref->type, "lowerp", ir_var_temporary);
+            new(mem_ctx) ir_variable(deref->type, "lowerp", ir_var_temporary);
          base_ir->insert_before(new_var);
 
          /* Fix types in dereferences. */
          fix_types_in_deref_chain(deref);
 
          /* Convert to 32 bits for the return value. */
-         convert_split_assignment(new(linalloc) ir_dereference_variable(new_var),
+         convert_split_assignment(new(mem_ctx) ir_dereference_variable(new_var),
                                   deref, true);
-         ir->value = new(linalloc) ir_dereference_variable(new_var);
+         ir->value = new(mem_ctx) ir_dereference_variable(new_var);
       }
    }
 
@@ -1262,19 +1255,20 @@ void lower_variables_visitor::handle_rvalue(ir_rvalue **rvalue)
       if (var &&
           _mesa_set_search(lower_vars, var) &&
           glsl_type_is_32bit(glsl_without_array(deref->type))) {
+         void *mem_ctx = ralloc_parent(ir);
 
          /* Create a 32-bit temporary variable. */
          ir_variable *new_var =
-            new(ir->node_linalloc) ir_variable(deref->type, "lowerp", ir_var_temporary);
+            new(mem_ctx) ir_variable(deref->type, "lowerp", ir_var_temporary);
          base_ir->insert_before(new_var);
 
          /* Fix types in dereferences. */
          fix_types_in_deref_chain(deref);
 
          /* Convert to 32 bits for the rvalue. */
-         convert_split_assignment(new(ir->node_linalloc) ir_dereference_variable(new_var),
+         convert_split_assignment(new(mem_ctx) ir_dereference_variable(new_var),
                                   deref, true);
-         *rvalue = new(ir->node_linalloc) ir_dereference_variable(new_var);
+         *rvalue = new(mem_ctx) ir_dereference_variable(new_var);
       }
    }
 }
@@ -1282,6 +1276,8 @@ void lower_variables_visitor::handle_rvalue(ir_rvalue **rvalue)
 ir_visitor_status
 lower_variables_visitor::visit_enter(ir_call *ir)
 {
+   void *mem_ctx = ralloc_parent(ir);
+
    /* We can't pass 16-bit variables as 32-bit inout/out parameters. */
    ir_foreach_two_lists(formal_node, &ir->callee->parameters,
                      actual_node, &ir->actual_parameters) {
@@ -1302,23 +1298,23 @@ lower_variables_visitor::visit_enter(ir_call *ir)
 
          /* Create a 32-bit temporary variable for the parameter. */
          ir_variable *new_var =
-            new(ir->node_linalloc) ir_variable(param->type, "lowerp", ir_var_temporary);
+            new(mem_ctx) ir_variable(param->type, "lowerp", ir_var_temporary);
          base_ir->insert_before(new_var);
 
          /* Replace the parameter. */
-         actual_node->replace_with(new(ir->node_linalloc) ir_dereference_variable(new_var));
+         actual_node->replace_with(new(mem_ctx) ir_dereference_variable(new_var));
 
          if (param->data.mode == ir_var_function_in ||
              param->data.mode == ir_var_function_inout) {
             /* Convert to 32 bits for passing in. */
-            convert_split_assignment(new(ir->node_linalloc) ir_dereference_variable(new_var),
-                                     param_deref->clone(ir->node_linalloc, NULL), true);
+            convert_split_assignment(new(mem_ctx) ir_dereference_variable(new_var),
+                                     param_deref->clone(mem_ctx, NULL), true);
          }
          if (param->data.mode == ir_var_function_out ||
              param->data.mode == ir_var_function_inout) {
             /* Convert to 16 bits after returning. */
             convert_split_assignment(param_deref,
-                                     new(ir->node_linalloc) ir_dereference_variable(new_var),
+                                     new(mem_ctx) ir_dereference_variable(new_var),
                                      false);
          }
       }
@@ -1333,7 +1329,7 @@ lower_variables_visitor::visit_enter(ir_call *ir)
        glsl_type_is_32bit(glsl_without_array(ret_deref->type))) {
       /* Create a 32-bit temporary variable. */
       ir_variable *new_var =
-         new(ir->node_linalloc) ir_variable(ir->callee->return_type, "lowerp",
+         new(mem_ctx) ir_variable(ir->callee->return_type, "lowerp",
                                   ir_var_temporary);
       base_ir->insert_before(new_var);
 
@@ -1341,8 +1337,8 @@ lower_variables_visitor::visit_enter(ir_call *ir)
       ret_deref->var = new_var;
 
       /* Convert to 16 bits after returning. */
-      convert_split_assignment(new(ir->node_linalloc) ir_dereference_variable(ret_var),
-                               new(ir->node_linalloc) ir_dereference_variable(new_var),
+      convert_split_assignment(new(mem_ctx) ir_dereference_variable(ret_var),
+                               new(mem_ctx) ir_dereference_variable(new_var),
                                false);
    }
 
@@ -1352,15 +1348,13 @@ lower_variables_visitor::visit_enter(ir_call *ir)
 }
 
 void
-lower_precision(const struct pipe_screen *screen,
-                mesa_shader_stage stage,
+lower_precision(const struct gl_shader_compiler_options *options,
                 ir_exec_list *instructions)
 {
-   find_precision_visitor v(screen, stage);
-   find_lowerable_rvalues(screen, stage, instructions,
-                          v.lowerable_rvalues);
+   find_precision_visitor v(options);
+   find_lowerable_rvalues(options, instructions, v.lowerable_rvalues);
    visit_list_elements(&v, instructions);
 
-   lower_variables_visitor vars(screen, stage);
+   lower_variables_visitor vars(options);
    visit_list_elements(&vars, instructions);
 }

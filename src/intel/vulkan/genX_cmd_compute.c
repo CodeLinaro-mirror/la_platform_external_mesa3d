@@ -26,7 +26,6 @@
 
 #include "anv_private.h"
 #include "anv_measure.h"
-#include "anv_nir.h"
 
 #include "common/intel_common.h"
 #include "common/intel_compute_slm.h"
@@ -67,7 +66,7 @@ genX(cmd_buffer_ensure_cfe_state)(struct anv_cmd_buffer *cmd_buffer,
       anv_reloc_list_add_bo(cmd_buffer->batch.relocs, scratch_bo);
       scratch_surf = anv_scratch_pool_get_surf(cmd_buffer->device, scratch_pool,
                                                total_scratch);
-      cfe.ScratchSpaceBuffer = scratch_surf >> ANV_SCRATCH_SPACE_SHIFT;
+      cfe.ScratchSpaceBuffer = scratch_surf >> ANV_SCRATCH_SPACE_SHIFT(GFX_VER);
 #if GFX_VER >= 20
       switch (cmd_buffer->device->physical->instance->stack_ids) {
       case 256:  cfe.StackIDControl = StackIDs256;  break;
@@ -76,6 +75,19 @@ genX(cmd_buffer_ensure_cfe_state)(struct anv_cmd_buffer *cmd_buffer,
       case 2048: cfe.StackIDControl = StackIDs2048; break;
       default:   UNREACHABLE("invalid stack_ids value");
       }
+
+#if INTEL_WA_14021821874_GFX_VER || INTEL_WA_14018813551_GFX_VER
+      /* Wa_14021821874, Wa_14018813551:
+       *
+       * "StackIDControlOverride_RTGlobals = 0 (i.e. 2k)". We
+       * already set stack size per ray to 64 in brw_nir_lower_rt_intrinsics
+       * as the workaround also requires.
+       */
+      if (intel_needs_workaround(cmd_buffer->device->info, 14021821874) ||
+          intel_needs_workaround(cmd_buffer->device->info, 14018813551))
+         cfe.StackIDControl = StackIDs2048;
+#endif
+
 #endif
 
       cfe.OverDispatchControl = 2; /* 50% overdispatch */
@@ -93,20 +105,20 @@ cmd_buffer_flush_compute_state(struct anv_cmd_buffer *cmd_buffer)
    struct anv_device *device = cmd_buffer->device;
    struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
    const UNUSED struct intel_device_info *devinfo = cmd_buffer->device->info;
+   struct anv_compute_pipeline *pipeline =
+      anv_pipeline_to_compute(comp_state->base.pipeline);
 
    assert(comp_state->shader);
 
    genX(cmd_buffer_config_l3)(cmd_buffer,
-                              comp_state->shader->prog_data->total_shared > 0 ?
+                              pipeline->cs->prog_data->total_shared > 0 ?
                               device->l3_slm_config : device->l3_config);
 
    genX(cmd_buffer_update_color_aux_op(cmd_buffer, ISL_AUX_OP_NONE));
 
-   genX(flush_descriptor_buffers)(cmd_buffer, &comp_state->base,
-                                  VK_SHADER_STAGE_COMPUTE_BIT);
+   genX(flush_descriptor_buffers)(cmd_buffer, &comp_state->base);
 
-   const bool uses_systolic = get_cs_prog_data(comp_state)->uses_systolic;
-   genX(flush_pipeline_select_gpgpu)(cmd_buffer, uses_systolic);
+   genX(flush_pipeline_select_gpgpu)(cmd_buffer);
 
    /* Apply any pending pipeline flushes we may have.  We want to apply them
     * now because, if any of those flushes are for things like push constants,
@@ -114,7 +126,7 @@ cmd_buffer_flush_compute_state(struct anv_cmd_buffer *cmd_buffer)
     */
    genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
 
-   if (comp_state->pipeline_dirty) {
+   if (cmd_buffer->state.compute.pipeline_dirty) {
 #if GFX_VERx10 < 125
       /* From the Sky Lake PRM Vol 2a, MEDIA_VFE_STATE:
        *
@@ -125,36 +137,17 @@ cmd_buffer_flush_compute_state(struct anv_cmd_buffer *cmd_buffer)
        *    sufficient."
        */
       anv_add_pending_pipe_bits(cmd_buffer,
-                                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                                ANV_PIPE_CS_STALL_BIT,
-                                "flush compute state");
+                              ANV_PIPE_CS_STALL_BIT,
+                              "flush compute state");
       genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
 #endif
 
-#define anv_batch_emit_cs(batch, cmd, field) ({                         \
-            void *__dst = anv_batch_emit_dwords(                        \
-               batch, __anv_cmd_length(cmd));                           \
-            if (__dst != NULL) {                                        \
-               memcpy(__dst,                                            \
-                     &comp_state->shader->cmd_data[                     \
-                        comp_state->shader->field.offset],              \
-                     4 * __anv_cmd_length(cmd));                        \
-               VG(VALGRIND_CHECK_MEM_IS_DEFINED(                        \
-                     __dst, __anv_cmd_length(cmd) * 4));                \
-            }                                                           \
-            __dst;                                                      \
-         })
-
+      anv_batch_emit_batch(&cmd_buffer->batch, &pipeline->base.batch);
 
 #if GFX_VERx10 >= 125
       const struct brw_cs_prog_data *prog_data = get_cs_prog_data(comp_state);
       genX(cmd_buffer_ensure_cfe_state)(cmd_buffer, prog_data->base.total_scratch);
-#else
-      anv_batch_emit_cs(&cmd_buffer->batch, GENX(MEDIA_VFE_STATE), cs.gfx9.vfe);
 #endif
-
-#undef anv_batch_emit_cs
 
       /* Changing the pipeline affects the push constants layout (different
        * amount of cross/per thread allocations). The allocation is also
@@ -175,24 +168,20 @@ cmd_buffer_flush_compute_state(struct anv_cmd_buffer *cmd_buffer)
       comp_state->base.push_constants_data_dirty = true;
    }
 
-   anv_cmd_buffer_dirty_descriptors(
-      cmd_buffer,
+   cmd_buffer->state.descriptors_dirty |=
       genX(cmd_buffer_flush_push_descriptors)(cmd_buffer,
-                                              &cmd_buffer->state.compute.base),
-      "dirty compute descriptor");
+                                              &cmd_buffer->state.compute.base);
 
-   if (cmd_buffer->state.descriptors_dirty & VK_SHADER_STAGE_COMPUTE_BIT) {
-      cmd_buffer->state.descriptors_pointers_dirty |=
-         genX(cmd_buffer_flush_descriptor_sets)(
-            cmd_buffer,
-            &cmd_buffer->state.compute.base,
-            VK_SHADER_STAGE_COMPUTE_BIT,
-            (const struct anv_shader **)&comp_state->shader, 1);
-      cmd_buffer->state.descriptors_dirty &= ~VK_SHADER_STAGE_COMPUTE_BIT;
-   }
-#if GFX_VERx10 < 125
-   if ((cmd_buffer->state.descriptors_pointers_dirty & VK_SHADER_STAGE_COMPUTE_BIT) ||
+   if ((cmd_buffer->state.descriptors_dirty & VK_SHADER_STAGE_COMPUTE_BIT) ||
        cmd_buffer->state.compute.pipeline_dirty) {
+      genX(cmd_buffer_flush_descriptor_sets)(
+         cmd_buffer,
+         &cmd_buffer->state.compute.base,
+         VK_SHADER_STAGE_COMPUTE_BIT,
+         (const struct anv_shader_bin **)&comp_state->shader, 1);
+      cmd_buffer->state.descriptors_dirty &= ~VK_SHADER_STAGE_COMPUTE_BIT;
+
+#if GFX_VERx10 < 125
       uint32_t iface_desc_data_dw[GENX(INTERFACE_DESCRIPTOR_DATA_length)];
       struct GENX(INTERFACE_DESCRIPTOR_DATA) desc = {
          .BindingTablePointer =
@@ -204,7 +193,7 @@ cmd_buffer_flush_compute_state(struct anv_cmd_buffer *cmd_buffer)
 
       struct anv_state state =
          anv_cmd_buffer_merge_dynamic(cmd_buffer, iface_desc_data_dw,
-                                      comp_state->shader->cs.gfx9.idd,
+                                      pipeline->gfx9.interface_descriptor_data,
                                       GENX(INTERFACE_DESCRIPTOR_DATA_length),
                                       64);
 
@@ -214,8 +203,8 @@ cmd_buffer_flush_compute_state(struct anv_cmd_buffer *cmd_buffer)
          mid.InterfaceDescriptorTotalLength        = size;
          mid.InterfaceDescriptorDataStartAddress   = state.offset;
       }
-   }
 #endif
+   }
 
    if (cmd_buffer->state.push_constants_dirty & VK_SHADER_STAGE_COMPUTE_BIT) {
 
@@ -250,60 +239,61 @@ genX(cmd_buffer_flush_compute_state)(struct anv_cmd_buffer *cmd_buffer)
 }
 
 static void
-anv_cmd_buffer_push_driver_values(struct anv_cmd_buffer *cmd_buffer,
-                                  const struct anv_pipeline_bind_map *bind_map,
-                                  uint32_t baseGroupX,
-                                  uint32_t baseGroupY,
-                                  uint32_t baseGroupZ,
-                                  uint32_t groupCountX,
-                                  uint32_t groupCountY,
-                                  uint32_t groupCountZ,
-                                  struct anv_address indirect_group,
-                                  uint32_t unaligned_x_offset)
+anv_cmd_buffer_push_workgroups(struct anv_cmd_buffer *cmd_buffer,
+                               const struct brw_cs_prog_data *prog_data,
+                               uint32_t baseGroupX,
+                               uint32_t baseGroupY,
+                               uint32_t baseGroupZ,
+                               uint32_t groupCountX,
+                               uint32_t groupCountY,
+                               uint32_t groupCountZ,
+                               struct anv_address indirect_group)
 {
    if (anv_batch_has_error(&cmd_buffer->batch))
       return;
 
-#define UPDATE_PUSH(field, value) do {          \
-      if (field != value) {                     \
-         field = value;                         \
-         updated = true;                        \
-      }                                         \
-   } while(0)
-
    struct anv_push_constants *push =
       &cmd_buffer->state.compute.base.push_constants;
    bool updated = false;
-   if (bind_map->binding_mask & ANV_PIPELINE_BIND_MASK_BASE_WORKGROUP) {
-      UPDATE_PUSH(push->cs.base_workgroup[0], baseGroupX);
-      UPDATE_PUSH(push->cs.base_workgroup[1], baseGroupY);
-      UPDATE_PUSH(push->cs.base_workgroup[2], baseGroupZ);
+   if (push->cs.base_work_group_id[0] != baseGroupX ||
+       push->cs.base_work_group_id[1] != baseGroupY ||
+       push->cs.base_work_group_id[2] != baseGroupZ) {
+      push->cs.base_work_group_id[0] = baseGroupX;
+      push->cs.base_work_group_id[1] = baseGroupY;
+      push->cs.base_work_group_id[2] = baseGroupZ;
+      updated = true;
    }
 
-   if (bind_map->binding_mask & ANV_PIPELINE_BIND_MASK_NUM_WORKGROUP) {
+   /* On Gfx12.5+ this value goes into the inline parameter register */
+   if (GFX_VERx10 < 125 && prog_data->uses_num_work_groups) {
       if (anv_address_is_null(indirect_group)) {
-         UPDATE_PUSH(push->cs.num_workgroups[0], groupCountX);
-         UPDATE_PUSH(push->cs.num_workgroups[1], groupCountY);
-         UPDATE_PUSH(push->cs.num_workgroups[2], groupCountZ);
+         if (push->cs.num_work_groups[0] != groupCountX ||
+             push->cs.num_work_groups[1] != groupCountY ||
+             push->cs.num_work_groups[2] != groupCountZ) {
+            push->cs.num_work_groups[0] = groupCountX;
+            push->cs.num_work_groups[1] = groupCountY;
+            push->cs.num_work_groups[2] = groupCountZ;
+            updated = true;
+         }
       } else {
          uint64_t addr64 = anv_address_physical(indirect_group);
          uint32_t lower_addr32 = addr64 & 0xffffffff;
          uint32_t upper_addr32 = addr64 >> 32;
-         UPDATE_PUSH(push->cs.num_workgroups[0], UINT32_MAX);
-         UPDATE_PUSH(push->cs.num_workgroups[1], lower_addr32);
-         UPDATE_PUSH(push->cs.num_workgroups[2], upper_addr32);
+         if (push->cs.num_work_groups[0] != UINT32_MAX ||
+             push->cs.num_work_groups[1] != lower_addr32 ||
+             push->cs.num_work_groups[2] != upper_addr32) {
+            push->cs.num_work_groups[0] = UINT32_MAX;
+            push->cs.num_work_groups[1] = lower_addr32;
+            push->cs.num_work_groups[2] = upper_addr32;
+            updated = true;
+         }
       }
    }
-
-   if (bind_map->binding_mask & ANV_PIPELINE_BIND_MASK_UNALIGNED_INV_X)
-      UPDATE_PUSH(push->cs.unaligned_invocations_x, unaligned_x_offset);
 
    if (updated) {
       cmd_buffer->state.push_constants_dirty |= VK_SHADER_STAGE_COMPUTE_BIT;
       cmd_buffer->state.compute.base.push_constants_data_dirty = true;
    }
-
-#undef UPDATE_PUSH
 }
 
 #define GPGPU_DISPATCHDIMX 0x2500
@@ -363,11 +353,33 @@ compute_store_indirect_params(struct anv_cmd_buffer *cmd_buffer,
 #if GFX_VERx10 >= 125
 
 static inline struct GENX(INTERFACE_DESCRIPTOR_DATA)
-get_interface_descriptor_data_tables(struct anv_cmd_buffer *cmd_buffer)
+get_interface_descriptor_data(struct anv_cmd_buffer *cmd_buffer,
+                              const struct anv_shader_bin *shader,
+                              const struct brw_cs_prog_data *prog_data,
+                              const struct intel_cs_dispatch_info *dispatch)
 {
+   const struct intel_device_info *devinfo = cmd_buffer->device->info;
+
    return (struct GENX(INTERFACE_DESCRIPTOR_DATA)) {
+      .SamplerCount = DIV_ROUND_UP(CLAMP(shader->bind_map.sampler_count, 0, 16), 4),
+      .KernelStartPointer = shader->kernel.offset,
       .SamplerStatePointer = cmd_buffer->state.samplers[MESA_SHADER_COMPUTE].offset,
       .BindingTablePointer = cmd_buffer->state.binding_tables[MESA_SHADER_COMPUTE].offset,
+      /* Typically set to 0 to avoid prefetching on every thread dispatch. */
+      .BindingTableEntryCount = devinfo->verx10 == 125 ?
+         0 : MIN2(shader->bind_map.surface_count, 30),
+      .NumberofThreadsinGPGPUThreadGroup = dispatch->threads,
+      .ThreadGroupDispatchSize = intel_compute_threads_group_dispatch_size(dispatch->threads),
+      .SharedLocalMemorySize = intel_compute_slm_encode_size(GFX_VER, prog_data->base.total_shared),
+      .PreferredSLMAllocationSize =
+         intel_compute_preferred_slm_calc_encode_size(devinfo,
+                                                      prog_data->base.total_shared,
+                                                      dispatch->group_size,
+                                                      dispatch->simd_size),
+      .NumberOfBarriers = prog_data->uses_barrier,
+#if GFX_VER >= 30
+      .RegistersPerThread = ptl_register_blocks(prog_data->base.grf_used),
+#endif
    };
 }
 
@@ -421,78 +433,6 @@ compute_update_async_threads_limit(struct anv_cmd_buffer *cmd_buffer,
    }
 }
 
-static inline uint32_t
-fill_inline_param(uint8_t param_value,
-                  const uint32_t *push_data,
-                  uint64_t push_addr64,
-                  uint32_t base_wg[3],
-                  uint32_t num_wg[3],
-                  uint32_t unaligned_x_offset)
-{
-   switch (param_value) {
-   case ANV_INLINE_DWORD_PUSH_ADDRESS_LDW:               return push_addr64 & 0xffffffff;
-   case ANV_INLINE_DWORD_PUSH_ADDRESS_UDW:               return push_addr64 >> 32;
-   case anv_drv_const_dword(cs.num_workgroups[0]):       return num_wg[0];
-   case anv_drv_const_dword(cs.num_workgroups[1]):       return num_wg[1];
-   case anv_drv_const_dword(cs.num_workgroups[2]):       return num_wg[2];
-   case anv_drv_const_dword(cs.base_workgroup[0]):       return base_wg[0];
-   case anv_drv_const_dword(cs.base_workgroup[1]):       return base_wg[1];
-   case anv_drv_const_dword(cs.base_workgroup[2]):       return base_wg[2];
-   case anv_drv_const_dword(cs.unaligned_invocations_x): return unaligned_x_offset;
-   default:                                              return push_data[param_value];
-   }
-}
-
-static inline void
-fill_inline_params(struct GENX(COMPUTE_WALKER_BODY) *body,
-                   const struct anv_cmd_compute_state *comp_state,
-                   uint64_t push_addr64,
-                   uint32_t base_wg[3],
-                   uint32_t num_wg[3],
-                   uint32_t unaligned_x_offset)
-{
-   const uint32_t *push_data =
-      (const uint32_t *)&comp_state->base.push_constants;
-   const struct anv_pipeline_bind_map *bind_map =
-      &comp_state->shader->bind_map;
-
-   for (uint32_t i = 0; i < bind_map->inline_dwords_count; i++) {
-      body->InlineData[i] = fill_inline_param(
-         bind_map->inline_dwords[i], push_data, push_addr64,
-         base_wg, num_wg, unaligned_x_offset);
-   }
-}
-
-static inline void
-cmd_buffer_post_dispatch_wa(struct anv_cmd_buffer *cmd_buffer)
-{
-   genX(cmd_buffer_post_dispatch_wa)(cmd_buffer);
-
-   struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
-
-   /* Workaround WaW hazards in applications that clear a buffer and start
-    * writing to it immediately without a barrier between the clear & write
-    * operations.
-    */
-   if (cmd_buffer->device->physical->instance->barrier_post_typed_clear_shader &&
-       (comp_state->shader->bind_map.inferred_behavior & ANV_PIPELINE_BEHAVIOR_CLEAR_TYPED)) {
-      anv_add_pending_pipe_bits(cmd_buffer,
-                                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                                VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                                ANV_PIPE_HDC_PIPELINE_FLUSH_BIT,
-                                "clear shader typed L1 flush app wa");
-   }
-   if (cmd_buffer->device->physical->instance->barrier_post_untyped_clear_shader &&
-       (comp_state->shader->bind_map.inferred_behavior & ANV_PIPELINE_BEHAVIOR_CLEAR_UNTYPED)) {
-      anv_add_pending_pipe_bits(cmd_buffer,
-                                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                                VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                                ANV_PIPE_UNTYPED_DATAPORT_CACHE_FLUSH_BIT |
-                                ANV_PIPE_HDC_PIPELINE_FLUSH_BIT,
-                                "clear shader untyped L1 flush app wa");
-   }
-}
-
 static inline void
 emit_indirect_compute_walker(struct anv_cmd_buffer *cmd_buffer,
                              const struct brw_cs_prog_data *prog_data,
@@ -506,6 +446,7 @@ emit_indirect_compute_walker(struct anv_cmd_buffer *cmd_buffer,
 
    const struct intel_cs_dispatch_info dispatch =
       brw_cs_get_dispatch_info(devinfo, prog_data, NULL);
+   const int dispatch_size = dispatch.simd_size / 16;
 
    uint64_t indirect_addr64 = anv_address_physical(indirect_addr);
 
@@ -515,29 +456,47 @@ emit_indirect_compute_walker(struct anv_cmd_buffer *cmd_buffer,
 
    compute_update_async_threads_limit(cmd_buffer, prog_data, &dispatch);
 
-   struct GENX(COMPUTE_WALKER_BODY) body = {
-      .InterfaceDescriptor     = get_interface_descriptor_data_tables(cmd_buffer),
-      .ExecutionMask           = dispatch.right_mask,
-      .PostSync                = {
-         .MOCS                 = anv_mocs(cmd_buffer->device, NULL, 0),
+   struct GENX(COMPUTE_WALKER_BODY) body =  {
+      .SIMDSize                 = dispatch_size,
+      /* HSD 14016252163: Use of Morton walk order (and batching using a batch
+       * size of 4) is expected to increase sampler cache hit rates by
+       * increasing sample address locality within a subslice.
+       */
+#if GFX_VER >= 30
+      .DispatchWalkOrder        = prog_data->uses_sampler ?
+                                  MortonWalk :
+                                  LinearWalk,
+      .ThreadGroupBatchSize     = prog_data->uses_sampler ? TG_BATCH_4 :
+                                                            TG_BATCH_1,
+#endif
+      .MessageSIMD              = dispatch_size,
+      .GenerateLocalID          = prog_data->generate_local_id != 0,
+      .EmitLocal                = prog_data->generate_local_id,
+      .WalkOrder                = prog_data->walk_order,
+      .TileLayout               = prog_data->walk_order == INTEL_WALK_ORDER_YXZ ?
+                                  TileY32bpe : Linear,
+      .LocalXMaximum            = prog_data->local_size[0] - 1,
+      .LocalYMaximum            = prog_data->local_size[1] - 1,
+      .LocalZMaximum            = prog_data->local_size[2] - 1,
+      .ExecutionMask            = dispatch.right_mask,
+      .PostSync.MOCS            = anv_mocs(cmd_buffer->device, NULL, 0),
+      .InterfaceDescriptor =
+         get_interface_descriptor_data(cmd_buffer, comp_state->shader,
+                                       prog_data, &dispatch),
+      .EmitInlineParameter      = prog_data->uses_inline_data,
+      .InlineData               = {
+         [ANV_INLINE_PARAM_PUSH_ADDRESS_OFFSET / 4 + 0]   = push_addr64 & 0xffffffff,
+         [ANV_INLINE_PARAM_PUSH_ADDRESS_OFFSET / 4 + 1]   = push_addr64 >> 32,
+         [ANV_INLINE_PARAM_NUM_WORKGROUPS_OFFSET / 4 + 0] = UINT32_MAX,
+         [ANV_INLINE_PARAM_NUM_WORKGROUPS_OFFSET / 4 + 1] = indirect_addr64 & 0xffffffff,
+         [ANV_INLINE_PARAM_NUM_WORKGROUPS_OFFSET / 4 + 2] = indirect_addr64 >> 32,
       },
    };
 
-   uint32_t num_workgroup_data[3] = {
-      UINT32_MAX,
-      indirect_addr64 & 0xffffffff,
-      indirect_addr64 >> 32,
-   };
-   fill_inline_params(&body, comp_state, push_addr64,
-                      (uint32_t[]) {0, 0, 0},
-                      num_workgroup_data, 0);
-
    cmd_buffer->state.last_indirect_dispatch =
-      anv_batch_emitn_merge_at(
+      anv_batch_emitn(
          &cmd_buffer->batch,
          GENX(EXECUTE_INDIRECT_DISPATCH_length),
-         GENX(EXECUTE_INDIRECT_DISPATCH_body_start) / 32,
-         comp_state->shader->cs.gfx125.compute_walker_body,
          GENX(EXECUTE_INDIRECT_DISPATCH),
          .PredicateEnable            = predicate,
          .MaxCount                   = 1,
@@ -546,8 +505,6 @@ emit_indirect_compute_walker(struct anv_cmd_buffer *cmd_buffer,
          .MOCS                       = anv_mocs(cmd_buffer->device,
                                                 indirect_addr.bo, 0),
       );
-
-   cmd_buffer_post_dispatch_wa(cmd_buffer);
 }
 
 static inline void
@@ -555,8 +512,8 @@ emit_compute_walker(struct anv_cmd_buffer *cmd_buffer,
                     struct anv_address indirect_addr,
                     const struct brw_cs_prog_data *prog_data,
                     struct intel_cs_dispatch_info dispatch,
-                    uint32_t base_wg[3], uint32_t num_wg[3],
-                    uint32_t unaligned_invocations_x)
+                    uint32_t groupCountX, uint32_t groupCountY,
+                    uint32_t groupCountZ)
 {
    const struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
    const bool predicate = cmd_buffer->state.conditional_render_enabled;
@@ -570,9 +527,9 @@ emit_compute_walker(struct anv_cmd_buffer *cmd_buffer,
       num_workgroup_data[1] = indirect_addr64 & 0xffffffff;
       num_workgroup_data[2] = indirect_addr64 >> 32;
    } else {
-      num_workgroup_data[0] = num_wg[0];
-      num_workgroup_data[1] = num_wg[1];
-      num_workgroup_data[2] = num_wg[2];
+      num_workgroup_data[0] = groupCountX;
+      num_workgroup_data[1] = groupCountY;
+      num_workgroup_data[2] = groupCountZ;
    }
 
    uint64_t push_addr64 = anv_address_physical(
@@ -580,26 +537,45 @@ emit_compute_walker(struct anv_cmd_buffer *cmd_buffer,
                                    comp_state->base.push_constants_state));
 
    struct GENX(COMPUTE_WALKER_BODY) body = {
-      .InterfaceDescriptor            = get_interface_descriptor_data_tables(cmd_buffer),
-      .ThreadGroupIDXDimension        = num_wg[0],
-      .ThreadGroupIDYDimension        = num_wg[1],
-      .ThreadGroupIDZDimension        = num_wg[2],
+      .SIMDSize                       = dispatch.simd_size / 16,
+      .MessageSIMD                    = dispatch.simd_size / 16,
+      .GenerateLocalID                = prog_data->generate_local_id != 0,
+      .EmitLocal                      = prog_data->generate_local_id,
+      .WalkOrder                      = prog_data->walk_order,
+      .TileLayout = prog_data->walk_order == INTEL_WALK_ORDER_YXZ ?
+                    TileY32bpe : Linear,
+      .LocalXMaximum                  = prog_data->local_size[0] - 1,
+      .LocalYMaximum                  = prog_data->local_size[1] - 1,
+      .LocalZMaximum                  = prog_data->local_size[2] - 1,
+      .ThreadGroupIDXDimension        = groupCountX,
+      .ThreadGroupIDYDimension        = groupCountY,
+      .ThreadGroupIDZDimension        = groupCountZ,
       .ExecutionMask                  = dispatch.right_mask,
       .PostSync                       = {
-         .MOCS = anv_mocs(cmd_buffer->device, NULL, 0),
+         .MOCS                        = anv_mocs(cmd_buffer->device, NULL, 0),
       },
+      .InterfaceDescriptor =
+         get_interface_descriptor_data(cmd_buffer, comp_state->shader,
+                                       prog_data, &dispatch),
+      .EmitInlineParameter            = prog_data->uses_inline_data,
+      .InlineData                     = {
+         [ANV_INLINE_PARAM_PUSH_ADDRESS_OFFSET / 4 + 0]   = push_addr64 & 0xffffffff,
+         [ANV_INLINE_PARAM_PUSH_ADDRESS_OFFSET / 4 + 1]   = push_addr64 >> 32,
+         [ANV_INLINE_PARAM_NUM_WORKGROUPS_OFFSET / 4 + 0] = num_workgroup_data[0],
+         [ANV_INLINE_PARAM_NUM_WORKGROUPS_OFFSET / 4 + 1] = num_workgroup_data[1],
+         [ANV_INLINE_PARAM_NUM_WORKGROUPS_OFFSET / 4 + 2] = num_workgroup_data[2],
+      },
+#if GFX_VER >= 30
+         /* HSD 14016252163 */
+      .DispatchWalkOrder = prog_data->uses_sampler ? MortonWalk : LinearWalk,
+      .ThreadGroupBatchSize = prog_data->uses_sampler ? TG_BATCH_4 : TG_BATCH_1,
+#endif
    };
 
-   fill_inline_params(&body, comp_state, push_addr64,
-                      base_wg, num_workgroup_data,
-                      unaligned_invocations_x);
-
    cmd_buffer->state.last_compute_walker =
-      anv_batch_emitn_merge_at(
+      anv_batch_emitn(
          &cmd_buffer->batch,
          GENX(COMPUTE_WALKER_length),
-         GENX(COMPUTE_WALKER_body_start) / 32,
-         comp_state->shader->cs.gfx125.compute_walker_body,
          GENX(COMPUTE_WALKER),
          .IndirectParameterEnable        = !anv_address_is_null(indirect_addr),
          .PredicateEnable                = predicate,
@@ -608,8 +584,6 @@ emit_compute_walker(struct anv_cmd_buffer *cmd_buffer,
          .SystolicModeEnable             = prog_data->uses_systolic,
 #endif
       );
-
-   cmd_buffer_post_dispatch_wa(cmd_buffer);
 }
 
 #else /* #if GFX_VERx10 >= 125 */
@@ -618,7 +592,8 @@ static inline void
 emit_gpgpu_walker(struct anv_cmd_buffer *cmd_buffer,
                   bool indirect,
                   const struct brw_cs_prog_data *prog_data,
-                  uint32_t num_wg[3])
+                  uint32_t groupCountX, uint32_t groupCountY,
+                  uint32_t groupCountZ)
 {
    const bool predicate = cmd_buffer->state.conditional_render_enabled;
 
@@ -633,9 +608,9 @@ emit_gpgpu_walker(struct anv_cmd_buffer *cmd_buffer,
       ggw.ThreadDepthCounterMaximum    = 0;
       ggw.ThreadHeightCounterMaximum   = 0;
       ggw.ThreadWidthCounterMaximum    = dispatch.threads - 1;
-      ggw.ThreadGroupIDXDimension      = num_wg[0];
-      ggw.ThreadGroupIDYDimension      = num_wg[1];
-      ggw.ThreadGroupIDZDimension      = num_wg[2];
+      ggw.ThreadGroupIDXDimension      = groupCountX;
+      ggw.ThreadGroupIDYDimension      = groupCountY;
+      ggw.ThreadGroupIDZDimension      = groupCountZ;
       ggw.RightExecutionMask           = dispatch.right_mask;
       ggw.BottomExecutionMask          = 0xffffffff;
    }
@@ -650,8 +625,8 @@ emit_cs_walker(struct anv_cmd_buffer *cmd_buffer,
                const struct brw_cs_prog_data *prog_data,
                struct intel_cs_dispatch_info dispatch,
                struct anv_address indirect_addr,
-               uint32_t base_wg[3], uint32_t num_wg[3],
-               bool is_unaligned_size_x, uint32_t unaligned_invocations_x)
+               uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ,
+               bool is_unaligned_size_x)
 {
    struct anv_device *device = cmd_buffer->device;
    struct anv_instance *instance = device->physical->instance;
@@ -677,17 +652,16 @@ emit_cs_walker(struct anv_cmd_buffer *cmd_buffer,
    }
 #endif
 
-   if (is_indirect) {
+   if (is_indirect)
       compute_load_indirect_params(cmd_buffer, indirect_addr,
-                                   is_unaligned_size_x);
-   }
+            is_unaligned_size_x);
 
 #if GFX_VERx10 >= 125
    emit_compute_walker(cmd_buffer, indirect_addr, prog_data,
-                       dispatch, base_wg, num_wg,
-                       unaligned_invocations_x);
+                       dispatch, groupCountX, groupCountY, groupCountZ);
 #else
-   emit_gpgpu_walker(cmd_buffer, is_indirect, prog_data, num_wg);
+   emit_gpgpu_walker(cmd_buffer, is_indirect, prog_data,
+                     groupCountX, groupCountY, groupCountZ);
 #endif
 }
 
@@ -702,7 +676,6 @@ void genX(CmdDispatchBase)(
 {
    ANV_FROM_HANDLE(anv_cmd_buffer, cmd_buffer, commandBuffer);
    struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
-   const struct anv_pipeline_bind_map *bind_map = &comp_state->shader->bind_map;
    const struct brw_cs_prog_data *prog_data = get_cs_prog_data(comp_state);
    struct intel_cs_dispatch_info dispatch =
       brw_cs_get_dispatch_info(cmd_buffer->device->info, prog_data, NULL);
@@ -710,10 +683,10 @@ void genX(CmdDispatchBase)(
    if (anv_batch_has_error(&cmd_buffer->batch))
       return;
 
-   anv_cmd_buffer_push_driver_values(cmd_buffer, bind_map,
-                                     baseGroupX, baseGroupY, baseGroupZ,
-                                     groupCountX, groupCountY, groupCountZ,
-                                     ANV_NULL_ADDRESS, 0);
+   anv_cmd_buffer_push_workgroups(cmd_buffer, prog_data,
+                                  baseGroupX, baseGroupY, baseGroupZ,
+                                  groupCountX, groupCountY, groupCountZ,
+                                  ANV_NULL_ADDRESS);
 
    anv_measure_snapshot(cmd_buffer,
                         INTEL_SNAPSHOT_COMPUTE,
@@ -733,11 +706,67 @@ void genX(CmdDispatchBase)(
 
    emit_cs_walker(cmd_buffer, prog_data, dispatch,
                   ANV_NULL_ADDRESS /* no indirect data */,
-                  (uint32_t[]){ baseGroupX, baseGroupY, baseGroupZ },
-                  (uint32_t[]){ groupCountX, groupCountY, groupCountZ },
-                  false, 0);
+                  groupCountX, groupCountY, groupCountZ,
+                  false);
 
    genX(emit_breakpoint)(&cmd_buffer->batch, cmd_buffer->device, false);
+
+   trace_intel_end_compute(&cmd_buffer->trace,
+                           groupCountX, groupCountY, groupCountZ,
+                           prog_data->base.source_hash);
+}
+
+static void
+emit_unaligned_cs_walker(
+    VkCommandBuffer                             commandBuffer,
+    uint32_t                                    baseGroupX,
+    uint32_t                                    baseGroupY,
+    uint32_t                                    baseGroupZ,
+    uint32_t                                    groupCountX,
+    uint32_t                                    groupCountY,
+    uint32_t                                    groupCountZ,
+    struct intel_cs_dispatch_info               dispatch)
+{
+   ANV_FROM_HANDLE(anv_cmd_buffer, cmd_buffer, commandBuffer);
+   struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
+   const struct brw_cs_prog_data *prog_data = get_cs_prog_data(comp_state);
+
+   if (anv_batch_has_error(&cmd_buffer->batch))
+      return;
+
+   anv_cmd_buffer_push_workgroups(cmd_buffer, prog_data,
+                                  baseGroupX, baseGroupY, baseGroupZ,
+                                  groupCountX, groupCountY, groupCountZ,
+                                  ANV_NULL_ADDRESS);
+
+   /* RT shaders have Y and Z local size set to 1 always. */
+   assert(prog_data->local_size[1] == 1 && prog_data->local_size[2] == 1);
+
+   /* RT shaders dispatched with group Y and Z set to 1 always. */
+   assert(groupCountY == 1 && groupCountZ == 1);
+
+   if (anv_batch_has_error(&cmd_buffer->batch))
+      return;
+
+   anv_measure_snapshot(cmd_buffer,
+                        INTEL_SNAPSHOT_COMPUTE,
+                        "compute-unaligned-cs-walker",
+                        groupCountX * groupCountY * groupCountZ *
+                        prog_data->local_size[0] * prog_data->local_size[1] *
+                        prog_data->local_size[2]);
+
+   trace_intel_begin_compute(&cmd_buffer->trace);
+
+   assert(!prog_data->uses_num_work_groups);
+   genX(cmd_buffer_flush_compute_state)(cmd_buffer);
+
+   if (cmd_buffer->state.conditional_render_enabled)
+      genX(cmd_emit_conditional_render_predicate)(cmd_buffer);
+
+#if GFX_VERx10 >= 125
+   emit_compute_walker(cmd_buffer, ANV_NULL_ADDRESS, prog_data,
+                       dispatch, groupCountX, groupCountY, groupCountZ);
+#endif
 
    trace_intel_end_compute(&cmd_buffer->trace,
                            groupCountX, groupCountY, groupCountZ,
@@ -764,57 +793,44 @@ genX(cmd_dispatch_unaligned)(
 {
    ANV_FROM_HANDLE(anv_cmd_buffer, cmd_buffer, commandBuffer);
    struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
-   const struct anv_pipeline_bind_map *bind_map = &comp_state->shader->bind_map;
    const struct brw_cs_prog_data *prog_data = get_cs_prog_data(comp_state);
-   if (anv_batch_has_error(&cmd_buffer->batch))
-      return;
 
    /* Group X can be unaligned for RT dispatches. */
-   uint32_t groupCountX = DIV_ROUND_UP(invocations_x, prog_data->local_size[0]);
+   uint32_t groupCountX = invocations_x / prog_data->local_size[0];
    uint32_t groupCountY = invocations_y;
    uint32_t groupCountZ = invocations_z;
 
    struct intel_cs_dispatch_info dispatch =
       brw_cs_get_dispatch_info(cmd_buffer->device->info, prog_data, NULL);
 
-   anv_cmd_buffer_push_driver_values(cmd_buffer, bind_map, 0, 0, 0,
-                                     groupCountX, groupCountY, groupCountZ,
-                                     ANV_NULL_ADDRESS,
-                                     invocations_x);
+   /* Launch first CS walker with aligned group count X. */
+   if (groupCountX) {
+      emit_unaligned_cs_walker(commandBuffer, 0, 0, 0, groupCountX,
+                               groupCountY, groupCountZ, dispatch);
+   }
 
-   /* RT shaders have Y and Z local size set to 1 always. */
-   assert(prog_data->local_size[1] == 1 && prog_data->local_size[2] == 1);
-   /* RT shaders dispatched with group Y and Z set to 1 always. */
-   assert(groupCountY == 1 && groupCountZ == 1);
+   uint32_t unaligned_invocations_x = invocations_x % prog_data->local_size[0];
+   if (unaligned_invocations_x) {
+      dispatch.threads = DIV_ROUND_UP(unaligned_invocations_x,
+                                      dispatch.simd_size);
 
-   anv_measure_snapshot(cmd_buffer,
-                        INTEL_SNAPSHOT_COMPUTE,
-                        "compute-unaligned-cs-walker",
-                        groupCountX * groupCountY * groupCountZ *
-                        prog_data->local_size[0] * prog_data->local_size[1] *
-                        prog_data->local_size[2]);
+      /* Make sure the 2nd walker has the same amount of invocations per
+       * workgroup as the 1st walker, so that gl_GlobalInvocationsID can be
+       * calculated correctly with baseGroup.
+       */
+      assert(dispatch.threads * dispatch.simd_size == prog_data->local_size[0]);
 
-   trace_intel_begin_compute(&cmd_buffer->trace);
+      const uint32_t remainder = unaligned_invocations_x & (dispatch.simd_size - 1);
+      if (remainder > 0) {
+         dispatch.right_mask = ~0u >> (32 - remainder);
+      } else {
+         dispatch.right_mask = ~0u >> (32 - dispatch.simd_size);
+      }
 
-   assert((bind_map->binding_mask &
-           ANV_PIPELINE_BIND_MASK_NUM_WORKGROUP) == 0);
-   genX(cmd_buffer_flush_compute_state)(cmd_buffer);
-   if (cmd_buffer->state.conditional_render_enabled)
-      genX(cmd_emit_conditional_render_predicate)(cmd_buffer);
-
-   genX(emit_breakpoint)(&cmd_buffer->batch, cmd_buffer->device, true);
-
-   emit_cs_walker(cmd_buffer, prog_data, dispatch,
-                  ANV_NULL_ADDRESS /* no indirect data */,
-                  (uint32_t[]) { 0, 0, 0 },
-                  (uint32_t[]) { groupCountX, groupCountY, groupCountZ },
-                  false, invocations_x);
-
-   genX(emit_breakpoint)(&cmd_buffer->batch, cmd_buffer->device, false);
-
-   trace_intel_end_compute(&cmd_buffer->trace,
-                           groupCountX, groupCountY, groupCountZ,
-                           prog_data->base.source_hash);
+      /* Launch second CS walker for unaligned part. */
+      emit_unaligned_cs_walker(commandBuffer, groupCountX, 0, 0, 1, 1, 1,
+                               dispatch);
+   }
 }
 
 /*
@@ -827,7 +843,6 @@ genX(cmd_buffer_dispatch_indirect)(struct anv_cmd_buffer *cmd_buffer,
                                    bool is_unaligned_size_x)
 {
    struct anv_cmd_compute_state *comp_state = &cmd_buffer->state.compute;
-   const struct anv_pipeline_bind_map *bind_map = &comp_state->shader->bind_map;
    const struct brw_cs_prog_data *prog_data = get_cs_prog_data(comp_state);
    UNUSED struct anv_batch *batch = &cmd_buffer->batch;
    struct intel_cs_dispatch_info dispatch =
@@ -836,9 +851,8 @@ genX(cmd_buffer_dispatch_indirect)(struct anv_cmd_buffer *cmd_buffer,
    if (anv_batch_has_error(&cmd_buffer->batch))
       return;
 
-   anv_cmd_buffer_push_driver_values(cmd_buffer, bind_map,
-                                     0, 0, 0, 0, 0, 0,
-                                     indirect_addr, 0);
+   anv_cmd_buffer_push_workgroups(cmd_buffer, prog_data,
+                                  0, 0, 0, 0, 0, 0, indirect_addr);
 
    anv_measure_snapshot(cmd_buffer,
                         INTEL_SNAPSHOT_COMPUTE,
@@ -855,9 +869,7 @@ genX(cmd_buffer_dispatch_indirect)(struct anv_cmd_buffer *cmd_buffer,
    genX(emit_breakpoint)(&cmd_buffer->batch, cmd_buffer->device, true);
 
    emit_cs_walker(cmd_buffer, prog_data, dispatch, indirect_addr,
-                  (uint32_t[]){0, 0, 0},
-                  (uint32_t[]){0, 0, 0},
-                  is_unaligned_size_x, 0);
+                  0, 0, 0, is_unaligned_size_x);
 
    genX(emit_breakpoint)(&cmd_buffer->batch, cmd_buffer->device, false);
 
@@ -886,35 +898,33 @@ genX(cmd_buffer_ray_query_globals)(struct anv_cmd_buffer *cmd_buffer)
 
    struct anv_state state =
       anv_cmd_buffer_alloc_temporary_state(cmd_buffer,
-                                           2 * align(BRW_RT_DISPATCH_GLOBALS_SIZE, 64),
-                                           BRW_RT_DISPATCH_GLOBALS_ALIGN);
-   uint32_t stack_ids_per_dss =
-      brw_rt_ray_queries_stack_ids_per_dss(device->info);
+                                           BRW_RT_DISPATCH_GLOBALS_SIZE, 64);
+   struct brw_rt_scratch_layout layout;
+   uint32_t stack_ids_per_dss = 2048; /* TODO: can we use a lower value in
+                                       * some cases?
+                                       */
+   brw_rt_compute_scratch_layout(&layout, device->info,
+                                 stack_ids_per_dss, 1 << 10);
 
    uint8_t idx = anv_get_ray_query_bo_index(cmd_buffer);
 
-   for (uint32_t i = 0; i < 2; i++) {
-      const struct GENX(RT_DISPATCH_GLOBALS) rtdg = {
-         .MemBaseAddress = (struct anv_address) {
-            /* The ray query HW computes offsets from the top of the buffer, so
-             * let the address at the end of the buffer.
-             */
-            .bo = device->ray_query_bo[idx],
-            .offset = (i + 1) * (device->ray_query_bo[idx]->size / 2),
-         },
-         .AsyncRTStackSize = BRW_RT_SIZEOF_RAY_QUERY / 64,
-         .NumDSSRTStacks = stack_ids_per_dss,
-         .MaxBVHLevels = BRW_RT_MAX_BVH_LEVELS,
-         .Flags = RT_DEPTH_TEST_LESS_EQUAL,
-         .ResumeShaderTable = (struct anv_address) {
-            .bo = cmd_buffer->state.ray_query_shadow_bo,
-         },
-      };
-      GENX(RT_DISPATCH_GLOBALS_pack)(
-         NULL,
-         state.map + i * align(4 * GENX(RT_DISPATCH_GLOBALS_length), 64),
-         &rtdg);
-   }
+   const struct GENX(RT_DISPATCH_GLOBALS) rtdg = {
+      .MemBaseAddress = (struct anv_address) {
+         /* The ray query HW computes offsets from the top of the buffer, so
+          * let the address at the end of the buffer.
+          */
+         .bo = device->ray_query_bo[idx],
+         .offset = device->ray_query_bo[idx]->size
+      },
+      .AsyncRTStackSize = layout.ray_stack_stride / 64,
+      .NumDSSRTStacks = layout.stack_ids_per_dss,
+      .MaxBVHLevels = BRW_RT_MAX_BVH_LEVELS,
+      .Flags = RT_DEPTH_TEST_LESS_EQUAL,
+      .ResumeShaderTable = (struct anv_address) {
+         .bo = cmd_buffer->state.ray_query_shadow_bo,
+      },
+   };
+   GENX(RT_DISPATCH_GLOBALS_pack)(NULL, state.map, &rtdg);
 
    return anv_cmd_buffer_temporary_state_address(cmd_buffer, state);
 #else
@@ -1001,11 +1011,11 @@ cmd_buffer_emit_rt_dispatch_globals(struct anv_cmd_buffer *cmd_buffer,
          .bo = rt->scratch.bo,
          .offset = rt->scratch.layout.ray_stack_start,
       },
-#if GFX_VERx10 >= 300
-      .CallStackHandler   = anv_shader_internal_get_handler(
+#if GFX_VERx10 == 300
+      .CallStackHandler   = anv_shader_bin_get_handler(
          cmd_buffer->device->rt_trivial_return, 0),
 #else
-      .CallStackHandler   = anv_shader_internal_get_bsr(
+      .CallStackHandler   = anv_shader_bin_get_bsr(
          cmd_buffer->device->rt_trivial_return, 0),
 #endif
       .AsyncRTStackSize   = rt->scratch.layout.ray_stack_stride / 64,
@@ -1069,11 +1079,11 @@ cmd_buffer_emit_rt_dispatch_globals_indirect(struct anv_cmd_buffer *cmd_buffer,
          .bo = rt->scratch.bo,
          .offset = rt->scratch.layout.ray_stack_start,
       },
-#if GFX_VERx10 >= 300
-      .CallStackHandler   = anv_shader_internal_get_handler(
+#if GFX_VERx10 == 300
+      .CallStackHandler   = anv_shader_bin_get_handler(
          cmd_buffer->device->rt_trivial_return, 0),
 #else
-      .CallStackHandler   = anv_shader_internal_get_bsr(
+      .CallStackHandler   = anv_shader_bin_get_bsr(
          cmd_buffer->device->rt_trivial_return, 0),
 #endif
       .AsyncRTStackSize   = rt->scratch.layout.ray_stack_stride / 64,
@@ -1142,6 +1152,8 @@ cmd_buffer_trace_rays(struct anv_cmd_buffer *cmd_buffer,
 {
    struct anv_device *device = cmd_buffer->device;
    struct anv_cmd_ray_tracing_state *rt = &cmd_buffer->state.rt;
+   struct anv_ray_tracing_pipeline *pipeline =
+      anv_pipeline_to_ray_tracing(rt->base.pipeline);
 
    if (INTEL_DEBUG(DEBUG_RT_NO_TRACE))
       return;
@@ -1162,10 +1174,9 @@ cmd_buffer_trace_rays(struct anv_cmd_buffer *cmd_buffer,
 
    genX(cmd_buffer_update_color_aux_op(cmd_buffer, ISL_AUX_OP_NONE));
 
-   genX(flush_descriptor_buffers)(cmd_buffer, &rt->base,
-                                  ANV_RT_STAGE_BITS);
+   genX(flush_descriptor_buffers)(cmd_buffer, &rt->base);
 
-   genX(flush_pipeline_select_gpgpu)(cmd_buffer, false);
+   genX(flush_pipeline_select_gpgpu)(cmd_buffer);
 
    cmd_buffer->state.rt.pipeline_dirty = false;
 
@@ -1300,42 +1311,37 @@ cmd_buffer_trace_rays(struct anv_cmd_buffer *cmd_buffer,
        */
       btd.PerDSSMemoryBackedBufferSize = 6;
       btd.MemoryBackedBufferBasePointer = (struct anv_address) { .bo = device->btd_fifo_bo };
-      if (rt->scratch_size > 0) {
+      if (pipeline->base.scratch_size > 0) {
          struct anv_bo *scratch_bo =
             anv_scratch_pool_alloc(device,
                                    &device->scratch_pool,
                                    MESA_SHADER_COMPUTE,
-                                   rt->scratch_size);
+                                   pipeline->base.scratch_size);
          anv_reloc_list_add_bo(cmd_buffer->batch.relocs,
                                scratch_bo);
          uint32_t scratch_surf =
             anv_scratch_pool_get_surf(cmd_buffer->device,
                                       &device->scratch_pool,
-                                      rt->scratch_size);
-         btd.ScratchSpaceBuffer = scratch_surf >> ANV_SCRATCH_SPACE_SHIFT;
+                                      pipeline->base.scratch_size);
+         btd.ScratchSpaceBuffer = scratch_surf >> ANV_SCRATCH_SPACE_SHIFT(GFX_VER);
       }
 #if INTEL_NEEDS_WA_14017794102 || INTEL_NEEDS_WA_14023061436
       btd.BTDMidthreadpreemption = false;
 #endif
 
-#if GFX_VER >= 20
-      /* TODO: We can tune this value specific to apps. */
-      btd.ControlsthemaximumnumberofoutstandingRayQueriesperSS =
-         RAYS_QUERIES_OUTSTANDING_1024;
-#endif
 #if GFX_VER >= 30
       btd.RTMemStructures64bModeEnable = true;
 #endif
    }
 
-   genX(cmd_buffer_ensure_cfe_state)(cmd_buffer, rt->scratch_size);
+   genX(cmd_buffer_ensure_cfe_state)(cmd_buffer, pipeline->base.scratch_size);
 
    const struct brw_cs_prog_data *cs_prog_data =
       brw_cs_prog_data_const(device->rt_trampoline->prog_data);
    struct intel_cs_dispatch_info dispatch =
       brw_cs_get_dispatch_info(device->info, cs_prog_data, NULL);
 
-   const mesa_shader_stage s = MESA_SHADER_RAYGEN;
+   const gl_shader_stage s = MESA_SHADER_RAYGEN;
    struct anv_state *surfaces = &cmd_buffer->state.binding_tables[s];
    struct anv_state *samplers = &cmd_buffer->state.samplers[s];
    struct brw_rt_raygen_trampoline_params trampoline_params = {
@@ -1367,7 +1373,7 @@ cmd_buffer_trace_rays(struct anv_cmd_buffer *cmd_buffer,
       .ThreadGroupIDZDimension        = global_size[2],
       .ExecutionMask                  = 0xff,
       .EmitInlineParameter            = true,
-      .PostSync.MOCS                  = anv_mocs(cmd_buffer->device, NULL, 0),
+      .PostSync.MOCS                  = anv_mocs(pipeline->base.device, NULL, 0),
 #if GFX_VER >= 30
          /* HSD 14016252163 */
       .DispatchWalkOrder = cs_prog_data->uses_sampler ? MortonWalk : LinearWalk,
@@ -1405,8 +1411,6 @@ cmd_buffer_trace_rays(struct anv_cmd_buffer *cmd_buffer,
          .PredicateEnable          = false,
          .body                     = body,
       );
-
-   genX(cmd_buffer_post_dispatch_wa)(cmd_buffer);
 
    trace_intel_end_rays(&cmd_buffer->trace,
                         params->launch_size[0],

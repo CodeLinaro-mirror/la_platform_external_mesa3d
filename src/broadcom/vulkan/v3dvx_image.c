@@ -22,7 +22,8 @@
  */
 
 #include "v3dv_private.h"
-#include "v3dv_format_table.h"
+#include "broadcom/common/v3d_macros.h"
+#include "broadcom/cle/v3dx_pack.h"
 #include "broadcom/compiler/v3d_compiler.h"
 
 /*
@@ -54,12 +55,16 @@ pack_texture_shader_state_helper(struct v3dv_device *device,
 
          tex.level_0_xor_enable = (image->planes[iplane].slices[0].tiling == V3D_TILING_UIF_XOR);
 
-         /* If we ever set tex.uif_xor_disable we also need to flag
-          * tex.extended here.
+         if (tex.level_0_is_strictly_uif)
+            tex.level_0_ub_pad = image->planes[iplane].slices[0].ub_pad;
+
+         /* FIXME: v3d never sets uif_xor_disable, but uses it on the following
+          * check so let's set the default value
           */
-         if (tex.level_0_is_strictly_uif) {
-             tex.level_0_ub_pad = image->planes[iplane].slices[0].ub_pad;
-             tex.extended = true;
+         tex.uif_xor_disable = false;
+         if (tex.uif_xor_disable ||
+             tex.level_0_is_strictly_uif) {
+            tex.extended = true;
          }
 
          tex.base_level = image_view->vk.base_mip_level;

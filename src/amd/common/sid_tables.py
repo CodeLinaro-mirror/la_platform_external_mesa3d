@@ -47,10 +47,10 @@ class StringTable:
 
         return idx
 
-    def emit(self, filp, name):
+    def emit(self, filp, name, static=True):
         """
         Write
-        [extern] const char name[] = "...";
+        [static] const char name[] = "...";
         to filp.
         """
         fragments = [
@@ -61,15 +61,11 @@ class StringTable:
             )
             for te in self.table
         ]
-
-        filp.write('#ifdef SID_TABLE_IMPLEMENTATION\n')
-        filp.write('const char %s[] = {\n%s\n};\n' % (
+        filp.write('%sconst char %s[] = {\n%s\n};\n' % (
+            'static ' if static else '',
             name,
             '\n'.join('\t' + fragment for fragment in fragments)
         ))
-        filp.write('#else // SID_TABLE_IMPLEMENTATION\n')
-        filp.write('extern const char %s[];\n' % ( name ))
-        filp.write('#endif // SID_TABLE_IMPLEMENTATION\n')
 
 class IntTable:
     """
@@ -107,7 +103,7 @@ class IntTable:
     def emit(self, filp, name, static=True):
         """
         Write
-        [extern] const typename name[] = { ... };
+        [static] const typename name[] = { ... };
         to filp.
         """
         idxs = sorted(self.idxs) + [len(self.table)]
@@ -120,16 +116,11 @@ class IntTable:
             for i in range(len(idxs) - 1)
         ]
 
-        filp.write('#ifdef SID_TABLE_IMPLEMENTATION\n')
-        filp.write('const %s %s[] = {\n%s\n};\n' % (
+        filp.write('%sconst %s %s[] = {\n%s\n};\n' % (
+            'static ' if static else '',
             self.typename, name,
             '\n'.join(fragments)
         ))
-        filp.write('extern const %s %s[];\n' % (
-            self.typename, name
-        ))
-        filp.write('#else // SID_TABLE_IMPLEMENTATION\n')
-        filp.write('#endif // SID_TABLE_IMPLEMENTATION\n')
 
 class Field:
     def __init__(self, name, bits):
@@ -207,8 +198,7 @@ class FieldTable:
         """
         idxs = sorted(self.idxs) + [len(self.table)]
 
-        filp.write('#ifdef SID_TABLE_IMPLEMENTATION\n')
-        filp.write('const struct si_field sid_fields_table[] = {\n')
+        filp.write('static const struct si_field sid_fields_table[] = {\n')
 
         for start, end in zip(idxs, idxs[1:]):
             filp.write('\t/* %s */\n' % (start))
@@ -216,9 +206,6 @@ class FieldTable:
                 filp.write('\t%s,\n' % (field.format(string_table, idx_table)))
 
         filp.write('};\n')
-        filp.write('#else // SID_TABLE_IMPLEMENTATION\n')
-        filp.write('extern const struct si_field sid_fields_table[];\n')
-        filp.write('#endif // SID_TABLE_IMPLEMENTATION\n')
 
 
 def parse_packet3(filp):
@@ -274,12 +261,10 @@ struct si_packet3 {
 };
 ''')
 
-        out('#ifdef SID_TABLE_IMPLEMENTATION\n')
-        out('const struct si_packet3 packet3_table[] = {')
+        out('static const struct si_packet3 packet3_table[] = {')
         for pkt in packets:
             out('\t{%s, %s},' % (self.__strings.add(pkt[5:]), pkt))
         out('};')
-        out('const unsigned packet3_table_size = %d;' % len(packets))
         out()
 
         regmaps_by_chip = defaultdict(list)
@@ -295,7 +280,7 @@ struct si_packet3 {
             regmaps = regmaps_by_chip[chip]
             regmaps.sort(key=lambda regmap: (regmap.map.to, regmap.map.at))
 
-            out('const struct si_reg {chip}_reg_table[] = {{'.format(**locals()))
+            out('static const struct si_reg {chip}_reg_table[] = {{'.format(**locals()))
 
             for regmap in regmaps:
                 if hasattr(regmap, 'type_ref'):
@@ -323,15 +308,6 @@ struct si_packet3 {
                           .format(self.__strings.add(regmap.name), **locals()))
 
             out('};\n')
-            out('const unsigned %s_reg_table_size = %d;' % (chip, len(regmaps)))
-
-        out('#else // SID_TABLE_IMPLEMENTATION\n')
-        out('extern const struct si_packet3 packet3_table[];')
-        out('extern const unsigned packet3_table_size;')
-        for chip in sorted(regmaps_by_chip.keys()):
-            out('extern const struct si_reg {chip}_reg_table[];'.format(**locals()))
-            out('extern const unsigned {chip}_reg_table_size;'.format(**locals()))
-        out('#endif // SID_TABLE_IMPLEMENTATION\n')
 
         self.__fields.emit(file, self.__strings, self.__strings_offsets)
 

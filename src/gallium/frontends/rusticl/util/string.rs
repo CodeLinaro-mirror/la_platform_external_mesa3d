@@ -1,6 +1,3 @@
-// Copyright 2020 Red Hat.
-// SPDX-License-Identifier: MIT
-
 use std::ffi::CStr;
 use std::os::raw::c_char;
 

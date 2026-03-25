@@ -37,14 +37,13 @@ CsBuilderTest::CsBuilderTest()
 
 CsBuilderTest::~CsBuilderTest()
 {
-   cs_builder_fini(&b);
    delete output;
 }
 
 TEST_F(CsBuilderTest, basic)
 {
    cs_move32_to(&b, cs_reg32(&b, 42), 0xdeadbeef);
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected[] = {
       0x022a0000deadbeef, /* MOVE32 r42, #0xdeadbeef */
@@ -61,7 +60,7 @@ TEST_F(CsBuilderTest, maybe_no_patch)
    cs_maybe(&b, &maybe) {
       cs_move32_to(&b, cs_reg32(&b, 42), 0xdeadbeef);
    }
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected[] = {
       0x022a0000abad1dea, /* MOVE32 r42, #0xabad1dea */
@@ -79,7 +78,7 @@ TEST_F(CsBuilderTest, maybe_patch)
       cs_move32_to(&b, cs_reg32(&b, 42), 0xdeadbeef);
    }
    cs_patch_maybe(&b, maybe);
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected_patched[] = {
       0x022a0000abad1dea, /* MOVE32 r42, #0xabad1dea */
@@ -102,7 +101,7 @@ TEST_F(CsBuilderTest, maybe_inner_block)
       cs_move32_to(&b, cs_reg32(&b, 42), 0xabcdef01);
    }
    cs_patch_maybe(&b, maybe);
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected_patched[] = {
       0x022a0000abad1dea, /* MOVE32 r42, #0xabad1dea */
@@ -129,7 +128,7 @@ TEST_F(CsBuilderTest, maybe_early_patch)
 
       cs_patch_maybe(&b, maybe);
    }
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected_patched[] = {
       0x022a0000abad1dea, /* MOVE32 r42, #0xabad1dea */
@@ -155,7 +154,7 @@ TEST_F(CsBuilderTest, loop_ls_tracker_unrelated_inside)
       cs_break(&b);
    }
    cs_add32(&b, r0, r0, 0xab);
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected_patched[] = {
       0x14000a0000010000, /* LOAD_MULTIPLE r0, addr, #0x0 */
@@ -183,7 +182,7 @@ TEST_F(CsBuilderTest, loop_ls_tracker_load_only_inside_if)
       cs_break(&b);
    }
    cs_add32(&b, r0, r0, 0xab);
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected_patched[] = {
       0x1600000050000001, /* BRANCH ge, r0, #1 */
@@ -216,7 +215,7 @@ TEST_F(CsBuilderTest, loop_ls_tracker_load_only_continue_inside_if)
       cs_break(&b);
    }
    cs_add32(&b, r0, r0, 0xab);
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected_patched[] = {
       0x1000000000000000, /* ADD32 r0, r0, #0x0 */
@@ -248,7 +247,7 @@ TEST_F(CsBuilderTest, loop_ls_tracker_load_only_break_inside_if)
       }
    }
    cs_add32(&b, r0, r0, 0xab);
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected_patched[] = {
       0x1000000000000000, /* ADD32 r0, r0, #0x0 */
@@ -282,7 +281,7 @@ TEST_F(CsBuilderTest, loop_ls_tracker_load_same_inside)
       }
    }
    cs_add32(&b, r0, r0, 0xab);
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected_patched[] = {
       0x14000a0000010000, /* LOAD_MULTIPLE r0, addr, #0x0 */
@@ -317,7 +316,7 @@ TEST_F(CsBuilderTest, loop_ls_tracker_load_same_inside_use_as_cond)
       }
    }
    cs_add32(&b, r0, r0, 0xab);
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected_patched[] = {
       0x14000a0000010000, /* LOAD_MULTIPLE r0, addr, #0x0 */
@@ -355,7 +354,7 @@ TEST_F(CsBuilderTest, maybe_flush_outer_load)
    /* This should also flush the load to reg */
    cs_add32(&b, reg2, reg1, 0);
    cs_patch_maybe(&b, maybe);
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected_patched[] = {
       0x1403000000010000, /* LOAD_MULTIPLE r3, [d0] */
@@ -387,7 +386,7 @@ TEST_F(CsBuilderTest, maybe_flush_inner_load)
    /* This should not flush the load to reg */
    cs_add32(&b, reg2, reg1, 0);
    cs_patch_maybe(&b, maybe);
-   cs_end(&b);
+   cs_finish(&b);
 
    uint64_t expected_patched[] = {
       /* inside maybe block */

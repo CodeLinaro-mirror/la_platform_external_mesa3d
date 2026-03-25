@@ -123,13 +123,9 @@ glxSendClientInfo(struct glx_display *glx_dpy, int screen)
    for (i = 0; i < ScreenCount(glx_dpy->dpy); i++) {
       struct glx_screen *src = glx_dpy->screens[i];
 
-      if (src == NULL) {
-          continue;
-      }
-
       const char *haystack = src->serverGLXexts;
       while (haystack != NULL) {
-    const char *match = strstr(haystack, "GLX_ARB_create_context");
+    char *match = strstr(haystack, "GLX_ARB_create_context");
 
     if (match == NULL)
        break;

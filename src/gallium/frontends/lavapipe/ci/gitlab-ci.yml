@@ -31,19 +31,10 @@ lavapipe-vkcts-asan:
     GPU_VERSION: lvp-asan
     DEQP_FORCE_ASAN: 1
     S3_ARTIFACT_NAME: mesa-x86_64-asan-debugoptimized
-    DEQP_FRACTION: 1000
   needs:
     - job: debian/x86_64_test-vk
       optional: true
     - job: debian-x86_64-asan
-
-lavapipe-vkcts-asan-full:
-  extends:
-    - lavapipe-vkcts-asan
-    - .lavapipe-manual-rules
-  timeout: 2h
-  variables:
-    DEQP_FRACTION: 40
 
 lavapipe-vkd3d:
   extends:
@@ -53,6 +44,8 @@ lavapipe-vkd3d:
   timeout: 15m  # base runtime = 8m
   variables:
     GPU_VERSION: lvp
+    # Random tests fail/crash when trying to run them in parallel
+    FDO_CI_CONCURRENT: 1
   script: install/vkd3d-runner.sh
 
 # Disabled due to only running a single trace which was using old Wine.
@@ -68,7 +61,7 @@ lavapipe-vkd3d:
 
 android-angle-lavapipe:
   variables:
-    CUTTLEFISH_GPU_MODE: mesa_swrast_guest_angle
+    ANDROID_GPU_MODE: mesa_swrast_guest_angle
     DEQP_SUITE: android-angle-lavapipe
     GPU_VERSION: lvp-android-angle
   timeout: 15m
@@ -79,11 +72,11 @@ android-angle-lavapipe:
 
 android-angle-lavapipe-cts:
   variables:
-    CUTTLEFISH_GPU_MODE: mesa_swrast_guest_angle
+    ANDROID_GPU_MODE: mesa_swrast_guest_angle
     GPU_VERSION: lvp-android-angle
-  timeout: 30m
+  timeout: 15m
   extends:
     - .test-android
     - .test-android-cts
-    - .lavapipe-manual-rules
+    - .lavapipe-rules
     - .test-angle

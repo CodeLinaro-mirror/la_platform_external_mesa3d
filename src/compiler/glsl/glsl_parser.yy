@@ -32,7 +32,6 @@
 #include "ast.h"
 #include "glsl_parser_extras.h"
 #include "compiler/glsl_types.h"
-#include "util/blend.h"
 #include "util/u_string.h"
 #include "util/format/u_format.h"
 #include "main/consts_exts.h"
@@ -83,8 +82,8 @@ static bool match_layout_qualifier(const char *s1, const char *s2,
 
 %expect 0
 
-%define api.pure
-%define parse.error verbose
+%pure-parser
+%error-verbose
 
 %locations
 %initial-action {
@@ -145,11 +144,9 @@ static bool match_layout_qualifier(const char *s1, const char *s2,
 %token BREAK BUFFER CONTINUE DO ELSE FOR IF DEMOTE DISCARD RETURN SWITCH CASE DEFAULT
 %token CENTROID IN_TOK OUT_TOK INOUT_TOK UNIFORM VARYING SAMPLE
 %token NOPERSPECTIVE FLAT SMOOTH
-%token PIXEL_LOCAL PIXEL_LOCAL_IN PIXEL_LOCAL_OUT
 %token IMAGE1DSHADOW IMAGE2DSHADOW IMAGE1DARRAYSHADOW IMAGE2DARRAYSHADOW
 %token COHERENT VOLATILE RESTRICT READONLY WRITEONLY
 %token SHARED
-%token TASKPAYLOAD PERPRIMITIVE
 %token STRUCT VOID_TOK WHILE
 %token <identifier> IDENTIFIER TYPE_IDENTIFIER NEW_IDENTIFIER
 %type <identifier> any_identifier
@@ -908,7 +905,7 @@ function_header:
          /* add type for IDENTIFIER search */
          state->symbols->add_type($2, glsl_subroutine_type($2));
       } else
-         state->symbols->add_function(new(ctx) ir_function($2));
+         state->symbols->add_function(new(state) ir_function($2));
       state->symbols->push_scope();
    }
    ;
@@ -923,7 +920,7 @@ parameter_declarator:
       $$->type->set_location(@1);
       $$->type->specifier = $1;
       $$->identifier = $2;
-      state->symbols->add_variable(new(ctx) ir_variable(NULL, $2, ir_var_auto));
+      state->symbols->add_variable(new(state) ir_variable(NULL, $2, ir_var_auto));
    }
    | layout_qualifier type_specifier any_identifier
    {
@@ -940,7 +937,7 @@ parameter_declarator:
       $$->type->specifier = $1;
       $$->identifier = $2;
       $$->array_specifier = $3;
-      state->symbols->add_variable(new(ctx) ir_variable(NULL, $2, ir_var_auto));
+      state->symbols->add_variable(new(state) ir_variable(NULL, $2, ir_var_auto));
    }
    ;
 
@@ -1052,7 +1049,7 @@ init_declarator_list:
 
       $$ = $1;
       $$->declarations.push_tail(&decl->link);
-      state->symbols->add_variable(new(ctx) ir_variable(NULL, $3, ir_var_auto));
+      state->symbols->add_variable(new(state) ir_variable(NULL, $3, ir_var_auto));
    }
    | init_declarator_list ',' any_identifier array_specifier
    {
@@ -1062,7 +1059,7 @@ init_declarator_list:
 
       $$ = $1;
       $$->declarations.push_tail(&decl->link);
-      state->symbols->add_variable(new(ctx) ir_variable(NULL, $3, ir_var_auto));
+      state->symbols->add_variable(new(state) ir_variable(NULL, $3, ir_var_auto));
    }
    | init_declarator_list ',' any_identifier array_specifier '=' initializer
    {
@@ -1072,7 +1069,7 @@ init_declarator_list:
 
       $$ = $1;
       $$->declarations.push_tail(&decl->link);
-      state->symbols->add_variable(new(ctx) ir_variable(NULL, $3, ir_var_auto));
+      state->symbols->add_variable(new(state) ir_variable(NULL, $3, ir_var_auto));
    }
    | init_declarator_list ',' any_identifier '=' initializer
    {
@@ -1082,7 +1079,7 @@ init_declarator_list:
 
       $$ = $1;
       $$->declarations.push_tail(&decl->link);
-      state->symbols->add_variable(new(ctx) ir_variable(NULL, $3, ir_var_auto));
+      state->symbols->add_variable(new(state) ir_variable(NULL, $3, ir_var_auto));
    }
    ;
 
@@ -1104,7 +1101,7 @@ single_declaration:
       $$ = new(ctx) ast_declarator_list($1);
       $$->set_location_range(@1, @2);
       $$->declarations.push_tail(&decl->link);
-      state->symbols->add_variable(new(ctx) ir_variable(NULL, $2, ir_var_auto));
+      state->symbols->add_variable(new(state) ir_variable(NULL, $2, ir_var_auto));
    }
    | fully_specified_type any_identifier array_specifier
    {
@@ -1115,7 +1112,7 @@ single_declaration:
       $$ = new(ctx) ast_declarator_list($1);
       $$->set_location_range(@1, @3);
       $$->declarations.push_tail(&decl->link);
-      state->symbols->add_variable(new(ctx) ir_variable(NULL, $2, ir_var_auto));
+      state->symbols->add_variable(new(state) ir_variable(NULL, $2, ir_var_auto));
    }
    | fully_specified_type any_identifier array_specifier '=' initializer
    {
@@ -1126,7 +1123,7 @@ single_declaration:
       $$ = new(ctx) ast_declarator_list($1);
       $$->set_location_range(@1, @3);
       $$->declarations.push_tail(&decl->link);
-      state->symbols->add_variable(new(ctx) ir_variable(NULL, $2, ir_var_auto));
+      state->symbols->add_variable(new(state) ir_variable(NULL, $2, ir_var_auto));
    }
    | fully_specified_type any_identifier '=' initializer
    {
@@ -1137,7 +1134,7 @@ single_declaration:
       $$ = new(ctx) ast_declarator_list($1);
       $$->set_location_range(@1, @2);
       $$->declarations.push_tail(&decl->link);
-      state->symbols->add_variable(new(ctx) ir_variable(NULL, $2, ir_var_auto));
+      state->symbols->add_variable(new(state) ir_variable(NULL, $2, ir_var_auto));
    }
    | INVARIANT variable_identifier
    {
@@ -1330,15 +1327,14 @@ layout_qualifier_id:
          }
 
          if ($$.flags.i && !state->has_geometry_shader() &&
-             !state->has_tessellation_shader() && !state->EXT_mesh_shader_enable) {
+             !state->has_tessellation_shader()) {
             _mesa_glsl_error(& @1, state, "#version 150 layout "
                              "qualifier `%s' used", $1);
          }
       }
 
       /* Layout qualifiers for ARB_shader_image_load_store. */
-      if (state->has_shader_image_load_store() ||
-          state->EXT_shader_pixel_local_storage_enable) {
+      if (state->has_shader_image_load_store()) {
          if (!$$.flags.i) {
             static const struct {
                const char *name;
@@ -1354,68 +1350,58 @@ layout_qualifier_id:
                /* NV_image_formats */
                bool nv_image_formats;
                bool ext_qualifiers;
-               /* for __pixel_localEXT */
-               bool pixel_local_qualifiers;
             } map[] = {
-               { "rgba32f", PIPE_FORMAT_R32G32B32A32_FLOAT, GLSL_TYPE_FLOAT, 130, 310, false, false, false },
-               { "rgba16f", PIPE_FORMAT_R16G16B16A16_FLOAT, GLSL_TYPE_FLOAT, 130, 310, false, false, false },
-               { "rg32f", PIPE_FORMAT_R32G32_FLOAT, GLSL_TYPE_FLOAT, 130, 0, true, false, false },
-               { "rg16f", PIPE_FORMAT_R16G16_FLOAT, GLSL_TYPE_FLOAT, 130, 0, true, false, true },
-               { "r11f_g11f_b10f", PIPE_FORMAT_R11G11B10_FLOAT, GLSL_TYPE_FLOAT, 130, 0, true, false, true },
-               { "r32f", PIPE_FORMAT_R32_FLOAT, GLSL_TYPE_FLOAT, 130, 310, false, false, true },
-               { "r16f", PIPE_FORMAT_R16_FLOAT, GLSL_TYPE_FLOAT, 130, 0, true, false, false },
-               { "rgba32ui", PIPE_FORMAT_R32G32B32A32_UINT, GLSL_TYPE_UINT, 130, 310, false, false, false },
-               { "rgba16ui", PIPE_FORMAT_R16G16B16A16_UINT, GLSL_TYPE_UINT, 130, 310, false, false, false },
-               { "rgb10_a2ui", PIPE_FORMAT_R10G10B10A2_UINT, GLSL_TYPE_UINT, 130, 0, true, false, true },
-               { "rgba8ui", PIPE_FORMAT_R8G8B8A8_UINT, GLSL_TYPE_UINT, 130, 310, false, false, true },
-               { "rg32ui", PIPE_FORMAT_R32G32_UINT, GLSL_TYPE_UINT, 130, 0, true, false, false },
-               { "rg16ui", PIPE_FORMAT_R16G16_UINT, GLSL_TYPE_UINT, 130, 0, true, false, true },
-               { "rg8ui", PIPE_FORMAT_R8G8_UINT, GLSL_TYPE_UINT, 130, 0, true, false, false },
-               { "r32ui", PIPE_FORMAT_R32_UINT, GLSL_TYPE_UINT, 130, 310, false, false, true },
-               { "r16ui", PIPE_FORMAT_R16_UINT, GLSL_TYPE_UINT, 130, 0, true, false, false },
-               { "r8ui", PIPE_FORMAT_R8_UINT, GLSL_TYPE_UINT, 130, 0, true, false, false },
-               { "rgba32i", PIPE_FORMAT_R32G32B32A32_SINT, GLSL_TYPE_INT, 130, 310, false, false, false },
-               { "rgba16i", PIPE_FORMAT_R16G16B16A16_SINT, GLSL_TYPE_INT, 130, 310, false, false, false },
-               { "rgba8i", PIPE_FORMAT_R8G8B8A8_SINT, GLSL_TYPE_INT, 130, 310, false, false, true },
-               { "rg32i", PIPE_FORMAT_R32G32_SINT, GLSL_TYPE_INT, 130, 0, true, false, false },
-               { "rg16i", PIPE_FORMAT_R16G16_SINT, GLSL_TYPE_INT, 130, 0, true, false, true },
-               { "rg8i", PIPE_FORMAT_R8G8_SINT, GLSL_TYPE_INT, 130, 0, true, false, false },
-               { "r32i", PIPE_FORMAT_R32_SINT, GLSL_TYPE_INT, 130, 310, false, false, true },
-               { "r16i", PIPE_FORMAT_R16_SINT, GLSL_TYPE_INT, 130, 0, true, false, false },
-               { "r8i", PIPE_FORMAT_R8_SINT, GLSL_TYPE_INT, 130, 0, true, false, false },
-               { "rgba16", PIPE_FORMAT_R16G16B16A16_UNORM, GLSL_TYPE_FLOAT, 130, 0, true, false, false },
-               { "rgb10_a2", PIPE_FORMAT_R10G10B10A2_UNORM, GLSL_TYPE_FLOAT, 130, 0, true, false, true },
-               { "rgba8", PIPE_FORMAT_R8G8B8A8_UNORM, GLSL_TYPE_FLOAT, 130, 310, false, false, true },
-               { "rg16", PIPE_FORMAT_R16G16_UNORM, GLSL_TYPE_FLOAT, 130, 0, true, false, true },
-               { "rg8", PIPE_FORMAT_R8G8_UNORM, GLSL_TYPE_FLOAT, 130, 0, true, false, false },
-               { "r16", PIPE_FORMAT_R16_UNORM, GLSL_TYPE_FLOAT, 130, 0, true, false, false },
-               { "r8", PIPE_FORMAT_R8_UNORM, GLSL_TYPE_FLOAT, 130, 0, true, false, false },
-               { "rgba16_snorm", PIPE_FORMAT_R16G16B16A16_SNORM, GLSL_TYPE_FLOAT, 130, 0, true, false, false },
-               { "rgba8_snorm", PIPE_FORMAT_R8G8B8A8_SNORM, GLSL_TYPE_FLOAT, 130, 310, false, false, false },
-               { "rg16_snorm", PIPE_FORMAT_R16G16_SNORM, GLSL_TYPE_FLOAT, 130, 0, true, false, false },
-               { "rg8_snorm", PIPE_FORMAT_R8G8_SNORM, GLSL_TYPE_FLOAT, 130, 0, true, false, false },
-               { "r16_snorm", PIPE_FORMAT_R16_SNORM, GLSL_TYPE_FLOAT, 130, 0, true, false, false },
-               { "r8_snorm", PIPE_FORMAT_R8_SNORM, GLSL_TYPE_FLOAT, 130, 0, true, false, false },
+               { "rgba32f", PIPE_FORMAT_R32G32B32A32_FLOAT, GLSL_TYPE_FLOAT, 130, 310, false, false },
+               { "rgba16f", PIPE_FORMAT_R16G16B16A16_FLOAT, GLSL_TYPE_FLOAT, 130, 310, false, false },
+               { "rg32f", PIPE_FORMAT_R32G32_FLOAT, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "rg16f", PIPE_FORMAT_R16G16_FLOAT, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "r11f_g11f_b10f", PIPE_FORMAT_R11G11B10_FLOAT, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "r32f", PIPE_FORMAT_R32_FLOAT, GLSL_TYPE_FLOAT, 130, 310, false, false },
+               { "r16f", PIPE_FORMAT_R16_FLOAT, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "rgba32ui", PIPE_FORMAT_R32G32B32A32_UINT, GLSL_TYPE_UINT, 130, 310, false, false },
+               { "rgba16ui", PIPE_FORMAT_R16G16B16A16_UINT, GLSL_TYPE_UINT, 130, 310, false, false },
+               { "rgb10_a2ui", PIPE_FORMAT_R10G10B10A2_UINT, GLSL_TYPE_UINT, 130, 0, true, false },
+               { "rgba8ui", PIPE_FORMAT_R8G8B8A8_UINT, GLSL_TYPE_UINT, 130, 310, false, false },
+               { "rg32ui", PIPE_FORMAT_R32G32_UINT, GLSL_TYPE_UINT, 130, 0, true, false },
+               { "rg16ui", PIPE_FORMAT_R16G16_UINT, GLSL_TYPE_UINT, 130, 0, true, false },
+               { "rg8ui", PIPE_FORMAT_R8G8_UINT, GLSL_TYPE_UINT, 130, 0, true, false },
+               { "r32ui", PIPE_FORMAT_R32_UINT, GLSL_TYPE_UINT, 130, 310, false, false },
+               { "r16ui", PIPE_FORMAT_R16_UINT, GLSL_TYPE_UINT, 130, 0, true, false },
+               { "r8ui", PIPE_FORMAT_R8_UINT, GLSL_TYPE_UINT, 130, 0, true, false },
+               { "rgba32i", PIPE_FORMAT_R32G32B32A32_SINT, GLSL_TYPE_INT, 130, 310, false, false },
+               { "rgba16i", PIPE_FORMAT_R16G16B16A16_SINT, GLSL_TYPE_INT, 130, 310, false, false },
+               { "rgba8i", PIPE_FORMAT_R8G8B8A8_SINT, GLSL_TYPE_INT, 130, 310, false, false },
+               { "rg32i", PIPE_FORMAT_R32G32_SINT, GLSL_TYPE_INT, 130, 0, true, false },
+               { "rg16i", PIPE_FORMAT_R16G16_SINT, GLSL_TYPE_INT, 130, 0, true, false },
+               { "rg8i", PIPE_FORMAT_R8G8_SINT, GLSL_TYPE_INT, 130, 0, true, false },
+               { "r32i", PIPE_FORMAT_R32_SINT, GLSL_TYPE_INT, 130, 310, false, false },
+               { "r16i", PIPE_FORMAT_R16_SINT, GLSL_TYPE_INT, 130, 0, true, false },
+               { "r8i", PIPE_FORMAT_R8_SINT, GLSL_TYPE_INT, 130, 0, true, false },
+               { "rgba16", PIPE_FORMAT_R16G16B16A16_UNORM, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "rgb10_a2", PIPE_FORMAT_R10G10B10A2_UNORM, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "rgba8", PIPE_FORMAT_R8G8B8A8_UNORM, GLSL_TYPE_FLOAT, 130, 310, false, false },
+               { "rg16", PIPE_FORMAT_R16G16_UNORM, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "rg8", PIPE_FORMAT_R8G8_UNORM, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "r16", PIPE_FORMAT_R16_UNORM, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "r8", PIPE_FORMAT_R8_UNORM, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "rgba16_snorm", PIPE_FORMAT_R16G16B16A16_SNORM, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "rgba8_snorm", PIPE_FORMAT_R8G8B8A8_SNORM, GLSL_TYPE_FLOAT, 130, 310, false, false },
+               { "rg16_snorm", PIPE_FORMAT_R16G16_SNORM, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "rg8_snorm", PIPE_FORMAT_R8G8_SNORM, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "r16_snorm", PIPE_FORMAT_R16_SNORM, GLSL_TYPE_FLOAT, 130, 0, true, false },
+               { "r8_snorm", PIPE_FORMAT_R8_SNORM, GLSL_TYPE_FLOAT, 130, 0, true, false },
 
                /* From GL_EXT_shader_image_load_store: */
                /* base_type is incorrect but it'll be patched later when we know
                 * the variable type. See ast_to_hir.cpp */
-               { "size1x8", PIPE_FORMAT_R8_SINT, GLSL_TYPE_VOID, 130, 0, false, true, false },
-               { "size1x16", PIPE_FORMAT_R16_SINT, GLSL_TYPE_VOID, 130, 0, false, true, false },
-               { "size1x32", PIPE_FORMAT_R32_SINT, GLSL_TYPE_VOID, 130, 0, false, true, false },
-               { "size2x32", PIPE_FORMAT_R32G32_SINT, GLSL_TYPE_VOID, 130, 0, false, true, false },
-               { "size4x32", PIPE_FORMAT_R32G32B32A32_SINT, GLSL_TYPE_VOID, 130, 0, false, true, false },
+               { "size1x8", PIPE_FORMAT_R8_SINT, GLSL_TYPE_VOID, 130, 0, false, true },
+               { "size1x16", PIPE_FORMAT_R16_SINT, GLSL_TYPE_VOID, 130, 0, false, true },
+               { "size1x32", PIPE_FORMAT_R32_SINT, GLSL_TYPE_VOID, 130, 0, false, true },
+               { "size2x32", PIPE_FORMAT_R32G32_SINT, GLSL_TYPE_VOID, 130, 0, false, true },
+               { "size4x32", PIPE_FORMAT_R32G32B32A32_SINT, GLSL_TYPE_VOID, 130, 0, false, true },
             };
 
             for (unsigned i = 0; i < ARRAY_SIZE(map); i++) {
-               if (state->EXT_shader_pixel_local_storage_enable &&
-                   map[i].pixel_local_qualifiers &&
-                   match_layout_qualifier($1, map[i].name, state) == 0) {
-                  $$.flags.q.explicit_image_format = 1;
-                  $$.image_format = map[i].format;
-                  $$.image_base_type = map[i].base_type;
-                  break;
-               }
                if ((state->is_version(map[i].required_glsl,
                                       map[i].required_essl) ||
                     (state->NV_image_formats_enable &&
@@ -1613,22 +1599,22 @@ layout_qualifier_id:
             const char *s;
             uint32_t mask;
          } map[] = {
-                 { "blend_support_multiply",       BITFIELD_BIT(PIPE_ADVANCED_BLEND_MULTIPLY) },
-                 { "blend_support_screen",         BITFIELD_BIT(PIPE_ADVANCED_BLEND_SCREEN) },
-                 { "blend_support_overlay",        BITFIELD_BIT(PIPE_ADVANCED_BLEND_OVERLAY) },
-                 { "blend_support_darken",         BITFIELD_BIT(PIPE_ADVANCED_BLEND_DARKEN) },
-                 { "blend_support_lighten",        BITFIELD_BIT(PIPE_ADVANCED_BLEND_LIGHTEN) },
-                 { "blend_support_colordodge",     BITFIELD_BIT(PIPE_ADVANCED_BLEND_COLORDODGE) },
-                 { "blend_support_colorburn",      BITFIELD_BIT(PIPE_ADVANCED_BLEND_COLORBURN) },
-                 { "blend_support_hardlight",      BITFIELD_BIT(PIPE_ADVANCED_BLEND_HARDLIGHT) },
-                 { "blend_support_softlight",      BITFIELD_BIT(PIPE_ADVANCED_BLEND_SOFTLIGHT) },
-                 { "blend_support_difference",     BITFIELD_BIT(PIPE_ADVANCED_BLEND_DIFFERENCE) },
-                 { "blend_support_exclusion",      BITFIELD_BIT(PIPE_ADVANCED_BLEND_EXCLUSION) },
-                 { "blend_support_hsl_hue",        BITFIELD_BIT(PIPE_ADVANCED_BLEND_HSL_HUE) },
-                 { "blend_support_hsl_saturation", BITFIELD_BIT(PIPE_ADVANCED_BLEND_HSL_SATURATION) },
-                 { "blend_support_hsl_color",      BITFIELD_BIT(PIPE_ADVANCED_BLEND_HSL_COLOR) },
-                 { "blend_support_hsl_luminosity", BITFIELD_BIT(PIPE_ADVANCED_BLEND_HSL_LUMINOSITY) },
-                 { "blend_support_all_equations",  (1u << (PIPE_ADVANCED_BLEND_HSL_LUMINOSITY + 1)) - 2 },
+                 { "blend_support_multiply",       BITFIELD_BIT(BLEND_MULTIPLY) },
+                 { "blend_support_screen",         BITFIELD_BIT(BLEND_SCREEN) },
+                 { "blend_support_overlay",        BITFIELD_BIT(BLEND_OVERLAY) },
+                 { "blend_support_darken",         BITFIELD_BIT(BLEND_DARKEN) },
+                 { "blend_support_lighten",        BITFIELD_BIT(BLEND_LIGHTEN) },
+                 { "blend_support_colordodge",     BITFIELD_BIT(BLEND_COLORDODGE) },
+                 { "blend_support_colorburn",      BITFIELD_BIT(BLEND_COLORBURN) },
+                 { "blend_support_hardlight",      BITFIELD_BIT(BLEND_HARDLIGHT) },
+                 { "blend_support_softlight",      BITFIELD_BIT(BLEND_SOFTLIGHT) },
+                 { "blend_support_difference",     BITFIELD_BIT(BLEND_DIFFERENCE) },
+                 { "blend_support_exclusion",      BITFIELD_BIT(BLEND_EXCLUSION) },
+                 { "blend_support_hsl_hue",        BITFIELD_BIT(BLEND_HSL_HUE) },
+                 { "blend_support_hsl_saturation", BITFIELD_BIT(BLEND_HSL_SATURATION) },
+                 { "blend_support_hsl_color",      BITFIELD_BIT(BLEND_HSL_COLOR) },
+                 { "blend_support_hsl_luminosity", BITFIELD_BIT(BLEND_HSL_LUMINOSITY) },
+                 { "blend_support_all_equations",  (1u << (BLEND_HSL_LUMINOSITY + 1)) - 2 },
          };
          for (unsigned i = 0; i < ARRAY_SIZE(map); i++) {
             if (match_layout_qualifier($1, map[i].s, state) == 0) {
@@ -1829,18 +1815,10 @@ layout_qualifier_id:
       if (match_layout_qualifier("max_vertices", $1, state) == 0) {
          $$.flags.q.max_vertices = 1;
          $$.max_vertices = new(ctx) ast_layout_expression(@1, $3);
-         if (!state->has_geometry_shader() && !state->EXT_mesh_shader_enable) {
+         if (!state->has_geometry_shader()) {
             _mesa_glsl_error(& @3, state,
-                             "max_vertices qualifier specified");
-         }
-      }
-
-      if (match_layout_qualifier("max_primitives", $1, state) == 0) {
-         $$.flags.q.max_primitives = 1;
-         $$.max_primitives = new(ctx) ast_layout_expression(@1, $3);
-         if (!state->EXT_mesh_shader_enable) {
-            _mesa_glsl_error(& @3, state,
-                             "max_primitives qualifier specified");
+                             "#version 150 max_vertices qualifier "
+                             "specified");
          }
       }
 
@@ -1880,10 +1858,10 @@ layout_qualifier_id:
       for (int i = 0; i < 3; i++) {
          if (match_layout_qualifier(local_size_qualifiers[i], $1,
                                     state) == 0) {
-            if (!state->has_compute_shader() && !state->EXT_mesh_shader_enable) {
+            if (!state->has_compute_shader()) {
                _mesa_glsl_error(& @3, state,
                                 "%s qualifier requires GLSL 4.30 or "
-                                "GLSL ES 3.10 or ARB_compute_shader or EXT_mesh_shader",
+                                "GLSL ES 3.10 or ARB_compute_shader",
                                 local_size_qualifiers[i]);
                YYERROR;
             } else {
@@ -2211,11 +2189,6 @@ auxiliary_storage_qualifier:
       memset(& $$, 0, sizeof($$));
       $$.flags.q.patch = 1;
    }
-   | PERPRIMITIVE
-   {
-      memset(& $$, 0, sizeof($$));
-      $$.flags.q.per_primitive = 1;
-   }
 
 storage_qualifier:
    CONST_TOK
@@ -2289,26 +2262,6 @@ storage_qualifier:
    {
       memset(& $$, 0, sizeof($$));
       $$.flags.q.shared_storage = 1;
-   }
-   | TASKPAYLOAD
-   {
-      memset(& $$, 0, sizeof($$));
-      $$.flags.q.task_payload = 1;
-   }
-   | PIXEL_LOCAL
-   {
-      memset(& $$, 0, sizeof($$));
-      $$.flags.q.pixel_local_storage = GLSL_PIXEL_LOCAL_STORAGE_INOUT;
-   }
-   | PIXEL_LOCAL_IN
-   {
-      memset(& $$, 0, sizeof($$));
-      $$.flags.q.pixel_local_storage = GLSL_PIXEL_LOCAL_STORAGE_IN;
-   }
-   | PIXEL_LOCAL_OUT
-   {
-      memset(& $$, 0, sizeof($$));
-      $$.flags.q.pixel_local_storage = GLSL_PIXEL_LOCAL_STORAGE_OUT;
    }
    ;
 
@@ -2990,32 +2943,16 @@ interface_qualifier:
       memset(& $$, 0, sizeof($$));
       $$.flags.q.buffer = 1;
    }
-   | PIXEL_LOCAL
-   {
-      memset(& $$, 0, sizeof($$));
-      $$.flags.q.pixel_local_storage = GLSL_PIXEL_LOCAL_STORAGE_INOUT;
-   }
-   | PIXEL_LOCAL_IN
-   {
-      memset(& $$, 0, sizeof($$));
-      $$.flags.q.pixel_local_storage = GLSL_PIXEL_LOCAL_STORAGE_IN;
-   }
-   | PIXEL_LOCAL_OUT
-   {
-      memset(& $$, 0, sizeof($$));
-      $$.flags.q.pixel_local_storage = GLSL_PIXEL_LOCAL_STORAGE_OUT;
-   }
    | auxiliary_storage_qualifier interface_qualifier
    {
-      if (!$1.flags.q.patch && !$1.flags.q.per_primitive) {
+      if (!$1.flags.q.patch) {
          _mesa_glsl_error(&@1, state, "invalid interface qualifier");
       }
       if ($2.has_auxiliary_storage()) {
-         _mesa_glsl_error(&@1, state, "duplicate auxiliary storage qualifier");
+         _mesa_glsl_error(&@1, state, "duplicate patch qualifier");
       }
       $$ = $2;
-      $$.flags.q.patch = $1.flags.q.patch;
-      $$.flags.q.per_primitive = $1.flags.q.per_primitive;
+      $$.flags.q.patch = 1;
    }
    ;
 

@@ -38,7 +38,6 @@
 #include "util/u_debug_describe.h"
 #include "util/u_debug_refcnt.h"
 #include "util/u_atomic.h"
-#include "util/u_upload_mgr.h"
 #include "util/box.h"
 #include "util/u_math.h"
 
@@ -196,19 +195,6 @@ pipe_resource_reference(struct pipe_resource **dst, struct pipe_resource *src)
    *dst = src;
 }
 
-static inline void
-pipe_resource_release(struct pipe_context *pipe, struct pipe_resource *resource)
-{
-   if (resource)
-      pipe->resource_release(pipe, resource);
-}
-
-static inline void
-u_default_resource_release(struct pipe_context *pipe, struct pipe_resource *pres)
-{
-   pipe_resource_reference(&pres, NULL);
-}
-
 /**
  * Subtract the given number of references.
  */
@@ -356,7 +342,7 @@ pipe_surface_init(struct pipe_context *ctx, struct pipe_surface* ps,
 static inline unsigned
 pipe_surface_width(const struct pipe_surface *ps)
 {
-   unsigned width = u_minify(ps->texture->width0, ps->level);
+   unsigned width = (uint16_t)u_minify(ps->texture->width0, ps->level);
 
    /* adjust texture view size to get full blocksize on compressed formats */
    if (!util_format_is_depth_or_stencil(ps->texture->format) && ps->format != ps->texture->format) {
@@ -395,13 +381,13 @@ pipe_surface_height(const struct pipe_surface *ps)
 }
 
 static inline void
-pipe_surface_size(const struct pipe_surface *ps, unsigned *width, unsigned *height)
+pipe_surface_size(const struct pipe_surface *ps, uint16_t *width, uint16_t *height)
 {
    if (width)
-      *width = pipe_surface_width(ps);
+      *width = (uint16_t)pipe_surface_width(ps);
 
    if (height)
-      *height = pipe_surface_height(ps);
+      *height = (uint16_t)pipe_surface_height(ps);
 }
 
 /* Return true if the surfaces are equal. */
@@ -690,7 +676,7 @@ pipe_texture_unmap(struct pipe_context *context,
 
 static inline void
 pipe_set_constant_buffer(struct pipe_context *pipe,
-                         mesa_shader_stage shader, uint index,
+                         enum pipe_shader_type shader, uint index,
                          struct pipe_resource *buf)
 {
    if (buf) {
@@ -699,34 +685,12 @@ pipe_set_constant_buffer(struct pipe_context *pipe,
       cb.buffer_offset = 0;
       cb.buffer_size = buf->width0;
       cb.user_buffer = NULL;
-      pipe->set_constant_buffer(pipe, shader, index, &cb);
+      pipe->set_constant_buffer(pipe, shader, index, false, &cb);
    } else {
-      pipe->set_constant_buffer(pipe, shader, index, NULL);
+      pipe->set_constant_buffer(pipe, shader, index, false, NULL);
    }
 }
 
-static inline void
-pipe_upload_constant_buffer0(struct pipe_context *pipe, mesa_shader_stage stage,
-                             struct pipe_constant_buffer *cb,
-                             struct pipe_resource **releasebuf)
-{
-   struct pipe_constant_buffer cbuf = *cb;
-   cbuf.buffer = NULL;
-   const unsigned alignment = MAX2(pipe->screen->caps.constant_buffer_offset_alignment, 64);
-   void *ptr;
-
-   if (pipe->screen->caps.prefer_real_buffer_in_constbuf0) {
-      u_upload_alloc(pipe->const_uploader, 0, cbuf.buffer_size,
-         alignment, &cbuf.buffer_offset, &cbuf.buffer, releasebuf, (void**)&ptr);
-      memcpy(ptr, cbuf.user_buffer, cbuf.buffer_size);
-      cbuf.user_buffer = NULL;
-
-      u_upload_unmap(pipe->const_uploader);
-      pipe->set_constant_buffer(pipe, stage, 0, &cbuf);
-   } else {
-      pipe->set_constant_buffer(pipe, stage, 0, cb);
-   }
-}
 
 /**
  * Get the polygon offset enable/disable flag for the given polygon fill mode.
@@ -793,10 +757,16 @@ util_query_clear_result(union pipe_query_result *result, unsigned type)
 
 static inline void
 util_copy_constant_buffer(struct pipe_constant_buffer *dst,
-                          const struct pipe_constant_buffer *src)
+                          const struct pipe_constant_buffer *src,
+                          bool take_ownership)
 {
    if (src) {
-      pipe_resource_reference(&dst->buffer, src->buffer);
+      if (take_ownership) {
+         pipe_resource_reference(&dst->buffer, NULL);
+         dst->buffer = src->buffer;
+      } else {
+         pipe_resource_reference(&dst->buffer, src->buffer);
+      }
       dst->buffer_offset = src->buffer_offset;
       dst->buffer_size = src->buffer_size;
       dst->user_buffer = src->user_buffer;
@@ -992,6 +962,24 @@ pipe_create_multimedia_context(struct pipe_screen *screen, bool compute_only)
 static inline unsigned util_res_sample_count(const struct pipe_resource *res)
 {
    return res->nr_samples > 0 ? res->nr_samples : 1;
+}
+
+static inline void
+util_set_vertex_buffers(struct pipe_context *pipe,
+                        unsigned num_buffers, bool take_ownership,
+                        const struct pipe_vertex_buffer *buffers)
+{
+   /* set_vertex_buffers requires that reference counts are incremented
+    * by the caller.
+    */
+   if (!take_ownership) {
+      for (unsigned i = 0; i < num_buffers; i++) {
+         if (!buffers[i].is_user_buffer && buffers[i].buffer.resource)
+            p_atomic_inc(&buffers[i].buffer.resource->reference.count);
+      }
+   }
+
+   pipe->set_vertex_buffers(pipe, num_buffers, buffers);
 }
 
 #ifdef __cplusplus

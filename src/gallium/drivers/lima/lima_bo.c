@@ -395,7 +395,7 @@ bool lima_bo_export(struct lima_bo *bo, struct winsys_handle *handle)
       return true;
 
    case WINSYS_HANDLE_TYPE_FD:
-      if (drmPrimeHandleToFD(screen->fd, bo->handle, DRM_CLOEXEC | DRM_RDWR,
+      if (drmPrimeHandleToFD(screen->fd, bo->handle, DRM_CLOEXEC,
                              (int*)&handle->handle))
          return false;
 

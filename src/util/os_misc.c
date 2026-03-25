@@ -32,7 +32,6 @@
 #include "os_file.h"
 #include "ralloc.h"
 #include "simple_mtx.h"
-#include "u_debug.h"
 
 #include <stdarg.h>
 
@@ -142,16 +141,6 @@ os_log_message(const char *message)
 #  include "c11/threads.h"
 
 /**
- * In Android 26+ there is no restriction on the length of the name for a
- * property, replace the default max length with one large enough to support
- * all property names.
- */
-#if ANDROID_API_LEVEL >= 26
-#undef PROPERTY_KEY_MAX
-#define PROPERTY_KEY_MAX 128
-#endif /* ANDROID_API_LEVEL >= 26 */
-
-/**
  * Get an option value from android's property system, as a fallback to
  * getenv() (which is generally less useful on android due to processes
  * typically being forked from the zygote.
@@ -210,29 +199,20 @@ os_get_android_option(const char *name)
  * that have been made during the process lifetime, if either the
  * setter uses a different CRT (e.g. due to static linking) or the
  * setter used the Win32 API directly. */
-static const char *
-os_get_option_internal(const char *name, UNUSED bool use_secure_getenv)
+const char *
+os_get_option(const char *name)
 {
    static thread_local char value[_MAX_ENV];
    DWORD size = GetEnvironmentVariableA(name, value, _MAX_ENV);
    return (size > 0 && size < _MAX_ENV) ? value : NULL;
 }
 
-#else /* !DETECT_OS_WINDOWS */
-
-static const char *
-os_get_option_internal(const char *name, bool use_secure_getenv)
-{
-   const char *opt;
-   if (use_secure_getenv) {
-#ifdef HAVE_SECURE_GETENV
-      opt = secure_getenv(name);
 #else
-      opt = getenv(name);
-#endif
-   } else {
-      opt = getenv(name);
-   }
+
+const char *
+os_get_option(const char *name)
+{
+   const char *opt = getenv(name);
 #if DETECT_OS_ANDROID
    if (!opt) {
       opt = os_get_android_option(name);
@@ -241,39 +221,7 @@ os_get_option_internal(const char *name, bool use_secure_getenv)
    return opt;
 }
 
-#endif /* DETECT_OS_WINDOWS */
-
-const char *
-os_get_option(const char *name)
-{
-   return os_get_option_internal(name, false);
-}
-
-char *
-os_get_option_dup(const char *name)
-{
-   const char *opt = os_get_option_internal(name, false);
-   if (opt) {
-      return strdup(opt);
-   }
-   return NULL;
-}
-
-const char *
-os_get_option_secure(const char *name)
-{
-   return os_get_option_internal(name, true);
-}
-
-char *
-os_get_option_secure_dup(const char *name)
-{
-   const char *opt = os_get_option_internal(name, true);
-   if (opt) {
-      return strdup(opt);
-   }
-   return NULL;
-}
+#endif
 
 static struct hash_table *options_tbl;
 static bool options_tbl_exited = false;
@@ -328,25 +276,6 @@ exit_mutex:
    return opt;
 }
 
-void
-os_set_option(const char *name, const char *value, bool override)
-{
-   if (override == false) {
-      if (os_get_option(name)) {
-         return;
-      }
-   }
-#if DETECT_OS_WINDOWS
-   SetEnvironmentVariableA(name, value);
-#else
-   if (value == NULL) {
-      unsetenv(name);
-   } else {
-      setenv(name, value, 1);
-   }
-#endif
-}
-
 /**
  * Return the size of the total physical memory.
  * \param size returns the size of the total physical memory
@@ -355,9 +284,9 @@ os_set_option(const char *name, const char *value, bool override)
 bool
 os_get_total_physical_memory(uint64_t *size)
 {
-#if HAVE_SYSCONF
+#if DETECT_OS_LINUX || DETECT_OS_CYGWIN || DETECT_OS_SOLARIS || DETECT_OS_HURD || DETECT_OS_MANAGARM
    const long phys_pages = sysconf(_SC_PHYS_PAGES);
-   const long page_size = sysconf(_SC_PAGESIZE);
+   const long page_size = sysconf(_SC_PAGE_SIZE);
 
    if (phys_pages <= 0 || page_size <= 0)
       return false;
@@ -483,8 +412,8 @@ os_get_available_system_memory(uint64_t *size)
 bool
 os_get_page_size(uint64_t *size)
 {
-#if HAVE_SYSCONF
-   const long page_size = sysconf(_SC_PAGESIZE);
+#if DETECT_OS_POSIX_LITE && !DETECT_OS_APPLE && !DETECT_OS_HAIKU
+   const long page_size = sysconf(_SC_PAGE_SIZE);
 
    if (page_size <= 0)
       return false;

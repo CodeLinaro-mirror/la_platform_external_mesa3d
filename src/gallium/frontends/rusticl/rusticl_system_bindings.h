@@ -1,9 +1,3 @@
-/*
- * Copyright 2022 LingMan.
- *
- * SPDX-License-Identifier: MIT
- */
-
 #include <stdio.h>
 #include <sys/mman.h>
 

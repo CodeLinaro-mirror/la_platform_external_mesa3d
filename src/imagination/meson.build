@@ -11,16 +11,10 @@ inc_imagination = include_directories([
   'include',
 ])
 
-if with_imagination_vk or with_tools.contains('imagination')
+if with_imagination_vk
   subdir('common')
   subdir('csbgen')
   subdir('pco')
-endif
-
-if with_imagination_vk
+  subdir('rogue')
   subdir('vulkan')
-
-  if with_tools.contains('drm-shim')
-    subdir('drm-shim')
-  endif
 endif

@@ -88,9 +88,10 @@
 #define LLVMCreateBuilder ILLEGAL_LLVM_FUNCTION
 
 typedef struct lp_context_ref {
-   LLVMContextRef ref;
 #if GALLIVM_USE_ORCJIT
-   LLVMOrcThreadSafeContextRef tsref;
+   LLVMOrcThreadSafeContextRef ref;
+#else
+   LLVMContextRef ref;
 #endif
    bool owned;
 } lp_context_ref;
@@ -100,21 +101,18 @@ lp_context_create(lp_context_ref *context)
 {
    assert(context != NULL);
 #if GALLIVM_USE_ORCJIT
-#if LLVM_VERSION_MAJOR >= 21
-   context->ref = LLVMContextCreate();
-   /* Ownership of ref is then transferred to tsref */
-   context->tsref = LLVMOrcCreateNewThreadSafeContextFromLLVMContext(context->ref);
-#else
-   context->tsref = LLVMOrcCreateNewThreadSafeContext();
-   context->ref = LLVMOrcThreadSafeContextGetContext(context->tsref);
-#endif
+   context->ref = LLVMOrcCreateNewThreadSafeContext();
 #else
    context->ref = LLVMContextCreate();
 #endif
    context->owned = true;
 #if LLVM_VERSION_MAJOR == 15
    if (context->ref) {
+#if GALLIVM_USE_ORCJIT
+      LLVMContextSetOpaquePointers(LLVMOrcThreadSafeContextGetContext(context->ref), false);
+#else
       LLVMContextSetOpaquePointers(context->ref, false);
+#endif
    }
 #endif
 }
@@ -125,7 +123,7 @@ lp_context_destroy(lp_context_ref *context)
    assert(context != NULL);
    if (context->owned) {
 #if GALLIVM_USE_ORCJIT
-      LLVMOrcDisposeThreadSafeContext(context->tsref);
+      LLVMOrcDisposeThreadSafeContext(context->ref);
 #else
       LLVMContextDispose(context->ref);
 #endif

@@ -37,9 +37,12 @@
 #define LP_BLD_STRUCT_H
 
 
-#include <llvm-c/Core.h>
+#include "gallivm/lp_bld.h"
+#include "gallivm/lp_bld_init.h"
 
-struct gallivm_state;
+#include "util/u_debug.h"
+#include "util/u_memory.h"
+
 
 #define LP_CHECK_STRUCT_SIZE(_ctype, _ltarget, _ltype) \
       assert(LLVMABISizeOfType(_ltarget, _ltype) == \

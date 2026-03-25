@@ -28,10 +28,8 @@
 #include <stdint.h>
 #include <vulkan/vulkan_core.h>
 
-#include "util/bitset.h"
-
 #include "pvr_csb.h"
-#include "pvr_macros.h"
+#include "util/bitset.h"
 
 #define PVR_BORDER_COLOR_TABLE_NR_ENTRIES \
    (ROGUE_TEXSTATE_SAMPLER_WORD0_BORDERCOLOR_INDEX_MAX_SIZE + 1)
@@ -49,7 +47,7 @@ struct pvr_sampler;
 /* Forward declaration from "pvr_bo.h" */
 struct pvr_bo;
 
-/* Forward declaration from "pvr_device.h" */
+/* Forward declaration from "pvr_private.h" */
 struct pvr_device;
 
 struct pvr_border_color_table {
@@ -61,31 +59,15 @@ struct pvr_border_color_table {
    struct pvr_bo *table;
 };
 
-#ifdef PVR_PER_ARCH
+VkResult pvr_border_color_table_init(struct pvr_border_color_table *table,
+                                     struct pvr_device *device);
+void pvr_border_color_table_finish(struct pvr_border_color_table *table,
+                                   struct pvr_device *device);
 
-VkResult PVR_PER_ARCH(border_color_table_init)(struct pvr_device *const device);
-#   define pvr_arch_border_color_table_init \
-      PVR_PER_ARCH(border_color_table_init)
-
-void PVR_PER_ARCH(border_color_table_finish)(struct pvr_device *device);
-#   define pvr_arch_border_color_table_finish \
-      PVR_PER_ARCH(border_color_table_finish)
-
-VkResult PVR_PER_ARCH(border_color_table_get_or_create_entry)(
-   struct pvr_device *device,
-   const struct pvr_sampler *sampler,
-   struct pvr_border_color_table *table,
-   uint32_t *index_out);
-#   define pvr_arch_border_color_table_get_or_create_entry \
-      PVR_PER_ARCH(border_color_table_get_or_create_entry)
-
-void PVR_PER_ARCH(border_color_table_release_entry)(
-   struct pvr_border_color_table *table,
-   uint32_t index);
-#   define pvr_arch_border_color_table_release_entry \
-      PVR_PER_ARCH(border_color_table_release_entry)
-
-#endif
+VkResult
+pvr_border_color_table_get_or_create_entry(struct pvr_border_color_table *table,
+                                           const struct pvr_sampler *sampler,
+                                           uint32_t *index_out);
 
 static inline bool pvr_border_color_table_is_index_valid(
    const struct pvr_border_color_table *const table,

@@ -6,7 +6,7 @@
 
 set -ex
 
-section_start fossilize "Building fossilize"
+uncollapsed_section_start fossilize "Building fossilize"
 
 git clone https://github.com/ValveSoftware/Fossilize.git
 cd Fossilize

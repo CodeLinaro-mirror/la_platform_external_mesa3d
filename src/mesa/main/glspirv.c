@@ -36,8 +36,6 @@
 #include "util/u_atomic.h"
 #include "api_exec_decl.h"
 
-#include "pipe/p_screen.h"
-
 void
 _mesa_spirv_module_reference(struct gl_spirv_module **dest,
                              struct gl_spirv_module *src)
@@ -142,7 +140,7 @@ _mesa_spirv_link_shaders(struct gl_context *ctx, struct gl_shader_program *prog)
 
    for (unsigned i = 0; i < prog->NumShaders; i++) {
       struct gl_shader *shader = prog->Shaders[i];
-      mesa_shader_stage shader_type = shader->Stage;
+      gl_shader_stage shader_type = shader->Stage;
 
       /* We only support one shader per stage. The gl_spirv spec doesn't seem
        * to prevent this, but the way the API is designed, requiring all shaders
@@ -198,7 +196,7 @@ _mesa_spirv_link_shaders(struct gl_context *ctx, struct gl_shader_program *prog)
    /* Some shaders have to be linked with some other shaders present. */
    if (!prog->SeparateShader) {
       static const struct {
-         mesa_shader_stage a, b;
+         gl_shader_stage a, b;
       } stage_pairs[] = {
          { MESA_SHADER_GEOMETRY, MESA_SHADER_VERTEX },
          { MESA_SHADER_TESS_EVAL, MESA_SHADER_VERTEX },
@@ -207,8 +205,8 @@ _mesa_spirv_link_shaders(struct gl_context *ctx, struct gl_shader_program *prog)
       };
 
       for (unsigned i = 0; i < ARRAY_SIZE(stage_pairs); i++) {
-         mesa_shader_stage a = stage_pairs[i].a;
-         mesa_shader_stage b = stage_pairs[i].b;
+         gl_shader_stage a = stage_pairs[i].a;
+         gl_shader_stage b = stage_pairs[i].b;
          if ((prog->data->linked_stages & ((1 << a) | (1 << b))) == (1 << a)) {
             ralloc_asprintf_append(&prog->data->InfoLog,
                                    "%s shader must be linked with %s shader\n",
@@ -234,7 +232,7 @@ _mesa_spirv_link_shaders(struct gl_context *ctx, struct gl_shader_program *prog)
 nir_shader *
 _mesa_spirv_to_nir(struct gl_context *ctx,
                    const struct gl_shader_program *prog,
-                   mesa_shader_stage stage,
+                   gl_shader_stage stage,
                    const nir_shader_compiler_options *options)
 {
    struct gl_linked_shader *linked_shader = prog->_LinkedShaders[stage];
@@ -266,6 +264,7 @@ _mesa_spirv_to_nir(struct gl_context *ctx,
    struct spirv_to_nir_options spirv_options = {
       .environment = NIR_SPIRV_OPENGL,
       .capabilities = &spirv_caps,
+      .subgroup_size = SUBGROUP_SIZE_UNIFORM,
       .ubo_addr_format = nir_address_format_32bit_index_offset,
       .ssbo_addr_format = nir_address_format_32bit_index_offset,
 
@@ -275,7 +274,6 @@ _mesa_spirv_to_nir(struct gl_context *ctx,
        */
       .shared_addr_format = nir_address_format_32bit_offset,
 
-      .group_non_uniform_subgroup_size = ctx->screen->caps.shader_subgroup_size,
    };
 
    nir_shader *nir =
@@ -299,7 +297,6 @@ _mesa_spirv_to_nir(struct gl_context *ctx,
    nir_validate_shader(nir, "after spirv_to_nir");
 
    nir->info.separate_shader = linked_shader->Program->info.separate_shader;
-   nir->info.api_subgroup_size_draw_uniform = !mesa_shader_stage_uses_workgroup(stage);
 
    /* Convert some sysvals to input varyings. */
    const struct nir_lower_sysvals_to_varyings_options sysvals_to_varyings = {
@@ -316,7 +313,7 @@ _mesa_spirv_to_nir(struct gl_context *ctx,
    NIR_PASS(_, nir, nir_lower_variable_initializers, nir_var_function_temp);
    NIR_PASS(_, nir, nir_lower_returns);
    NIR_PASS(_, nir, nir_inline_functions);
-   NIR_PASS(_, nir, nir_opt_copy_prop);
+   NIR_PASS(_, nir, nir_copy_prop);
    NIR_PASS(_, nir, nir_opt_deref);
 
    /* Pick off the single entrypoint that we want */

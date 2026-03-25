@@ -70,7 +70,7 @@ legal_src_factor(const struct gl_context *ctx, GLenum factor)
    case GL_SRC1_ALPHA:
    case GL_ONE_MINUS_SRC1_COLOR:
    case GL_ONE_MINUS_SRC1_ALPHA:
-      return !_mesa_is_gles1(ctx)
+      return ctx->API != API_OPENGLES
          && ctx->Extensions.ARB_blend_func_extended;
    default:
       return GL_FALSE;
@@ -103,14 +103,14 @@ legal_dst_factor(const struct gl_context *ctx, GLenum factor)
    case GL_ONE_MINUS_CONSTANT_ALPHA:
       return _mesa_is_desktop_gl(ctx) || _mesa_is_gles2(ctx);
    case GL_SRC_ALPHA_SATURATE:
-      return (!_mesa_is_gles1(ctx)
+      return (ctx->API != API_OPENGLES
               && ctx->Extensions.ARB_blend_func_extended)
          || _mesa_is_gles3(ctx);
    case GL_SRC1_COLOR:
    case GL_SRC1_ALPHA:
    case GL_ONE_MINUS_SRC1_COLOR:
    case GL_ONE_MINUS_SRC1_ALPHA:
-      return !_mesa_is_gles1(ctx)
+      return ctx->API != API_OPENGLES
          && ctx->Extensions.ARB_blend_func_extended;
    default:
       return GL_FALSE;
@@ -241,7 +241,7 @@ blend_func_separate(struct gl_context *ctx,
                     GLenum sfactorA, GLenum dfactorA)
 {
    FLUSH_VERTICES(ctx, 0, GL_COLOR_BUFFER_BIT);
-   ST_SET_STATE(ctx->NewDriverState, ST_NEW_BLEND);
+   ctx->NewDriverState |= ST_NEW_BLEND;
 
    const unsigned numBuffers = num_buffers(ctx);
    for (unsigned buf = 0; buf < numBuffers; buf++) {
@@ -402,7 +402,7 @@ blend_func_separatei(GLuint buf, GLenum sfactorRGB, GLenum dfactorRGB,
    }
 
    FLUSH_VERTICES(ctx, 0, GL_COLOR_BUFFER_BIT);
-   ST_SET_STATE(ctx->NewDriverState, ST_NEW_BLEND);
+   ctx->NewDriverState |= ST_NEW_BLEND;
 
    ctx->Color.Blend[buf].SrcRGB = sfactorRGB;
    ctx->Color.Blend[buf].DstRGB = dfactorRGB;
@@ -455,62 +455,61 @@ legal_simple_blend_equation(const struct gl_context *ctx, GLenum mode)
    }
 }
 
-static enum pipe_advanced_blend_mode
+static enum gl_advanced_blend_mode
 advanced_blend_mode_from_gl_enum(GLenum mode)
 {
    switch (mode) {
    case GL_MULTIPLY_KHR:
-      return PIPE_ADVANCED_BLEND_MULTIPLY;
+      return BLEND_MULTIPLY;
    case GL_SCREEN_KHR:
-      return PIPE_ADVANCED_BLEND_SCREEN;
+      return BLEND_SCREEN;
    case GL_OVERLAY_KHR:
-      return PIPE_ADVANCED_BLEND_OVERLAY;
+      return BLEND_OVERLAY;
    case GL_DARKEN_KHR:
-      return PIPE_ADVANCED_BLEND_DARKEN;
+      return BLEND_DARKEN;
    case GL_LIGHTEN_KHR:
-      return PIPE_ADVANCED_BLEND_LIGHTEN;
+      return BLEND_LIGHTEN;
    case GL_COLORDODGE_KHR:
-      return PIPE_ADVANCED_BLEND_COLORDODGE;
+      return BLEND_COLORDODGE;
    case GL_COLORBURN_KHR:
-      return PIPE_ADVANCED_BLEND_COLORBURN;
+      return BLEND_COLORBURN;
    case GL_HARDLIGHT_KHR:
-      return PIPE_ADVANCED_BLEND_HARDLIGHT;
+      return BLEND_HARDLIGHT;
    case GL_SOFTLIGHT_KHR:
-      return PIPE_ADVANCED_BLEND_SOFTLIGHT;
+      return BLEND_SOFTLIGHT;
    case GL_DIFFERENCE_KHR:
-      return PIPE_ADVANCED_BLEND_DIFFERENCE;
+      return BLEND_DIFFERENCE;
    case GL_EXCLUSION_KHR:
-      return PIPE_ADVANCED_BLEND_EXCLUSION;
+      return BLEND_EXCLUSION;
    case GL_HSL_HUE_KHR:
-      return PIPE_ADVANCED_BLEND_HSL_HUE;
+      return BLEND_HSL_HUE;
    case GL_HSL_SATURATION_KHR:
-      return PIPE_ADVANCED_BLEND_HSL_SATURATION;
+      return BLEND_HSL_SATURATION;
    case GL_HSL_COLOR_KHR:
-      return PIPE_ADVANCED_BLEND_HSL_COLOR;
+      return BLEND_HSL_COLOR;
    case GL_HSL_LUMINOSITY_KHR:
-      return PIPE_ADVANCED_BLEND_HSL_LUMINOSITY;
+      return BLEND_HSL_LUMINOSITY;
    default:
-      return PIPE_ADVANCED_BLEND_NONE;
+      return BLEND_NONE;
    }
 }
 
 /**
  * If \p mode is one of the advanced blending equations defined by
  * GL_KHR_blend_equation_advanced (and the extension is supported),
- * return the corresponding PIPE_ADVANCED_BLEND_* enum.
- * Otherwise, return PIPE_ADVANCED_BLEND_NONE (which can also be
- * treated as false).
+ * return the corresponding BLEND_* enum.  Otherwise, return BLEND_NONE
+ * (which can also be treated as false).
  */
-static enum pipe_advanced_blend_mode
+static enum gl_advanced_blend_mode
 advanced_blend_mode(const struct gl_context *ctx, GLenum mode)
 {
    return _mesa_has_KHR_blend_equation_advanced(ctx) ?
-          advanced_blend_mode_from_gl_enum(mode) : PIPE_ADVANCED_BLEND_NONE;
+          advanced_blend_mode_from_gl_enum(mode) : BLEND_NONE;
 }
 
 static void
 set_advanced_blend_mode(struct gl_context *ctx,
-                        enum pipe_advanced_blend_mode advanced_mode)
+                        enum gl_advanced_blend_mode advanced_mode)
 {
    if (ctx->Color._AdvancedBlendMode != advanced_mode) {
       ctx->Color._AdvancedBlendMode = advanced_mode;
@@ -526,7 +525,7 @@ _mesa_BlendEquation( GLenum mode )
    const unsigned numBuffers = num_buffers(ctx);
    unsigned buf;
    bool changed = false;
-   enum pipe_advanced_blend_mode advanced_mode = advanced_blend_mode(ctx, mode);
+   enum gl_advanced_blend_mode advanced_mode = advanced_blend_mode(ctx, mode);
 
    if (MESA_VERBOSE & VERBOSE_API)
       _mesa_debug(ctx, "glBlendEquation(%s)\n",
@@ -576,7 +575,7 @@ _mesa_BlendEquation( GLenum mode )
  */
 static void
 blend_equationi(struct gl_context *ctx, GLuint buf, GLenum mode,
-                enum pipe_advanced_blend_mode advanced_mode)
+                enum gl_advanced_blend_mode advanced_mode)
 {
    if (ctx->Color.Blend[buf].EquationRGB == mode &&
        ctx->Color.Blend[buf].EquationA == mode)
@@ -598,7 +597,7 @@ _mesa_BlendEquationiARB_no_error(GLuint buf, GLenum mode)
 {
    GET_CURRENT_CONTEXT(ctx);
 
-   enum pipe_advanced_blend_mode advanced_mode = advanced_blend_mode(ctx, mode);
+   enum gl_advanced_blend_mode advanced_mode = advanced_blend_mode(ctx, mode);
    blend_equationi(ctx, buf, mode, advanced_mode);
 }
 
@@ -607,7 +606,7 @@ void GLAPIENTRY
 _mesa_BlendEquationiARB(GLuint buf, GLenum mode)
 {
    GET_CURRENT_CONTEXT(ctx);
-   enum pipe_advanced_blend_mode advanced_mode = advanced_blend_mode(ctx, mode);
+   enum gl_advanced_blend_mode advanced_mode = advanced_blend_mode(ctx, mode);
 
    if (MESA_VERBOSE & VERBOSE_API)
       _mesa_debug(ctx, "glBlendEquationi(%u, %s)\n",
@@ -688,7 +687,7 @@ blend_equation_separate(struct gl_context *ctx, GLenum modeRGB, GLenum modeA,
       ctx->Color.Blend[buf].EquationA = modeA;
    }
    ctx->Color._BlendEquationPerBuffer = GL_FALSE;
-   set_advanced_blend_mode(ctx, PIPE_ADVANCED_BLEND_NONE);
+   set_advanced_blend_mode(ctx, BLEND_NONE);
 }
 
 
@@ -744,7 +743,7 @@ blend_equation_separatei(struct gl_context *ctx, GLuint buf, GLenum modeRGB,
    ctx->Color.Blend[buf].EquationRGB = modeRGB;
    ctx->Color.Blend[buf].EquationA = modeA;
    ctx->Color._BlendEquationPerBuffer = GL_TRUE;
-   set_advanced_blend_mode(ctx, PIPE_ADVANCED_BLEND_NONE);
+   set_advanced_blend_mode(ctx, BLEND_NONE);
 }
 
 
@@ -809,7 +808,7 @@ _mesa_BlendColor( GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha )
       return;
 
    FLUSH_VERTICES(ctx, 0, GL_COLOR_BUFFER_BIT);
-   ST_SET_STATE(ctx->NewDriverState, ST_NEW_BLEND_COLOR);
+   ctx->NewDriverState |= ST_NEW_BLEND_COLOR;
    COPY_4FV( ctx->Color.BlendColorUnclamped, tmp );
 
    ctx->Color.BlendColor[0] = CLAMP(tmp[0], 0.0F, 1.0F);
@@ -825,7 +824,7 @@ _mesa_BlendColor( GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha )
  * \param func alpha comparison function.
  * \param ref reference value.
  *
- * Verifies the parameters and updates gl_colorbuffer_attrib.
+ * Verifies the parameters and updates gl_colorbuffer_attrib. 
  * On a change, flushes the vertices and notifies the driver via
  * dd_function_table::AlphaFunc callback.
  */
@@ -851,7 +850,7 @@ _mesa_AlphaFunc( GLenum func, GLclampf ref )
    case GL_GEQUAL:
    case GL_ALWAYS:
       FLUSH_VERTICES(ctx, 0, GL_COLOR_BUFFER_BIT);
-      ST_SET_STATES(ctx->NewDriverState, ctx->DriverFlags.NewAlphaTest);
+      ctx->NewDriverState |= ctx->DriverFlags.NewAlphaTest;
       ctx->Color.AlphaFunc = func;
       ctx->Color.AlphaRefUnclamped = ref;
       ctx->Color.AlphaRef = CLAMP(ref, 0.0F, 1.0F);
@@ -914,7 +913,7 @@ logic_op(struct gl_context *ctx, GLenum opcode, bool no_error)
    }
 
    FLUSH_VERTICES(ctx, 0, GL_COLOR_BUFFER_BIT);
-   ST_SET_STATE(ctx->NewDriverState, ST_NEW_BLEND);
+   ctx->NewDriverState |= ST_NEW_BLEND;
    ctx->Color.LogicOp = opcode;
    ctx->Color._LogicOp = color_logicop_mapping[opcode & 0x0f];
    _mesa_update_allow_draw_out_of_order(ctx);
@@ -960,7 +959,7 @@ _mesa_IndexMask( GLuint mask )
       return;
 
    FLUSH_VERTICES(ctx, 0, GL_COLOR_BUFFER_BIT);
-   ST_SET_STATE(ctx->NewDriverState, ST_NEW_BLEND);
+   ctx->NewDriverState |= ST_NEW_BLEND;
    ctx->Color.IndexMask = mask;
 }
 
@@ -999,7 +998,7 @@ _mesa_ColorMask( GLboolean red, GLboolean green,
       return;
 
    FLUSH_VERTICES(ctx, 0, GL_COLOR_BUFFER_BIT);
-   ST_SET_STATE(ctx->NewDriverState, ST_NEW_BLEND);
+   ctx->NewDriverState |= ST_NEW_BLEND;
    ctx->Color.ColorMask = mask;
    _mesa_update_allow_draw_out_of_order(ctx);
 }
@@ -1032,7 +1031,7 @@ _mesa_ColorMaski(GLuint buf, GLboolean red, GLboolean green,
       return;
 
    FLUSH_VERTICES(ctx, 0, GL_COLOR_BUFFER_BIT);
-   ST_SET_STATE(ctx->NewDriverState, ST_NEW_BLEND);
+   ctx->NewDriverState |= ST_NEW_BLEND;
    ctx->Color.ColorMask &= ~(0xfu << (4 * buf));
    ctx->Color.ColorMask |= mask << (4 * buf);
    _mesa_update_allow_draw_out_of_order(ctx);
@@ -1146,7 +1145,7 @@ _mesa_update_clamp_fragment_color(struct gl_context *ctx,
       return;
 
    ctx->NewState |= _NEW_FRAG_CLAMP; /* for state constants */
-   ST_SET_STATES(ctx->NewDriverState, ctx->DriverFlags.NewFragClamp);
+   ctx->NewDriverState |= ctx->DriverFlags.NewFragClamp;
    ctx->Color._ClampFragmentColor = clamp;
 }
 

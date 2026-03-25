@@ -9,8 +9,7 @@ bool si_nir_kill_outputs(nir_shader *nir, const union si_shader_key *key)
 {
    nir_function_impl *impl = nir_shader_get_entrypoint(nir);
    assert(impl);
-   assert(nir->info.stage <= MESA_SHADER_GEOMETRY ||
-          nir->info.stage == MESA_SHADER_MESH);
+   assert(nir->info.stage <= MESA_SHADER_GEOMETRY);
 
    if (!key->ge.opt.kill_outputs &&
        !key->ge.opt.kill_pointsize &&
@@ -35,10 +34,7 @@ bool si_nir_kill_outputs(nir_shader *nir, const union si_shader_key *key)
             continue;
 
          nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
-         if (intr->intrinsic != nir_intrinsic_store_output &&
-             /* for mesh shader outputs */
-             intr->intrinsic != nir_intrinsic_store_per_vertex_output &&
-             intr->intrinsic != nir_intrinsic_store_per_primitive_output)
+         if (intr->intrinsic != nir_intrinsic_store_output)
             continue;
 
          /* No indirect indexing allowed. */
@@ -63,6 +59,7 @@ bool si_nir_kill_outputs(nir_shader *nir, const union si_shader_key *key)
             /* Clear xfb info if the output is used as a sysval or varying. */
             static const nir_io_xfb zeroed;
             nir_intrinsic_set_io_xfb(intr, zeroed);
+            nir_intrinsic_set_io_xfb2(intr, zeroed);
             progress = true;
          }
 

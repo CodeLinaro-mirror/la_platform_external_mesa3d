@@ -127,6 +127,3 @@ enum VPE_POLL_REGMEM_SUBOP {
     VPE_POLL_REGMEM_SUBOP_REGMEM_WRITE = 0x1,
 };
 
-#ifdef __cplusplus
-}
-#endif

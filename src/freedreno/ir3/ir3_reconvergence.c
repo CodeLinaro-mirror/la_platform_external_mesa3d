@@ -84,16 +84,8 @@ struct block_data {
    unsigned divergence_count;
 };
 
-/**
- * Calculate reconvergence in one of two ways.  In wave_pair_divergence==true,
- * consider points that co-issued waves could reconverge.  In this pass, do
- * not setup physical edges for uGPR allocation, as uGPR resources are per
- * wave.
- *
- * If wave_pair_divergence=false, calculate normal thread divergence instead.
- */
-static void
-calc_reconvergence(struct ir3_shader_variant *so, bool wave_pair_divergence)
+void
+ir3_calc_reconvergence(struct ir3_shader_variant *so)
 {
    void *mem_ctx = ralloc_context(NULL);
 
@@ -133,8 +125,7 @@ calc_reconvergence(struct ir3_shader_variant *so, bool wave_pair_divergence)
       blocks[block->index].first_processed_divergent_pred = UINT_MAX;
       for (unsigned i = 0; i < ARRAY_SIZE(block->successors); i++) {
          if (block->successors[i]) {
-            if (!wave_pair_divergence)
-               ir3_block_link_physical(block, block->successors[i]);
+            ir3_block_link_physical(block, block->successors[i]);
 
             if (block->successors[i]->index > block->index + 1) {
                edges[edge] = (struct logical_edge) {
@@ -163,7 +154,7 @@ calc_reconvergence(struct ir3_shader_variant *so, bool wave_pair_divergence)
 
                uinterval_tree_insert(&backward_edges, &edges[edge++].node);
             }
-         } else if (!wave_pair_divergence) {
+         } else {
             struct ir3_instruction *terminator =
                ir3_block_get_terminator(block);
 
@@ -216,13 +207,8 @@ calc_reconvergence(struct ir3_shader_variant *so, bool wave_pair_divergence)
          continue;
       if (terminator->opc == OPC_PREDT || terminator->opc == OPC_PREDF)
          continue;
-
-      /* We don't have info from nir about shader level divergence vs wave
-       * level divergence.  So when calculating wave level reconvergence
-       * consider all blocks as not having a uniform divergence condition
-       */
       if (block->successors[0] && block->successors[1] &&
-          (block->divergent_condition || wave_pair_divergence)) {
+          block->divergent_condition) {
          struct ir3_block *reconv_points[2];
          unsigned num_reconv_points;
          struct ir3_instruction *prev_instr = NULL;
@@ -328,7 +314,7 @@ calc_reconvergence(struct ir3_shader_variant *so, bool wave_pair_divergence)
             u_worklist_push_tail(&worklist, edge->end_block, index);
          }
 
-         if ((!prev || prev->start_block != edge->start_block) && !wave_pair_divergence) {
+         if (!prev || prev->start_block != edge->start_block) {
             /* We should only process this edge + block combination once, and
              * we use the fact that edges are sorted by start point to avoid
              * adding redundant physical edges in case multiple edges have the
@@ -362,13 +348,8 @@ calc_reconvergence(struct ir3_shader_variant *so, bool wave_pair_divergence)
       }
    }
 
-   /* If we've already calculated the branchstack in the first pass,
-    * we can skip doing it a 2nd time
-    */
-   if (so->branchstack)
-      goto out;
-
    unsigned rc_level = 0;
+   so->branchstack = 0;
    foreach_block (block, &so->ir->block_list) {
       if (block->reconvergence_point)
          rc_level--;
@@ -392,32 +373,10 @@ calc_reconvergence(struct ir3_shader_variant *so, bool wave_pair_divergence)
 
       rc_level += blocks[block->index].divergence_count;
 
-      so->branchstack = MAX2(so->branchstack, rc_level);
+      so->branchstack = MAX2(so->branchstack, rc_level); 
    }
    assert(rc_level == 0);
 
-out:
    ralloc_free(mem_ctx);
 }
 
-void
-ir3_calc_reconvergence(struct ir3_shader_variant *so)
-{
-   so->branchstack = 0;
-
-   if (so->compiler->info->props.has_dual_wave_dispatch &&
-       (ir3_shader_compute(so) ||
-        so->type == MESA_SHADER_FRAGMENT)) {
-      calc_reconvergence(so, true);
-
-      /* The calculated convergence points are wave convergence
-       * points, move the flags over now before the second
-       * pass calculating thread divergence
-       */
-      foreach_block (block, &so->ir->block_list) {
-         block->wave_reconvergence_point = block->reconvergence_point;
-      }
-   }
-
-   calc_reconvergence(so, false);
-}

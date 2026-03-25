@@ -6,7 +6,6 @@ project(
   'rust',
   version : '0.2.168',
   license : 'MIT OR Apache-2.0',
-  meson_version : '>= 1.7.0',
 )
 
 libc_args = [
@@ -35,7 +34,8 @@ lib = static_library(
   'libc',
   'src/lib.rs',
   rust_abi : 'rust',
-  override_options : ['rust_std=2021', 'build.rust_std=2021', 'warning_level=0'],
+  override_options : ['rust_std=2021', 'build.rust_std=2021'],
+  native : true,
   rust_args: libc_args,
 )
 

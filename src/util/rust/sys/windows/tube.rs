@@ -42,9 +42,3 @@ impl Listener {
         Err(MesaError::Unsupported)
     }
 }
-
-impl AsBorrowedDescriptor for Listener {
-    fn as_borrowed_descriptor(&self) -> &OwnedDescriptor {
-        unimplemented!()
-    }
-}

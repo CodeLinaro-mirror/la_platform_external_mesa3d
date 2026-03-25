@@ -851,7 +851,7 @@ _mesa_SetFragmentShaderConstantATI(GLuint dst, const GLfloat * value)
    }
    else {
       FLUSH_VERTICES(ctx, 0, 0);
-      ST_SET_STATE(ctx->NewDriverState, ST_NEW_FS_CONSTANTS);
+      ctx->NewDriverState |= ST_NEW_FS_CONSTANTS;
       COPY_4V(ctx->ATIFragmentShader.GlobalConstants[dstindex], value);
    }
 }

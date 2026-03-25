@@ -113,7 +113,7 @@ repair_ssa_def(nir_def *def, void *void_state)
        * deref information.
        */
       if (!nir_src_is_if(src) &&
-          nir_def_is_deref(def) &&
+          def->parent_instr->type == nir_instr_type_deref &&
           nir_src_parent_instr(src)->type == nir_instr_type_deref &&
           nir_instr_as_deref(nir_src_parent_instr(src))->deref_type != nir_deref_type_cast) {
          nir_deref_instr *cast =
@@ -151,8 +151,7 @@ nir_repair_ssa_impl(nir_function_impl *impl)
    state.phi_builder = NULL;
    state.progress = false;
 
-   nir_metadata_require(impl,
-                        nir_metadata_block_index | nir_metadata_dominance);
+   nir_metadata_require(impl, nir_metadata_control_flow);
 
    nir_foreach_block_unstructured(block, impl) {
       nir_foreach_instr_safe(instr, block) {

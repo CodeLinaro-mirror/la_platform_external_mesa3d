@@ -69,7 +69,7 @@ struct tgsi_transform_context
     */
    void (*epilog)(struct tgsi_transform_context *ctx);
 
-   mesa_shader_stage processor;
+   enum pipe_shader_type processor;
 
 /*** PRIVATE ***/
 

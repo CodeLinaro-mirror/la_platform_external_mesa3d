@@ -145,8 +145,7 @@ struct sw_winsys
                                    enum pipe_format format,
                                    unsigned width, unsigned height,
                                    unsigned stride,
-                                   void *data,
-                                   struct winsys_handle *whandle );
+                                   void *data );
 };
 
 

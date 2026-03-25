@@ -94,24 +94,14 @@ public:
       /* We can have memory_write_only set on both images and buffer variables,
        * but in the former there is a distinction between reads from
        * the variable itself (write_only) and from the memory they point to
-       * (memory_write_only), while in the case of buffer and pixel local
-       * storage variables there is no such distinction, that is why this check
-       * here is limited to buffer and pixel local storage variables.
+       * (memory_write_only), while in the case of buffer variables there is
+       * no such distinction, that is why this check here is limited to
+       * buffer variables alone.
        */
-      if (!var)
+      if (!var || var->data.mode != ir_var_shader_storage)
          return visit_continue;
 
-      if (var->data.mode == ir_var_shader_storage &&
-          var->data.memory_write_only)
-      {
-         found = var;
-         return visit_stop;
-      }
-
-      /* Variables declared with the__pixel_local_outEXT qualifier are
-       * write-only.
-       */
-      if (var->data.pixel_local_storage == GLSL_PIXEL_LOCAL_STORAGE_OUT) {
+      if (var->data.memory_write_only) {
          found = var;
          return visit_stop;
       }
@@ -149,9 +139,7 @@ _mesa_ast_to_hir(ir_exec_list *instructions, struct _mesa_glsl_parse_state *stat
 
    state->gs_input_prim_type_specified = false;
    state->tcs_output_vertices_specified = false;
-   state->cs_ms_input_local_size_specified = false;
-   state->ms_output_max_vertices_specified = false;
-   state->ms_output_max_primitives_specified = false;
+   state->cs_input_local_size_specified = false;
 
    /* Section 4.2 of the GLSL 1.20 specification states:
     * "The built-in functions are scoped in a scope outside the global scope
@@ -331,6 +319,7 @@ static bool
 apply_implicit_conversion(const glsl_type *to, ir_rvalue * &from,
                           struct _mesa_glsl_parse_state *state)
 {
+   void *ctx = state;
    if (to->base_type == from->type->base_type)
       return true;
 
@@ -356,7 +345,7 @@ apply_implicit_conversion(const glsl_type *to, ir_rvalue * &from,
 
    ir_expression_operation op = get_implicit_conversion_operation(to, from->type, state);
    if (op) {
-      from = new(state->linalloc) ir_expression(op, to, from, NULL);
+      from = new(ctx) ir_expression(op, to, from, NULL);
       return true;
    } else {
       return false;
@@ -913,8 +902,7 @@ validate_assignment(struct _mesa_glsl_parse_state *state,
    }
    if (unsized_array) {
       if (is_initializer) {
-         if (glsl_without_array_or_matrix(rhs->type) ==
-               glsl_without_array_or_matrix(lhs->type))
+         if (glsl_get_scalar_type(rhs->type) == glsl_get_scalar_type(lhs->type))
             return rhs;
       } else {
          _mesa_glsl_error(&loc, state,
@@ -956,6 +944,7 @@ do_assignment(ir_exec_list *instructions, struct _mesa_glsl_parse_state *state,
               bool is_initializer,
               YYLTYPE lhs_loc)
 {
+   void *ctx = state;
    bool error_emitted = (glsl_type_is_error(lhs->type) || glsl_type_is_error(rhs->type));
 
    ir_variable *lhs_var = lhs->variable_referenced();
@@ -1004,28 +993,6 @@ do_assignment(ir_exec_list *instructions, struct _mesa_glsl_parse_state *state,
       } else if (!lhs->is_lvalue(state)) {
          _mesa_glsl_error(& lhs_loc, state, "non-lvalue in assignment");
          error_emitted = true;
-      } else if (lhs_var != NULL) {
-         switch(lhs_var->data.mode) {
-         case ir_var_shader_pixel_local_storage:
-            state->fs_writes_pixel_local_storage = true;
-            break;
-         case ir_var_shader_out:
-            state->fs_writes_output = true;
-            break;
-         }
-
-         /* From the GL_EXT_shader_pixel_local_storage spec:
-          *
-          *    "It is a compile-time error for a shader to statically write to
-          *     both regular user-defined fragment outputs and to pixel local
-          *     storage variables."
-          */
-         if (state->fs_writes_pixel_local_storage && state->fs_writes_output) {
-            _mesa_glsl_error(&lhs_loc, state,
-                             "shader writes to both output and pixel local "
-                             "storage");
-            error_emitted = true;
-         }
       }
    }
 
@@ -1068,7 +1035,7 @@ do_assignment(ir_exec_list *instructions, struct _mesa_glsl_parse_state *state,
    }
 
    if (omit_assignment) {
-      *out_rvalue = needs_rvalue ? ir_rvalue::error_value(state->linalloc) : NULL;
+      *out_rvalue = needs_rvalue ? ir_rvalue::error_value(ctx) : NULL;
       return error_emitted;
    }
 
@@ -1081,22 +1048,22 @@ do_assignment(ir_exec_list *instructions, struct _mesa_glsl_parse_state *state,
    if (needs_rvalue) {
       ir_rvalue *rvalue;
       if (!error_emitted) {
-         ir_variable *var = new(state->linalloc) ir_variable(rhs->type, "assignment_tmp",
+         ir_variable *var = new(ctx) ir_variable(rhs->type, "assignment_tmp",
                                                  ir_var_temporary);
          instructions->push_tail(var);
          instructions->push_tail(assign(var, rhs));
 
          ir_dereference_variable *deref_var =
-            new(state->linalloc) ir_dereference_variable(var);
-         instructions->push_tail(new(state->linalloc) ir_assignment(lhs, deref_var));
-         rvalue = new(state->linalloc) ir_dereference_variable(var);
+            new(ctx) ir_dereference_variable(var);
+         instructions->push_tail(new(ctx) ir_assignment(lhs, deref_var));
+         rvalue = new(ctx) ir_dereference_variable(var);
       } else {
-         rvalue = ir_rvalue::error_value(state->linalloc);
+         rvalue = ir_rvalue::error_value(ctx);
       }
       *out_rvalue = rvalue;
    } else {
       if (!error_emitted)
-         instructions->push_tail(new(state->linalloc) ir_assignment(lhs, rhs));
+         instructions->push_tail(new(ctx) ir_assignment(lhs, rhs));
       *out_rvalue = NULL;
    }
 
@@ -1106,17 +1073,17 @@ do_assignment(ir_exec_list *instructions, struct _mesa_glsl_parse_state *state,
 static ir_rvalue *
 get_lvalue_copy(ir_exec_list *instructions, ir_rvalue *lvalue)
 {
-   linear_ctx *linalloc = lvalue->node_linalloc;
+   void *ctx = ralloc_parent(lvalue);
    ir_variable *var;
 
-   var = new(linalloc) ir_variable(lvalue->type, "_post_incdec_tmp",
+   var = new(ctx) ir_variable(lvalue->type, "_post_incdec_tmp",
                               ir_var_temporary);
    instructions->push_tail(var);
 
-   instructions->push_tail(new(linalloc) ir_assignment(new(linalloc) ir_dereference_variable(var),
+   instructions->push_tail(new(ctx) ir_assignment(new(ctx) ir_dereference_variable(var),
                                                   lvalue));
 
-   return new(linalloc) ir_dereference_variable(var);
+   return new(ctx) ir_dereference_variable(var);
 }
 
 
@@ -1155,7 +1122,7 @@ ast_aggregate_initializer::hir_no_rvalue(ir_exec_list *instructions,
 }
 
 static ir_rvalue *
-do_comparison(linear_ctx *linalloc, int operation, ir_rvalue *op0, ir_rvalue *op1)
+do_comparison(void *mem_ctx, int operation, ir_rvalue *op0, ir_rvalue *op1)
 {
    int join_op;
    ir_rvalue *cmp = NULL;
@@ -1181,20 +1148,20 @@ do_comparison(linear_ctx *linalloc, int operation, ir_rvalue *op0, ir_rvalue *op
    case GLSL_TYPE_INT16:
    case GLSL_TYPE_UINT8:
    case GLSL_TYPE_INT8:
-      return new(linalloc) ir_expression(operation, op0, op1);
+      return new(mem_ctx) ir_expression(operation, op0, op1);
 
    case GLSL_TYPE_ARRAY: {
       for (unsigned int i = 0; i < op0->type->length; i++) {
          ir_rvalue *e0, *e1, *result;
 
-         e0 = new(linalloc) ir_dereference_array(op0->clone(linalloc, NULL),
-                                                new(linalloc) ir_constant(i));
-         e1 = new(linalloc) ir_dereference_array(op1->clone(linalloc, NULL),
-                                                new(linalloc) ir_constant(i));
-         result = do_comparison(linalloc, operation, e0, e1);
+         e0 = new(mem_ctx) ir_dereference_array(op0->clone(mem_ctx, NULL),
+                                                new(mem_ctx) ir_constant(i));
+         e1 = new(mem_ctx) ir_dereference_array(op1->clone(mem_ctx, NULL),
+                                                new(mem_ctx) ir_constant(i));
+         result = do_comparison(mem_ctx, operation, e0, e1);
 
          if (cmp) {
-            cmp = new(linalloc) ir_expression(join_op, cmp, result);
+            cmp = new(mem_ctx) ir_expression(join_op, cmp, result);
          } else {
             cmp = result;
          }
@@ -1210,14 +1177,14 @@ do_comparison(linear_ctx *linalloc, int operation, ir_rvalue *op0, ir_rvalue *op
          ir_rvalue *e0, *e1, *result;
          const char *field_name = op0->type->fields.structure[i].name;
 
-         e0 = new(linalloc) ir_dereference_record(op0->clone(linalloc, NULL),
+         e0 = new(mem_ctx) ir_dereference_record(op0->clone(mem_ctx, NULL),
                                                  field_name);
-         e1 = new(linalloc) ir_dereference_record(op1->clone(linalloc, NULL),
+         e1 = new(mem_ctx) ir_dereference_record(op1->clone(mem_ctx, NULL),
                                                  field_name);
-         result = do_comparison(linalloc, operation, e0, e1);
+         result = do_comparison(mem_ctx, operation, e0, e1);
 
          if (cmp) {
-            cmp = new(linalloc) ir_expression(join_op, cmp, result);
+            cmp = new(mem_ctx) ir_expression(join_op, cmp, result);
          } else {
             cmp = result;
          }
@@ -1243,7 +1210,7 @@ do_comparison(linear_ctx *linalloc, int operation, ir_rvalue *op0, ir_rvalue *op
    }
 
    if (cmp == NULL)
-      cmp = new(linalloc) ir_constant(true);
+      cmp = new(mem_ctx) ir_constant(true);
 
    return cmp;
 }
@@ -1261,7 +1228,7 @@ get_scalar_boolean_operand(ir_exec_list *instructions,
                            bool *error_emitted)
 {
    ast_expression *expr = parent_expr->subexpressions[operand];
-   linear_ctx *linalloc = state->linalloc;
+   void *ctx = state;
    ir_rvalue *val = expr->hir(instructions, state);
 
    if (glsl_type_is_boolean(val->type) && glsl_type_is_scalar(val->type))
@@ -1275,7 +1242,7 @@ get_scalar_boolean_operand(ir_exec_list *instructions,
       *error_emitted = true;
    }
 
-   return new(linalloc) ir_constant(true);
+   return new(ctx) ir_constant(true);
 }
 
 /**
@@ -1355,20 +1322,20 @@ check_builtin_array_max_size(const char *name, unsigned size,
  * a floating point 1--the error will be detected later.
  */
 static ir_rvalue *
-constant_one_for_inc_dec(linear_ctx *linalloc, const glsl_type *type)
+constant_one_for_inc_dec(void *ctx, const glsl_type *type)
 {
    switch (type->base_type) {
    case GLSL_TYPE_UINT:
-      return new(linalloc) ir_constant((unsigned) 1);
+      return new(ctx) ir_constant((unsigned) 1);
    case GLSL_TYPE_INT:
-      return new(linalloc) ir_constant(1);
+      return new(ctx) ir_constant(1);
    case GLSL_TYPE_UINT64:
-      return new(linalloc) ir_constant((uint64_t) 1);
+      return new(ctx) ir_constant((uint64_t) 1);
    case GLSL_TYPE_INT64:
-      return new(linalloc) ir_constant((int64_t) 1);
+      return new(ctx) ir_constant((int64_t) 1);
    default:
    case GLSL_TYPE_FLOAT:
-      return new(linalloc) ir_constant(1.0f);
+      return new(ctx) ir_constant(1.0f);
    }
 }
 
@@ -1409,7 +1376,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
                        struct _mesa_glsl_parse_state *state,
                        bool needs_rvalue)
 {
-   linear_ctx *linalloc = state->linalloc;
+   void *ctx = state;
    static const int operations[AST_NUM_OPERATORS] = {
       -1,               /* ast_assign doesn't convert to ir_expression. */
       -1,               /* ast_plus doesn't convert to ir_expression. */
@@ -1508,7 +1475,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
 
       error_emitted = glsl_type_is_error(type);
 
-      result = new(linalloc) ir_expression(operations[this->oper], type,
+      result = new(ctx) ir_expression(operations[this->oper], type,
                                       op[0], NULL);
       break;
 
@@ -1524,7 +1491,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
                                     state, & loc);
       error_emitted = glsl_type_is_error(type);
 
-      result = new(linalloc) ir_expression(operations[this->oper], type,
+      result = new(ctx) ir_expression(operations[this->oper], type,
                                       op[0], op[1]);
       break;
 
@@ -1536,7 +1503,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
 
       assert(operations[this->oper] == ir_binop_mod);
 
-      result = new(linalloc) ir_expression(operations[this->oper], type,
+      result = new(ctx) ir_expression(operations[this->oper], type,
                                       op[0], op[1]);
       error_emitted = glsl_type_is_error(type);
       break;
@@ -1551,7 +1518,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
        op[1] = this->subexpressions[1]->hir(instructions, state);
        type = shift_result_type(op[0]->type, op[1]->type, this->oper, state,
                                 &loc);
-       result = new(linalloc) ir_expression(operations[this->oper], type,
+       result = new(ctx) ir_expression(operations[this->oper], type,
                                        op[0], op[1]);
        error_emitted = glsl_type_is_error(op[0]->type) || glsl_type_is_error(op[1]->type);
        break;
@@ -1580,7 +1547,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
          op[1] = tmp;
       }
 
-      result = new(linalloc) ir_expression(operations[this->oper], type,
+      result = new(ctx) ir_expression(operations[this->oper], type,
                                       op[0], op[1]);
       error_emitted = glsl_type_is_error(type);
       break;
@@ -1627,9 +1594,9 @@ ast_expression::do_hir(ir_exec_list *instructions,
       }
 
       if (error_emitted) {
-         result = new(linalloc) ir_constant(false);
+         result = new(ctx) ir_constant(false);
       } else {
-         result = do_comparison(state->linalloc, operations[this->oper], op[0], op[1]);
+         result = do_comparison(ctx, operations[this->oper], op[0], op[1]);
          assert(result->type == &glsl_type_builtin_bool);
       }
       break;
@@ -1640,7 +1607,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
       op[0] = this->subexpressions[0]->hir(instructions, state);
       op[1] = this->subexpressions[1]->hir(instructions, state);
       type = bit_logic_result_type(op[0], op[1], this->oper, state, &loc);
-      result = new(linalloc) ir_expression(operations[this->oper], type,
+      result = new(ctx) ir_expression(operations[this->oper], type,
                                       op[0], op[1]);
       error_emitted = glsl_type_is_error(op[0]->type) || glsl_type_is_error(op[1]->type);
       break;
@@ -1658,7 +1625,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
       }
 
       type = error_emitted ? &glsl_type_builtin_error : op[0]->type;
-      result = new(linalloc) ir_expression(ir_unop_bit_not, type, op[0], NULL);
+      result = new(ctx) ir_expression(ir_unop_bit_not, type, op[0], NULL);
       break;
 
    case ast_logic_and: {
@@ -1669,28 +1636,28 @@ ast_expression::do_hir(ir_exec_list *instructions,
                                          "RHS", &error_emitted);
 
       if (rhs_instructions.is_empty()) {
-         result = new(linalloc) ir_expression(ir_binop_logic_and, op[0], op[1]);
+         result = new(ctx) ir_expression(ir_binop_logic_and, op[0], op[1]);
       } else {
-         ir_variable *const tmp = new(linalloc) ir_variable(&glsl_type_builtin_bool,
+         ir_variable *const tmp = new(ctx) ir_variable(&glsl_type_builtin_bool,
                                                        "and_tmp",
                                                        ir_var_temporary);
          instructions->push_tail(tmp);
 
-         ir_if *const stmt = new(linalloc) ir_if(op[0]);
+         ir_if *const stmt = new(ctx) ir_if(op[0]);
          instructions->push_tail(stmt);
 
          stmt->then_instructions.append_list(&rhs_instructions);
-         ir_dereference *const then_deref = new(linalloc) ir_dereference_variable(tmp);
+         ir_dereference *const then_deref = new(ctx) ir_dereference_variable(tmp);
          ir_assignment *const then_assign =
-            new(linalloc) ir_assignment(then_deref, op[1]);
+            new(ctx) ir_assignment(then_deref, op[1]);
          stmt->then_instructions.push_tail(then_assign);
 
-         ir_dereference *const else_deref = new(linalloc) ir_dereference_variable(tmp);
+         ir_dereference *const else_deref = new(ctx) ir_dereference_variable(tmp);
          ir_assignment *const else_assign =
-            new(linalloc) ir_assignment(else_deref, new(linalloc) ir_constant(false));
+            new(ctx) ir_assignment(else_deref, new(ctx) ir_constant(false));
          stmt->else_instructions.push_tail(else_assign);
 
-         result = new(linalloc) ir_dereference_variable(tmp);
+         result = new(ctx) ir_dereference_variable(tmp);
       }
       break;
    }
@@ -1703,28 +1670,28 @@ ast_expression::do_hir(ir_exec_list *instructions,
                                          "RHS", &error_emitted);
 
       if (rhs_instructions.is_empty()) {
-         result = new(linalloc) ir_expression(ir_binop_logic_or, op[0], op[1]);
+         result = new(ctx) ir_expression(ir_binop_logic_or, op[0], op[1]);
       } else {
-         ir_variable *const tmp = new(linalloc) ir_variable(&glsl_type_builtin_bool,
+         ir_variable *const tmp = new(ctx) ir_variable(&glsl_type_builtin_bool,
                                                        "or_tmp",
                                                        ir_var_temporary);
          instructions->push_tail(tmp);
 
-         ir_if *const stmt = new(linalloc) ir_if(op[0]);
+         ir_if *const stmt = new(ctx) ir_if(op[0]);
          instructions->push_tail(stmt);
 
-         ir_dereference *const then_deref = new(linalloc) ir_dereference_variable(tmp);
+         ir_dereference *const then_deref = new(ctx) ir_dereference_variable(tmp);
          ir_assignment *const then_assign =
-            new(linalloc) ir_assignment(then_deref, new(linalloc) ir_constant(true));
+            new(ctx) ir_assignment(then_deref, new(ctx) ir_constant(true));
          stmt->then_instructions.push_tail(then_assign);
 
          stmt->else_instructions.append_list(&rhs_instructions);
-         ir_dereference *const else_deref = new(linalloc) ir_dereference_variable(tmp);
+         ir_dereference *const else_deref = new(ctx) ir_dereference_variable(tmp);
          ir_assignment *const else_assign =
-            new(linalloc) ir_assignment(else_deref, op[1]);
+            new(ctx) ir_assignment(else_deref, op[1]);
          stmt->else_instructions.push_tail(else_assign);
 
-         result = new(linalloc) ir_dereference_variable(tmp);
+         result = new(ctx) ir_dereference_variable(tmp);
       }
       break;
    }
@@ -1741,7 +1708,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
       op[1] = get_scalar_boolean_operand(instructions, state, this, 1, "RHS",
                                          &error_emitted);
 
-      result = new(linalloc) ir_expression(operations[this->oper], &glsl_type_builtin_bool,
+      result = new(ctx) ir_expression(operations[this->oper], &glsl_type_builtin_bool,
                                       op[0], op[1]);
       break;
 
@@ -1749,7 +1716,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
       op[0] = get_scalar_boolean_operand(instructions, state, this, 0,
                                          "operand", &error_emitted);
 
-      result = new(linalloc) ir_expression(operations[this->oper], &glsl_type_builtin_bool,
+      result = new(ctx) ir_expression(operations[this->oper], &glsl_type_builtin_bool,
                                       op[0], NULL);
       break;
 
@@ -1767,7 +1734,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
       if ((op[0]->type == &glsl_type_builtin_error ||
            op[1]->type == &glsl_type_builtin_error)) {
          error_emitted = true;
-         result = ir_rvalue::error_value(linalloc);
+         result = ir_rvalue::error_value(ctx);
          break;
       }
 
@@ -1782,13 +1749,13 @@ ast_expression::do_hir(ir_exec_list *instructions,
          type = &glsl_type_builtin_error;
       }
 
-      ir_rvalue *temp_rhs = new(linalloc) ir_expression(operations[this->oper], type,
+      ir_rvalue *temp_rhs = new(ctx) ir_expression(operations[this->oper], type,
                                                    op[0], op[1]);
 
       error_emitted =
          do_assignment(instructions, state,
                        this->subexpressions[0]->non_lvalue_description,
-                       op[0]->clone(linalloc, NULL), temp_rhs,
+                       op[0]->clone(ctx, NULL), temp_rhs,
                        &result, needs_rvalue, false,
                        this->subexpressions[0]->get_location());
 
@@ -1809,7 +1776,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
       if ((op[0]->type == &glsl_type_builtin_error ||
            op[1]->type == &glsl_type_builtin_error)) {
          error_emitted = true;
-         result = ir_rvalue::error_value(linalloc);
+         result = ir_rvalue::error_value(ctx);
          break;
       }
 
@@ -1826,13 +1793,13 @@ ast_expression::do_hir(ir_exec_list *instructions,
       assert(operations[this->oper] == ir_binop_mod);
 
       ir_rvalue *temp_rhs;
-      temp_rhs = new(linalloc) ir_expression(operations[this->oper], type,
+      temp_rhs = new(ctx) ir_expression(operations[this->oper], type,
                                         op[0], op[1]);
 
       error_emitted =
          do_assignment(instructions, state,
                        this->subexpressions[0]->non_lvalue_description,
-                       op[0]->clone(linalloc, NULL), temp_rhs,
+                       op[0]->clone(ctx, NULL), temp_rhs,
                        &result, needs_rvalue, false,
                        this->subexpressions[0]->get_location());
       break;
@@ -1848,18 +1815,18 @@ ast_expression::do_hir(ir_exec_list *instructions,
       if ((op[0]->type == &glsl_type_builtin_error ||
            op[1]->type == &glsl_type_builtin_error)) {
          error_emitted = true;
-         result = ir_rvalue::error_value(linalloc);
+         result = ir_rvalue::error_value(ctx);
          break;
       }
 
       type = shift_result_type(op[0]->type, op[1]->type, this->oper, state,
                                &loc);
-      ir_rvalue *temp_rhs = new(linalloc) ir_expression(operations[this->oper],
+      ir_rvalue *temp_rhs = new(ctx) ir_expression(operations[this->oper],
                                                    type, op[0], op[1]);
       error_emitted =
          do_assignment(instructions, state,
                        this->subexpressions[0]->non_lvalue_description,
-                       op[0]->clone(linalloc, NULL), temp_rhs,
+                       op[0]->clone(ctx, NULL), temp_rhs,
                        &result, needs_rvalue, false,
                        this->subexpressions[0]->get_location());
       break;
@@ -1876,7 +1843,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
       if ((op[0]->type == &glsl_type_builtin_error ||
            op[1]->type == &glsl_type_builtin_error)) {
          error_emitted = true;
-         result = ir_rvalue::error_value(linalloc);
+         result = ir_rvalue::error_value(ctx);
          break;
       }
 
@@ -1890,12 +1857,12 @@ ast_expression::do_hir(ir_exec_list *instructions,
          type = &glsl_type_builtin_error;
       }
 
-      ir_rvalue *temp_rhs = new(linalloc) ir_expression(operations[this->oper],
+      ir_rvalue *temp_rhs = new(ctx) ir_expression(operations[this->oper],
                                                    type, op[0], op[1]);
       error_emitted =
          do_assignment(instructions, state,
                        this->subexpressions[0]->non_lvalue_description,
-                       op[0]->clone(linalloc, NULL), temp_rhs,
+                       op[0]->clone(ctx, NULL), temp_rhs,
                        &result, needs_rvalue, false,
                        this->subexpressions[0]->get_location());
       break;
@@ -1970,7 +1937,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
          }
       }
 
-      ir_constant *cond_val = op[0]->constant_expression_value(linalloc);
+      ir_constant *cond_val = op[0]->constant_expression_value(ctx);
 
       if (then_instructions.is_empty()
           && else_instructions.is_empty()
@@ -1984,27 +1951,27 @@ ast_expression::do_hir(ir_exec_list *instructions,
          }
 
          ir_variable *const tmp =
-            new(linalloc) ir_variable(type, "conditional_tmp", ir_var_temporary);
+            new(ctx) ir_variable(type, "conditional_tmp", ir_var_temporary);
          instructions->push_tail(tmp);
 
-         ir_if *const stmt = new(linalloc) ir_if(op[0]);
+         ir_if *const stmt = new(ctx) ir_if(op[0]);
          instructions->push_tail(stmt);
 
          then_instructions.move_nodes_to(& stmt->then_instructions);
          ir_dereference *const then_deref =
-            new(linalloc) ir_dereference_variable(tmp);
+            new(ctx) ir_dereference_variable(tmp);
          ir_assignment *const then_assign =
-            new(linalloc) ir_assignment(then_deref, op[1]);
+            new(ctx) ir_assignment(then_deref, op[1]);
          stmt->then_instructions.push_tail(then_assign);
 
          else_instructions.move_nodes_to(& stmt->else_instructions);
          ir_dereference *const else_deref =
-            new(linalloc) ir_dereference_variable(tmp);
+            new(ctx) ir_dereference_variable(tmp);
          ir_assignment *const else_assign =
-            new(linalloc) ir_assignment(else_deref, op[2]);
+            new(ctx) ir_assignment(else_deref, op[2]);
          stmt->else_instructions.push_tail(else_assign);
 
-         result = new(linalloc) ir_dereference_variable(tmp);
+         result = new(ctx) ir_dereference_variable(tmp);
       }
       break;
    }
@@ -2015,18 +1982,18 @@ ast_expression::do_hir(ir_exec_list *instructions,
          ? "pre-increment operation" : "pre-decrement operation";
 
       op[0] = this->subexpressions[0]->hir(instructions, state);
-      op[1] = constant_one_for_inc_dec(linalloc, op[0]->type);
+      op[1] = constant_one_for_inc_dec(ctx, op[0]->type);
 
       type = arithmetic_result_type(op[0], op[1], false, state, & loc);
 
       ir_rvalue *temp_rhs;
-      temp_rhs = new(linalloc) ir_expression(operations[this->oper], type,
+      temp_rhs = new(ctx) ir_expression(operations[this->oper], type,
                                         op[0], op[1]);
 
       error_emitted =
          do_assignment(instructions, state,
                        this->subexpressions[0]->non_lvalue_description,
-                       op[0]->clone(linalloc, NULL), temp_rhs,
+                       op[0]->clone(ctx, NULL), temp_rhs,
                        &result, needs_rvalue, false,
                        this->subexpressions[0]->get_location());
       break;
@@ -2037,31 +2004,31 @@ ast_expression::do_hir(ir_exec_list *instructions,
       this->non_lvalue_description = (this->oper == ast_post_inc)
          ? "post-increment operation" : "post-decrement operation";
       op[0] = this->subexpressions[0]->hir(instructions, state);
-      op[1] = constant_one_for_inc_dec(linalloc, op[0]->type);
+      op[1] = constant_one_for_inc_dec(ctx, op[0]->type);
 
       error_emitted = glsl_type_is_error(op[0]->type) || glsl_type_is_error(op[1]->type);
 
       if (error_emitted) {
-         result = ir_rvalue::error_value(linalloc);
+         result = ir_rvalue::error_value(ctx);
          break;
       }
 
       type = arithmetic_result_type(op[0], op[1], false, state, & loc);
 
       ir_rvalue *temp_rhs;
-      temp_rhs = new(linalloc) ir_expression(operations[this->oper], type,
+      temp_rhs = new(ctx) ir_expression(operations[this->oper], type,
                                         op[0], op[1]);
 
       /* Get a temporary of a copy of the lvalue before it's modified.
        * This may get thrown away later.
        */
-      result = get_lvalue_copy(instructions, op[0]->clone(linalloc, NULL));
+      result = get_lvalue_copy(instructions, op[0]->clone(ctx, NULL));
 
       ir_rvalue *junk_rvalue;
       error_emitted =
          do_assignment(instructions, state,
                        this->subexpressions[0]->non_lvalue_description,
-                       op[0]->clone(linalloc, NULL), temp_rhs,
+                       op[0]->clone(ctx, NULL), temp_rhs,
                        &junk_rvalue, false, false,
                        this->subexpressions[0]->get_location());
 
@@ -2083,7 +2050,7 @@ ast_expression::do_hir(ir_exec_list *instructions,
       op[0] = subexpressions[0]->hir(instructions, state);
       op[1] = subexpressions[1]->hir(instructions, state);
 
-      result = _mesa_ast_array_index_to_hir(state, op[0], op[1],
+      result = _mesa_ast_array_index_to_hir(ctx, state, op[0], op[1],
                                             loc, index_loc);
 
       if (glsl_type_is_error(result->type))
@@ -2112,14 +2079,14 @@ ast_expression::do_hir(ir_exec_list *instructions,
       if (var == NULL) {
          /* the identifier might be a subroutine name */
          char *sub_name;
-         sub_name = ralloc_asprintf(state, "%s_%s", _mesa_shader_stage_to_subroutine_prefix(state->stage), this->primary_expression.identifier);
+         sub_name = ralloc_asprintf(ctx, "%s_%s", _mesa_shader_stage_to_subroutine_prefix(state->stage), this->primary_expression.identifier);
          var = state->symbols->get_variable(sub_name);
          ralloc_free(sub_name);
       }
 
       if (var != NULL) {
          var->data.used = true;
-         result = new(linalloc) ir_dereference_variable(var);
+         result = new(ctx) ir_dereference_variable(var);
 
          if ((var->data.mode == ir_var_auto || var->data.mode == ir_var_shader_out)
              && !this->is_lhs
@@ -2159,42 +2126,42 @@ ast_expression::do_hir(ir_exec_list *instructions,
          _mesa_glsl_error(& loc, state, "`%s' undeclared",
                           this->primary_expression.identifier);
 
-         result = ir_rvalue::error_value(linalloc);
+         result = ir_rvalue::error_value(ctx);
          error_emitted = true;
       }
       break;
    }
 
    case ast_int_constant:
-      result = new(linalloc) ir_constant(this->primary_expression.int_constant);
+      result = new(ctx) ir_constant(this->primary_expression.int_constant);
       break;
 
    case ast_uint_constant:
-      result = new(linalloc) ir_constant(this->primary_expression.uint_constant);
+      result = new(ctx) ir_constant(this->primary_expression.uint_constant);
       break;
 
    case ast_float16_constant:
-      result = new(linalloc) ir_constant(float16_t(this->primary_expression.float16_constant));
+      result = new(ctx) ir_constant(float16_t(this->primary_expression.float16_constant));
       break;
 
    case ast_float_constant:
-      result = new(linalloc) ir_constant(this->primary_expression.float_constant);
+      result = new(ctx) ir_constant(this->primary_expression.float_constant);
       break;
 
    case ast_bool_constant:
-      result = new(linalloc) ir_constant(bool(this->primary_expression.bool_constant));
+      result = new(ctx) ir_constant(bool(this->primary_expression.bool_constant));
       break;
 
    case ast_double_constant:
-      result = new(linalloc) ir_constant(this->primary_expression.double_constant);
+      result = new(ctx) ir_constant(this->primary_expression.double_constant);
       break;
 
    case ast_uint64_constant:
-      result = new(linalloc) ir_constant(this->primary_expression.uint64_constant);
+      result = new(ctx) ir_constant(this->primary_expression.uint64_constant);
       break;
 
    case ast_int64_constant:
-      result = new(linalloc) ir_constant(this->primary_expression.int64_constant);
+      result = new(ctx) ir_constant(this->primary_expression.int64_constant);
       break;
 
    case ast_sequence: {
@@ -2389,6 +2356,8 @@ static unsigned
 process_array_size(ir_exec_node *node,
                    struct _mesa_glsl_parse_state *state)
 {
+   void *mem_ctx = state;
+
    ir_exec_list dummy_instructions;
 
    ast_node *array_size = ir_exec_node_data(ast_node, node, link);
@@ -2421,7 +2390,7 @@ process_array_size(ir_exec_node *node,
       return 0;
    }
 
-   ir_constant *const size = ir->constant_expression_value(state->linalloc);
+   ir_constant *const size = ir->constant_expression_value(mem_ctx);
    if (size == NULL ||
        (state->is_version(120, 300) &&
         array_size->has_sequence_subexpression())) {
@@ -2822,7 +2791,7 @@ ast_fully_specified_type::glsl_type(const char **name,
  * this function will produce undefined results.
  */
 static bool
-is_varying_var(ir_variable *var, mesa_shader_stage target)
+is_varying_var(ir_variable *var, gl_shader_stage target)
 {
    switch (target) {
    case MESA_SHADER_VERTEX:
@@ -3337,17 +3306,8 @@ validate_interpolation_qualifier(struct _mesa_glsl_parse_state *state,
                        "deprecated storage qualifier '%s'", i, s);
    }
 
-   if (qual->flags.q.per_primitive) {
-      if (interpolation != INTERP_MODE_NONE) {
-         _mesa_glsl_error(loc, state,
-                          "interpolation qualifier '%s' cannot be applied to "
-                          "per-primitive auxiliary storage qualifier",
-                          interpolation_string(interpolation));
-      }
-   } else {
-      validate_fragment_flat_interpolation_input(state, loc, interpolation,
-                                                 var_type, mode);
-   }
+   validate_fragment_flat_interpolation_input(state, loc, interpolation,
+                                              var_type, mode);
 }
 
 static glsl_interp_mode
@@ -3444,7 +3404,6 @@ apply_explicit_location(const struct ast_type_qualifier *qual,
    case MESA_SHADER_TESS_CTRL:
    case MESA_SHADER_TESS_EVAL:
    case MESA_SHADER_GEOMETRY:
-   case MESA_SHADER_MESH:
       if (var->data.mode == ir_var_shader_in || var->data.mode == ir_var_shader_out) {
          if (!state->check_separate_shader_objects_allowed(loc, var))
             return;
@@ -3473,11 +3432,10 @@ apply_explicit_location(const struct ast_type_qualifier *qual,
       fail = true;
       break;
 
-   case MESA_SHADER_TASK:
    case MESA_SHADER_COMPUTE:
       _mesa_glsl_error(loc, state,
-                       "%s shader variables cannot be given explicit locations",
-                       _mesa_shader_stage_to_string(state->stage));
+                       "compute shader variables cannot be given "
+                       "explicit locations");
       return;
    default:
       fail = true;
@@ -3502,7 +3460,6 @@ apply_explicit_location(const struct ast_type_qualifier *qual,
       case MESA_SHADER_TESS_CTRL:
       case MESA_SHADER_TESS_EVAL:
       case MESA_SHADER_GEOMETRY:
-      case MESA_SHADER_MESH:
          if (var->data.patch)
             var->data.location = qual_location + VARYING_SLOT_PATCH0;
          else
@@ -3634,10 +3591,7 @@ validate_image_format_qualifier_for_type(struct _mesa_glsl_parse_state *state,
     * "Format layout qualifiers can be used on image variable declarations
     *  (those declared with a basic type  having “image ” in its keyword)."
     */
-   if (!glsl_type_is_image(type) &&
-       (qual->flags.q.explicit_image_format &&
-        !qual->flags.q.pixel_local_storage))
-   {
+   if (!glsl_type_is_image(type) && qual->flags.q.explicit_image_format) {
       _mesa_glsl_error(loc, state, "format layout qualifiers may only be "
                        "applied to images");
       return false;
@@ -4272,8 +4226,6 @@ apply_type_qualifier_to_variable(const struct ast_type_qualifier *qual,
       var->data.mode = ir_var_shader_storage;
    else if (qual->flags.q.shared_storage)
       var->data.mode = ir_var_shader_shared;
-   else if (qual->flags.q.task_payload)
-      var->data.mode = ir_var_shader_task_payload;
 
    if (!is_parameter && state->stage == MESA_SHADER_FRAGMENT) {
       if (state->has_framebuffer_fetch()) {
@@ -4450,40 +4402,10 @@ apply_type_qualifier_to_variable(const struct ast_type_qualifier *qual,
                        "`out' or `varying' variables between shader stages");
    }
 
-   if (qual->flags.q.shared_storage && state->stage != MESA_SHADER_COMPUTE &&
-       state->stage != MESA_SHADER_TASK && state->stage != MESA_SHADER_MESH) {
+   if (qual->flags.q.shared_storage && state->stage != MESA_SHADER_COMPUTE) {
       _mesa_glsl_error(loc, state,
                        "the shared storage qualifiers can only be used with "
-                       "compute, task, or mesh shaders");
-   }
-
-   if (qual->flags.q.task_payload && state->stage != MESA_SHADER_TASK &&
-       state->stage != MESA_SHADER_MESH) {
-      _mesa_glsl_error(loc, state,
-                       "the taskPayloadSharedEXT storage qualifier can only be used "
-                       "with task and mesh shaders");
-   }
-
-   if (qual->flags.q.per_primitive) {
-      if (state->stage == MESA_SHADER_MESH) {
-         if (var->data.mode != ir_var_shader_out) {
-            _mesa_glsl_error(loc, state,
-                             "the perprimitiveEXT auxiliary storage qualifier can only be "
-                             "used on `out` variables with mesh shader");
-         }
-      } else if (state->stage == MESA_SHADER_FRAGMENT) {
-         if (var->data.mode != ir_var_shader_in) {
-            _mesa_glsl_error(loc, state,
-                             "the perprimitiveEXT auxiliary storage qualifier can only be "
-                             "used on `in` variables with fragment shader");
-         }
-      } else {
-         _mesa_glsl_error(loc, state,
-                          "the perprimitiveEXT auxiliary storage qualifier can only be "
-                          "used with mesh and fragment shaders");
-      }
-
-      var->data.per_primitive = 1;
+                       "compute shaders");
    }
 
    apply_image_qualifier_to_variable(qual, var, state, loc);
@@ -4567,6 +4489,7 @@ get_variable_being_redeclared(ir_variable **var_ptr, YYLTYPE loc,
       }
 
       earlier->type = var->type;
+      delete var;
       var = NULL;
       *var_ptr = NULL;
    } else if (earlier->type != var->type) {
@@ -4697,6 +4620,7 @@ process_initializer(ir_variable *var, ast_declaration *decl,
                     ir_exec_list *initializer_instructions,
                     struct _mesa_glsl_parse_state *state)
 {
+   void *mem_ctx = state;
    ir_rvalue *result = NULL;
 
    YYLTYPE initializer_loc = decl->initializer->get_location();
@@ -4769,7 +4693,7 @@ process_initializer(ir_variable *var, ast_declaration *decl,
    if (decl->initializer->oper == ast_aggregate)
       _mesa_ast_set_aggregate_type(var->type, decl->initializer);
 
-   ir_dereference *const lhs = new(state->linalloc) ir_dereference_variable(var);
+   ir_dereference *const lhs = new(state) ir_dereference_variable(var);
    ir_rvalue *rhs = decl->initializer->hir(initializer_instructions, state);
 
    /* Calculate the constant value if this is a const or uniform
@@ -4832,7 +4756,7 @@ process_initializer(ir_variable *var, ast_declaration *decl,
           * versions.
           */
          ir_constant *constant_value =
-            rhs->constant_expression_value(state->linalloc);
+            rhs->constant_expression_value(mem_ctx);
 
          if (!constant_value ||
              (state->is_version(430, 300) &&
@@ -4857,7 +4781,7 @@ process_initializer(ir_variable *var, ast_declaration *decl,
                if (glsl_type_is_numeric(var->type)) {
                   /* Reduce cascading errors. */
                   var->constant_value = type->qualifier.flags.q.constant
-                     ? ir_constant::zero(state->linalloc, var->type) : NULL;
+                     ? ir_constant::zero(state, var->type) : NULL;
                }
             }
          } else {
@@ -4869,7 +4793,7 @@ process_initializer(ir_variable *var, ast_declaration *decl,
          if (glsl_type_is_numeric(var->type)) {
             /* Reduce cascading errors. */
             rhs = var->constant_value = type->qualifier.flags.q.constant
-               ? ir_constant::zero(state->linalloc, var->type) : NULL;
+               ? ir_constant::zero(state, var->type) : NULL;
          }
       }
    }
@@ -4894,7 +4818,7 @@ process_initializer(ir_variable *var, ast_declaration *decl,
          initializer_type = rhs->type;
 
       if (!error_emitted) {
-         var->constant_initializer = rhs->constant_expression_value(state->linalloc);
+         var->constant_initializer = rhs->constant_expression_value(mem_ctx);
          var->data.has_initializer = true;
          var->data.is_implicit_initializer = false;
 
@@ -5021,44 +4945,6 @@ handle_tess_ctrl_shader_output_decl(struct _mesa_glsl_parse_state *state,
                                           "tessellation control shader output");
 }
 
-static void
-handle_mesh_shader_output_decl(struct _mesa_glsl_parse_state *state,
-                               YYLTYPE loc, ir_variable *var)
-{
-   unsigned max_vertices = 0;
-   if (state->ms_output_max_vertices_specified) {
-      if (!state->out_qualifier->max_vertices->
-          process_qualifier_constant(state, "max_vertices", &max_vertices, false)) {
-         return;
-      }
-   }
-
-   unsigned max_primitives = 0;
-   if (state->ms_output_max_primitives_specified) {
-      if (!state->out_qualifier->max_primitives->
-          process_qualifier_constant(state, "max_primitives", &max_primitives, false)) {
-         return;
-      }
-   }
-
-   if (!glsl_type_is_array(var->type)) {
-      _mesa_glsl_error(&loc, state, "mesh shader outputs must be arrays");
-
-      /* To avoid cascading failures, short circuit the checks below. */
-      return;
-   }
-
-   if (var->data.per_primitive) {
-      validate_layout_qualifier_vertex_count(state, loc, var, max_primitives,
-                                             &state->ms_per_primitive_output_size,
-                                             "mesh shader per primitive output");
-   } else {
-      validate_layout_qualifier_vertex_count(state, loc, var, max_vertices,
-                                             &state->ms_per_vertex_output_size,
-                                             "mesh shader per vertex output");
-   }
-}
-
 /**
  * Do additional processing necessary for tessellation control/evaluation shader
  * input declarations. This covers both interface block arrays and bare input
@@ -5168,7 +5054,7 @@ ir_rvalue *
 ast_declarator_list::hir(ir_exec_list *instructions,
                          struct _mesa_glsl_parse_state *state)
 {
-   linear_ctx *linalloc = state->linalloc;
+   void *ctx = state;
    const struct glsl_type *decl_type;
    const char *type_name = NULL;
    ir_rvalue *result = NULL;
@@ -5358,17 +5244,6 @@ ast_declarator_list::hir(ir_exec_list *instructions,
                        "interface blocks");
    }
 
-   /* Similarly, the EXT_shader_pixel_local_storage spec says:
-    *    "Pixel local storage variables may only be declared inside
-    *     interface blocks..."
-    */
-   if (type->qualifier.flags.q.pixel_local_storage &&
-       !glsl_type_is_interface(decl_type)) {
-      _mesa_glsl_error(&loc, state,
-                       "pixel local storage variables cannot be declared "
-                       "outside interface blocks");
-   }
-
    /* An offset-qualified atomic counter declaration sets the default
     * offset for the next declaration within the same atomic counter
     * buffer.
@@ -5514,7 +5389,7 @@ ast_declarator_list::hir(ir_exec_list *instructions,
             _mesa_glsl_error(& loc, state,
                              "invalid type in declaration of `%s'",
                              decl->identifier);
-         name = ralloc_asprintf(state, "%s_%s", _mesa_shader_stage_to_subroutine_prefix(state->stage), decl->identifier);
+         name = ralloc_asprintf(ctx, "%s_%s", _mesa_shader_stage_to_subroutine_prefix(state->stage), decl->identifier);
 
          identifier = name;
 
@@ -5522,7 +5397,7 @@ ast_declarator_list::hir(ir_exec_list *instructions,
       var_type = process_array_type(&loc, decl_type, decl->array_specifier,
                                     state);
 
-      var = new(linalloc) ir_variable(var_type, identifier, ir_var_auto);
+      var = new(ctx) ir_variable(var_type, identifier, ir_var_auto);
 
       /* The 'varying in' and 'varying out' qualifiers can only be used with
        * ARB_geometry_shader4 and EXT_geometry_shader4, which we don't support
@@ -5589,7 +5464,7 @@ ast_declarator_list::hir(ir_exec_list *instructions,
          const ir_constant_data data = { { 0 } };
          var->data.has_initializer = true;
          var->data.is_implicit_initializer = true;
-         var->constant_initializer = new(state->linalloc) ir_constant(var->type, &data);
+         var->constant_initializer = new(var) ir_constant(var->type, &data);
       }
 
       if (this->type->qualifier.flags.q.invariant) {
@@ -5875,8 +5750,6 @@ ast_declarator_list::hir(ir_exec_list *instructions,
 
          if (state->stage == MESA_SHADER_TESS_CTRL) {
             handle_tess_ctrl_shader_output_decl(state, loc, var);
-         } else if (state->stage == MESA_SHADER_MESH) {
-            handle_mesh_shader_output_decl(state, loc, var);
          }
       } else if (glsl_contains_subroutine(var->type)) {
          /* declare subroutine uniforms as hidden */
@@ -6110,7 +5983,7 @@ ir_rvalue *
 ast_parameter_declarator::hir(ir_exec_list *instructions,
                               struct _mesa_glsl_parse_state *state)
 {
-   linear_ctx *linalloc = state->linalloc;
+   void *ctx = state;
    const struct glsl_type *type;
    const char *name = NULL;
    YYLTYPE loc = this->get_location();
@@ -6169,7 +6042,7 @@ ast_parameter_declarator::hir(ir_exec_list *instructions,
    }
 
    is_void = false;
-   ir_variable *var = new(linalloc)
+   ir_variable *var = new(ctx)
       ir_variable(type, this->identifier, ir_var_function_in);
 
    /* Apply any specified qualifiers to the parameter declaration.  Note that
@@ -6183,7 +6056,7 @@ ast_parameter_declarator::hir(ir_exec_list *instructions,
          const ir_constant_data data = { { 0 } };
          var->data.has_initializer = true;
          var->data.is_implicit_initializer = true;
-         var->constant_initializer = new(state->linalloc) ir_constant(var->type, &data);
+         var->constant_initializer = new(var) ir_constant(var->type, &data);
    }
 
    /* From section 4.1.7 of the GLSL 4.40 spec:
@@ -6286,7 +6159,7 @@ ir_rvalue *
 ast_function::hir(ir_exec_list *instructions,
                   struct _mesa_glsl_parse_state *state)
 {
-   linear_ctx *linalloc = state->linalloc;
+   void *ctx = state;
    ir_function *f = NULL;
    ir_function_signature *sig = NULL;
    ir_exec_list hir_parameters;
@@ -6428,7 +6301,7 @@ ast_function::hir(ir_exec_list *instructions,
    /* Create an ir_function if one doesn't already exist. */
    f = state->symbols->get_function(name);
    if (f == NULL) {
-      f = new(linalloc) ir_function(name);
+      f = new(ctx) ir_function(name);
       if (!this->return_type->qualifier.is_subroutine_decl()) {
          if (!state->symbols->add_function(f)) {
             /* This function name shadows a non-function use of the same name. */
@@ -6544,7 +6417,7 @@ ast_function::hir(ir_exec_list *instructions,
    /* Finish storing the information about this new function in its signature.
     */
    if (sig == NULL) {
-      sig = new(linalloc) ir_function_signature(return_type);
+      sig = new(ctx) ir_function_signature(return_type);
       sig->return_precision = return_precision;
       f->add_signature(sig);
    }
@@ -6700,7 +6573,7 @@ ir_rvalue *
 ast_jump_statement::hir(ir_exec_list *instructions,
                         struct _mesa_glsl_parse_state *state)
 {
-   linear_ctx *linalloc = state->linalloc;
+   void *ctx = state;
 
    switch (mode) {
    case ast_return: {
@@ -6762,7 +6635,7 @@ ast_jump_statement::hir(ir_exec_list *instructions,
                              "return argument");
          }
 
-         inst = new(linalloc) ir_return(ret);
+         inst = new(ctx) ir_return(ret);
       } else {
          if (state->current_function->return_type->base_type !=
              GLSL_TYPE_VOID) {
@@ -6773,7 +6646,7 @@ ast_jump_statement::hir(ir_exec_list *instructions,
                              "non-void",
             state->current_function->function_name());
          }
-         inst = new(linalloc) ir_return;
+         inst = new(ctx) ir_return;
       }
 
       state->found_return = true;
@@ -6788,7 +6661,7 @@ ast_jump_statement::hir(ir_exec_list *instructions,
          _mesa_glsl_error(& loc, state,
                           "`discard' may only appear in a fragment shader");
       }
-      instructions->push_tail(new(linalloc) ir_discard);
+      instructions->push_tail(new(ctx) ir_discard);
       break;
 
    case ast_break:
@@ -6806,30 +6679,47 @@ ast_jump_statement::hir(ir_exec_list *instructions,
          _mesa_glsl_error(& loc, state,
                           "break may only appear in a loop or a switch");
       } else {
+         /* For a loop, inline the for loop expression again, since we don't
+          * know where near the end of the loop body the normal copy of it is
+          * going to be placed.  Same goes for the condition for a do-while
+          * loop.
+          */
+         if (state->loop_nesting_ast != NULL &&
+             mode == ast_continue && !state->switch_state.is_switch_innermost) {
+            if (state->loop_nesting_ast->rest_expression) {
+               clone_ir_list(ctx, instructions,
+                             &state->loop_nesting_ast->rest_instructions);
+            }
+            if (state->loop_nesting_ast->mode ==
+                ast_iteration_statement::ast_do_while) {
+               state->loop_nesting_ast->condition_to_hir(instructions, state);
+            }
+         }
+
          if (state->switch_state.is_switch_innermost &&
              mode == ast_continue) {
             /* Set 'continue_inside' to true. */
-            ir_rvalue *const true_val = new (linalloc) ir_constant(true);
+            ir_rvalue *const true_val = new (ctx) ir_constant(true);
             ir_dereference_variable *deref_continue_inside_var =
-               new(linalloc) ir_dereference_variable(state->switch_state.continue_inside);
-            instructions->push_tail(new(linalloc) ir_assignment(deref_continue_inside_var,
+               new(ctx) ir_dereference_variable(state->switch_state.continue_inside);
+            instructions->push_tail(new(ctx) ir_assignment(deref_continue_inside_var,
                                                            true_val));
 
             /* Break out from the switch, continue for the loop will
              * be called right after switch. */
             ir_loop_jump *const jump =
-               new(linalloc) ir_loop_jump(ir_loop_jump::jump_break);
+               new(ctx) ir_loop_jump(ir_loop_jump::jump_break);
             instructions->push_tail(jump);
 
          } else if (state->switch_state.is_switch_innermost &&
              mode == ast_break) {
             /* Force break out of switch by inserting a break. */
             ir_loop_jump *const jump =
-               new(linalloc) ir_loop_jump(ir_loop_jump::jump_break);
+               new(ctx) ir_loop_jump(ir_loop_jump::jump_break);
             instructions->push_tail(jump);
          } else {
             ir_loop_jump *const jump =
-               new(linalloc) ir_loop_jump((mode == ast_break)
+               new(ctx) ir_loop_jump((mode == ast_break)
                   ? ir_loop_jump::jump_break
                   : ir_loop_jump::jump_continue);
             instructions->push_tail(jump);
@@ -6849,7 +6739,7 @@ ir_rvalue *
 ast_demote_statement::hir(ir_exec_list *instructions,
                           struct _mesa_glsl_parse_state *state)
 {
-   linear_ctx *linalloc = state->linalloc;
+   void *ctx = state;
 
    if (state->stage != MESA_SHADER_FRAGMENT) {
       YYLTYPE loc = this->get_location();
@@ -6858,7 +6748,7 @@ ast_demote_statement::hir(ir_exec_list *instructions,
                        "`demote' may only appear in a fragment shader");
    }
 
-   instructions->push_tail(new(linalloc) ir_demote);
+   instructions->push_tail(new(ctx) ir_demote);
 
    return NULL;
 }
@@ -6868,7 +6758,7 @@ ir_rvalue *
 ast_selection_statement::hir(ir_exec_list *instructions,
                              struct _mesa_glsl_parse_state *state)
 {
-   linear_ctx *linalloc = state->linalloc;
+   void *ctx = state;
 
    ir_rvalue *const condition = this->condition->hir(instructions, state);
 
@@ -6888,7 +6778,7 @@ ast_selection_statement::hir(ir_exec_list *instructions,
                        "boolean");
    }
 
-   ir_if *const stmt = new(linalloc) ir_if(condition);
+   ir_if *const stmt = new(ctx) ir_if(condition);
 
    if (then_statement != NULL) {
       state->symbols->push_scope();
@@ -6956,7 +6846,7 @@ ir_rvalue *
 ast_switch_statement::hir(ir_exec_list *instructions,
                           struct _mesa_glsl_parse_state *state)
 {
-   linear_ctx *linalloc = state->linalloc;
+   void *ctx = state;
 
    this->eval_test_expression(instructions, state);
 
@@ -6989,40 +6879,40 @@ ast_switch_statement::hir(ir_exec_list *instructions,
 
    /* Initalize is_fallthru state to false.
     */
-   ir_rvalue *const is_fallthru_val = new (linalloc) ir_constant(false);
+   ir_rvalue *const is_fallthru_val = new (ctx) ir_constant(false);
    state->switch_state.is_fallthru_var =
-      new(linalloc) ir_variable(&glsl_type_builtin_bool,
+      new(ctx) ir_variable(&glsl_type_builtin_bool,
                            "switch_is_fallthru_tmp",
                            ir_var_temporary);
    instructions->push_tail(state->switch_state.is_fallthru_var);
 
    ir_dereference_variable *deref_is_fallthru_var =
-      new(linalloc) ir_dereference_variable(state->switch_state.is_fallthru_var);
-   instructions->push_tail(new(linalloc) ir_assignment(deref_is_fallthru_var,
+      new(ctx) ir_dereference_variable(state->switch_state.is_fallthru_var);
+   instructions->push_tail(new(ctx) ir_assignment(deref_is_fallthru_var,
                                                   is_fallthru_val));
 
    /* Initialize continue_inside state to false.
     */
    state->switch_state.continue_inside =
-      new(linalloc) ir_variable(&glsl_type_builtin_bool,
+      new(ctx) ir_variable(&glsl_type_builtin_bool,
                            "continue_inside_tmp",
                            ir_var_temporary);
    instructions->push_tail(state->switch_state.continue_inside);
 
-   ir_rvalue *const false_val = new (linalloc) ir_constant(false);
+   ir_rvalue *const false_val = new (ctx) ir_constant(false);
    ir_dereference_variable *deref_continue_inside_var =
-      new(linalloc) ir_dereference_variable(state->switch_state.continue_inside);
-   instructions->push_tail(new(linalloc) ir_assignment(deref_continue_inside_var,
+      new(ctx) ir_dereference_variable(state->switch_state.continue_inside);
+   instructions->push_tail(new(ctx) ir_assignment(deref_continue_inside_var,
                                                   false_val));
 
    state->switch_state.run_default =
-      new(linalloc) ir_variable(&glsl_type_builtin_bool,
+      new(ctx) ir_variable(&glsl_type_builtin_bool,
                              "run_default_tmp",
                              ir_var_temporary);
    instructions->push_tail(state->switch_state.run_default);
 
    /* Loop around the switch is used for flow control. */
-   ir_loop * loop = new(linalloc) ir_loop();
+   ir_loop * loop = new(ctx) ir_loop();
    instructions->push_tail(loop);
 
    /* Cache test expression.
@@ -7034,16 +6924,26 @@ ast_switch_statement::hir(ir_exec_list *instructions,
    body->hir(&loop->body_instructions, state);
 
    /* Insert a break at the end to exit loop. */
-   ir_loop_jump *jump = new(linalloc) ir_loop_jump(ir_loop_jump::jump_break);
+   ir_loop_jump *jump = new(ctx) ir_loop_jump(ir_loop_jump::jump_break);
    loop->body_instructions.push_tail(jump);
 
    /* If we are inside loop, check if continue got called inside switch. */
    if (state->loop_nesting_ast != NULL) {
       ir_dereference_variable *deref_continue_inside =
-         new(linalloc) ir_dereference_variable(state->switch_state.continue_inside);
-      ir_if *irif = new(linalloc) ir_if(deref_continue_inside);
-      ir_loop_jump *jump = new(linalloc) ir_loop_jump(ir_loop_jump::jump_continue);
+         new(ctx) ir_dereference_variable(state->switch_state.continue_inside);
+      ir_if *irif = new(ctx) ir_if(deref_continue_inside);
+      ir_loop_jump *jump = new(ctx) ir_loop_jump(ir_loop_jump::jump_continue);
 
+      if (state->loop_nesting_ast != NULL) {
+         if (state->loop_nesting_ast->rest_expression) {
+            clone_ir_list(ctx, &irif->then_instructions,
+                          &state->loop_nesting_ast->rest_instructions);
+         }
+         if (state->loop_nesting_ast->mode ==
+             ast_iteration_statement::ast_do_while) {
+            state->loop_nesting_ast->condition_to_hir(&irif->then_instructions, state);
+         }
+      }
       irif->then_instructions.push_tail(jump);
       instructions->push_tail(irif);
    }
@@ -7061,7 +6961,7 @@ void
 ast_switch_statement::test_to_hir(ir_exec_list *instructions,
                                   struct _mesa_glsl_parse_state *state)
 {
-   linear_ctx *linalloc = state->linalloc;
+   void *ctx = state;
 
    /* set to true to avoid a duplicate "use of uninitialized variable" warning
     * on the switch test case. The first one would be already raised when
@@ -7071,14 +6971,14 @@ ast_switch_statement::test_to_hir(ir_exec_list *instructions,
    /* Cache value of test expression. */
    this->eval_test_expression(instructions, state);
 
-   state->switch_state.test_var = new(linalloc) ir_variable(test_val->type,
+   state->switch_state.test_var = new(ctx) ir_variable(test_val->type,
                                                        "switch_test_tmp",
                                                        ir_var_temporary);
    ir_dereference_variable *deref_test_var =
-      new(linalloc) ir_dereference_variable(state->switch_state.test_var);
+      new(ctx) ir_dereference_variable(state->switch_state.test_var);
 
    instructions->push_tail(state->switch_state.test_var);
-   instructions->push_tail(new(linalloc) ir_assignment(deref_test_var, test_val));
+   instructions->push_tail(new(ctx) ir_assignment(deref_test_var, test_val));
 }
 
 
@@ -7123,7 +7023,7 @@ ast_case_statement_list::hir(ir_exec_list *instructions,
     * if default should be chosen or not.
     */
    if (!default_case.is_empty()) {
-      ir_factory body(instructions, state->linalloc);
+      ir_factory body(instructions, state);
 
       ir_expression *cmp = NULL;
 
@@ -7168,8 +7068,8 @@ ast_case_statement::hir(ir_exec_list *instructions,
 
    /* Guard case statements depending on fallthru state. */
    ir_dereference_variable *const deref_fallthru_guard =
-      new(state->linalloc) ir_dereference_variable(state->switch_state.is_fallthru_var);
-   ir_if *const test_fallthru = new(state->linalloc) ir_if(deref_fallthru_guard);
+      new(state) ir_dereference_variable(state->switch_state.is_fallthru_var);
+   ir_if *const test_fallthru = new(state) ir_if(deref_fallthru_guard);
 
    ir_foreach_list_typed (ast_node, stmt, link, & this->stmts)
       stmt->hir(& test_fallthru->then_instructions, state);
@@ -7196,7 +7096,7 @@ ir_rvalue *
 ast_case_label::hir(ir_exec_list *instructions,
                     struct _mesa_glsl_parse_state *state)
 {
-   ir_factory body(instructions, state->linalloc);
+   ir_factory body(instructions, state);
 
    ir_variable *const fallthru_var = state->switch_state.is_fallthru_var;
 
@@ -7207,7 +7107,7 @@ ast_case_label::hir(ir_exec_list *instructions,
        */
       ir_rvalue *const label_rval = this->test_value->hir(instructions, state);
       ir_constant *label_const =
-         label_rval->constant_expression_value(state->linalloc);
+         label_rval->constant_expression_value(body.mem_ctx);
 
       if (!label_const) {
          YYLTYPE loc = this->test_value->get_location();
@@ -7254,7 +7154,7 @@ ast_case_label::hir(ir_exec_list *instructions,
       ir_rvalue *label = label_const;
 
       ir_rvalue *deref_test_var =
-         new(state->linalloc) ir_dereference_variable(state->switch_state.test_var);
+         new(body.mem_ctx) ir_dereference_variable(state->switch_state.test_var);
 
       /*
        * From GLSL 4.40 specification section 6.2 ("Selection"):
@@ -7333,7 +7233,7 @@ void
 ast_iteration_statement::condition_to_hir(ir_exec_list *instructions,
                                           struct _mesa_glsl_parse_state *state)
 {
-   linear_ctx *linalloc = state->linalloc;
+   void *ctx = state;
 
    if (condition != NULL) {
       ir_rvalue *const cond =
@@ -7350,12 +7250,12 @@ ast_iteration_statement::condition_to_hir(ir_exec_list *instructions,
           * like 'if (!condition) break;' as the loop termination condition.
           */
          ir_rvalue *const not_cond =
-            new(linalloc) ir_expression(ir_unop_logic_not, cond);
+            new(ctx) ir_expression(ir_unop_logic_not, cond);
 
-         ir_if *const if_stmt = new(linalloc) ir_if(not_cond);
+         ir_if *const if_stmt = new(ctx) ir_if(not_cond);
 
          ir_jump *const break_stmt =
-            new(linalloc) ir_loop_jump(ir_loop_jump::jump_break);
+            new(ctx) ir_loop_jump(ir_loop_jump::jump_break);
 
          if_stmt->then_instructions.push_tail(break_stmt);
          instructions->push_tail(if_stmt);
@@ -7368,7 +7268,7 @@ ir_rvalue *
 ast_iteration_statement::hir(ir_exec_list *instructions,
                              struct _mesa_glsl_parse_state *state)
 {
-   linear_ctx *linalloc = state->linalloc;
+   void *ctx = state;
 
    /* For-loops and while-loops start a new scope, but do-while loops do not.
     */
@@ -7378,7 +7278,7 @@ ast_iteration_statement::hir(ir_exec_list *instructions,
    if (init_statement != NULL)
       init_statement->hir(instructions, state);
 
-   ir_loop *const stmt = new(linalloc) ir_loop();
+   ir_loop *const stmt = new(ctx) ir_loop();
    instructions->push_tail(stmt);
 
    /* Track the current loop nesting. */
@@ -7392,24 +7292,27 @@ ast_iteration_statement::hir(ir_exec_list *instructions,
    bool saved_is_switch_innermost = state->switch_state.is_switch_innermost;
    state->switch_state.is_switch_innermost = false;
 
-   if (rest_expression != NULL)
-      rest_expression->hir(&stmt->continue_instructions, state);
-
    if (mode != ast_do_while)
       condition_to_hir(&stmt->body_instructions, state);
+
+   if (rest_expression != NULL)
+      rest_expression->hir(&rest_instructions, state);
 
    if (body != NULL) {
       if (mode == ast_do_while)
          state->symbols->push_scope();
 
-      body->hir(&stmt->body_instructions, state);
+      body->hir(& stmt->body_instructions, state);
 
       if (mode == ast_do_while)
          state->symbols->pop_scope();
    }
 
+   if (rest_expression != NULL)
+      stmt->body_instructions.append_list(&rest_instructions);
+
    if (mode == ast_do_while)
-      condition_to_hir(&stmt->continue_instructions, state);
+      condition_to_hir(&stmt->body_instructions, state);
 
    if (mode != ast_do_while)
       state->symbols->pop_scope();
@@ -7637,7 +7540,6 @@ ast_process_struct_or_iface_block_members(ir_exec_list *instructions,
        * embedded structures in 1.10 only.
        */
       if (state->language_version != 110 &&
-          !state->allow_glsl_embedded_structure_declarations &&
           decl_list->type->specifier->structure != NULL)
          _mesa_glsl_error(&loc, state,
                           "embedded structure declarations are not allowed");
@@ -7673,25 +7575,6 @@ ast_process_struct_or_iface_block_members(ir_exec_list *instructions,
             _mesa_glsl_error(&loc, state, "uniform/buffer in non-default "
                              "interface block contains %s variable",
                              state->has_bindless() ? "atomic" : "opaque");
-         }
-
-         /* From section 4.3 ("Storage Qualifiers") of the GLSL 4.60.7 spec:
-          *
-          *     "It is a compile-time error to declare a tessellation control,
-          *      tessellation evaluation or geometry shader input with, or that
-          *      contains, any of the following types:
-          *         - boolean type
-          *         - An opaque type
-          *     "
-          *
-          * (Same condition applies to vertex and fragment stages, opaque types
-          *  are handled by check above. Also, same restriction is stated for
-          *  output interfaces in outputs section.)
-          */
-         if ((qual->flags.q.in || qual->flags.q.out) &&
-             glsl_type_is_boolean(decl_type)) {
-            _mesa_glsl_error(&loc, state,
-                             "boolean type used as input or output.");
          }
       } else {
          if (glsl_contains_atomic(decl_type)) {
@@ -7846,18 +7729,12 @@ ast_process_struct_or_iface_block_members(ir_exec_list *instructions,
          fields[i].centroid = qual->flags.q.centroid ? 1 : 0;
          fields[i].sample = qual->flags.q.sample ? 1 : 0;
          fields[i].patch = qual->flags.q.patch ? 1 : 0;
-         fields[i].per_primitive = qual->flags.q.per_primitive ? 1 : 0;
          fields[i].offset = -1;
          fields[i].explicit_xfb_buffer = explicit_xfb_buffer;
          fields[i].xfb_buffer = xfb_buffer;
          fields[i].xfb_stride = xfb_stride;
-         fields[i].pixel_local_storage = qual->flags.q.pixel_local_storage;
 
-         /* for pixel local storage, all locations are effectively "explicit" */
-         if (var_mode == ir_var_shader_pixel_local_storage) {
-            fields[i].location = FRAG_RESULT_DATA0 + expl_location;
-            expl_location += glsl_count_attribute_slots(fields[i].type, false);
-         } else if (qual->flags.q.explicit_location) {
+         if (qual->flags.q.explicit_location) {
             unsigned qual_location;
             if (process_qualifier_constant(state, &loc, "location",
                                            qual->location, &qual_location)) {
@@ -8016,7 +7893,6 @@ ast_process_struct_or_iface_block_members(ir_exec_list *instructions,
           * the format qualifier is only accepted for images.
           */
          if (var_mode == ir_var_shader_storage ||
-             var_mode == ir_var_shader_pixel_local_storage ||
              glsl_type_is_image(glsl_without_array(field_type))) {
             /* For readonly and writeonly qualifiers the field definition,
              * if set, overwrites the layout qualifier.
@@ -8041,22 +7917,6 @@ ast_process_struct_or_iface_block_members(ir_exec_list *instructions,
             fields[i].memory_restrict = qual->flags.q.restrict_flag ||
                                         (layout && layout->flags.q.restrict_flag);
 
-            if (qual->flags.q.pixel_local_storage) {
-               pipe_format this_image_format = layout->image_format;
-               glsl_base_type this_image_type = layout->image_base_type;
-               if (qual->flags.q.explicit_image_format) {
-                  this_image_format = qual->image_format;
-                  this_image_type = qual->image_base_type;
-               }
-               if (this_image_type != field_type->base_type ||
-                   util_format_get_nr_components(this_image_format) !=
-                   field_type->vector_elements) {
-                  _mesa_glsl_error(&loc, state, "format qualifier doesn't "
-                                   "match the base data type of the image");
-               }
-
-               fields[i].image_format = this_image_format;
-            }
             if (glsl_type_is_image(glsl_without_array(field_type))) {
                if (qual->flags.q.explicit_image_format) {
                   if (qual->image_base_type !=
@@ -8278,11 +8138,6 @@ ast_interface_block::hir(ir_exec_list *instructions,
       } else {
          allowed_blk_qualifiers.flags.q.uniform = 1;
       }
-   } else if (this->layout.flags.q.pixel_local_storage) {
-      allowed_blk_qualifiers.flags.q.pixel_local_storage = 3;
-      allowed_blk_qualifiers.flags.q.read_only = 1;
-      allowed_blk_qualifiers.flags.q.write_only = 1;
-      allowed_blk_qualifiers.flags.q.explicit_image_format = 1;
    } else {
       /* Interface block */
       assert(this->layout.flags.q.in || this->layout.flags.q.out);
@@ -8303,17 +8158,14 @@ ast_interface_block::hir(ir_exec_list *instructions,
          if (state->stage == MESA_SHADER_GEOMETRY) {
             allowed_blk_qualifiers.flags.q.stream = 1;
             allowed_blk_qualifiers.flags.q.explicit_stream = 1;
-         } else if (state->stage == MESA_SHADER_TESS_CTRL) {
+         }
+         if (state->stage == MESA_SHADER_TESS_CTRL) {
             allowed_blk_qualifiers.flags.q.patch = 1;
-         } else if (state->stage == MESA_SHADER_MESH) {
-            allowed_blk_qualifiers.flags.q.per_primitive = 1;
          }
       } else {
          allowed_blk_qualifiers.flags.q.in = 1;
          if (state->stage == MESA_SHADER_TESS_EVAL) {
             allowed_blk_qualifiers.flags.q.patch = 1;
-         } else if (state->stage == MESA_SHADER_FRAGMENT) {
-            allowed_blk_qualifiers.flags.q.per_primitive = 1;
          }
       }
    }
@@ -8349,9 +8201,6 @@ ast_interface_block::hir(ir_exec_list *instructions,
    } else if (this->layout.flags.q.buffer) {
       var_mode = ir_var_shader_storage;
       iface_type_name = "buffer";
-   } else if (this->layout.flags.q.pixel_local_storage) {
-      var_mode = ir_var_shader_pixel_local_storage;
-      iface_type_name = "pixel local storage";
    } else {
       var_mode = ir_var_auto;
       iface_type_name = "UNKNOWN";
@@ -8365,15 +8214,6 @@ ast_interface_block::hir(ir_exec_list *instructions,
       matrix_layout = GLSL_MATRIX_LAYOUT_COLUMN_MAJOR;
 
    bool redeclaring_per_vertex = strcmp(this->block_name, "gl_PerVertex") == 0;
-   bool redeclaring_mesh_per_vertex =
-      strcmp(this->block_name, "gl_MeshPerVertexEXT") == 0;
-   bool redeclaring_mesh_per_primitive =
-      strcmp(this->block_name, "gl_MeshPerPrimitiveEXT") == 0;
-   bool redeclaring =
-      redeclaring_per_vertex ||
-      redeclaring_mesh_per_vertex ||
-      redeclaring_mesh_per_primitive;
-
    ir_exec_list declared_variables;
    glsl_struct_field *fields;
 
@@ -8453,7 +8293,7 @@ ast_interface_block::hir(ir_exec_list *instructions,
                                                 &fields,
                                                 true,
                                                 matrix_layout,
-                                                redeclaring,
+                                                redeclaring_per_vertex,
                                                 var_mode,
                                                 &this->layout,
                                                 qual_stream,
@@ -8462,7 +8302,7 @@ ast_interface_block::hir(ir_exec_list *instructions,
                                                 expl_location,
                                                 expl_align);
 
-   if (!redeclaring) {
+   if (!redeclaring_per_vertex) {
       validate_identifier(this->block_name, loc, state);
 
       /* From section 4.3.9 ("Interface Blocks") of the GLSL 4.50 spec:
@@ -8479,7 +8319,7 @@ ast_interface_block::hir(ir_exec_list *instructions,
       }
    }
 
-   const glsl_type *earlier_redeclaring = NULL;
+   const glsl_type *earlier_per_vertex = NULL;
    if (redeclaring_per_vertex) {
       /* Find the previous declaration of gl_PerVertex.  If we're redeclaring
        * the named interface block gl_in, we can find it by looking at the
@@ -8494,7 +8334,7 @@ ast_interface_block::hir(ir_exec_list *instructions,
       case ir_var_shader_in:
          if (ir_variable *earlier_gl_in =
              state->symbols->get_variable("gl_in")) {
-            earlier_redeclaring = earlier_gl_in->get_interface_type();
+            earlier_per_vertex = earlier_gl_in->get_interface_type();
          } else {
             _mesa_glsl_error(&loc, state,
                              "redeclaration of gl_PerVertex input not allowed "
@@ -8512,10 +8352,10 @@ ast_interface_block::hir(ir_exec_list *instructions,
       case ir_var_shader_out:
          if (ir_variable *earlier_gl_Position =
              state->symbols->get_variable("gl_Position")) {
-            earlier_redeclaring = earlier_gl_Position->get_interface_type();
+            earlier_per_vertex = earlier_gl_Position->get_interface_type();
          } else if (ir_variable *earlier_gl_out =
                state->symbols->get_variable("gl_out")) {
-            earlier_redeclaring = earlier_gl_out->get_interface_type();
+            earlier_per_vertex = earlier_gl_out->get_interface_type();
          } else {
             _mesa_glsl_error(&loc, state,
                              "redeclaration of gl_PerVertex output not "
@@ -8543,78 +8383,42 @@ ast_interface_block::hir(ir_exec_list *instructions,
                           "output");
          break;
       }
-   } else if (redeclaring_mesh_per_vertex || redeclaring_mesh_per_primitive) {
-      const char *instance_name = redeclaring_mesh_per_vertex ?
-         "gl_MeshVerticesEXT" : "gl_MeshPrimitivesEXT";
-      ir_variable *earlier_var = state->symbols->get_variable(instance_name);
-      if (earlier_var) {
-         earlier_redeclaring = earlier_var->get_interface_type();
-      } else {
-         _mesa_glsl_error(&loc, state,
-                          "redeclaration of %s output not allowed "
-                          "in the %s shader", this->block_name,
-                          _mesa_shader_stage_to_string(state->stage));
-      }
 
-      if (var_mode == ir_var_shader_out) {
-         if (this->instance_name == NULL ||
-             strcmp(this->instance_name, instance_name) != 0 ||
-             this->array_specifier == NULL) {
-            _mesa_glsl_error(&loc, state,
-                             "%s output must be redeclared as %s[]",
-                             this->block_name, instance_name);
-         }
-      } else {
-         _mesa_glsl_error(&loc, state,
-                          "%s must be declared as an output", this->block_name);
-      }
-
-      if (redeclaring_mesh_per_primitive && !this->layout.flags.q.per_primitive) {
-         _mesa_glsl_error(&loc, state,
-                          "gl_MeshPerPrimitiveEXT must be declared with "
-                          "perprimitiveEXT");
-      }
-   }
-
-   if (redeclaring) {
-      if (earlier_redeclaring == NULL) {
+      if (earlier_per_vertex == NULL) {
          /* An error has already been reported.  Bail out to avoid null
           * dereferences later in this function.
           */
          return NULL;
       }
 
-      /* Copy locations from the old interface block. */
+      /* Copy locations from the old gl_PerVertex interface block. */
       for (unsigned i = 0; i < num_variables; i++) {
-         int j = glsl_get_field_index(earlier_redeclaring, fields[i].name);
+         int j = glsl_get_field_index(earlier_per_vertex, fields[i].name);
          if (j == -1) {
             _mesa_glsl_error(&loc, state,
-                             "redeclaration of %s must be a subset "
-                             "of the built-in members of %s",
-                             this->block_name, this->block_name);
+                             "redeclaration of gl_PerVertex must be a subset "
+                             "of the built-in members of gl_PerVertex");
          } else {
             fields[i].location =
-               earlier_redeclaring->fields.structure[j].location;
+               earlier_per_vertex->fields.structure[j].location;
             fields[i].offset =
-               earlier_redeclaring->fields.structure[j].offset;
+               earlier_per_vertex->fields.structure[j].offset;
             fields[i].interpolation =
-               earlier_redeclaring->fields.structure[j].interpolation;
+               earlier_per_vertex->fields.structure[j].interpolation;
             fields[i].centroid =
-               earlier_redeclaring->fields.structure[j].centroid;
+               earlier_per_vertex->fields.structure[j].centroid;
             fields[i].sample =
-               earlier_redeclaring->fields.structure[j].sample;
+               earlier_per_vertex->fields.structure[j].sample;
             fields[i].patch =
-               earlier_redeclaring->fields.structure[j].patch;
-            fields[i].per_primitive =
-               earlier_redeclaring->fields.structure[j].per_primitive;
+               earlier_per_vertex->fields.structure[j].patch;
             fields[i].precision =
-               earlier_redeclaring->fields.structure[j].precision;
+               earlier_per_vertex->fields.structure[j].precision;
             fields[i].explicit_xfb_buffer =
-               earlier_redeclaring->fields.structure[j].explicit_xfb_buffer;
+               earlier_per_vertex->fields.structure[j].explicit_xfb_buffer;
             fields[i].xfb_buffer =
-               earlier_redeclaring->fields.structure[j].xfb_buffer;
+               earlier_per_vertex->fields.structure[j].xfb_buffer;
             fields[i].xfb_stride =
-               earlier_redeclaring->fields.structure[j].xfb_stride;
+               earlier_per_vertex->fields.structure[j].xfb_stride;
          }
       }
 
@@ -8629,7 +8433,7 @@ ast_interface_block::hir(ir_exec_list *instructions,
        * gl_PerVertex by GLSL 1.50, therefore we implement this behaviour
        * regardless of GLSL version.
        */
-      interface_block_usage_visitor v(var_mode, earlier_redeclaring);
+      interface_block_usage_visitor v(var_mode, earlier_per_vertex);
       v.run(instructions);
       if (v.usage_found()) {
          _mesa_glsl_error(&loc, state,
@@ -8687,48 +8491,9 @@ ast_interface_block::hir(ir_exec_list *instructions,
               this->array_specifier == NULL &&
               var_mode == ir_var_shader_out) {
       _mesa_glsl_error(&loc, state, "tessellation control shader outputs must be arrays");
-   } else if (state->stage == MESA_SHADER_MESH &&
-              this->array_specifier == NULL &&
-              var_mode == ir_var_shader_out) {
-      _mesa_glsl_error(&loc, state, "mesh shader outputs must be arrays");
    }
 
 
-   /*
-    * Check various features for EXT_shader_pixel_local_storage
-    */
-   if (var_mode == ir_var_shader_pixel_local_storage) {
-      /* ensure we do not exceed the available space */
-      unsigned bytes_used = 4 * num_variables;
-      if (bytes_used > state->caps->shader_pixel_local_storage_size) {
-         _mesa_glsl_error(&loc, state,
-                          "bytes needed for pixel local storage (%u) exceeds "
-                          "maximum (%u)", bytes_used,
-                          state->caps->shader_pixel_local_storage_size);
-      }
-      /* The GL_EXT_shader_pixel_local_storage spec says:
-       *
-       *    "A shader may only declare a single input and a single output pixel
-       *     local storage block."
-       */
-      unsigned flags = this->layout.flags.q.pixel_local_storage;
-      if (flags & GLSL_PIXEL_LOCAL_STORAGE_IN) {
-         if (state->pixel_local_input_specified) {
-            _mesa_glsl_error(&loc, state,
-                             "multiple pixel local storage input interfaces "
-                             "specified");
-         }
-         state->pixel_local_input_specified = true;
-      }
-      if (flags & GLSL_PIXEL_LOCAL_STORAGE_OUT) {
-         if (state->pixel_local_output_specified) {
-            _mesa_glsl_error(&loc, state,
-                             "multiple pixel local storage output interfaces "
-                             "specified");
-         }
-         state->pixel_local_output_specified = true;
-      }
-   }
    /* Page 39 (page 45 of the PDF) of section 4.3.7 in the GLSL ES 3.00 spec
     * says:
     *
@@ -8737,7 +8502,7 @@ ast_interface_block::hir(ir_exec_list *instructions,
     *     field selector ( . ) operator (analogously to structures)."
     */
    if (this->instance_name) {
-      if (redeclaring) {
+      if (redeclaring_per_vertex) {
          /* When a built-in in an unnamed interface block is redeclared,
           * get_variable_being_redeclared() calls
           * check_builtin_array_max_size() to make sure that built-in array
@@ -8785,7 +8550,7 @@ ast_interface_block::hir(ir_exec_list *instructions,
           *     per-vertex-arrays as required for tessellation, it is an error
           *     to declare a member of the block with a location qualifier."
           */
-         if (!redeclaring &&
+         if (!redeclaring_per_vertex &&
              (state->has_enhanced_layouts() || state->has_shader_io_blocks())) {
             bool allow_location;
             switch (state->stage)
@@ -8797,10 +8562,6 @@ ast_interface_block::hir(ir_exec_list *instructions,
             case MESA_SHADER_GEOMETRY:
                allow_location = (this->array_specifier->is_single_dimension()
                                  && var_mode == ir_var_shader_in);
-               break;
-            case MESA_SHADER_MESH:
-               allow_location = (this->array_specifier->is_single_dimension()
-                                 && var_mode == ir_var_shader_out);
                break;
             default:
                allow_location = false;
@@ -8846,8 +8607,7 @@ ast_interface_block::hir(ir_exec_list *instructions,
             bool allow_inputs = state->stage == MESA_SHADER_GEOMETRY ||
                                 state->stage == MESA_SHADER_TESS_CTRL ||
                                 state->stage == MESA_SHADER_TESS_EVAL;
-            bool allow_outputs = state->stage == MESA_SHADER_TESS_CTRL ||
-                                 state->stage == MESA_SHADER_MESH;
+            bool allow_outputs = state->stage == MESA_SHADER_TESS_CTRL;
 
             if (this->layout.flags.q.in) {
                if (!allow_inputs)
@@ -8881,11 +8641,11 @@ ast_interface_block::hir(ir_exec_list *instructions,
                              "not allowed");
          }
 
-         var = new(state->linalloc) ir_variable(block_array_type,
+         var = new(state) ir_variable(block_array_type,
                                       this->instance_name,
                                       var_mode);
       } else {
-         var = new(state->linalloc) ir_variable(block_type,
+         var = new(state) ir_variable(block_type,
                                       this->instance_name,
                                       var_mode);
       }
@@ -8895,14 +8655,8 @@ ast_interface_block::hir(ir_exec_list *instructions,
 
       if (var_mode == ir_var_shader_in || var_mode == ir_var_uniform)
          var->data.read_only = true;
-      else if (var_mode == ir_var_shader_pixel_local_storage)
-         var->data.read_only =
-            this->layout.flags.q.pixel_local_storage ==
-               GLSL_PIXEL_LOCAL_STORAGE_IN;
 
       var->data.patch = this->layout.flags.q.patch;
-      var->data.per_primitive = this->layout.flags.q.per_primitive;
-      var->data.pixel_local_storage = this->layout.flags.q.pixel_local_storage;
 
       if (state->stage == MESA_SHADER_GEOMETRY && var_mode == ir_var_shader_in)
          handle_geometry_shader_input_decl(state, loc, var);
@@ -8911,8 +8665,6 @@ ast_interface_block::hir(ir_exec_list *instructions,
          handle_tess_shader_input_decl(state, loc, var);
       else if (state->stage == MESA_SHADER_TESS_CTRL && var_mode == ir_var_shader_out)
          handle_tess_ctrl_shader_output_decl(state, loc, var);
-      else if (state->stage == MESA_SHADER_MESH && var_mode == ir_var_shader_out)
-         handle_mesh_shader_output_decl(state, loc, var);
 
       for (unsigned i = 0; i < num_variables; i++) {
          if (var->data.mode == ir_var_shader_storage)
@@ -8921,13 +8673,14 @@ ast_interface_block::hir(ir_exec_list *instructions,
 
       if (ir_variable *earlier =
           state->symbols->get_variable(this->instance_name)) {
-         if (!redeclaring) {
+         if (!redeclaring_per_vertex) {
             _mesa_glsl_error(&loc, state, "`%s' redeclared",
                              this->instance_name);
          }
          earlier->data.how_declared = ir_var_declared_normally;
          earlier->type = var->type;
          earlier->reinit_interface_type(block_type);
+         delete var;
       } else {
          if (this->layout.flags.q.explicit_binding) {
             apply_explicit_binding(state, &loc, var, var->type,
@@ -8937,9 +8690,6 @@ ast_interface_block::hir(ir_exec_list *instructions,
          var->data.stream = qual_stream;
          if (layout.flags.q.explicit_location) {
             var->data.location = expl_location;
-            var->data.explicit_location = true;
-         } else if (layout.flags.q.pixel_local_storage) {
-            var->data.location = FRAG_RESULT_DATA0;
             var->data.explicit_location = true;
          }
 
@@ -8954,8 +8704,8 @@ ast_interface_block::hir(ir_exec_list *instructions,
 
       for (unsigned i = 0; i < num_variables; i++) {
          ir_variable *var =
-            new(state->linalloc) ir_variable(fields[i].type,
-                                   linear_strdup(state->linalloc, fields[i].name),
+            new(state) ir_variable(fields[i].type,
+                                   ralloc_strdup(state, fields[i].name),
                                    var_mode);
          var->data.interpolation = fields[i].interpolation;
          var->data.centroid = fields[i].centroid;
@@ -8963,7 +8713,6 @@ ast_interface_block::hir(ir_exec_list *instructions,
          var->data.patch = fields[i].patch;
          var->data.stream = qual_stream;
          var->data.location = fields[i].location;
-         var->data.per_primitive = fields[i].per_primitive;
 
          if (fields[i].location != -1)
             var->data.explicit_location = true;
@@ -8979,14 +8728,6 @@ ast_interface_block::hir(ir_exec_list *instructions,
 
          if (var_mode == ir_var_shader_in || var_mode == ir_var_uniform)
             var->data.read_only = true;
-
-         if (var_mode == ir_var_shader_pixel_local_storage) {
-            var->data.pixel_local_storage =
-               this->layout.flags.q.pixel_local_storage;
-            var->data.read_only =
-               var->data.pixel_local_storage == GLSL_PIXEL_LOCAL_STORAGE_IN;
-            var->data.image_format = fields[i].image_format;
-         }
 
          /* Precision qualifiers do not have any meaning in Desktop GLSL */
          if (state->es_shader) {
@@ -9070,7 +8811,7 @@ ast_interface_block::hir(ir_exec_list *instructions,
          instructions->push_tail(var);
       }
 
-      if (redeclaring_per_vertex && block_type != earlier_redeclaring) {
+      if (redeclaring_per_vertex && block_type != earlier_per_vertex) {
          /* From section 7.1 ("Built-in Language Variables") of the GLSL 4.10 spec:
           *
           *     It is also a compilation error ... to redeclare a built-in
@@ -9095,7 +8836,7 @@ ast_interface_block::hir(ir_exec_list *instructions,
          ir_foreach_in_list_safe(ir_instruction, node, instructions) {
             ir_variable *const var = node->as_variable();
             if (var != NULL &&
-                var->get_interface_type() == earlier_redeclaring &&
+                var->get_interface_type() == earlier_per_vertex &&
                 var->data.mode == var_mode) {
                if (var->data.how_declared == ir_var_declared_normally) {
                   _mesa_glsl_error(&loc, state,
@@ -9172,101 +8913,6 @@ ast_tcs_output_layout::hir(ir_exec_list *instructions,
 
 
 ir_rvalue *
-ast_ms_output_layout::hir(ir_exec_list *instructions,
-                          struct _mesa_glsl_parse_state *state)
-{
-   YYLTYPE loc = this->get_location();
-
-   unsigned max_vertices;
-   bool max_vertices_specified = state->out_qualifier->max_vertices->
-      process_qualifier_constant(state, "max_vertices", &max_vertices, false);
-   if (max_vertices_specified) {
-      /* If any shader outputs occurred before this declaration and specified an
-       * array size, make sure the size they specified is consistent with the
-       * layout qualifier.
-       */
-      if (state->ms_per_vertex_output_size != 0 &&
-          state->ms_per_vertex_output_size != max_vertices) {
-         _mesa_glsl_error(&loc, state,
-                          "this mesh shader output layout "
-                          "specifies %u max_vertices, but a previous output "
-                          "is declared with size %u",
-                          max_vertices, state->ms_per_vertex_output_size);
-         return NULL;
-      }
-
-      state->ms_output_max_vertices_specified = true;
-   }
-
-   unsigned max_primitives;
-   bool max_primitives_specified = state->out_qualifier->max_primitives->
-      process_qualifier_constant(state, "max_primitives", &max_primitives, false);
-   if (max_primitives_specified) {
-      /* If any shader outputs occurred before this declaration and specified an
-       * array size, make sure the size they specified is consistent with the
-       * layout qualifier.
-       */
-      if (state->ms_per_primitive_output_size != 0 &&
-          state->ms_per_primitive_output_size != max_primitives) {
-         _mesa_glsl_error(&loc, state,
-                          "this mesh shader output layout "
-                          "specifies %u max_primitives, but a previous output "
-                          "is declared with size %u",
-                          max_primitives, state->ms_per_primitive_output_size);
-         return NULL;
-      }
-
-      state->ms_output_max_primitives_specified = true;
-   }
-
-   if (!max_vertices_specified && !max_primitives_specified)
-      return NULL;
-
-   /* If any shader outputs occurred before this declaration and did not
-    * specify an array size, their size is determined now.
-    */
-   ir_foreach_in_list (ir_instruction, node, instructions) {
-      ir_variable *var = node->as_variable();
-      if (var == NULL || var->data.mode != ir_var_shader_out)
-         continue;
-
-      if (!glsl_type_is_unsized_array(var->type))
-         continue;
-
-      if (var->data.per_primitive) {
-         if (!max_primitives_specified)
-            continue;
-
-         if (var->data.max_array_access >= (int)max_primitives) {
-            _mesa_glsl_error(&loc, state,
-                             "this mesh shader output layout "
-                             "specifies %u max_primitives, but an access to element "
-                             "%u of output `%s' already exists", max_primitives,
-                             var->data.max_array_access, var->name);
-         } else {
-            var->type = glsl_array_type(var->type->fields.array, max_primitives, 0);
-         }
-      } else {
-         if (!max_vertices_specified)
-            continue;
-
-         if (var->data.max_array_access >= (int)max_vertices) {
-            _mesa_glsl_error(&loc, state,
-                             "this mesh shader output layout "
-                             "specifies %u vertices, but an access to element "
-                             "%u of output `%s' already exists", max_vertices,
-                             var->data.max_array_access, var->name);
-         } else {
-            var->type = glsl_array_type(var->type->fields.array, max_vertices, 0);
-         }
-      }
-   }
-
-   return NULL;
-}
-
-
-ir_rvalue *
 ast_gs_input_layout::hir(ir_exec_list *instructions,
                          struct _mesa_glsl_parse_state *state)
 {
@@ -9323,8 +8969,8 @@ ast_gs_input_layout::hir(ir_exec_list *instructions,
 
 
 ir_rvalue *
-ast_cs_ms_input_layout::hir(ir_exec_list *instructions,
-                            struct _mesa_glsl_parse_state *state)
+ast_cs_input_layout::hir(ir_exec_list *instructions,
+                         struct _mesa_glsl_parse_state *state)
 {
    YYLTYPE loc = this->get_location();
 
@@ -9339,26 +8985,6 @@ ast_cs_ms_input_layout::hir(ir_exec_list *instructions,
     * MAX_COMPUTE_WORK_GROUP_INVOCATIONS, but it seems reasonable to
     * report it at compile time as well.
     */
-
-   const unsigned *max_work_group_size;
-   unsigned max_work_group_invocations;
-   switch (state->stage) {
-   case MESA_SHADER_COMPUTE:
-      max_work_group_size = state->consts->MaxComputeWorkGroupSize;
-      max_work_group_invocations = state->consts->MaxComputeWorkGroupInvocations;
-      break;
-   case MESA_SHADER_TASK:
-      max_work_group_size = state->caps->mesh.max_task_work_group_size;
-      max_work_group_invocations = state->caps->mesh.max_task_work_group_invocations;
-      break;
-   case MESA_SHADER_MESH:
-      max_work_group_size = state->caps->mesh.max_mesh_work_group_size;
-      max_work_group_invocations = state->caps->mesh.max_mesh_work_group_invocations;
-      break;
-   default:
-      UNREACHABLE("invalid shader stage");
-   }
-
    GLuint64 total_invocations = 1;
    unsigned qual_local_size[3];
    for (int i = 0; i < 3; i++) {
@@ -9376,19 +9002,20 @@ ast_cs_ms_input_layout::hir(ir_exec_list *instructions,
       }
       ralloc_free(local_size_str);
 
-      if (qual_local_size[i] > max_work_group_size[i]) {
+      if (qual_local_size[i] > state->consts->MaxComputeWorkGroupSize[i]) {
          _mesa_glsl_error(&loc, state,
-                          "local_size_%c exceeds max work group size"
+                          "local_size_%c exceeds MAX_COMPUTE_WORK_GROUP_SIZE"
                           " (%d)", 'x' + i,
-                          max_work_group_size[i]);
+                          state->consts->MaxComputeWorkGroupSize[i]);
          break;
       }
       total_invocations *= qual_local_size[i];
-      if (total_invocations > max_work_group_invocations) {
+      if (total_invocations >
+          state->consts->MaxComputeWorkGroupInvocations) {
          _mesa_glsl_error(&loc, state,
                           "product of local_sizes exceeds "
-                          "max work group invocations (%d)",
-                          max_work_group_invocations);
+                          "MAX_COMPUTE_WORK_GROUP_INVOCATIONS (%d)",
+                          state->consts->MaxComputeWorkGroupInvocations);
          break;
       }
    }
@@ -9396,11 +9023,11 @@ ast_cs_ms_input_layout::hir(ir_exec_list *instructions,
    /* If any compute input layout declaration preceded this one, make sure it
     * was consistent with this one.
     */
-   if (state->cs_ms_input_local_size_specified) {
+   if (state->cs_input_local_size_specified) {
       for (int i = 0; i < 3; i++) {
-         if (state->cs_ms_input_local_size[i] != qual_local_size[i]) {
+         if (state->cs_input_local_size[i] != qual_local_size[i]) {
             _mesa_glsl_error(&loc, state,
-                             "shader input layout does not match"
+                             "compute shader input layout does not match"
                              " previous declaration");
             return NULL;
          }
@@ -9421,15 +9048,15 @@ ast_cs_ms_input_layout::hir(ir_exec_list *instructions,
       return NULL;
    }
 
-   state->cs_ms_input_local_size_specified = true;
+   state->cs_input_local_size_specified = true;
    for (int i = 0; i < 3; i++)
-      state->cs_ms_input_local_size[i] = qual_local_size[i];
+      state->cs_input_local_size[i] = qual_local_size[i];
 
    /* We may now declare the built-in constant gl_WorkGroupSize (see
     * builtin_variable_generator::generate_constants() for why we didn't
     * declare it earlier).
     */
-   ir_variable *var = new(state->linalloc)
+   ir_variable *var = new(state->symbols)
       ir_variable(&glsl_type_builtin_uvec3, "gl_WorkGroupSize", ir_var_auto);
    var->data.how_declared = ir_var_declared_implicitly;
    var->data.read_only = true;
@@ -9439,9 +9066,9 @@ ast_cs_ms_input_layout::hir(ir_exec_list *instructions,
    memset(&data, 0, sizeof(data));
    for (int i = 0; i < 3; i++)
       data.u[i] = qual_local_size[i];
-   var->constant_value = new(state->linalloc) ir_constant(&glsl_type_builtin_uvec3, &data);
+   var->constant_value = new(var) ir_constant(&glsl_type_builtin_uvec3, &data);
    var->constant_initializer =
-      new(state->linalloc) ir_constant(&glsl_type_builtin_uvec3, &data);
+      new(var) ir_constant(&glsl_type_builtin_uvec3, &data);
    var->data.has_initializer = true;
    var->data.is_implicit_initializer = false;
 
@@ -9476,7 +9103,7 @@ detect_conflicting_assignments(struct _mesa_glsl_parse_state *state,
             const ir_constant_data data = { { 0 } };
             var->data.has_initializer = true;
             var->data.is_implicit_initializer = true;
-            var->constant_initializer = new(state->linalloc) ir_constant(var->type, &data);
+            var->constant_initializer = new(var) ir_constant(var->type, &data);
          }
       }
       else if (strcmp(var->name, "gl_FragData") == 0)

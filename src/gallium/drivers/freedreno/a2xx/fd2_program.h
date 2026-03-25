@@ -18,7 +18,7 @@
 
 struct fd2_shader_stateobj {
    nir_shader *nir;
-   mesa_shader_stage type;
+   gl_shader_stage type;
    bool is_a20x;
 
    /* note: using same set of immediates for all variants

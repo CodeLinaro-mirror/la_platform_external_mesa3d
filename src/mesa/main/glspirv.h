@@ -88,7 +88,7 @@ _mesa_spirv_link_shaders(struct gl_context *ctx,
 nir_shader *
 _mesa_spirv_to_nir(struct gl_context *ctx,
                    const struct gl_shader_program *prog,
-                   mesa_shader_stage stage,
+                   gl_shader_stage stage,
                    const nir_shader_compiler_options *options);
 
 #ifdef __cplusplus

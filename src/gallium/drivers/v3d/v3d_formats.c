@@ -33,27 +33,13 @@
  */
 
 #include "util/macros.h"
+
 #include "v3d_context.h"
+#include "v3d_format_table.h"
 
 /* The format internal types are the same across V3D versions */
 #define V3D_VERSION 42
-#include "v3d_format_table.h"
-
-bool
-v3d_rt_format_is_emulated(enum pipe_format f)
-{
-        switch (f) {
-        case PIPE_FORMAT_R16G16B16A16_UNORM:
-        case PIPE_FORMAT_R16G16_UNORM:
-        case PIPE_FORMAT_R16_UNORM:
-        case PIPE_FORMAT_R16G16B16A16_SNORM:
-        case PIPE_FORMAT_R16G16_SNORM:
-        case PIPE_FORMAT_R16_SNORM:
-               return true;
-        default:
-               return false;
-        }
-}
+#include "broadcom/cle/v3dx_pack.h"
 
 bool
 v3d_rt_format_supported(const struct v3d_device_info *devinfo,
@@ -67,7 +53,7 @@ v3d_rt_format_supported(const struct v3d_device_info *devinfo,
         return vf->rt_type != V3D_OUTPUT_IMAGE_FORMAT_NO;
 }
 
-enum V3DX(Output_Image_Format)
+uint8_t
 v3d_get_rt_format(const struct v3d_device_info *devinfo, enum pipe_format f)
 {
         const struct v3d_format *vf = v3d_X(devinfo, get_format_desc)(f);
@@ -87,7 +73,7 @@ v3d_tex_format_supported(const struct v3d_device_info *devinfo,
         return vf != NULL;
 }
 
-enum V3DX(Texture_Data_Formats)
+uint8_t
 v3d_get_tex_format(const struct v3d_device_info *devinfo, enum pipe_format f)
 {
         const struct v3d_format *vf = v3d_X(devinfo, get_format_desc)(f);
@@ -140,13 +126,9 @@ v3d_get_format_swizzle(const struct v3d_device_info *devinfo, enum pipe_format f
         return vf->swizzle;
 }
 
-/**
- * If our internal type is normalised or a 16bit float we can do real
- * operations on the tilebuffer such as msaa resolve or blending.
- */
 bool
-v3d_format_supports_tlb_resolve_and_blend(const struct v3d_device_info *devinfo,
-                                          enum pipe_format f)
+v3d_format_supports_tlb_msaa_resolve(const struct v3d_device_info *devinfo,
+                                     enum pipe_format f)
 {
         uint32_t internal_type;
         uint32_t internal_bpp;
@@ -203,7 +185,7 @@ v3d_format_get_internal_type_and_bpp(const struct v3d_device_info *devinfo,
                 }
         } else {
                 uint32_t bpp, type;
-                enum V3DX(Output_Image_Format) rt_format = v3d_get_rt_format(devinfo, format);
+                uint16_t rt_format = v3d_get_rt_format(devinfo, format);
                 v3d_X(devinfo, get_internal_type_bpp_for_output_format)
                         (rt_format, &type, &bpp);
                 if (internal_bpp)

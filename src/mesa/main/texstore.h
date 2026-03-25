@@ -118,17 +118,31 @@ _mesa_store_texsubimage(struct gl_context *ctx, GLuint dims,
                         GLenum format, GLenum type, const GLvoid *pixels,
                         const struct gl_pixelstore_attrib *packing);
 
+
+extern void
+_mesa_store_cleartexsubimage(struct gl_context *ctx,
+                             struct gl_texture_image *texImage,
+                             GLint xoffset, GLint yoffset, GLint zoffset,
+                             GLsizei width, GLsizei height, GLsizei depth,
+                             const GLvoid *clearValue);
+
+extern void
+_mesa_store_compressed_teximage(struct gl_context *ctx, GLuint dims,
+                                struct gl_texture_image *texImage,
+                                GLsizei imageSize, const GLvoid *data);
+
+
 extern void
 _mesa_store_compressed_texsubimage(struct gl_context *ctx, GLuint dims,
                                    struct gl_texture_image *texImage,
                                    GLint xoffset, GLint yoffset, GLint zoffset,
                                    GLsizei width, GLsizei height, GLsizei depth,
                                    GLenum format,
-                                   size_t imageSize, const GLvoid *data);
+                                   GLsizei imageSize, const GLvoid *data);
 
 
 struct compressed_pixelstore {
-   size_t SkipBytes;
+   int SkipBytes;
    int CopyBytesPerRow;
    int CopyRowsPerSlice;
    int TotalBytesPerRow;

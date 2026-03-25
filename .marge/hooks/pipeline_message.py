@@ -50,7 +50,7 @@ def get_problem_jobs(jobs: list[dict[str, Any]]):
     for job in jobs:
         if any(ignore.lower() in job["stage"] for ignore in ignore_stage_list):
             continue
-        if job["status"] != "success":
+        if job["status"] in {"failed", "canceled"}:
             problem_jobs.append(job)
     return problem_jobs
 
@@ -277,12 +277,6 @@ async def process_single_job(session, project_id, job):
     job_name = job.get("name", "Unnamed Job")
     message = f"[{job_name}]({job_url})"
 
-    if job["status"] == "running":
-        return f"{message}: still running<br>"
-
-    if job["status"] == "manual":
-        return f"{message}: waiting for manual action<br>"
-
     # if a job times out it's cancelled, so worth mentioning here
     if job["status"] == "canceled":
         return f"{message}: canceled<br>"
@@ -352,7 +346,7 @@ async def main(pipeline_id: str, project_id: str = "176") -> str:
                 session, project_id, pipeline_id
             )
             logging.debug(f"Pipeline status: {pipeline_status}")
-            if pipeline_status == "success":
+            if pipeline_status != "failed":
                 return message
 
             jobs = await get_jobs_for_pipeline(session, project_id, pipeline_id)

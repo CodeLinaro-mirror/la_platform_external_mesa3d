@@ -222,8 +222,6 @@ struct fd_device {
 
    bool closefd; /* call close(fd) upon destruction */
 
-   bool disable_explicit_sync_heuristic;
-
    /* just for valgrind: */
    int bo_size;
 

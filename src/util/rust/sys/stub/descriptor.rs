@@ -34,10 +34,6 @@ impl OwnedDescriptor {
     pub fn determine_type(&self) -> Result<DescriptorType> {
         Err(Error::from(ErrorKind::Unsupported))
     }
-
-    pub fn determine_map_access_mode(&self) -> Result<u32> {
-        Err(Error::from(ErrorKind::Unsupported))
-    }
 }
 
 impl AsRawDescriptor for OwnedDescriptor {

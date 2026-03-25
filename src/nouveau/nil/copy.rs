@@ -45,14 +45,12 @@ trait CopyGOB {
 
     // No bounding box for this one
     unsafe fn copy_whole_gob(tiled: usize, linear: LinearPointer) {
-        unsafe {
-            Self::copy_gob(
-                tiled,
-                linear,
-                Offset4D::new(0, 0, 0, 0),
-                Offset4D::new(0, 0, 0, 0) + Self::GOB_EXTENT_B,
-            );
-        }
+        Self::copy_gob(
+            tiled,
+            linear,
+            Offset4D::new(0, 0, 0, 0),
+            Offset4D::new(0, 0, 0, 0) + Self::GOB_EXTENT_B,
+        );
     }
 }
 
@@ -86,20 +84,16 @@ impl<C: CopyGOBLines> CopyGOB for C {
                 let tiled = tiled + (offset as usize);
                 let linear = linear.at(Offset4D::new(x, y, z, 0));
                 if x >= start.x && x + C::LINE_WIDTH_B <= end.x {
-                    unsafe {
-                        C::copy_whole_line(tiled as *mut _, linear as *mut _);
-                    }
+                    C::copy_whole_line(tiled as *mut _, linear as *mut _);
                 } else if x + C::LINE_WIDTH_B >= start.x && x < end.x {
                     let start = (std::cmp::max(x, start.x) - x) as usize;
                     let end =
                         std::cmp::min(end.x - x, C::LINE_WIDTH_B) as usize;
-                    unsafe {
-                        C::copy(
-                            (tiled + start) as *mut _,
-                            (linear + start) as *mut _,
-                            end - start,
-                        );
-                    }
+                    C::copy(
+                        (tiled + start) as *mut _,
+                        (linear + start) as *mut _,
+                        end - start,
+                    );
                 }
             }
         });
@@ -109,9 +103,7 @@ impl<C: CopyGOBLines> CopyGOB for C {
         Self::for_each_gob_line(|offset, x, y, z| {
             let tiled = tiled + (offset as usize);
             let linear = linear.at(Offset4D::new(x, y, z, 0));
-            unsafe {
-                C::copy_whole_line(tiled as *mut _, linear as *mut _);
-            }
+            C::copy_whole_line(tiled as *mut _, linear as *mut _);
         });
     }
 }
@@ -122,14 +114,10 @@ trait CopyBytes {
 
     unsafe fn copy(tiled: *mut u8, linear: *mut u8, bytes: usize);
     unsafe fn copy_16b(tiled: *mut [u8; 16], linear: *mut [u8; 16]) {
-        unsafe {
-            Self::copy(tiled as *mut _, linear as *mut _, 16);
-        }
+        Self::copy(tiled as *mut _, linear as *mut _, 16);
     }
     unsafe fn copy_8b(tiled: *mut [u8; 8], linear: *mut [u8; 8]) {
-        unsafe {
-            Self::copy(tiled as *mut _, linear as *mut _, 8);
-        }
+        Self::copy(tiled as *mut _, linear as *mut _, 8);
     }
 }
 
@@ -144,15 +132,11 @@ impl<C: CopyBytes> CopyGOBLines for CopyGOBFermi<C> {
     const X_DIVISOR: u32 = C::X_DIVISOR;
 
     unsafe fn copy(tiled: *mut u8, linear: *mut u8, bytes: usize) {
-        unsafe {
-            C::copy(tiled, linear, bytes);
-        }
+        C::copy(tiled, linear, bytes);
     }
 
     unsafe fn copy_whole_line(tiled: *mut u8, linear: *mut u8) {
-        unsafe {
-            C::copy_16b(tiled as *mut _, linear as *mut _);
-        }
+        C::copy_16b(tiled as *mut _, linear as *mut _);
     }
 
     #[inline(always)]
@@ -181,54 +165,6 @@ impl<C: CopyBytes> CopyGOBLines for CopyGOBFermi<C> {
     }
 }
 
-/// Implements copies for [`GOBType::TegraColor`]
-struct CopyGOBTegra<C: CopyBytes> {
-    phantom: std::marker::PhantomData<C>,
-}
-
-impl<C: CopyBytes> CopyGOBLines for CopyGOBTegra<C> {
-    const GOB_EXTENT_B: Extent4D<units::Bytes> = Extent4D::new(64, 8, 1, 1);
-    const LINE_WIDTH_B: u32 = 16;
-    const X_DIVISOR: u32 = C::X_DIVISOR;
-
-    unsafe fn copy(tiled: *mut u8, linear: *mut u8, bytes: usize) {
-        unsafe {
-            C::copy(tiled, linear, bytes);
-        }
-    }
-
-    unsafe fn copy_whole_line(tiled: *mut u8, linear: *mut u8) {
-        unsafe {
-            C::copy_16b(tiled as *mut _, linear as *mut _);
-        }
-    }
-
-    #[inline(always)]
-    fn for_each_gob_line(mut f: impl FnMut(u32, u32, u32, u32)) {
-        for i in 0..2 {
-            f(i * 0x100 + 0x00, i * 32 + 0, 0, 0);
-            f(i * 0x100 + 0x10, i * 32 + 0, 1, 0);
-            f(i * 0x100 + 0x20, i * 32 + 16, 0, 0);
-            f(i * 0x100 + 0x30, i * 32 + 16, 1, 0);
-
-            f(i * 0x100 + 0x40, i * 32 + 0, 2, 0);
-            f(i * 0x100 + 0x50, i * 32 + 0, 3, 0);
-            f(i * 0x100 + 0x60, i * 32 + 16, 2, 0);
-            f(i * 0x100 + 0x70, i * 32 + 16, 3, 0);
-
-            f(i * 0x100 + 0x80, i * 32 + 0, 4, 0);
-            f(i * 0x100 + 0x90, i * 32 + 0, 5, 0);
-            f(i * 0x100 + 0xa0, i * 32 + 16, 4, 0);
-            f(i * 0x100 + 0xb0, i * 32 + 16, 5, 0);
-
-            f(i * 0x100 + 0xc0, i * 32 + 0, 6, 0);
-            f(i * 0x100 + 0xd0, i * 32 + 0, 7, 0);
-            f(i * 0x100 + 0xe0, i * 32 + 16, 6, 0);
-            f(i * 0x100 + 0xf0, i * 32 + 16, 7, 0);
-        }
-    }
-}
-
 /// Implements copies for [`GOBType::TuringColor2D`]
 struct CopyGOBTuring2D<C: CopyBytes> {
     phantom: std::marker::PhantomData<C>,
@@ -240,15 +176,11 @@ impl<C: CopyBytes> CopyGOBLines for CopyGOBTuring2D<C> {
     const X_DIVISOR: u32 = C::X_DIVISOR;
 
     unsafe fn copy(tiled: *mut u8, linear: *mut u8, bytes: usize) {
-        unsafe {
-            C::copy(tiled, linear, bytes);
-        }
+        C::copy(tiled, linear, bytes);
     }
 
     unsafe fn copy_whole_line(tiled: *mut u8, linear: *mut u8) {
-        unsafe {
-            C::copy_16b(tiled as *mut _, linear as *mut _);
-        }
+        C::copy_16b(tiled as *mut _, linear as *mut _);
     }
 
     #[inline(always)]
@@ -288,15 +220,11 @@ impl<C: CopyBytes> CopyGOBLines for CopyGOBBlackwell2D2BPP<C> {
     const X_DIVISOR: u32 = C::X_DIVISOR;
 
     unsafe fn copy(tiled: *mut u8, linear: *mut u8, bytes: usize) {
-        unsafe {
-            C::copy(tiled, linear, bytes);
-        }
+        C::copy(tiled, linear, bytes);
     }
 
     unsafe fn copy_whole_line(tiled: *mut u8, linear: *mut u8) {
-        unsafe {
-            C::copy_16b(tiled as *mut _, linear as *mut _);
-        }
+        C::copy_16b(tiled as *mut _, linear as *mut _);
     }
 
     #[inline(always)]
@@ -336,15 +264,11 @@ impl<C: CopyBytes> CopyGOBLines for CopyGOBBlackwell2D1BPP<C> {
     const X_DIVISOR: u32 = C::X_DIVISOR;
 
     unsafe fn copy(tiled: *mut u8, linear: *mut u8, bytes: usize) {
-        unsafe {
-            C::copy(tiled, linear, bytes);
-        }
+        C::copy(tiled, linear, bytes);
     }
 
     unsafe fn copy_whole_line(tiled: *mut u8, linear: *mut u8) {
-        unsafe {
-            C::copy_8b(tiled as *mut _, linear as *mut _);
-        }
+        C::copy_8b(tiled as *mut _, linear as *mut _);
     }
 
     #[inline(always)]
@@ -369,7 +293,11 @@ fn chunk_range(
     chunk_len: u32,
 ) -> Range<u32> {
     debug_assert!(chunk_start < whole.end);
-    let start = whole.start.saturating_sub(chunk_start);
+    let start = if chunk_start < whole.start {
+        whole.start - chunk_start
+    } else {
+        0
+    };
     let end = std::cmp::min(whole.end - chunk_start, chunk_len);
     start..end
 }
@@ -594,7 +522,7 @@ unsafe fn copy_tile<CG: CopyGOB>(
     if start.is_aligned_to(CG::GOB_EXTENT_B)
         && end.is_aligned_to(CG::GOB_EXTENT_B)
     {
-        for_each_extent4d_aligned(start, end, CG::GOB_EXTENT_B, |gob| unsafe {
+        for_each_extent4d_aligned(start, end, CG::GOB_EXTENT_B, |gob| {
             CG::copy_whole_gob(tile_ptr.at(gob), linear.offset(gob));
         });
     } else {
@@ -604,13 +532,9 @@ unsafe fn copy_tile<CG: CopyGOB>(
             if start == Offset4D::new(0, 0, 0, 0)
                 && end == Offset4D::new(0, 0, 0, 0) + CG::GOB_EXTENT_B
             {
-                unsafe {
-                    CG::copy_whole_gob(tiled, linear);
-                }
+                CG::copy_whole_gob(tiled, linear);
             } else {
-                unsafe {
-                    CG::copy_gob(tiled, linear, start, end);
-                }
+                CG::copy_gob(tiled, linear, start, end);
             }
         });
     }
@@ -638,9 +562,7 @@ unsafe fn copy_tiled<CG: CopyGOB>(
     for_each_extent4d(start, end, tile_extent_B, |tile, start, end| {
         let tile_ptr = level_tiled_ptr.at(tile);
         let linear = linear.offset(tile);
-        unsafe {
-            copy_tile::<CG>(tiling, tile_ptr, linear, start, end);
-        }
+        copy_tile::<CG>(tiling, tile_ptr, linear, start, end);
     });
 }
 
@@ -651,9 +573,7 @@ impl CopyBytes for RawCopyToTiled {
 
     unsafe fn copy(tiled: *mut u8, linear: *mut u8, bytes: usize) {
         // This is backwards from memcpy
-        unsafe {
-            std::ptr::copy_nonoverlapping(linear, tiled, bytes);
-        }
+        std::ptr::copy_nonoverlapping(linear, tiled, bytes);
     }
 }
 
@@ -664,9 +584,7 @@ impl CopyBytes for RawCopyToLinear {
 
     unsafe fn copy(tiled: *mut u8, linear: *mut u8, bytes: usize) {
         // This is backwards from memcpy
-        unsafe {
-            std::ptr::copy_nonoverlapping(tiled, linear, bytes);
-        }
+        std::ptr::copy_nonoverlapping(tiled, linear, bytes);
     }
 }
 
@@ -692,60 +610,48 @@ pub unsafe extern "C" fn nil_copy_linear_to_tiled(
         linear_plane_stride_B,
     );
 
-    unsafe {
-        match tiling.gob_type {
-            GOBType::Blackwell16Bit => {
-                copy_tiled::<CopyGOBBlackwell2D2BPP<RawCopyToTiled>>(
-                    *tiling,
-                    level_extent_B,
-                    tiled_dst,
-                    linear_pointer,
-                    offset_B,
-                    end_B,
-                );
-            }
-            GOBType::Blackwell8Bit => {
-                copy_tiled::<CopyGOBBlackwell2D1BPP<RawCopyToTiled>>(
-                    *tiling,
-                    level_extent_B,
-                    tiled_dst,
-                    linear_pointer,
-                    offset_B,
-                    end_B,
-                );
-            }
-            GOBType::TuringColor2D => {
-                copy_tiled::<CopyGOBTuring2D<RawCopyToTiled>>(
-                    *tiling,
-                    level_extent_B,
-                    tiled_dst,
-                    linear_pointer,
-                    offset_B,
-                    end_B,
-                );
-            }
-            GOBType::TegraColor => {
-                copy_tiled::<CopyGOBTegra<RawCopyToTiled>>(
-                    *tiling,
-                    level_extent_B,
-                    tiled_dst,
-                    linear_pointer,
-                    offset_B,
-                    end_B,
-                );
-            }
-            GOBType::FermiColor => {
-                copy_tiled::<CopyGOBFermi<RawCopyToTiled>>(
-                    *tiling,
-                    level_extent_B,
-                    tiled_dst,
-                    linear_pointer,
-                    offset_B,
-                    end_B,
-                );
-            }
-            _ => panic!("Unsupported GOB type"),
+    match tiling.gob_type {
+        GOBType::Blackwell16Bit => {
+            copy_tiled::<CopyGOBBlackwell2D2BPP<RawCopyToTiled>>(
+                *tiling,
+                level_extent_B,
+                tiled_dst,
+                linear_pointer,
+                offset_B,
+                end_B,
+            );
         }
+        GOBType::Blackwell8Bit => {
+            copy_tiled::<CopyGOBBlackwell2D1BPP<RawCopyToTiled>>(
+                *tiling,
+                level_extent_B,
+                tiled_dst,
+                linear_pointer,
+                offset_B,
+                end_B,
+            );
+        }
+        GOBType::TuringColor2D => {
+            copy_tiled::<CopyGOBTuring2D<RawCopyToTiled>>(
+                *tiling,
+                level_extent_B,
+                tiled_dst,
+                linear_pointer,
+                offset_B,
+                end_B,
+            );
+        }
+        GOBType::FermiColor => {
+            copy_tiled::<CopyGOBFermi<RawCopyToTiled>>(
+                *tiling,
+                level_extent_B,
+                tiled_dst,
+                linear_pointer,
+                offset_B,
+                end_B,
+            );
+        }
+        _ => panic!("Unsupported GOB type"),
     }
 }
 
@@ -771,59 +677,47 @@ pub unsafe extern "C" fn nil_copy_tiled_to_linear(
         linear_plane_stride_B,
     );
 
-    unsafe {
-        match tiling.gob_type {
-            GOBType::Blackwell16Bit => {
-                copy_tiled::<CopyGOBBlackwell2D2BPP<RawCopyToLinear>>(
-                    *tiling,
-                    level_extent_B,
-                    tiled_src,
-                    linear_pointer,
-                    offset_B,
-                    end_B,
-                );
-            }
-            GOBType::Blackwell8Bit => {
-                copy_tiled::<CopyGOBBlackwell2D1BPP<RawCopyToLinear>>(
-                    *tiling,
-                    level_extent_B,
-                    tiled_src,
-                    linear_pointer,
-                    offset_B,
-                    end_B,
-                );
-            }
-            GOBType::TuringColor2D => {
-                copy_tiled::<CopyGOBTuring2D<RawCopyToLinear>>(
-                    *tiling,
-                    level_extent_B,
-                    tiled_src,
-                    linear_pointer,
-                    offset_B,
-                    end_B,
-                );
-            }
-            GOBType::TegraColor => {
-                copy_tiled::<CopyGOBTegra<RawCopyToLinear>>(
-                    *tiling,
-                    level_extent_B,
-                    tiled_src,
-                    linear_pointer,
-                    offset_B,
-                    end_B,
-                );
-            }
-            GOBType::FermiColor => {
-                copy_tiled::<CopyGOBFermi<RawCopyToLinear>>(
-                    *tiling,
-                    level_extent_B,
-                    tiled_src,
-                    linear_pointer,
-                    offset_B,
-                    end_B,
-                );
-            }
-            _ => panic!("Unsupported GOB type"),
+    match tiling.gob_type {
+        GOBType::Blackwell16Bit => {
+            copy_tiled::<CopyGOBBlackwell2D2BPP<RawCopyToLinear>>(
+                *tiling,
+                level_extent_B,
+                tiled_src,
+                linear_pointer,
+                offset_B,
+                end_B,
+            );
         }
+        GOBType::Blackwell8Bit => {
+            copy_tiled::<CopyGOBBlackwell2D1BPP<RawCopyToLinear>>(
+                *tiling,
+                level_extent_B,
+                tiled_src,
+                linear_pointer,
+                offset_B,
+                end_B,
+            );
+        }
+        GOBType::TuringColor2D => {
+            copy_tiled::<CopyGOBTuring2D<RawCopyToLinear>>(
+                *tiling,
+                level_extent_B,
+                tiled_src,
+                linear_pointer,
+                offset_B,
+                end_B,
+            );
+        }
+        GOBType::FermiColor => {
+            copy_tiled::<CopyGOBFermi<RawCopyToLinear>>(
+                *tiling,
+                level_extent_B,
+                tiled_src,
+                linear_pointer,
+                offset_B,
+                end_B,
+            );
+        }
+        _ => panic!("Unsupported GOB type"),
     }
 }

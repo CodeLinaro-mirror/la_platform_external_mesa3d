@@ -54,7 +54,9 @@ build_instance_id(struct lower_multiview_state *state)
 
    if (state->instance_id == NULL) {
       nir_builder *b = &state->builder;
-      b->cursor = nir_after_def(state->instance_id_with_views);
+
+      b->cursor =
+         nir_after_instr(state->instance_id_with_views->parent_instr);
 
       /* We use instancing for implementing multiview.  The actual instance id
        * is given by dividing instance_id by the number of views in this
@@ -75,7 +77,9 @@ build_view_index(struct lower_multiview_state *state)
 
    if (state->view_index == NULL) {
       nir_builder *b = &state->builder;
-      b->cursor = nir_after_def(state->instance_id_with_views);
+
+      b->cursor =
+         nir_after_instr(state->instance_id_with_views->parent_instr);
 
       assert(state->view_mask != 0);
       if (util_bitcount(state->view_mask) == 1) {
@@ -241,7 +245,7 @@ anv_nir_lower_multiview(nir_shader *shader, uint32_t view_mask,
    nir_def *view_index = build_view_index(&state);
 
    assert(nir_def_block(view_index) == nir_start_block(entrypoint));
-   b->cursor = nir_after_def(view_index);
+   b->cursor = nir_after_instr(view_index->parent_instr);
 
    /* Unless there is only one possible view index (that would be set
     * directly), pass it to the next stage.

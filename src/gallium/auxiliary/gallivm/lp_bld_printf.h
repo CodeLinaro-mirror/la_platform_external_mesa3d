@@ -32,9 +32,9 @@
 extern "C" {
 #endif
 
-#include <llvm-c/Core.h>
-
-struct gallivm_state;
+#include "util/compiler.h"
+#include "lp_bld.h"
+#include "lp_bld_init.h"
 
 void lp_init_printf_hook(struct gallivm_state *gallivm);
 

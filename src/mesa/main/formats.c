@@ -804,12 +804,12 @@ _mesa_format_has_color_component(mesa_format format, int component)
  * Return number of bytes needed to store an image of the given size
  * in the given format.
  */
-size_t
+uint32_t
 _mesa_format_image_size(mesa_format format, int width,
                         int height, int depth)
 {
    const struct mesa_format_info *info = _mesa_get_format_info(format);
-   size_t sz;
+   uint32_t sz;
    /* Strictly speaking, a conditional isn't needed here */
    if (info->BlockWidth > 1 || info->BlockHeight > 1 || info->BlockDepth > 1) {
       /* compressed format (2D only for now) */
@@ -819,13 +819,43 @@ _mesa_format_image_size(mesa_format format, int width,
       const uint32_t wblocks = (width + bw - 1) / bw;
       const uint32_t hblocks = (height + bh - 1) / bh;
       const uint32_t dblocks = (depth + bd - 1) / bd;
-      sz = (size_t)wblocks * hblocks * dblocks * info->BytesPerBlock;
+      sz = wblocks * hblocks * dblocks * info->BytesPerBlock;
    } else
       /* non-compressed */
-      sz = (size_t)width * height * depth * info->BytesPerBlock;
+      sz = width * height * depth * info->BytesPerBlock;
 
    return sz;
 }
+
+
+/**
+ * Same as _mesa_format_image_size() but returns a 64-bit value to
+ * accommodate very large textures.
+ */
+uint64_t
+_mesa_format_image_size64(mesa_format format, int width,
+                          int height, int depth)
+{
+   const struct mesa_format_info *info = _mesa_get_format_info(format);
+   uint64_t sz;
+   /* Strictly speaking, a conditional isn't needed here */
+   if (info->BlockWidth > 1 || info->BlockHeight > 1 || info->BlockDepth > 1) {
+      /* compressed format (2D only for now) */
+      const uint64_t bw = info->BlockWidth;
+      const uint64_t bh = info->BlockHeight;
+      const uint64_t bd = info->BlockDepth;
+      const uint64_t wblocks = (width + bw - 1) / bw;
+      const uint64_t hblocks = (height + bh - 1) / bh;
+      const uint64_t dblocks = (depth + bd - 1) / bd;
+      sz = wblocks * hblocks * dblocks * info->BytesPerBlock;
+   } else
+      /* non-compressed */
+      sz = ((uint64_t) width * (uint64_t) height *
+            (uint64_t) depth * info->BytesPerBlock);
+
+   return sz;
+}
+
 
 
 int32_t

@@ -370,15 +370,8 @@ int draw_tess_eval_shader_run(struct draw_tess_eval_shader *shader,
 
       llvm_fetch_tess_factors(shader, i, num_input_vertices_per_patch, &factors);
 
-      /**
-       * Tessellate with the factors for this primitive.
-       * Make sure subnormals are not flushed to zero during tessellation.
-       * This is the behavior required by D3D11. OpenGL doesn't care.
-       */
-      unsigned fpstate = util_fpstate_get();
-      util_fpstate_set(shader->draw->fpstate);  /* do not flush subnormals */
+      /* tessellate with the factors for this primitive */
       p_tessellate(ptess, &factors, &data);
-      util_fpstate_set(fpstate);                /* flush subnormals again */
 
       if (data.num_domain_points == 0)
          continue;
@@ -474,7 +467,7 @@ draw_create_tess_ctrl_shader(struct draw_context *draw,
       tcs->tcs_output = align_malloc(sizeof(struct draw_tcs_outputs), 16);
       memset(tcs->tcs_output, 0, sizeof(struct draw_tcs_outputs));
 
-      tcs->jit_resources = &draw->llvm->jit_resources[MESA_SHADER_TESS_CTRL];
+      tcs->jit_resources = &draw->llvm->jit_resources[PIPE_SHADER_TESS_CTRL];
       llvm_tcs->variant_key_size =
          draw_tcs_llvm_variant_key_size(
                                         tcs->info.file_max[TGSI_FILE_SAMPLER]+1,
@@ -599,7 +592,7 @@ draw_create_tess_eval_shader(struct draw_context *draw,
       tes->tes_input = align_malloc(sizeof(struct draw_tes_inputs), 16);
       memset(tes->tes_input, 0, sizeof(struct draw_tes_inputs));
 
-      tes->jit_resources = &draw->llvm->jit_resources[MESA_SHADER_TESS_EVAL];
+      tes->jit_resources = &draw->llvm->jit_resources[PIPE_SHADER_TESS_EVAL];
       llvm_tes->variant_key_size =
          draw_tes_llvm_variant_key_size(
                                         tes->info.file_max[TGSI_FILE_SAMPLER]+1,

@@ -30,9 +30,8 @@
 
 #include "pipe/p_screen.h"
 #include "pipe/p_video_codec.h"
-#include "vl/vl_video_buffer.h"
 #include "vpelib/inc/vpelib.h"
-#include "si_video.h"
+#include "radeon_video.h"
 
 /* The buffer size of cmd_buf and emb_buf in bytes
  *
@@ -64,7 +63,7 @@ struct vpe_video_processor {
 
     uint8_t bufs_num;
     uint8_t cur_buf;
-    struct si_resource **emb_buffers;
+    struct rvid_buffer *emb_buffers;
 
     /* VPE HW version */
     uint8_t ver_major;
@@ -79,8 +78,6 @@ struct vpe_video_processor {
 
     struct pipe_surface src_surfaces[VL_MAX_SURFACES];
     struct pipe_surface dst_surfaces[VL_MAX_SURFACES];
-    struct pipe_video_buffer *src_buffer;
-    struct pipe_video_buffer *dst_buffer;
 
     /* For HDR content display */
     void *gm_handle;

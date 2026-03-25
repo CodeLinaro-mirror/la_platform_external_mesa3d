@@ -1543,7 +1543,7 @@ _mesa_test_framebuffer_completeness(struct gl_context *ctx,
                return;
             }
             /* check that all color buffers are the same format */
-            if (!_mesa_is_gles2(ctx) && intFormat != GL_NONE && f != intFormat) {
+            if (ctx->API != API_OPENGLES2 && intFormat != GL_NONE && f != intFormat) {
                fb->_Status = GL_FRAMEBUFFER_INCOMPLETE_FORMATS_EXT;
                fbo_incomplete(ctx, "format mismatch", -1);
                return;
@@ -1967,7 +1967,7 @@ framebuffer_parameteri(struct gl_context *ctx, struct gl_framebuffer *fb,
    case GL_FRAMEBUFFER_PROGRAMMABLE_SAMPLE_LOCATIONS_ARB:
    case GL_FRAMEBUFFER_SAMPLE_LOCATION_PIXEL_GRID_ARB:
       if (fb == ctx->DrawBuffer)
-         ST_SET_STATE(ctx->NewDriverState, ST_NEW_SAMPLE_STATE);
+         ctx->NewDriverState |= ST_NEW_SAMPLE_STATE;
       break;
    default:
       invalidate_framebuffer(fb);
@@ -2490,7 +2490,7 @@ _mesa_base_fbo_format(const struct gl_context *ctx, GLenum internalFormat)
       return _mesa_has_ARB_texture_rg(ctx) || _mesa_has_EXT_texture_norm16(ctx)
          ? GL_RED : 0;
    case GL_R8:
-      return !_mesa_is_gles1(ctx) && ctx->Extensions.ARB_texture_rg
+      return ctx->API != API_OPENGLES && ctx->Extensions.ARB_texture_rg
          ? GL_RED : 0;
    case GL_RG:
       return _mesa_has_ARB_texture_rg(ctx) ? GL_RG : 0;
@@ -2498,7 +2498,7 @@ _mesa_base_fbo_format(const struct gl_context *ctx, GLenum internalFormat)
       return _mesa_has_ARB_texture_rg(ctx) || _mesa_has_EXT_texture_norm16(ctx)
          ? GL_RG : 0;
    case GL_RG8:
-      return !_mesa_is_gles1(ctx) && ctx->Extensions.ARB_texture_rg
+      return ctx->API != API_OPENGLES && ctx->Extensions.ARB_texture_rg
          ? GL_RG : 0;
    /* signed normalized texture formats */
    case GL_R8_SNORM:
@@ -3338,12 +3338,6 @@ bind_framebuffer(GLenum target, GLuint framebuffer)
    GLboolean bindReadBuf, bindDrawBuf;
    GET_CURRENT_CONTEXT(ctx);
 
-   if (MESA_VERBOSE & VERBOSE_API)
-      _mesa_debug(ctx,
-                  "glBindFramebuffer(%s, %u)\n",
-                  _mesa_enum_to_string(target),
-                  framebuffer);
-
    switch (target) {
    case GL_DRAW_FRAMEBUFFER_EXT:
       bindDrawBuf = GL_TRUE;
@@ -3359,17 +3353,6 @@ bind_framebuffer(GLenum target, GLuint framebuffer)
       break;
    default:
       _mesa_error(ctx, GL_INVALID_ENUM, "glBindFramebufferEXT(target)");
-      return;
-   }
-
-   /* The GL_EXT_shader_pixel_local_storage spec says:
-    *
-    *    "INVALID_OPERATION is generated if pixel local storage is enabled and
-    *     the application attempts to bind a new draw framebuffer, [...]"
-    */
-   if (bindDrawBuf && ctx->PixelLocalStorage) {
-      _mesa_error(ctx, GL_INVALID_OPERATION,
-                  "glBindFrameBuffer(draw fb): pixel local storage enabled");
       return;
    }
 
@@ -3451,7 +3434,7 @@ _mesa_bind_framebuffers(struct gl_context *ctx,
 
    if (bindDrawBuf) {
       FLUSH_VERTICES(ctx, _NEW_BUFFERS, 0);
-      ST_SET_STATE(ctx->NewDriverState, ST_NEW_SAMPLE_STATE);
+      ctx->NewDriverState |= ST_NEW_SAMPLE_STATE;
 
       /* check if old framebuffer had any texture attachments */
       if (oldDrawFb)
@@ -3489,9 +3472,8 @@ _mesa_DeleteFramebuffers(GLsizei n, const GLuint *framebuffers)
    GLint i;
    GET_CURRENT_CONTEXT(ctx);
 
-   const char *func = "glDeleteFramebuffers";
    if (n < 0) {
-      _mesa_error(ctx, GL_INVALID_VALUE, "%s(n < 0)", func);
+      _mesa_error(ctx, GL_INVALID_VALUE, "glDeleteFramebuffers(n < 0)");
       return;
    }
 
@@ -3508,19 +3490,6 @@ _mesa_DeleteFramebuffers(GLsizei n, const GLuint *framebuffers)
             if (fb == ctx->DrawBuffer) {
                /* bind default */
                assert(fb->RefCount >= 2);
-
-               /* The GL_EXT_shader_pixel_local_storage spec says:
-                *
-                *    "INVALID_OPERATION is generated if pixel local storage is
-                *     enabled and the application attempts to [...] delete the
-                *     currently bound draw framebuffer, [...]"
-                */
-               if (ctx->PixelLocalStorage) {
-                  _mesa_error(ctx, GL_INVALID_OPERATION,
-                              "%s(draw fb): pixel local storage enabled", func);
-                  return;
-               }
-
                _mesa_BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
             }
             if (fb == ctx->ReadBuffer) {
@@ -3755,7 +3724,6 @@ reuse_framebuffer_texture_attachment(struct gl_framebuffer *fb,
    dst_att->Zoffset = src_att->Zoffset;
    dst_att->Layered = src_att->Layered;
    dst_att->NumViews = src_att->NumViews;
-   dst_att->NumSamples = src_att->NumSamples;
 }
 
 
@@ -4273,18 +4241,6 @@ framebuffer_texture_with_dims(int dims, GLenum target, GLuint framebuffer,
    struct gl_framebuffer *fb;
    struct gl_texture_object *texObj;
 
-   /* The GL_EXT_shader_pixel_local_storage spec says:
-    *
-    *    "INVALID_OPERATION is generated if pixel local storage is enabled and
-    *     the application attempts to [...] modify any attachment of the
-    *     currently bound draw framebuffer including their underlying storage."
-    */
-   if (ctx->PixelLocalStorage) {
-       _mesa_error(ctx, GL_INVALID_OPERATION,
-                   "%s(): pixel local storage enabled", caller);
-      return;
-   }
-
    /* Get the framebuffer object */
    if (dsa) {
       fb = _mesa_lookup_framebuffer_dsa(ctx, framebuffer, caller);
@@ -4411,18 +4367,6 @@ frame_buffer_texture(GLuint framebuffer, GLenum target,
                      "unsupported function (%s) called", func);
          return;
       }
-   }
-
-   /* The GL_EXT_shader_pixel_local_storage spec says:
-    *
-    *    "INVALID_OPERATION is generated if pixel local storage is enabled and
-    *     the application attempts to [...] modify any attachment of the
-    *     currently bound draw framebuffer including their underlying storage."
-    */
-   if (!no_error && ctx->PixelLocalStorage) {
-       _mesa_error(ctx, GL_INVALID_OPERATION,
-                   "%s(): pixel local storage enabled", func);
-      return;
    }
 
    /* Get the framebuffer object */
@@ -5108,9 +5052,9 @@ get_framebuffer_attachment_parameter(struct gl_context *ctx,
       }
       return;
    case GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE:
-      if ((!_mesa_is_desktop_gl_compat(ctx) ||
+      if ((ctx->API != API_OPENGL_COMPAT ||
            !ctx->Extensions.ARB_framebuffer_object)
-          && !_mesa_is_desktop_gl_core(ctx)
+          && ctx->API != API_OPENGL_CORE
           && !_mesa_is_gles3(ctx)) {
          goto invalid_pname_enum;
       }
@@ -5561,7 +5505,7 @@ invalidate_framebuffer_storage(struct gl_context *ctx,
             /* Accumulation buffers and auxilary buffers were removed in
              * OpenGL 3.1, and they never existed in OpenGL ES.
              */
-            if (!_mesa_is_desktop_gl_compat(ctx))
+            if (ctx->API != API_OPENGL_COMPAT)
                goto invalid_enum;
             break;
          case GL_COLOR:
@@ -5836,14 +5780,6 @@ _mesa_InvalidateFramebuffer(GLenum target, GLsizei numAttachments,
    struct gl_framebuffer *fb;
    GET_CURRENT_CONTEXT(ctx);
 
-   if (MESA_VERBOSE & VERBOSE_API) {
-      for (unsigned i = 0; i < numAttachments; i++)
-         _mesa_debug(ctx,
-                     "glInvalidateFramebuffer(%s, %s)\n",
-                     _mesa_enum_to_string(target),
-                     _mesa_enum_to_string(attachments[i]));
-   }
-
    fb = get_framebuffer_target(ctx, target);
    if (!fb) {
       _mesa_error(ctx, GL_INVALID_ENUM,
@@ -6035,7 +5971,7 @@ sample_locations(struct gl_context *ctx, struct gl_framebuffer *fb,
    }
 
    if (fb == ctx->DrawBuffer)
-      ST_SET_STATE(ctx->NewDriverState, ST_NEW_SAMPLE_STATE);
+      ctx->NewDriverState |= ST_NEW_SAMPLE_STATE;
 }
 
 void GLAPIENTRY
@@ -6110,8 +6046,7 @@ _mesa_EvaluateDepthValuesARB(void)
       return;
    }
 
-   ST_PIPELINE_UPDATE_FB_STATE_MASK(mask);
-   st_validate_state(st_context(ctx), mask);
+   st_validate_state(st_context(ctx), ST_PIPELINE_UPDATE_FB_STATE_MASK);
 
    ctx->pipe->evaluate_depth_buffer(ctx->pipe);
 }

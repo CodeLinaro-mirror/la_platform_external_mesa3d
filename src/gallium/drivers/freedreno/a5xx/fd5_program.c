@@ -68,28 +68,23 @@ fd5_emit_shader_obj(struct fd_context *ctx, struct fd_ringbuffer *ring,
                     const struct ir3_shader_variant *so,
                     uint32_t shader_obj_reg)
 {
-   struct fd_screen *screen = ctx->screen;
-
-   fd_screen_lock(screen);
-   ir3_get_private_mem(screen, so);
+   ir3_get_private_mem(ctx, so);
 
    OUT_PKT4(ring, shader_obj_reg, 6);
-   OUT_RELOC(ring, so->bo, 0, 0, 0); /* SP_VS_OBJ_START */
+   OUT_RELOC(ring, so->bo, 0, 0, 0); /* SP_VS_OBJ_START_LO/HI */
 
-   uint32_t per_sp_size = screen->pvtmem[so->pvtmem_per_wave].per_sp_size;
+   uint32_t per_sp_size = ctx->pvtmem[so->pvtmem_per_wave].per_sp_size;
    OUT_RING(ring, A5XX_SP_VS_PVT_MEM_PARAM_MEMSIZEPERITEM(
-                     screen->pvtmem[so->pvtmem_per_wave].per_fiber_size) |
+                     ctx->pvtmem[so->pvtmem_per_wave].per_fiber_size) |
                      A5XX_SP_VS_PVT_MEM_PARAM_HWSTACKOFFSET(per_sp_size));
    if (so->pvtmem_size > 0) { /* SP_xS_PVT_MEM_ADDR */
-      OUT_RELOC(ring, screen->pvtmem[so->pvtmem_per_wave].bo, 0, 0, 0);
-      fd_ringbuffer_attach_bo(ring, screen->pvtmem[so->pvtmem_per_wave].bo);
+      OUT_RELOC(ring, ctx->pvtmem[so->pvtmem_per_wave].bo, 0, 0, 0);
+      fd_ringbuffer_attach_bo(ring, ctx->pvtmem[so->pvtmem_per_wave].bo);
    } else {
       OUT_RING(ring, 0);
       OUT_RING(ring, 0);
    }
    OUT_RING(ring, A5XX_SP_VS_PVT_MEM_SIZE_TOTALPVTMEMSIZE(per_sp_size));
-
-   fd_screen_unlock(screen);
 }
 
 /* TODO maybe some of this we could pre-compute once rather than having
@@ -107,7 +102,7 @@ emit_stream_out(struct fd_ringbuffer *ring, const struct ir3_shader_variant *v,
 
    for (unsigned i = 0; i < strmout->num_outputs; i++) {
       const struct ir3_stream_output *out = &strmout->output[i];
-      gl_varying_slot slot = out->location;
+      unsigned k = out->register_index;
       unsigned idx;
 
       ncomp[out->output_buffer] += out->num_components;
@@ -116,7 +111,7 @@ emit_stream_out(struct fd_ringbuffer *ring, const struct ir3_shader_variant *v,
        * a bit less ideal here..
        */
       for (idx = 0; idx < l->cnt; idx++)
-         if (l->var[idx].slot == slot)
+         if (l->var[idx].slot == v->outputs[k].slot)
             break;
 
       assert(idx < l->cnt);
@@ -498,7 +493,7 @@ fd5_program_emit(struct fd_context *ctx, struct fd_ringbuffer *ring,
       OUT_RING(ring, reg);
    }
 
-   fd5_emit_shader_obj(ctx, ring, s[VS].v, REG_A5XX_SP_VS_OBJ_START);
+   fd5_emit_shader_obj(ctx, ring, s[VS].v, REG_A5XX_SP_VS_OBJ_START_LO);
 
    if (s[VS].instrlen)
       fd5_emit_shader(ring, s[VS].v);
@@ -518,11 +513,11 @@ fd5_program_emit(struct fd_context *ctx, struct fd_ringbuffer *ring,
    fd5_context(ctx)->max_loc = l.max_loc;
 
    if (emit->binning_pass) {
-      OUT_PKT4(ring, REG_A5XX_SP_FS_OBJ_START, 2);
+      OUT_PKT4(ring, REG_A5XX_SP_FS_OBJ_START_LO, 2);
       OUT_RING(ring, 0x00000000); /* SP_FS_OBJ_START_LO */
       OUT_RING(ring, 0x00000000); /* SP_FS_OBJ_START_HI */
    } else {
-      fd5_emit_shader_obj(ctx, ring, s[FS].v, REG_A5XX_SP_FS_OBJ_START);
+      fd5_emit_shader_obj(ctx, ring, s[FS].v, REG_A5XX_SP_FS_OBJ_START_LO);
    }
 
    OUT_PKT4(ring, REG_A5XX_HLSQ_CONTROL_0_REG, 5);

@@ -139,12 +139,15 @@ iris_predicate(int fd, const char *driver)
 bool
 nouveau_zink_predicate(int fd, const char *driver)
 {
-#ifndef HAVE_LIBDRM
-   return true;
-#else
    /* Never load on nv proprietary driver */
    if (!drm_fd_is_nouveau(fd))
       return false;
+
+#if !defined(HAVE_NVK) || !defined(HAVE_ZINK)
+   if (!strcmp(driver, "zink"))
+      return false;
+   return true;
+#else
 
    bool prefer_zink = false;
    bool require_zink = false;
@@ -264,9 +267,7 @@ loader_open_render_node_platform_devices(const char * const drivers[],
          }
 
          for (j = 0; j < n_drivers; j++) {
-            /* Always try to open the render device with Zink if requested */
-            if (strcmp("zink", drivers[j]) == 0 ||
-                strcmp(version->name, drivers[j]) == 0) {
+            if (strcmp(version->name, drivers[j]) == 0) {
                found = true;
                break;
             }
@@ -452,7 +453,7 @@ static char *drm_get_id_path_tag_for_fd(int fd)
 
 bool loader_get_user_preferred_fd(int *fd_render_gpu, int *original_fd)
 {
-   const char *dri_prime = os_get_option("DRI_PRIME");
+   const char *dri_prime = getenv("DRI_PRIME");
    bool debug = debug_get_bool_option("DRI_PRIME_DEBUG", false);
    char *default_tag = NULL;
    drmDevicePtr devices[MAX_DRM_DEVICES];
@@ -772,7 +773,7 @@ loader_get_driver_for_fd(int fd)
     */
    if (__normal_user()) {
       const char *override = os_get_option("MESA_LOADER_DRIVER_OVERRIDE");
-      if (override && strlen(override))
+      if (override)
          return strdup(override);
    }
 

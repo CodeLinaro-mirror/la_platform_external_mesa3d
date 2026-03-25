@@ -40,11 +40,10 @@
  */
 
 struct live_defs_state {
-   unsigned num_bits;
-   void *mem_ctx;
+   unsigned bitset_words;
 
    /* Used in propagate_across_edge() */
-   struct u_sparse_bitset tmp_live;
+   BITSET_WORD *tmp_live;
 
    nir_block_worklist worklist;
 };
@@ -56,20 +55,26 @@ static void
 init_liveness_block(nir_block *block,
                     struct live_defs_state *state)
 {
-   u_sparse_bitset_init(&block->live_in, state->num_bits, state->mem_ctx);
-   u_sparse_bitset_init(&block->live_out, state->num_bits, state->mem_ctx);
+   block->live_in = reralloc(block, block->live_in, BITSET_WORD,
+                             state->bitset_words);
+   memset(block->live_in, 0, state->bitset_words * sizeof(BITSET_WORD));
+
+   block->live_out = reralloc(block, block->live_out, BITSET_WORD,
+                              state->bitset_words);
+   memset(block->live_out, 0, state->bitset_words * sizeof(BITSET_WORD));
+
    nir_block_worklist_push_head(&state->worklist, block);
 }
 
 static bool
 set_src_live(nir_src *src, void *void_live)
 {
-   struct u_sparse_bitset *live = void_live;
+   BITSET_WORD *live = void_live;
 
    if (nir_src_is_undef(*src))
       return true; /* undefined variables are never live */
 
-   u_sparse_bitset_set(live, src->ssa->index);
+   BITSET_SET(live, src->ssa->index);
 
    return true;
 }
@@ -77,9 +82,9 @@ set_src_live(nir_src *src, void *void_live)
 static bool
 set_ssa_def_dead(nir_def *def, void *void_live)
 {
-   struct u_sparse_bitset *live = void_live;
+   BITSET_WORD *live = void_live;
 
-   u_sparse_bitset_clear(live, def->index);
+   BITSET_CLEAR(live, def->index);
 
    return true;
 }
@@ -97,8 +102,8 @@ static bool
 propagate_across_edge(nir_block *pred, nir_block *succ,
                       struct live_defs_state *state)
 {
-   struct u_sparse_bitset *live = &state->tmp_live;
-   u_sparse_bitset_dup(live, &succ->live_in);
+   BITSET_WORD *live = state->tmp_live;
+   memcpy(live, succ->live_in, state->bitset_words * sizeof *live);
 
    nir_foreach_phi(phi, succ) {
       set_ssa_def_dead(&phi->def, live);
@@ -113,18 +118,21 @@ propagate_across_edge(nir_block *pred, nir_block *succ,
       }
    }
 
-   bool progress = u_sparse_bitset_merge(&pred->live_out, live);
-   u_sparse_bitset_free(live);
-   return progress;
+   BITSET_WORD progress = 0;
+   for (unsigned i = 0; i < state->bitset_words; ++i) {
+      progress |= live[i] & ~pred->live_out[i];
+      pred->live_out[i] |= live[i];
+   }
+   return progress != 0;
 }
 
 void
 nir_live_defs_impl(nir_function_impl *impl)
 {
    struct live_defs_state state = {
-      .num_bits = impl->ssa_alloc,
-      .mem_ctx = impl,
+      .bitset_words = BITSET_WORDS(impl->ssa_alloc),
    };
+   state.tmp_live = rzalloc_array(impl, BITSET_WORD, state.bitset_words),
 
    nir_block_worklist_init(&state.worklist, impl->num_blocks, NULL);
 
@@ -148,11 +156,12 @@ nir_live_defs_impl(nir_function_impl *impl)
        */
       nir_block *block = nir_block_worklist_pop_head(&state.worklist);
 
-      u_sparse_bitset_dup(&block->live_in, &block->live_out);
+      memcpy(block->live_in, block->live_out,
+             state.bitset_words * sizeof(BITSET_WORD));
 
       nir_if *following_if = nir_block_get_following_if(block);
       if (following_if)
-         set_src_live(&following_if->condition, &block->live_in);
+         set_src_live(&following_if->condition, block->live_in);
 
       nir_foreach_instr_reverse(instr, block) {
          /* Phi nodes are handled seperately so we want to skip them.  Since
@@ -162,8 +171,8 @@ nir_live_defs_impl(nir_function_impl *impl)
          if (instr->type == nir_instr_type_phi)
             break;
 
-         nir_foreach_def(instr, set_ssa_def_dead, &block->live_in);
-         nir_foreach_src(instr, set_src_live, &block->live_in);
+         nir_foreach_def(instr, set_ssa_def_dead, block->live_in);
+         nir_foreach_src(instr, set_src_live, block->live_in);
       }
 
       /* Walk over all of the predecessors of the current block updating
@@ -171,13 +180,14 @@ nir_live_defs_impl(nir_function_impl *impl)
        * changed, add the predecessor to the work list so that we ensure
        * that the new information is used.
        */
-      set_foreach(&block->predecessors, entry) {
+      set_foreach(block->predecessors, entry) {
          nir_block *pred = (nir_block *)entry->key;
          if (propagate_across_edge(pred, block, &state))
             nir_block_worklist_push_tail(&state.worklist, pred);
       }
    }
 
+   ralloc_free(state.tmp_live);
    nir_block_worklist_fini(&state.worklist);
 }
 
@@ -187,34 +197,35 @@ nir_live_defs_impl(nir_function_impl *impl)
  *       which the instruction lives.  Do not ralloc_free() it directly;
  *       instead, provide a mem_ctx and free that.
  */
-struct u_sparse_bitset *
+const BITSET_WORD *
 nir_get_live_defs(nir_cursor cursor, void *mem_ctx)
 {
    nir_block *block = nir_cursor_current_block(cursor);
-   ASSERTED nir_function_impl *impl = nir_cf_node_get_function(&block->cf_node);
+   nir_function_impl *impl = nir_cf_node_get_function(&block->cf_node);
    assert(impl->valid_metadata & nir_metadata_live_defs);
 
    switch (cursor.option) {
    case nir_cursor_before_block:
-      return &cursor.block->live_in;
+      return cursor.block->live_in;
 
    case nir_cursor_after_block:
-      return &cursor.block->live_out;
+      return cursor.block->live_out;
 
    case nir_cursor_before_instr:
       if (cursor.instr == nir_block_first_instr(cursor.instr->block))
-         return &cursor.instr->block->live_in;
+         return cursor.instr->block->live_in;
       break;
 
    case nir_cursor_after_instr:
       if (cursor.instr == nir_block_last_instr(cursor.instr->block))
-         return &cursor.instr->block->live_out;
+         return cursor.instr->block->live_out;
       break;
    }
 
    /* If we got here, we're an instruction cursor mid-block */
-   struct u_sparse_bitset *live = rzalloc_size(mem_ctx, sizeof(struct u_sparse_bitset));
-   u_sparse_bitset_dup_with_ctx(live, &block->live_out, mem_ctx);
+   const unsigned bitset_words = BITSET_WORDS(impl->ssa_alloc);
+   BITSET_WORD *live = ralloc_array(mem_ctx, BITSET_WORD, bitset_words);
+   memcpy(live, block->live_out, bitset_words * sizeof(BITSET_WORD));
 
    nir_foreach_instr_reverse(instr, block) {
       if (cursor.option == nir_cursor_after_instr && instr == cursor.instr)
@@ -272,13 +283,13 @@ search_for_use_after_instr(nir_instr *start, nir_def *def)
 static bool
 nir_def_is_live_at(nir_def *def, nir_instr *instr)
 {
-   if (u_sparse_bitset_test(&instr->block->live_out, def->index)) {
+   if (BITSET_TEST(instr->block->live_out, def->index)) {
       /* Since def dominates instr, if def is in the liveout of the block,
        * it's live at instr
        */
       return true;
    } else {
-      if (u_sparse_bitset_test(&instr->block->live_in, def->index) ||
+      if (BITSET_TEST(instr->block->live_in, def->index) ||
           nir_def_block(def) == instr->block) {
          /* In this case it is either live coming into instr's block or it
           * is defined in the same block.  In this case, we simply need to
@@ -294,20 +305,18 @@ nir_def_is_live_at(nir_def *def, nir_instr *instr)
 bool
 nir_defs_interfere(nir_def *a, nir_def *b)
 {
-   nir_instr *a_instr = nir_def_instr(a);
-   nir_instr *b_instr = nir_def_instr(b);
-   if (a_instr == b_instr) {
+   if (a->parent_instr == b->parent_instr) {
       /* Two variables defined at the same time interfere assuming at
        * least one isn't dead.
        */
       return true;
-   } else if (a_instr->type == nir_instr_type_undef ||
-              b_instr->type == nir_instr_type_undef) {
+   } else if (a->parent_instr->type == nir_instr_type_undef ||
+              b->parent_instr->type == nir_instr_type_undef) {
       /* If either variable is an ssa_undef, then there's no interference */
       return false;
-   } else if (a_instr->index < b_instr->index) {
-      return nir_def_is_live_at(a, b_instr);
+   } else if (a->parent_instr->index < b->parent_instr->index) {
+      return nir_def_is_live_at(a, b->parent_instr);
    } else {
-      return nir_def_is_live_at(b, a_instr);
+      return nir_def_is_live_at(b, a->parent_instr);
    }
 }

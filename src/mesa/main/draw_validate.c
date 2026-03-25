@@ -107,21 +107,8 @@ _mesa_update_valid_to_render_state(struct gl_context *ctx)
                       num_color_buffers - max_dual_source_buffers))
       return;
 
-   /* From the GL_EXT_shader_pixel_local_storage spec:
-    *
-    *    "INVALID_OPERATION is generated if pixel local storage is disabled and
-    *     the application attempts to issue a rendering command while a program
-    *     object that accesses pixel local storage is bound."
-    */
-   const struct gl_program *fp =
-      ctx->_Shader->CurrentProgram[MESA_SHADER_FRAGMENT];
-
-   if (!ctx->PixelLocalStorage && fp &&
-       fp->info.fs.accesses_pixel_local_storage)
-      return;
-
    if (ctx->Color.BlendEnabled &&
-       ctx->Color._AdvancedBlendMode != PIPE_ADVANCED_BLEND_NONE) {
+       ctx->Color._AdvancedBlendMode != BLEND_NONE) {
       /* The KHR_blend_equation_advanced spec says:
        *
        *    "If any non-NONE draw buffer uses a blend equation found in table
@@ -151,14 +138,16 @@ _mesa_update_valid_to_render_state(struct gl_context *ctx)
        *     the blend equation or "blend_support_all_equations", the error
        *     INVALID_OPERATION is generated [...]"
        */
-      const GLbitfield blend_support = !fp ? 0 : fp->info.fs.advanced_blend_modes;
+      const struct gl_program *prog =
+         ctx->_Shader->CurrentProgram[MESA_SHADER_FRAGMENT];
+      const GLbitfield blend_support = !prog ? 0 : prog->info.fs.advanced_blend_modes;
 
       if ((blend_support & BITFIELD_BIT(ctx->Color._AdvancedBlendMode)) == 0)
          return;
    }
 
    if (_mesa_is_desktop_gl_compat(ctx)) {
-      if (!fp) {
+      if (!shader->CurrentProgram[MESA_SHADER_FRAGMENT]) {
          if (ctx->FragmentProgram.Enabled &&
              !_mesa_arb_fragment_program_enabled(ctx))
             return;
@@ -481,7 +470,7 @@ _mesa_update_valid_to_render_state(struct gl_context *ctx)
    if (shader->Flags & GLSL_LOG) {
       struct gl_program **prog = shader->CurrentProgram;
 
-      for (unsigned i = 0; i < MESA_SHADER_MESH_STAGES; i++) {
+      for (unsigned i = 0; i < MESA_SHADER_STAGES; i++) {
 	 if (prog[i] == NULL || prog[i]->_Used)
 	    continue;
 
@@ -497,7 +486,7 @@ _mesa_update_valid_to_render_state(struct gl_context *ctx)
 	 _mesa_append_uniforms_to_file(prog[i]);
       }
 
-      for (unsigned i = 0; i < MESA_SHADER_MESH_STAGES; i++) {
+      for (unsigned i = 0; i < MESA_SHADER_STAGES; i++) {
 	 if (prog[i] != NULL)
 	    prog[i]->_Used = GL_TRUE;
       }

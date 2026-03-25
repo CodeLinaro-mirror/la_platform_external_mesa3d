@@ -26,10 +26,6 @@ template = """/*
 
 #include <stdbool.h>
 
-#ifndef __OPENCL_VERSION__
-#define __constant
-#endif
-
 /** Enums. */
 % for enum in [enum for enum in enums.values() if enum.parent is None]:
 #define _${enum.name.upper()}_COUNT ${enum.unique_count}U
@@ -40,7 +36,7 @@ enum ${enum.name} {
 };
 
 static inline
-__constant const char *${enum.name}_str(uint64_t val) {
+const char *${enum.name}_str(uint64_t val) {
    switch (val) {
    % for elem in enum.elems.values():
       % if elem.string is not None:

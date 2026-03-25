@@ -67,6 +67,14 @@ enum vpe10_dscl_mode_sel vpe10_dpp_dscl_get_dscl_mode(const struct scaler_data *
     return DSCL_MODE_SCALING_420_YCBCR_ENABLE;
 }
 
+void vpe10_dpp_dscl_set_dscl_mode(struct dpp *dpp, enum vpe10_dscl_mode_sel dscl_mode)
+{
+
+    PROGRAM_ENTRY();
+
+    REG_SET(VPDSCL_MODE, 0, VPDSCL_MODE, dscl_mode);
+}
+
 static void dpp1_dscl_set_recout(struct dpp *dpp, const struct vpe_rect *recout)
 {
 
@@ -161,8 +169,8 @@ void vpe10_dpp_dscl_set_scaler_filter(struct dpp *dpp, uint32_t taps,
     }
 }
 
-void vpe10_dpp_dscl_set_scl_filter_and_dscl_mode(struct dpp *dpp,
-    const struct scaler_data *scl_data, enum vpe10_dscl_mode_sel scl_mode, bool chroma_coef_mode)
+void vpe10_dpp_dscl_set_scl_filter(struct dpp *dpp, const struct scaler_data *scl_data,
+    enum vpe10_dscl_mode_sel scl_mode, bool chroma_coef_mode)
 {
 
     const uint16_t *filter_h   = NULL;
@@ -172,44 +180,41 @@ void vpe10_dpp_dscl_set_scl_filter_and_dscl_mode(struct dpp *dpp,
 
     PROGRAM_ENTRY();
 
-    if (scl_mode != DSCL_MODE_DSCL_BYPASS) {
-        if (scl_data->polyphase_filter_coeffs ==
-            0) /*no externally provided set of coeffs and taps*/
-        {
-            filter_h = (uint16_t *)dpp1_dscl_get_filter_coeffs_64p(
-                (int)scl_data->taps.h_taps, scl_data->ratios.horz);
-            filter_v =
-                dpp1_dscl_get_filter_coeffs_64p((int)scl_data->taps.v_taps, scl_data->ratios.vert);
-        } else {
-            filter_h = (const uint16_t *)&scl_data->polyphase_filter_coeffs->horiz_polyphase_coeffs;
-            filter_v = (const uint16_t *)&scl_data->polyphase_filter_coeffs->vert_polyphase_coeffs;
-        }
-        if (filter_h != NULL)
+    if (scl_data->polyphase_filter_coeffs == 0) /*no externally provided set of coeffs and taps*/
+    {
+        filter_h = (uint16_t *)dpp1_dscl_get_filter_coeffs_64p(
+            (int)scl_data->taps.h_taps, scl_data->ratios.horz);
+        filter_v =
+            dpp1_dscl_get_filter_coeffs_64p((int)scl_data->taps.v_taps, scl_data->ratios.vert);
+    } else {
+        filter_h = (const uint16_t *)&scl_data->polyphase_filter_coeffs->horiz_polyphase_coeffs;
+        filter_v = (const uint16_t *)&scl_data->polyphase_filter_coeffs->vert_polyphase_coeffs;
+    }
+    if (filter_h != NULL)
+        vpe10_dpp_dscl_set_scaler_filter(
+            dpp, scl_data->taps.h_taps, SCL_COEF_LUMA_HORZ_FILTER, filter_h);
+
+    if (filter_v != NULL)
+        vpe10_dpp_dscl_set_scaler_filter(
+            dpp, scl_data->taps.v_taps, SCL_COEF_LUMA_VERT_FILTER, filter_v);
+
+    if (chroma_coef_mode) {
+
+        filter_h_c =
+            dpp1_dscl_get_filter_coeffs_64p((int)scl_data->taps.h_taps_c, scl_data->ratios.horz_c);
+        filter_v_c =
+            dpp1_dscl_get_filter_coeffs_64p((int)scl_data->taps.v_taps_c, scl_data->ratios.vert_c);
+
+        if (filter_h_c != NULL)
             vpe10_dpp_dscl_set_scaler_filter(
-                dpp, scl_data->taps.h_taps, SCL_COEF_LUMA_HORZ_FILTER, filter_h);
+                dpp, scl_data->taps.h_taps_c, SCL_COEF_CHROMA_HORZ_FILTER, filter_h_c);
 
-        if (filter_v != NULL)
+        if (filter_v_c != NULL)
             vpe10_dpp_dscl_set_scaler_filter(
-                dpp, scl_data->taps.v_taps, SCL_COEF_LUMA_VERT_FILTER, filter_v);
-
-        if (chroma_coef_mode) {
-
-            filter_h_c = dpp1_dscl_get_filter_coeffs_64p(
-                (int)scl_data->taps.h_taps_c, scl_data->ratios.horz_c);
-            filter_v_c = dpp1_dscl_get_filter_coeffs_64p(
-                (int)scl_data->taps.v_taps_c, scl_data->ratios.vert_c);
-
-            if (filter_h_c != NULL)
-                vpe10_dpp_dscl_set_scaler_filter(
-                    dpp, scl_data->taps.h_taps_c, SCL_COEF_CHROMA_HORZ_FILTER, filter_h_c);
-
-            if (filter_v_c != NULL)
-                vpe10_dpp_dscl_set_scaler_filter(
-                    dpp, scl_data->taps.v_taps_c, SCL_COEF_CHROMA_VERT_FILTER, filter_v_c);
-        }
+                dpp, scl_data->taps.v_taps_c, SCL_COEF_CHROMA_VERT_FILTER, filter_v_c);
     }
 
-    REG_SET_2(VPDSCL_MODE, 0, VPDSCL_MODE, scl_mode, SCL_CHROMA_COEF_MODE, chroma_coef_mode);
+    REG_UPDATE(VPDSCL_MODE, SCL_CHROMA_COEF_MODE, chroma_coef_mode);
 }
 
 void vpe10_dpp_dscl_set_lb(struct dpp *dpp, const struct line_buffer_params *lb_params,
@@ -242,7 +247,7 @@ void vpe10_dpp_dscl_set_scale_ratio(struct dpp *dpp, const struct scaler_data *d
         vpe_fixpt_u3d19(data->ratios.vert_c) << 5);
 }
 
-void vpe10_dpp_dscl_set_scaler_position(struct dpp *dpp, const struct scaler_data *data)
+static void dpp1_dscl_set_scaler_position(struct dpp *dpp, const struct scaler_data *data)
 {
     uint32_t init_frac = 0;
     uint32_t init_int  = 0;
@@ -312,7 +317,7 @@ void vpe10_dpp_set_segment_scaler(struct dpp *dpp, const struct scaler_data *scl
     if (dscl_mode == DSCL_MODE_DSCL_BYPASS)
         return;
 
-    dpp->funcs->dscl_set_scaler_position(dpp, scl_data);
+    dpp1_dscl_set_scaler_position(dpp, scl_data);
 }
 
 void vpe10_dpp_set_frame_scaler(struct dpp *dpp, const struct scaler_data *scl_data)
@@ -327,8 +332,9 @@ void vpe10_dpp_set_frame_scaler(struct dpp *dpp, const struct scaler_data *scl_d
     if (dscl_mode != DSCL_MODE_DSCL_BYPASS)
         vpe10_dpp_power_on_dscl(dpp, true);
 
+    vpe10_dpp_dscl_set_dscl_mode(dpp, dscl_mode);
+
     if (dscl_mode == DSCL_MODE_DSCL_BYPASS) {
-        vpe10_dpp_dscl_set_scl_filter_and_dscl_mode(dpp, scl_data, dscl_mode, ycbcr);
         vpe10_dpp_power_on_dscl(dpp, false);
         return;
     }
@@ -336,5 +342,5 @@ void vpe10_dpp_set_frame_scaler(struct dpp *dpp, const struct scaler_data *scl_d
     vpe10_dpp_dscl_set_lb(dpp, &scl_data->lb_params, LB_MEMORY_CONFIG_0);
     vpe10_dpp_dscl_set_scale_ratio(dpp, scl_data);
     vpe10_dpp_dscl_set_taps(dpp, scl_data);
-    vpe10_dpp_dscl_set_scl_filter_and_dscl_mode(dpp, scl_data, dscl_mode, ycbcr);
+    vpe10_dpp_dscl_set_scl_filter(dpp, scl_data, dscl_mode, ycbcr);
 }

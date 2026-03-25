@@ -66,8 +66,7 @@ ir3_point_sprite(const struct ir3_shader_variant *fs, int i,
 void ir3_update_max_tf_vtx(struct fd_context *ctx,
                            const struct ir3_shader_variant *v) assert_dt;
 
-struct fd_screen;
-void ir3_get_private_mem(struct fd_screen *screen,
+void ir3_get_private_mem(struct fd_context *ctx,
                          const struct ir3_shader_variant *so) assert_dt;
 
 ENDC;

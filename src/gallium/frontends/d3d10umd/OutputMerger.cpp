@@ -83,6 +83,7 @@ CreateRenderTargetView(
 {
    LOG_ENTRYPOINT();
 
+   struct pipe_context *pipe = CastPipeContext(hDevice);
    struct pipe_resource *resource = CastPipeResource(pCreateRenderTargetView->hDrvResource);
    RenderTargetView *pRTView = CastRenderTargetView(hRenderTargetView);
 
@@ -94,35 +95,36 @@ CreateRenderTargetView(
 
    switch (pCreateRenderTargetView->ResourceDimension) {
    case D3D10DDIRESOURCE_BUFFER:
-      LOG_UNSUPPORTED("Render target view into buffer!");
-      SetError(hDevice, E_NOTIMPL);
-      return;
+      desc.u.buf.first_element = pCreateRenderTargetView->Buffer.FirstElement;
+      desc.u.buf.last_element = pCreateRenderTargetView->Buffer.NumElements - 1 +
+                                   desc.u.buf.first_element;
+      break;
    case D3D10DDIRESOURCE_TEXTURE1D:
       ASSERT(pCreateRenderTargetView->Tex1D.ArraySize != (UINT)-1);
-      desc.level = pCreateRenderTargetView->Tex1D.MipSlice;
-      desc.first_layer = pCreateRenderTargetView->Tex1D.FirstArraySlice;
-      desc.last_layer = pCreateRenderTargetView->Tex1D.ArraySize - 1 +
-                                 desc.first_layer;
+      desc.u.tex.level = pCreateRenderTargetView->Tex1D.MipSlice;
+      desc.u.tex.first_layer = pCreateRenderTargetView->Tex1D.FirstArraySlice;
+      desc.u.tex.last_layer = pCreateRenderTargetView->Tex1D.ArraySize - 1 +
+                                 desc.u.tex.first_layer;
       break;
    case D3D10DDIRESOURCE_TEXTURE2D:
       ASSERT(pCreateRenderTargetView->Tex2D.ArraySize != (UINT)-1);
-      desc.level = pCreateRenderTargetView->Tex2D.MipSlice;
-      desc.first_layer = pCreateRenderTargetView->Tex2D.FirstArraySlice;
-      desc.last_layer = pCreateRenderTargetView->Tex2D.ArraySize - 1 +
-                                 desc.first_layer;
+      desc.u.tex.level = pCreateRenderTargetView->Tex2D.MipSlice;
+      desc.u.tex.first_layer = pCreateRenderTargetView->Tex2D.FirstArraySlice;
+      desc.u.tex.last_layer = pCreateRenderTargetView->Tex2D.ArraySize - 1 +
+                                 desc.u.tex.first_layer;
       break;
    case D3D10DDIRESOURCE_TEXTURE3D:
-      desc.level = pCreateRenderTargetView->Tex3D.MipSlice;
-      desc.first_layer = pCreateRenderTargetView->Tex3D.FirstW;
-      desc.last_layer = pCreateRenderTargetView->Tex3D.WSize - 1 +
-                                 desc.first_layer;
+      desc.u.tex.level = pCreateRenderTargetView->Tex3D.MipSlice;
+      desc.u.tex.first_layer = pCreateRenderTargetView->Tex3D.FirstW;
+      desc.u.tex.last_layer = pCreateRenderTargetView->Tex3D.WSize - 1 +
+                                 desc.u.tex.first_layer;
       break;
    case D3D10DDIRESOURCE_TEXTURECUBE:
       ASSERT(pCreateRenderTargetView->TexCube.ArraySize != (UINT)-1);
-      desc.level = pCreateRenderTargetView->TexCube.MipSlice;
-      desc.first_layer = pCreateRenderTargetView->TexCube.FirstArraySlice;
-      desc.last_layer = pCreateRenderTargetView->TexCube.ArraySize - 1 +
-                                 desc.first_layer;
+      desc.u.tex.level = pCreateRenderTargetView->TexCube.MipSlice;
+      desc.u.tex.first_layer = pCreateRenderTargetView->TexCube.FirstArraySlice;
+      desc.u.tex.last_layer = pCreateRenderTargetView->TexCube.ArraySize - 1 +
+                                 desc.u.tex.first_layer;;
       break;
    default:
       ASSERT(0);
@@ -281,6 +283,7 @@ CreateDepthStencilView(
 {
    LOG_ENTRYPOINT();
 
+   struct pipe_context *pipe = CastPipeContext(hDevice);
    struct pipe_resource *resource = CastPipeResource(pCreateDepthStencilView->hDrvResource);
    DepthStencilView *pDSView = CastDepthStencilView(hDepthStencilView);
 
@@ -293,24 +296,24 @@ CreateDepthStencilView(
    switch (pCreateDepthStencilView->ResourceDimension) {
    case D3D10DDIRESOURCE_TEXTURE1D:
       ASSERT(pCreateDepthStencilView->Tex1D.ArraySize != (UINT)-1);
-      desc.level = pCreateDepthStencilView->Tex1D.MipSlice;
-      desc.first_layer = pCreateDepthStencilView->Tex1D.FirstArraySlice;
-      desc.last_layer = pCreateDepthStencilView->Tex1D.ArraySize - 1 +
-                                 desc.first_layer;
+      desc.u.tex.level = pCreateDepthStencilView->Tex1D.MipSlice;
+      desc.u.tex.first_layer = pCreateDepthStencilView->Tex1D.FirstArraySlice;
+      desc.u.tex.last_layer = pCreateDepthStencilView->Tex1D.ArraySize - 1 +
+                                 desc.u.tex.first_layer;
       break;
    case D3D10DDIRESOURCE_TEXTURE2D:
       ASSERT(pCreateDepthStencilView->Tex2D.ArraySize != (UINT)-1);
-      desc.level = pCreateDepthStencilView->Tex2D.MipSlice;
-      desc.first_layer = pCreateDepthStencilView->Tex2D.FirstArraySlice;
-      desc.last_layer = pCreateDepthStencilView->Tex2D.ArraySize - 1 +
-                                 desc.first_layer;
+      desc.u.tex.level = pCreateDepthStencilView->Tex2D.MipSlice;
+      desc.u.tex.first_layer = pCreateDepthStencilView->Tex2D.FirstArraySlice;
+      desc.u.tex.last_layer = pCreateDepthStencilView->Tex2D.ArraySize - 1 +
+                                 desc.u.tex.first_layer;
       break;
    case D3D10DDIRESOURCE_TEXTURECUBE:
       ASSERT(pCreateDepthStencilView->TexCube.ArraySize != (UINT)-1);
-      desc.level = pCreateDepthStencilView->TexCube.MipSlice;
-      desc.first_layer = pCreateDepthStencilView->TexCube.FirstArraySlice;
-      desc.last_layer = pCreateDepthStencilView->TexCube.ArraySize - 1 +
-                                 desc.first_layer;
+      desc.u.tex.level = pCreateDepthStencilView->TexCube.MipSlice;
+      desc.u.tex.first_layer = pCreateDepthStencilView->TexCube.FirstArraySlice;
+      desc.u.tex.last_layer = pCreateDepthStencilView->TexCube.ArraySize - 1 +
+                                 desc.u.tex.first_layer;
       break;
    default:
       ASSERT(0);

@@ -26,7 +26,10 @@
 
 #include "zink_types.h"
 
-
+#define ZINK_WORKGROUP_SIZE_X 1
+#define ZINK_WORKGROUP_SIZE_Y 2
+#define ZINK_WORKGROUP_SIZE_Z 3
+#define ZINK_VARIABLE_SHARED_MEM 4
 #define ZINK_INLINE_VAL_FLAT_MASK 0
 #define ZINK_INLINE_VAL_PV_LAST_VERT 2
 
@@ -40,7 +43,7 @@ struct spirv_shader;
 
 struct tgsi_token;
 
-static inline mesa_shader_stage
+static inline gl_shader_stage
 clamp_stage(const shader_info *info)
 {
    return info->stage == MESA_SHADER_KERNEL ? MESA_SHADER_COMPUTE : info->stage;
@@ -71,7 +74,7 @@ void
 zink_shader_init(struct zink_screen *screen, struct zink_shader *zs);
 
 void
-zink_shader_finalize(struct pipe_screen *pscreen, struct nir_shader *nir, bool optimize);
+zink_shader_finalize(struct pipe_screen *pscreen, struct nir_shader *nir);
 
 void
 zink_shader_free(struct zink_screen *screen, struct zink_shader *shader);

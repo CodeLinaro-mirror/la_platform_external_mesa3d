@@ -3,10 +3,10 @@ BasedOnStyle: InheritParentConfig
 DisableFormat: false
 
 ColumnLimit: 132
-SortIncludes: CaseSensitive
+SortIncludes: true
 
-AlignConsecutiveAssignments: None
-AlignConsecutiveDeclarations: None
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
 AlignTrailingComments: true
 
 PenaltyExcessCharacter: 75
@@ -23,7 +23,7 @@ BreakBeforeBraces: Custom
 BraceWrapping:
   AfterCaseLabel: true
   AfterClass: true
-  AfterControlStatement: Always
+  AfterControlStatement: true
   AfterEnum: true
   AfterNamespace: true
   AfterObjCDeclaration: true
@@ -54,7 +54,7 @@ SpaceBeforeParens: Custom
 SpaceBeforeParensOptions:
   AfterControlStatements: false
 SpacesBeforeTrailingComments: 3
-SpacesInAngles: Never
+SpacesInAngles: false
 SpacesInParentheses: true
 SpacesInSquareBrackets: false
 SpacesInCStyleCastParentheses: false

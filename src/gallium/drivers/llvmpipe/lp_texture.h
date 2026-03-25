@@ -47,8 +47,6 @@ enum lp_texture_usage
 
 enum llvmpipe_memory_fd_type
 {
-   LLVMPIPE_MEMORY_FD_TYPE_INVALID,
-   LLVMPIPE_MEMORY_FD_TYPE_ANONYMOUS,
    LLVMPIPE_MEMORY_FD_TYPE_OPAQUE,
    LLVMPIPE_MEMORY_FD_TYPE_DMA_BUF,
 };
@@ -139,6 +137,7 @@ struct llvmpipe_memory_allocation
    uint64_t size;
    enum llvmpipe_memory_fd_type type;
    int mem_fd;
+   int dmabuf_fd;
 };
 
 struct llvmpipe_memory_object

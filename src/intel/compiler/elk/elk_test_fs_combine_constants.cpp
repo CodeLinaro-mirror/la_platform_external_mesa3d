@@ -26,7 +26,8 @@ struct FSCombineConstantsTest : public ::testing::Test {
       params.mem_ctx = mem_ctx;
 
       prog_data = {};
-      nir_shader *nir = nir_shader_create(mem_ctx, MESA_SHADER_COMPUTE, NULL);
+      nir_shader *nir =
+         nir_shader_create(mem_ctx, MESA_SHADER_COMPUTE, NULL, NULL);
 
       shader = new elk_fs_visitor(&compiler, &params, NULL,
                               &prog_data.base, nir, 8, false, false);
@@ -42,13 +43,13 @@ struct FSCombineConstantsTest : public ::testing::Test {
    elk_compiler compiler;
    elk_compile_params params;
    intel_device_info devinfo;
-   struct elk_fs_prog_data prog_data;
+   struct elk_wm_prog_data prog_data;
    struct gl_shader_program *shader_prog;
 
    elk_fs_visitor *shader;
 
    bool opt_combine_constants(elk_fs_visitor *s) {
-      const bool print = os_get_option("TEST_DEBUG");
+      const bool print = getenv("TEST_DEBUG");
 
       if (print) {
          fprintf(stderr, "= Before =\n");

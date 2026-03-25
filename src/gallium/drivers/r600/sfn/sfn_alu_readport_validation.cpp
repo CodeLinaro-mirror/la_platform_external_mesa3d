@@ -72,23 +72,7 @@ public:
 };
 
 bool
-AluReadportReservation::update_from_sources(const std::array<PVirtualValue, 3>& src,
-                                            const unsigned int nsrc)
-{
-   AluBankSwizzle bs = alu_vec_012;
-   while (bs != alu_vec_unknown) {
-      AluReadportReservation rpr = *this;
-      if (rpr.schedule_vec_src(src, nsrc, bs) == nsrc) {
-         *this = rpr;
-         return true;
-      }
-      ++bs;
-   }
-   return false;
-}
-
-unsigned
-AluReadportReservation::schedule_vec_src(const std::array<PVirtualValue, 3>& src,
+AluReadportReservation::schedule_vec_src(PVirtualValue src[3],
                                          int nsrc,
                                          AluBankSwizzle swz)
 {
@@ -106,12 +90,9 @@ AluReadportReservation::schedule_vec_src(const std::array<PVirtualValue, 3>& src
       visitor.cycle = cycle_vec(swz, i);
       visitor.isrc = i;
       src[i]->accept(visitor);
-      if (!visitor.success) {
-         return i;
-      }
    }
 
-   return nsrc;
+   return visitor.success;
 }
 
 bool
@@ -182,13 +163,6 @@ AluReadportReservation::AluReadportReservation()
 bool
 AluReadportReservation::reserve_gpr(int sel, int chan, int cycle)
 {
-   for (int c = 0; c < 3; ++c) {
-      if (m_hw_gpr[c][chan] == sel) {
-         if (cycle == c)
-            return true;
-      }
-   }
-
    if (m_hw_gpr[cycle][chan] == -1) {
       m_hw_gpr[cycle][chan] = sel;
    } else if (m_hw_gpr[cycle][chan] != sel) {

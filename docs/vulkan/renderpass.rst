@@ -61,7 +61,7 @@ render pass clears with layout transitions, often from
 combining these transitions with clears is important for performance.
 
 .. c:autostruct:: VkRenderingAttachmentInitialLayoutInfoMESA
-   :file: src/vulkan/util/vk_internal_exts.h
+   :file: src/vulkan/runtime/vk_render_pass.h
    :members:
 
 Because render passes and subpass indices are also passed into

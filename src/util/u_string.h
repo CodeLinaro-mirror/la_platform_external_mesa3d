@@ -42,7 +42,6 @@
 #include <string.h>
 #include <limits.h>
 
-#include "util/detect_os.h"
 #include "util/macros.h" // PRINTFLIKE
 
 
@@ -50,7 +49,7 @@
 extern "C" {
 #endif
 
-#if !defined(_GNU_SOURCE) || defined(__APPLE__) || defined(DETECT_OS_WINDOWS)
+#if !defined(_GNU_SOURCE) || defined(__APPLE__)
 
 #define strchrnul util_strchrnul
 static inline char *
@@ -63,7 +62,7 @@ util_strchrnul(const char *s, char c)
 
 #endif
 
-#if DETECT_OS_WINDOWS
+#ifdef _WIN32
 
 #define sprintf util_sprintf
 static inline int
@@ -122,10 +121,8 @@ util_asprintf(char **str, const char *fmt, ...)
 #define strtok_r strtok_s
 #endif
 
-char *
-strdup_wstr_utf8(const wchar_t *wstr);
+#endif /* _WIN32 */
 
-#endif /* DETECT_OS_WINDOWS */
 
 #ifdef __cplusplus
 }

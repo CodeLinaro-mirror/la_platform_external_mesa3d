@@ -68,7 +68,7 @@ struct r600_resource *r600_compute_buffer_alloc_vram(struct r600_screen *screen,
 	buffer = pipe_buffer_create((struct pipe_screen*) screen,
 				    0, PIPE_USAGE_IMMUTABLE, size);
 
-	return r600_as_resource(buffer);
+	return (struct r600_resource *)buffer;
 }
 
 
@@ -79,6 +79,7 @@ static void evergreen_set_rat(struct r600_pipe_compute *pipe,
 			      int size)
 {
 	struct pipe_surface rat_templ;
+	struct r600_surface *surf = NULL;
 	struct r600_context *rctx = NULL;
 
 	assert(id < 12);
@@ -97,8 +98,12 @@ static void evergreen_set_rat(struct r600_pipe_compute *pipe,
 	rat_templ.first_layer = 0;
 	rat_templ.last_layer = 0;
 
-	/* Add the RAT the list of color buffers. */
+	/* Add the RAT the list of color buffers. Drop the old buffer first. */
 	pipe->ctx->framebuffer.state.cbufs[id] = rat_templ;
+	pipe_surface_unref(&pipe->ctx->b.b, &pipe->ctx->framebuffer.fb_cbufs[id]);
+	pipe->ctx->framebuffer.fb_cbufs[id] = pipe->ctx->b.b.create_surface(
+		(struct pipe_context *)pipe->ctx,
+		(struct pipe_resource *)bo, &rat_templ);
 
 	/* Update the number of color buffers */
 	pipe->ctx->framebuffer.state.nr_cbufs =
@@ -110,9 +115,8 @@ static void evergreen_set_rat(struct r600_pipe_compute *pipe,
 	 * of this driver. */
 	pipe->ctx->compute_cb_target_mask |= (0xf << (id * 4));
 
-	evergreen_init_color_surface_rat(rctx,
-					 &pipe->ctx->b.framebuffer.cbufs[id],
-					 &pipe->ctx->framebuffer.state.cbufs[id]);
+	surf = (struct r600_surface*)pipe->ctx->framebuffer.fb_cbufs[id];
+	evergreen_init_color_surface_rat(rctx, surf);
 }
 
 static void evergreen_cs_set_vertex_buffer(struct r600_context *rctx,
@@ -146,7 +150,7 @@ static void evergreen_cs_set_constant_buffer(struct r600_context *rctx,
 	cb.buffer = buffer;
 	cb.user_buffer = NULL;
 
-	rctx->b.b.set_constant_buffer(&rctx->b.b, MESA_SHADER_COMPUTE, cb_index, &cb);
+	rctx->b.b.set_constant_buffer(&rctx->b.b, PIPE_SHADER_COMPUTE, cb_index, false, &cb);
 }
 
 /* We need to define these R600 registers here, because we can't include
@@ -169,7 +173,7 @@ static void *evergreen_create_compute_state(struct pipe_context *ctx,
 
 	shader->ctx = rctx;
 	shader->local_size = cso->static_shared_mem;
-	shader->sel = r600_create_shader_state_tokens(ctx, cso->prog, cso->ir_type, MESA_SHADER_COMPUTE);
+	shader->sel = r600_create_shader_state_tokens(ctx, cso->prog, cso->ir_type, PIPE_SHADER_COMPUTE);
 
 	/* Precompile the shader with the expected shader key, to reduce jank at
 	 * draw time. Also produces output for shader-db.
@@ -324,7 +328,7 @@ static void compute_emit_cs(struct r600_context *rctx,
 		current->shader.has_txq_cube_array_z_comp;
 
 	if (info->indirect) {
-		struct r600_resource *indirect_resource = r600_as_resource(info->indirect);
+		struct r600_resource *indirect_resource = (struct r600_resource *)info->indirect;
 		unsigned *data = r600_buffer_map_sync_with_rings(&rctx->b, indirect_resource, PIPE_MAP_READ);
 		unsigned offset = info->indirect_offset / 4;
 		indirect_grid[0] = data[offset];
@@ -336,7 +340,7 @@ static void compute_emit_cs(struct r600_context *rctx,
 		rctx->cs_block_grid_sizes[i + 4] = info->indirect ? indirect_grid[i] : info->grid[i];
 	}
 	rctx->cs_block_grid_sizes[3] = rctx->cs_block_grid_sizes[7] = 0;
-	rctx->driver_consts[MESA_SHADER_COMPUTE].cs_block_grid_size_dirty = true;
+	rctx->driver_consts[PIPE_SHADER_COMPUTE].cs_block_grid_size_dirty = true;
 
 	if (rctx->b.gfx_level == CAYMAN)
 		global_atomic_count = cayman_emit_atomic_buffer_setup_count(rctx, current, combined_atomics, global_atomic_count);
@@ -346,9 +350,15 @@ static void compute_emit_cs(struct r600_context *rctx,
 	r600_need_cs_space(rctx, 0, true, global_atomic_count);
 
 	if (need_buf_const) {
-		eg_setup_buffer_constants(rctx, MESA_SHADER_COMPUTE);
+		eg_setup_buffer_constants(rctx, PIPE_SHADER_COMPUTE);
 	}
 	r600_update_driver_const_buffers(rctx, true);
+
+	evergreen_emit_atomic_buffer_setup(rctx, true, combined_atomics, global_atomic_count);
+	if (global_atomic_count) {
+		radeon_emit(cs, PKT3(PKT3_EVENT_WRITE, 0, 0));
+		radeon_emit(cs, EVENT_TYPE(EVENT_TYPE_CS_PARTIAL_FLUSH) | EVENT_INDEX(4));
+	}
 
 	/* Initialize all the compute-related registers.
 	 *
@@ -369,12 +379,6 @@ static void compute_emit_cs(struct r600_context *rctx,
 	rctx->b.flags |= R600_CONTEXT_WAIT_3D_IDLE | R600_CONTEXT_FLUSH_AND_INV;
 	r600_flush_emit(rctx);
 
-	evergreen_emit_atomic_buffer_setup(rctx, true, combined_atomics, global_atomic_count);
-	if (global_atomic_count) {
-		radeon_emit(cs, PKT3(PKT3_EVENT_WRITE, 0, 0));
-		radeon_emit(cs, EVENT_TYPE(EVENT_TYPE_CS_PARTIAL_FLUSH) | EVENT_INDEX(4));
-	}
-
 	uint32_t rat_mask;
 
 	rat_mask = evergreen_construct_rat_mask(rctx, &rctx->cb_misc_state, 0);
@@ -384,13 +388,13 @@ static void compute_emit_cs(struct r600_context *rctx,
 	r600_emit_atom(rctx, &rctx->b.render_cond_atom);
 
 	/* Emit constant buffer state */
-	r600_emit_atom(rctx, &rctx->constbuf_state[MESA_SHADER_COMPUTE].atom);
+	r600_emit_atom(rctx, &rctx->constbuf_state[PIPE_SHADER_COMPUTE].atom);
 
 	/* Emit sampler state */
-	r600_emit_atom(rctx, &rctx->samplers[MESA_SHADER_COMPUTE].states.atom);
+	r600_emit_atom(rctx, &rctx->samplers[PIPE_SHADER_COMPUTE].states.atom);
 
 	/* Emit sampler view (texture resource) state */
-	r600_emit_atom(rctx, &rctx->samplers[MESA_SHADER_COMPUTE].views.atom);
+	r600_emit_atom(rctx, &rctx->samplers[PIPE_SHADER_COMPUTE].views.atom);
 
 	/* Emit images state */
 	r600_emit_atom(rctx, &rctx->compute_images.atom);

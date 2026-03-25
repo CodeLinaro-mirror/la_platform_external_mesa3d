@@ -4,9 +4,6 @@
 #include "nvtypes.h"
 #include "util/macros.h"
 
-#include "drf.h"
-#include "cl906f.h"
-
 #include <assert.h>
 #include <stddef.h>
 #include <string.h>
@@ -24,28 +21,16 @@ struct nv_push {
 
    /* The value in the last method header, used to avoid read-back */
    uint32_t last_hdr_dw;
-
-#ifndef NDEBUG
-   /* A mask of valid subchannels */
-   uint8_t subc_mask;
-#endif
 };
 
-#define SUBC_MASK_ALL 0xff
-
 static inline void
-nv_push_init(struct nv_push *push, uint32_t *start,
-             size_t dw_count, uint8_t subc_mask)
+nv_push_init(struct nv_push *push, uint32_t *start, size_t dw_count)
 {
    push->start = start;
    push->end = start;
    push->limit = start + dw_count;
    push->last_hdr = NULL;
    push->last_hdr_dw = 0;
-
-#ifndef NDEBUG
-   push->subc_mask = subc_mask;
-#endif
 }
 
 static inline size_t
@@ -63,10 +48,9 @@ static inline void nv_push_validate(struct nv_push *push) { }
 #endif
 
 void vk_push_print(FILE *fp, const struct nv_push *push,
-                   const struct nv_device_info *devinfo) ATTRIBUTE_COLD;
+                   const struct nv_device_info *devinfo);
 
 #define SUBC_NV9097 0
-#define SUBC_NV9297 0
 #define SUBC_NVA097 0
 #define SUBC_NVB097 0
 #define SUBC_NVB197 0
@@ -85,7 +69,6 @@ void vk_push_print(FILE *fp, const struct nv_push *push,
 #define SUBC_NVC0C0 1
 #define SUBC_NVC3C0 1
 #define SUBC_NVC6C0 1
-#define SUBC_NVC7C0 1
 
 #define SUBC_NV9039 2
 
@@ -94,22 +77,10 @@ void vk_push_print(FILE *fp, const struct nv_push *push,
 #define SUBC_NV90B5 4
 #define SUBC_NVC1B5 4
 
-/* video decode will get push on sub channel 4 */
-#define SUBC_NVC5B0 4
-
-static inline uint8_t
-NVC0_FIFO_SUBC_FROM_PKHDR(uint32_t hdr)
-{
-   return NVVAL_GET(hdr, NV906F, DMA, METHOD_SUBCHANNEL);
-}
-
 static inline uint32_t
 NVC0_FIFO_PKHDR_SQ(int subc, int mthd, unsigned size)
 {
-   return NVDEF(NV906F, DMA_INCR, OPCODE, VALUE) |
-          NVVAL(NV906F, DMA_INCR, COUNT, size) |
-          NVVAL(NV906F, DMA_INCR, SUBCHANNEL, subc) |
-          NVVAL(NV906F, DMA_INCR, ADDRESS, mthd >> 2);
+   return 0x20000000 | (size << 16) | (subc << 13) | (mthd >> 2);
 }
 
 static inline void
@@ -119,11 +90,10 @@ __push_verify(struct nv_push *push)
       return;
 
    /* check for immd */
-   if (NVDEF_TEST(push->last_hdr_dw, NV906F, DMA, SEC_OP, ==, IMMD_DATA_METHOD))
+   if (push->last_hdr_dw >> 29 == 4)
       return;
 
-   ASSERTED uint32_t last_count =
-      NVVAL_GET(push->last_hdr_dw, NV906F, DMA, METHOD_COUNT);
+   ASSERTED uint32_t last_count = (push->last_hdr_dw & 0x1fff0000);
    assert(last_count);
 }
 
@@ -131,9 +101,6 @@ static inline void
 __push_hdr(struct nv_push *push, uint32_t hdr)
 {
    __push_verify(push);
-
-   ASSERTED const uint32_t subc = NVC0_FIFO_SUBC_FROM_PKHDR(hdr);
-   assert(push->subc_mask & BITFIELD_BIT(subc));
 
    *push->end = hdr;
    push->last_hdr_dw = hdr;
@@ -158,11 +125,8 @@ __push_mthd(struct nv_push *push, int subc, uint32_t mthd)
 static inline uint32_t
 NVC0_FIFO_PKHDR_IL(int subc, int mthd, uint16_t data)
 {
-   assert(!(data & ~DRF_MASK(NV906F_DMA_IMMD_DATA)));
-   return NVDEF(NV906F, DMA_IMMD, OPCODE, VALUE) |
-          NVVAL(NV906F, DMA_IMMD, DATA, data) |
-          NVVAL(NV906F, DMA_IMMD, SUBCHANNEL, subc) |
-          NVVAL(NV906F, DMA_IMMD, ADDRESS, mthd >> 2);
+   assert(!(data & ~0x1fff));
+   return 0x80000000 | (data << 16) | (subc << 13) | (mthd >> 2);
 }
 
 static inline void
@@ -171,11 +135,6 @@ __push_immd(struct nv_push *push, int subc, uint32_t mthd, uint32_t val)
    __push_hdr(push, NVC0_FIFO_PKHDR_IL(subc, mthd, val));
 }
 
-/**
- * P_IMMD() pushes a command and its arguments. Note that this always
- * takes two words in unoptimized builds but may sometimes take one word
- * with optimizations on.
- */
 #define P_IMMD(push, class, mthd, args...) do {                         \
    uint32_t __val;                                                      \
    VA_##class##_##mthd(__val, args);                                    \
@@ -187,24 +146,10 @@ __push_immd(struct nv_push *push, int subc, uint32_t mthd, uint32_t val)
    }                                                                    \
 } while(0)
 
-/**
- * P_IMMD_WORD is the same as P_IMMD, except that it always takes exactly
- * one word of space (and asserts if two words would be needed)
- */
-#define P_IMMD_WORD(push, class, mthd, args...) do {                    \
-   uint32_t __val;                                                      \
-   VA_##class##_##mthd(__val, args);                                    \
-   assert(!(__val & ~0x1fff));                                          \
-   __push_immd(push, SUBC_##class, class##_##mthd, __val);              \
-} while(0)
-
 static inline uint32_t
 NVC0_FIFO_PKHDR_1I(int subc, int mthd, unsigned size)
 {
-   return NVDEF(NV906F, DMA_ONEINCR, OPCODE, VALUE) |
-          NVVAL(NV906F, DMA_ONEINCR, COUNT, size) |
-          NVVAL(NV906F, DMA_ONEINCR, SUBCHANNEL, subc) |
-          NVVAL(NV906F, DMA_ONEINCR, ADDRESS, mthd >> 2);
+   return 0xa0000000 | (size << 16) | (subc << 13) | (mthd >> 2);
 }
 
 static inline void
@@ -218,10 +163,7 @@ __push_1inc(struct nv_push *push, int subc, uint32_t mthd)
 static inline uint32_t
 NVC0_FIFO_PKHDR_0I(int subc, int mthd, unsigned size)
 {
-   return NVDEF(NV906F, DMA_NONINCR, OPCODE, VALUE) |
-          NVVAL(NV906F, DMA_NONINCR, COUNT, size) |
-          NVVAL(NV906F, DMA_NONINCR, SUBCHANNEL, subc) |
-          NVVAL(NV906F, DMA_NONINCR, ADDRESS, mthd >> 2);
+   return 0x60000000 | (size << 16) | (subc << 13) | (mthd >> 2);
 }
 
 static inline void
@@ -232,7 +174,7 @@ __push_0inc(struct nv_push *push, int subc, uint32_t mthd)
 
 #define P_0INC(push, class, mthd) __push_0inc(push, SUBC_##class, class##_##mthd)
 
-#define NV_PUSH_MAX_COUNT DRF_MASK(NV906F_DMA_METHOD_COUNT)
+#define NV_PUSH_MAX_COUNT 0x1fff
 
 static inline bool
 nv_push_update_count(struct nv_push *push, uint16_t count)
@@ -245,15 +187,16 @@ nv_push_update_count(struct nv_push *push, uint16_t count)
 
    uint32_t hdr_dw = push->last_hdr_dw;
 
-   uint32_t old_count = NVVAL_GET(hdr_dw, NV906F, DMA, METHOD_COUNT);
-   uint32_t new_count = (count + old_count) & NV_PUSH_MAX_COUNT;
+   /* size is encoded at 28:16 */
+   uint32_t new_count = (count + (hdr_dw >> 16)) & NV_PUSH_MAX_COUNT;
    bool overflow = new_count < count;
    /* if we would overflow, don't change anything and just let it be */
    assert(!overflow);
    if (overflow)
       return false;
 
-   hdr_dw = NVVAL_SET(hdr_dw, NV906F, DMA, METHOD_COUNT, new_count);
+   hdr_dw &= ~0x1fff0000;
+   hdr_dw |= new_count << 16;
    push->last_hdr_dw = hdr_dw;
    *push->last_hdr = hdr_dw;
    return true;
@@ -297,12 +240,10 @@ static inline void
 nv_push_val(struct nv_push *push, uint32_t idx, uint32_t val)
 {
    ASSERTED uint32_t last_hdr_dw = push->last_hdr_dw;
-   ASSERTED uint32_t type = NVVAL_GET(last_hdr_dw, NV906F, DMA, SEC_OP);
-   ASSERTED bool is_0inc = type == NV906F_DMA_SEC_OP_NON_INC_METHOD;
-   ASSERTED bool is_1inc = type == NV906F_DMA_SEC_OP_ONE_INC;
-   ASSERTED bool is_immd = type == NV906F_DMA_SEC_OP_IMMD_DATA_METHOD;
-   ASSERTED uint16_t last_method =
-      NVVAL_GET(last_hdr_dw, NV906F, DMA, METHOD_ADDRESS) << 2;
+   ASSERTED bool is_0inc = (last_hdr_dw & 0xe0000000) == 0x60000000;
+   ASSERTED bool is_1inc = (last_hdr_dw & 0xe0000000) == 0xa0000000;
+   ASSERTED bool is_immd = (last_hdr_dw & 0xe0000000) == 0x80000000;
+   ASSERTED uint16_t last_method = (last_hdr_dw & 0x1fff) << 2;
 
    uint16_t distance = push->end - push->last_hdr - 1;
    if (is_0inc)

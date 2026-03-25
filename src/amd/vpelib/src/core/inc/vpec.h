@@ -35,10 +35,7 @@ struct vpe_priv;
 
 struct vpec_funcs {
     /** functions for capability check */
-    bool (*check_input_swmode_support)(
-        struct vpec *vpec, const struct vpe_surface_info *surface_info);
-    bool (*check_output_swmode_support)(
-        struct vpec *vpec, const struct vpe_surface_info *surface_info);
+    bool (*check_swmode_support)(struct vpec *vpec, enum vpe_swizzle_mode_values sw_mode);
 };
 
 struct vpec {

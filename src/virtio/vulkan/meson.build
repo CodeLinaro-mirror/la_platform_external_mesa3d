@@ -15,18 +15,16 @@ vn_entrypoints = custom_target(
   ],
 )
 
-icd_file_name = libname_prefix + 'vulkan_virtio.' + libname_suffix
-
 virtio_icd = custom_target(
   'virtio_icd',
   input : [vk_icd_gen, vk_api_xml],
-  output : 'virtio_icd.' + vulkan_manifest_suffix,
+  output : 'virtio_icd.@0@.json'.format(host_machine.cpu()),
   command : [
     prog_python, '@INPUT0@',
     '--api-version', '1.4', '--xml', '@INPUT1@',
     '--sizeof-pointer', sizeof_pointer,
-    '--icd-lib-path', vulkan_icd_lib_path,
-    '--icd-filename', icd_file_name,
+    '--lib-path', join_paths(get_option('prefix'), get_option('libdir'),
+                             'libvulkan_virtio.so'),
     '--out', '@OUTPUT@',
   ],
   build_by_default : true,
@@ -44,14 +42,15 @@ _dev_icd = custom_target(
     prog_python, '@INPUT0@',
     '--api-version', '1.4', '--xml', '@INPUT1@',
     '--sizeof-pointer', sizeof_pointer,
-    '--icd-lib-path', meson.current_build_dir(),
-    '--icd-filename', icd_file_name,
+    '--lib-path', meson.current_build_dir() / 'libvulkan_virtio.so',
     '--out', '@OUTPUT@',
   ],
   build_by_default : true,
 )
 
 devenv.append('VK_DRIVER_FILES', _dev_icd.full_path())
+# Deprecated: replaced by VK_DRIVER_FILES above
+devenv.append('VK_ICD_FILENAMES', _dev_icd.full_path())
 
 libvn_files = files(
   'vn_acceleration_structure.c',
@@ -59,7 +58,6 @@ libvn_files = files(
   'vn_command_buffer.c',
   'vn_common.c',
   'vn_cs.c',
-  'vn_descriptor_heap.c',
   'vn_descriptor_set.c',
   'vn_device.c',
   'vn_device_memory.c',
@@ -76,13 +74,8 @@ libvn_files = files(
   'vn_ring.c',
   'vn_renderer_internal.c',
   'vn_renderer_util.c',
+  'vn_renderer_vtest.c',
 )
-
-vn_incs = [
-  inc_include,
-  inc_src,
-  inc_virtio,
-]
 
 vn_deps = [
   dep_thread,
@@ -93,23 +86,13 @@ vn_deps = [
   idep_xmlconfig,
 ]
 
-vn_c_args = [
+vn_flags = [
   no_override_init_args,
 ] + cc.get_supported_arguments([
   '-Werror=switch',
 ])
 
-vn_link_args = [
-  ld_args_bsymbolic,
-  ld_args_gc_sections,
-  vulkan_icd_link_args,
-]
-
 vn_libs = []
-
-if not with_platform_windows
-  libvn_files += files('vn_renderer_vtest.c')
-endif
 
 if system_has_kms_drm
   libvn_files += files('vn_renderer_virtgpu.c')
@@ -117,10 +100,9 @@ if system_has_kms_drm
 endif
 
 if with_platform_wayland or with_platform_x11 or \
-   (system_has_kms_drm and not with_platform_android) or \
-   with_platform_windows
+   (system_has_kms_drm and not with_platform_android)
   libvn_files += files('vn_wsi.c')
-  vn_c_args += '-DVN_USE_WSI_PLATFORM'
+  vn_flags += '-DVN_USE_WSI_PLATFORM'
 endif
 
 if with_platform_wayland
@@ -139,11 +121,13 @@ endif
 libvulkan_virtio = shared_library(
   'vulkan_virtio',
   [libvn_files, vn_entrypoints, sha1_h],
-  include_directories : vn_incs,
+  include_directories : [
+    inc_include, inc_src, inc_virtio,
+  ],
   link_with : vn_libs,
-  dependencies : vn_deps,
-  c_args : vn_c_args,
-  link_args : vn_link_args,
+  dependencies : [vn_deps],
+  c_args : [vn_flags],
+  link_args : [vulkan_icd_link_args, ld_args_bsymbolic, ld_args_gc_sections],
   link_depends : vulkan_icd_link_depends,
   gnu_symbol_visibility : 'hidden',
   install : true,

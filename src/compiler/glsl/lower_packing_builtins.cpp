@@ -93,9 +93,10 @@ public:
       if (lowering_op == LOWER_PACK_UNPACK_NONE)
          return;
 
-      setup_factory(expr->node_linalloc);
+      setup_factory(ralloc_parent(expr));
 
       ir_rvalue *op0 = expr->operands[0];
+      ralloc_steal(factory.mem_ctx, op0);
 
       switch (lowering_op) {
       case LOWER_PACK_SNORM_2x16:
@@ -198,12 +199,12 @@ private:
    }
 
    void
-   setup_factory(linear_ctx *linalloc)
+   setup_factory(void *mem_ctx)
    {
-      assert(factory.linalloc == NULL);
+      assert(factory.mem_ctx == NULL);
       assert(factory.instructions->is_empty());
 
-      factory.linalloc = linalloc;
+      factory.mem_ctx = mem_ctx;
    }
 
    void
@@ -211,7 +212,7 @@ private:
    {
       base_ir->insert_before(factory.instructions);
       assert(factory.instructions->is_empty());
-      factory.linalloc = NULL;
+      factory.mem_ctx = NULL;
    }
 
    template <typename T>

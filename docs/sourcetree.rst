@@ -40,27 +40,21 @@ each directory.
    -  **gbm** - Generic Buffer Manager is a memory allocator for
       device buffers
 
-   -  **imagination** - Imagination-specific sources
-
-      -  **common** - common utility sources and hardware information
-      -  **csbgen** - code generator for pack/unpack functions used by
-         Control Stream Builder
-      -  **include** - common header files
-      -  **pco** - shader compiler for PowerVR Rogue and newer
-      -  **vulkan** - Vulkan implementation for PowerVR Rogue and newer
-
    -  **intel** - Intel-specific sources
 
       -  **blorp** - BLit Or Resolve Pass is a blit and HiZ resolve framework
       -  **vulkan** - Anvil is a Vulkan implementation for Intel gen 7
          (Ivy Bridge) and newer
 
-   -  **mesa** - Main Mesa sources
+   -  **mapi** - Mesa APIs
 
       -  **glapi** - OpenGL API dispatch layer. This is where all the GL
          entrypoints like glClear, glBegin, etc. are generated, as well as
          the GL dispatch table. All GL function calls jump through the
          dispatch table to functions found in main/.
+
+   -  **mesa** - Main Mesa sources
+
       -  **main** - The core Mesa code (mainly state management)
       -  **math** - vertex array translation and transformation code
          (not used with Gallium)
@@ -144,6 +138,7 @@ each directory.
          -  **hgl** - Haiku OpenGL
          -  **lavapipe** - Vulkan frontend, software Vulkan rasterizer using LLVMpipe.
          -  **va** - VA-API frontend
+         -  **vdpau** - VDPAU frontend
          -  **wgl** - Windows WGL frontend
 
       -  **winsys** - The device drivers are platform-independent, the

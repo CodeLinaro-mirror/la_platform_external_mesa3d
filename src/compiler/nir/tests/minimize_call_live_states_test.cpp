@@ -39,8 +39,7 @@ TEST_F(nir_minimize_call_live_states_test, no_live_states)
       shader: MESA_SHADER_COMPUTE
       name: nir_minimize_call_live_states_test
       workgroup_size: 1, 1, 1
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_function main () (entrypoint)
 
       impl main {
@@ -62,8 +61,8 @@ TEST_F(nir_minimize_call_live_states_test, life_intrinsics)
    nir_def *callee = nir_load_push_constant(b, 1, 32, nir_imm_int(b, 0));
 
    nir_def *v1 = nir_load_push_constant(b, 1, 64, nir_imm_int(b, 8));
-   nir_def *v2 = nir_load_global(b, 3, 32, v1);
-   nir_def *v3 = nir_load_global_constant(b, 1, 32, v1);
+   nir_def *v2 = nir_load_global(b, v1, 4, 3, 32);
+   nir_def *v3 = nir_load_global_constant(b, v1, 4, 1, 32);
 
    nir_build_indirect_call(b, indirect_decl, callee, 0, NULL);
 
@@ -77,8 +76,7 @@ TEST_F(nir_minimize_call_live_states_test, life_intrinsics)
       shader: MESA_SHADER_COMPUTE
       name: nir_minimize_call_live_states_test
       workgroup_size: 1, 1, 1
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_function main () (entrypoint)
 
       impl main {
@@ -125,8 +123,7 @@ TEST_F(nir_minimize_call_live_states_test, life_alu)
       shader: MESA_SHADER_COMPUTE
       name: nir_minimize_call_live_states_test
       workgroup_size: 1, 1, 1
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_function main () (entrypoint)
 
       impl main {
@@ -177,8 +174,7 @@ TEST_F(nir_minimize_call_live_states_test, call_inside_if)
       shader: MESA_SHADER_COMPUTE
       name: nir_minimize_call_live_states_test
       workgroup_size: 1, 1, 1
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_function main () (entrypoint)
 
       impl main {
@@ -228,7 +224,7 @@ TEST_F(nir_minimize_call_live_states_test, call_inside_loop)
    nir_def *index = nir_channel(b, nir_load_ray_launch_id(b), 0);
    addr = nir_iadd(b, addr, nir_u2u64(b, nir_imul_imm(b, index, 4)));
 
-   nir_def *callee = nir_load_global_constant(b, 1, 32, addr);
+   nir_def *callee = nir_load_global_constant(b, addr, 4, 1, 32);
 
    nir_def *value = nir_load_push_constant(b, 1, 32, nir_imm_int(b, 4));
    nir_def *v1 = nir_iadd_imm(b, value, 1);
@@ -253,8 +249,7 @@ TEST_F(nir_minimize_call_live_states_test, call_inside_loop)
       shader: MESA_SHADER_COMPUTE
       name: nir_minimize_call_live_states_test
       workgroup_size: 1, 1, 1
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_function main () (entrypoint)
 
       impl main {

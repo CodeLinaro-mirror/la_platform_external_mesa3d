@@ -51,7 +51,6 @@ files_etnaviv = files(
   'etnaviv_query.h',
   'etnaviv_query_acc_occlusion.c',
   'etnaviv_query_acc_perfmon.c',
-  'etnaviv_query_acc_xfb.c',
   'etnaviv_query_acc.c',
   'etnaviv_query_acc.h',
   'etnaviv_query_sw.c',

@@ -197,7 +197,7 @@ void
 crocus_predraw_resolve_inputs(struct crocus_context *ice,
                               struct crocus_batch *batch,
                               bool *draw_aux_buffer_disabled,
-                              mesa_shader_stage stage,
+                              gl_shader_stage stage,
                               bool consider_framebuffer)
 {
    struct crocus_shader_state *shs = &ice->state.shaders[stage];

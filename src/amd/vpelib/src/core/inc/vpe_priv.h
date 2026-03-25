@@ -60,7 +60,6 @@ extern "C" {
 #define MAX_LINE_SIZE 1024 // without 16 pixels for the seams
 #define MAX_LINE_CNT  4
 
-#define VPE_NO_ALIGNMENT 1
 enum vpe_cmd_ops {
     VPE_CMD_OPS_BLENDING,
     VPE_CMD_OPS_BG,
@@ -80,11 +79,6 @@ enum vpe_cmd_type {
 enum vpe_stream_type {
     VPE_STREAM_TYPE_INPUT,
     VPE_STREAM_TYPE_BG_GEN,
-};
-
-enum lut3d_type {
-    LUT3D_TYPE_NONE,
-    LUT3D_TYPE_CPU,
 };
 
 /** this represents a segement context.
@@ -117,8 +111,7 @@ struct vpe_cmd_info {
     uint16_t              num_outputs;
     struct vpe_cmd_output outputs[MAX_OUTPUT_PIPE];
 
-    enum lut3d_type lut3d_type;
-
+    bool tm_enabled;
     bool insert_start_csync;
     bool insert_end_csync;
 };

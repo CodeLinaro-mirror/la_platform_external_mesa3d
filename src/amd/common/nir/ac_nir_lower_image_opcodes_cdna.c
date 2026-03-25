@@ -108,9 +108,9 @@ static nir_def *lower_image_coords(nir_builder *b, nir_def *desc, nir_def *coord
 }
 
 static nir_def *emulated_image_load(nir_builder *b, unsigned num_components, unsigned bit_size,
-                                    nir_def *desc, nir_def *coord,
-                                    enum gl_access_qualifier access, enum glsl_sampler_dim dim,
-                                    bool is_array, bool handle_out_of_bounds, nir_alu_type dest_type)
+                                        nir_def *desc, nir_def *coord,
+                                        enum gl_access_qualifier access, enum glsl_sampler_dim dim,
+                                        bool is_array, bool handle_out_of_bounds)
 {
    nir_def *zero = nir_imm_int(b, 0);
 
@@ -120,8 +120,7 @@ static nir_def *emulated_image_load(nir_builder *b, unsigned num_components, uns
                                                  handle_out_of_bounds),
                               .base = 0,
                               .memory_modes = nir_var_image,
-                              .access = access | ACCESS_USES_FORMAT_AMD,
-                              .dest_type = dest_type);
+                              .access = access | ACCESS_USES_FORMAT_AMD);
 }
 
 static void emulated_image_store(nir_builder *b, nir_def *desc, nir_def *coord,
@@ -147,10 +146,9 @@ static nir_def *get_dim(nir_builder *b, nir_def *desc, unsigned dim)
  * This basically converts the tex opcode into 1 or more image_load opcodes.
  */
 static nir_def *emulated_tex_level_zero(nir_builder *b, unsigned num_components,
-                                        unsigned bit_size, nir_def *desc,
-                                        nir_def *sampler_desc, nir_def *coord_vec,
-                                        enum glsl_sampler_dim sampler_dim, bool is_array,
-                                        nir_alu_type dest_type)
+                                            unsigned bit_size, nir_def *desc,
+                                            nir_def *sampler_desc, nir_def *coord_vec,
+                                            enum glsl_sampler_dim sampler_dim, bool is_array)
 {
    const enum gl_access_qualifier access =
       ACCESS_RESTRICT | ACCESS_NON_WRITEABLE | ACCESS_CAN_REORDER;
@@ -208,7 +206,7 @@ static nir_def *emulated_tex_level_zero(nir_builder *b, unsigned num_components,
       /* Load the texel. */
       result_nearest = emulated_image_load(b, num_components, bit_size, desc,
                                            nir_vec(b, coord0, num_coord_components),
-                                           access, sampler_dim, is_array, false, dest_type);
+                                           access, sampler_dim, is_array, false);
    }
    nir_push_else(b, if_nearest);
    {
@@ -280,7 +278,7 @@ static nir_def *emulated_tex_level_zero(nir_builder *b, unsigned num_components,
          /* Load the linear filter texel. */
          texel[i] = emulated_image_load(b, num_components, bit_size, desc,
                                          nir_vec(b, texel_coord, num_coord_components),
-                                         access, sampler_dim, is_array, false, dest_type);
+                                         access, sampler_dim, is_array, false);
 
          /* Multiply the texel by the weight. */
          texel[i] = nir_fmul(b, texel[i], texel_weight);
@@ -391,8 +389,7 @@ static bool lower_image_opcodes(nir_builder *b, nir_instr *instr, void *data)
       case nir_intrinsic_image_deref_load:
       case nir_intrinsic_bindless_image_load:
          result = emulated_image_load(b, intr->def.num_components, intr->def.bit_size,
-                                      desc, intr->src[1].ssa, access, dim, is_array, true,
-                                      nir_intrinsic_dest_type(intr));
+                                      desc, intr->src[1].ssa, access, dim, is_array, true);
          nir_def_rewrite_uses_after_instr(dst, result, instr);
          nir_instr_remove(instr);
          return true;
@@ -482,7 +479,7 @@ static bool lower_image_opcodes(nir_builder *b, nir_instr *instr, void *data)
             result = emulated_image_load(b, tex->def.num_components, tex->def.bit_size,
                                          desc, coord,
                                          ACCESS_RESTRICT | ACCESS_NON_WRITEABLE | ACCESS_CAN_REORDER,
-                                         tex->sampler_dim, tex->is_array, true, tex->dest_type);
+                                         tex->sampler_dim, tex->is_array, true);
             nir_def_rewrite_uses_after_instr(dst, result, instr);
             nir_instr_remove(instr);
             return true;
@@ -490,8 +487,7 @@ static bool lower_image_opcodes(nir_builder *b, nir_instr *instr, void *data)
          case nir_texop_tex:
          case nir_texop_txl:
             result = emulated_tex_level_zero(b, tex->def.num_components, tex->def.bit_size,
-                                             desc, sampler_desc, coord, tex->sampler_dim, tex->is_array,
-                                             tex->dest_type);
+                                  desc, sampler_desc, coord, tex->sampler_dim, tex->is_array);
             nir_def_rewrite_uses_after_instr(dst, result, instr);
             nir_instr_remove(instr);
             return true;

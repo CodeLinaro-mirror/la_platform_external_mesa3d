@@ -61,10 +61,10 @@ nir_get_texture_size(nir_builder *b, nir_tex_instr *tex);
 static inline nir_def *
 nir_fisnan(nir_builder *b, nir_def *x)
 {
-   unsigned old_fp_math_ctrl = b->fp_math_ctrl;
-   b->fp_math_ctrl |= nir_fp_exact;
+   bool old_exact = b->exact;
+   b->exact = true;
    nir_def *res = nir_fneu(b, x, x);
-   b->fp_math_ctrl = old_fp_math_ctrl;
+   b->exact = old_exact;
    return res;
 }
 

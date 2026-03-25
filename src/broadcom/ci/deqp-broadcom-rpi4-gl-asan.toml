@@ -9,7 +9,6 @@ deqp_args = [
     "--deqp-visibility=hidden",
 ]
 version_check = "GL ES 3.1.*git"
-tests_per_group = 500
 renderer_check = "V3D 4.2.14"
 prefix = "asan-"
 
@@ -25,7 +24,6 @@ deqp_args = [
     "--deqp-surface-width=256",
     "--deqp-visibility=hidden",
 ]
-tests_per_group = 500
 prefix = "asan-"
 
 # CTS enables GPU reset detection by default, which requires
@@ -43,5 +41,4 @@ deqp_args = [
     "--deqp-terminate-on-device-lost=disable",
     "--deqp-visibility=hidden",
 ]
-tests_per_group = 500
 prefix = "asan-"

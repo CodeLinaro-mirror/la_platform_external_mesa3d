@@ -18,7 +18,7 @@
 
 /* query pool commands */
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_CreateQueryPool(VkDevice device,
                    const VkQueryPoolCreateInfo *pCreateInfo,
                    const VkAllocationCallbacks *pAllocator,
@@ -84,13 +84,6 @@ vn_CreateQueryPool(VkDevice device,
        */
       pool->result_array_size = 1;
       break;
-   case VK_QUERY_TYPE_MESH_PRIMITIVES_GENERATED_EXT:
-      /*
-       * Similar to primitives generated query, the mesh primitives generated
-       * query also writes one integer value.
-       */
-      pool->result_array_size = 1;
-      break;
    case VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR:
    case VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_SIZE_KHR:
       /*
@@ -152,7 +145,7 @@ vn_CreateQueryPool(VkDevice device,
    return VK_SUCCESS;
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_DestroyQueryPool(VkDevice device,
                     VkQueryPool queryPool,
                     const VkAllocationCallbacks *pAllocator)
@@ -177,7 +170,7 @@ vn_DestroyQueryPool(VkDevice device,
    vk_free(alloc, pool);
 }
 
-VKAPI_ATTR void VKAPI_CALL
+void
 vn_ResetQueryPool(VkDevice device,
                   VkQueryPool queryPool,
                   uint32_t firstQuery,
@@ -299,7 +292,7 @@ vn_query_feedback_wait_ready(struct vn_device *dev,
    vn_relax_fini(&relax_state);
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
+VkResult
 vn_GetQueryPoolResults(VkDevice device,
                        VkQueryPool queryPool,
                        uint32_t firstQuery,

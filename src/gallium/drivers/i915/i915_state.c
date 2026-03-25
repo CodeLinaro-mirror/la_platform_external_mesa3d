@@ -350,10 +350,10 @@ i915_create_sampler_state(struct pipe_context *pipe,
 
 static void
 i915_bind_sampler_states(struct pipe_context *pipe,
-                         mesa_shader_stage shader, unsigned start,
+                         enum pipe_shader_type shader, unsigned start,
                          unsigned num, void **samplers)
 {
-   if (shader != MESA_SHADER_FRAGMENT) {
+   if (shader != PIPE_SHADER_FRAGMENT) {
       assert(num == 0);
       return;
    }
@@ -718,7 +718,8 @@ i915_delete_vs_state(struct pipe_context *pipe, void *shader)
 
 static void
 i915_set_constant_buffer(struct pipe_context *pipe,
-                         mesa_shader_stage shader, uint32_t index,
+                         enum pipe_shader_type shader, uint32_t index,
+                         bool take_ownership,
                          const struct pipe_constant_buffer *cb)
 {
    struct i915_context *i915 = i915_context(pipe);
@@ -727,7 +728,7 @@ i915_set_constant_buffer(struct pipe_context *pipe,
    bool diff = true;
 
    /* XXX don't support geom shaders now */
-   if (shader == MESA_SHADER_GEOMETRY)
+   if (shader == PIPE_SHADER_GEOMETRY)
       return;
 
    if (cb && cb->user_buffer) {
@@ -760,11 +761,16 @@ i915_set_constant_buffer(struct pipe_context *pipe,
       diff = i915->current.num_user_constants[shader] != 0;
    }
 
-   pipe_resource_reference(&i915->constants[shader], buf);
+   if (take_ownership) {
+      pipe_resource_reference(&i915->constants[shader], NULL);
+      i915->constants[shader] = buf;
+   } else {
+      pipe_resource_reference(&i915->constants[shader], buf);
+   }
    i915->current.num_user_constants[shader] = new_num;
 
    if (diff)
-      i915->dirty |= shader == MESA_SHADER_VERTEX ? I915_NEW_VS_CONSTANTS
+      i915->dirty |= shader == PIPE_SHADER_VERTEX ? I915_NEW_VS_CONSTANTS
                                                   : I915_NEW_FS_CONSTANTS;
 
    if (cb && cb->user_buffer) {
@@ -773,12 +779,12 @@ i915_set_constant_buffer(struct pipe_context *pipe,
 }
 
 static void
-i915_set_sampler_views(struct pipe_context *pipe, mesa_shader_stage shader,
+i915_set_sampler_views(struct pipe_context *pipe, enum pipe_shader_type shader,
                        unsigned start, unsigned num,
                        unsigned unbind_num_trailing_slots,
                        struct pipe_sampler_view **views)
 {
-   if (shader != MESA_SHADER_FRAGMENT) {
+   if (shader != PIPE_SHADER_FRAGMENT) {
       /* No support for VS samplers, because it would mean accessing the
        * write-combined maps of the textures, which is very slow.  VS samplers
        * are not a required feature of GL2.1 or GLES2.
@@ -1051,7 +1057,8 @@ i915_set_vertex_buffers(struct pipe_context *pipe, unsigned count,
    assert(count <= PIPE_MAX_ATTRIBS);
 
    util_set_vertex_buffers_count(draw->pt.vertex_buffer,
-                                 &draw->pt.nr_vertex_buffers, buffers, count);
+                                 &draw->pt.nr_vertex_buffers, buffers, count,
+                                 true);
 }
 
 static void *
@@ -1141,7 +1148,6 @@ i915_init_state_functions(struct i915_context *i915)
    i915->base.create_sampler_view = i915_create_sampler_view;
    i915->base.sampler_view_destroy = i915_sampler_view_destroy;
    i915->base.sampler_view_release = u_default_sampler_view_release;
-   i915->base.resource_release = u_default_resource_release;
    i915->base.set_viewport_states = i915_set_viewport_states;
    i915->base.set_vertex_buffers = i915_set_vertex_buffers;
 }

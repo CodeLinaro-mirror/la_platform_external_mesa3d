@@ -3,6 +3,13 @@
 
 inc_aemu = include_directories('include')
 
-files_libaemu = files('Stream.cpp', 'ring_buffer.cpp')
+files_libaemu = files(
+  'ring_buffer.cpp',
+  'Stream.cpp',
+)
 
-libaemu = static_library('aemu', files_libaemu, include_directories: [inc_aemu])
+libaemu = static_library(
+   'aemu',
+   files_libaemu,
+   include_directories: [inc_aemu],
+)

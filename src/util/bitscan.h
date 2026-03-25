@@ -42,9 +42,7 @@
 #include <popcntintrin.h>
 #endif
 
-#include "util/detect_arch.h"
-#include "util/detect_cc.h"
-#include "util/macros.h"
+#include "macros.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -365,7 +363,7 @@ util_bitcount(unsigned n)
 static inline unsigned
 util_popcnt_inline_asm(unsigned n)
 {
-#if (DETECT_ARCH_X86 || DETECT_ARCH_X86_64) && DETECT_CC_GCC
+#if defined(USE_X86_64_ASM) || defined(USE_X86_ASM)
    uint32_t out;
    __asm volatile("popcnt %1, %0" : "=r"(out) : "r"(n));
    return out;

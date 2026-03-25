@@ -1,18 +1,17 @@
 /*
  * Copyright © 2019-2021 Collabora, Ltd.
+ * Author: Antonio Caggiano <antonio.caggiano@collabora.com>
+ * Author: Rohan Garg <rohan.garg@collabora.com>
+ * Author: Robert Beckett <bob.beckett@collabora.com>
+ *
  * SPDX-License-Identifier: MIT
  */
 
 #include "pan_pps_driver.h"
 
 #include <cstring>
-#include <xf86drm.h>
-
-#ifndef ANDROID_LIBPERFETTO
 #include <perfetto.h>
-#else
-#include <perfetto/tracing.h>
-#endif
+#include <xf86drm.h>
 
 #include <drm-uapi/panfrost_drm.h>
 #include <perf/pan_perf.h>

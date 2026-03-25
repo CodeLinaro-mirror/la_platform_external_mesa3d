@@ -142,10 +142,6 @@ save_reg_writes(pr_opt_ctx& ctx, aco_ptr<Instruction>& instr)
       ctx.instr_idx_by_regs[ctx.current_block->index][instr->pseudo().scratch_sgpr] =
          overwritten_unknown_instr;
    }
-   if (instr->isCall()) {
-      std::fill(ctx.instr_idx_by_regs[ctx.current_block->index].begin(),
-                ctx.instr_idx_by_regs[ctx.current_block->index].end(), overwritten_unknown_instr);
-   }
 }
 
 Idx
@@ -616,10 +612,6 @@ try_combine_dpp(pr_opt_ctx& ctx, aco_ptr<Instruction>& instr)
       if (mov->opcode != aco_opcode::v_mov_b32 || !mov->isDPP())
          continue;
 
-      /* Applying DPP with many uses is unlikely to be profitable. */
-      if (ctx.uses[mov->definitions[0].tempId()] > 3)
-         continue;
-
       /* If we aren't going to remove the v_mov_b32, we have to ensure that it doesn't overwrite
        * it's own operand before we use it.
        */
@@ -651,26 +643,14 @@ try_combine_dpp(pr_opt_ctx& ctx, aco_ptr<Instruction>& instr)
       if (((dpp8 && ctx.program->gfx_level < GFX11) || !input_mods) && mov_uses_mods)
          continue;
 
-      Format old_format = instr->format;
       if (i != 0) {
-         if (!instr->operands[0].isOfType(RegType::vgpr) && !instr->isVOP3P())
-            instr->format = asVOP3(instr->format);
-         if (!can_swap_operands(instr, &instr->opcode, 0, i)) {
-            instr->format = old_format;
+         if (!can_swap_operands(instr, &instr->opcode, 0, i))
             continue;
-         }
          instr->valu().swapOperands(0, i);
       }
 
-      if (!can_use_DPP(ctx.program->gfx_level, instr, dpp8)) {
-         if (i != 0) {
-            ASSERTED bool success = can_swap_operands(instr, &instr->opcode, 0, i);
-            assert(success);
-            instr->valu().swapOperands(0, i);
-            instr->format = old_format;
-         }
+      if (!can_use_DPP(ctx.program->gfx_level, instr, dpp8))
          continue;
-      }
 
       if (!dpp8) /* anything else doesn't make sense in SSA */
          assert(mov->dpp16().row_mask == 0xf && mov->dpp16().bank_mask == 0xf);
@@ -686,7 +666,7 @@ try_combine_dpp(pr_opt_ctx& ctx, aco_ptr<Instruction>& instr)
          DPP8_instruction* dpp = &instr->dpp8();
          dpp->lane_sel = mov->dpp8().lane_sel;
          dpp->fetch_inactive = mov->dpp8().fetch_inactive;
-         if (mov_uses_mods && !instr->isVOP3P())
+         if (mov_uses_mods)
             instr->format = asVOP3(instr->format);
       } else {
          DPP16_instruction* dpp = &instr->dpp16();
@@ -837,6 +817,39 @@ try_reassign_split_vector(pr_opt_ctx& ctx, aco_ptr<Instruction>& instr)
    }
 }
 
+void
+try_convert_fma_to_vop2(pr_opt_ctx& ctx, aco_ptr<Instruction>& instr)
+{
+   /* We convert v_fma_f32 with inline constant to fmamk/fmaak.
+    * This is only benefical if it allows more VOPD.
+    */
+   if (ctx.program->gfx_level < GFX11 || ctx.program->wave_size != 32 ||
+       instr->opcode != aco_opcode::v_fma_f32 || instr->usesModifiers())
+      return;
+
+   int constant_idx = -1;
+   int vgpr_idx = -1;
+   for (int i = 0; i < 3; i++) {
+      const Operand& op = instr->operands[i];
+      if (op.isConstant() && !op.isLiteral())
+         constant_idx = i;
+      else if (op.isOfType(RegType::vgpr))
+         vgpr_idx = i;
+      else
+         return;
+   }
+
+   if (constant_idx < 0 || vgpr_idx < 0)
+      return;
+
+   std::swap(instr->operands[constant_idx], instr->operands[2]);
+   if (constant_idx == 0 || vgpr_idx == 0)
+      std::swap(instr->operands[0], instr->operands[1]);
+   instr->operands[2] = Operand::literal32(instr->operands[2].constantValue());
+   instr->opcode = constant_idx == 2 ? aco_opcode::v_fmaak_f32 : aco_opcode::v_fmamk_f32;
+   instr->format = Format::VOP2;
+}
+
 bool
 instr_overwrites(Instruction* instr, PhysReg reg, unsigned size)
 {
@@ -849,8 +862,6 @@ instr_overwrites(Instruction* instr, PhysReg reg, unsigned size)
       if (scratch_reg >= reg && reg + size > scratch_reg)
          return true;
    }
-   if (instr->isCall())
-      return true;
    return false;
 }
 
@@ -942,30 +953,6 @@ fixup_reg_writes(pr_opt_ctx& ctx, unsigned start)
 }
 
 bool
-is_nop_copy(Instruction* instr)
-{
-   if (instr->opcode == aco_opcode::p_split_vector) {
-      PhysReg op_reg = instr->operands[0].physReg();
-      for (const Definition& def : instr->definitions) {
-         if (def.physReg() != op_reg)
-            return false;
-         op_reg = op_reg.advance(def.bytes());
-      }
-      return true;
-   } else if (instr->opcode == aco_opcode::p_create_vector) {
-      PhysReg def_reg = instr->definitions[0].physReg();
-      for (const Operand& op : instr->operands) {
-         if (op.physReg() != def_reg)
-            return false;
-         def_reg = def_reg.advance(op.bytes());
-      }
-      return true;
-   } else {
-      return false;
-   }
-}
-
-bool
 try_optimize_branching_sequence(pr_opt_ctx& ctx, aco_ptr<Instruction>& exec_copy)
 {
    /* Try to optimize the branching sequence at the end of a block.
@@ -1051,6 +1038,10 @@ try_optimize_branching_sequence(pr_opt_ctx& ctx, aco_ptr<Instruction>& exec_copy
          : aco_opcode::num_opcodes;
    const bool vopc = v_cmpx_op != aco_opcode::num_opcodes;
 
+   /* V_CMPX+DPP returns 0 with reads from disabled lanes, unlike V_CMP+DPP (RDNA3 ISA doc, 7.7) */
+   if (vopc && exec_val->isDPP())
+      return false;
+
    /* If s_and_saveexec is used, we'll need to insert a new instruction to save the old exec. */
    bool save_original_exec =
       exec_copy->opcode == and_saveexec && !exec_copy->definitions[0].isKill();
@@ -1085,7 +1076,7 @@ try_optimize_branching_sequence(pr_opt_ctx& ctx, aco_ptr<Instruction>& exec_copy
    /* Ensure that nothing needs a previous exec between exec_val_idx and the current exec write. */
    for (unsigned i = exec_val_idx.instr + 1; i < ctx.current_instr_idx; i++) {
       Instruction* instr = ctx.current_block->instructions[i].get();
-      if (instr && needs_exec_mask(instr) && !is_nop_copy(instr))
+      if (instr && needs_exec_mask(instr))
          return false;
 
       /* If the successor has phis, copies might have to be inserted at p_logical_end. */
@@ -1126,7 +1117,7 @@ try_optimize_branching_sequence(pr_opt_ctx& ctx, aco_ptr<Instruction>& exec_copy
    if (vopc) {
       /* Add one extra definition for exec and copy the VOP3-specific fields if present. */
       if (!vcmpx_exec_only) {
-         if (exec_val->isSDWA() || exec_val->isDPP()) {
+         if (exec_val->isSDWA()) {
             /* This might work but it needs testing and more code to copy the instruction. */
             return false;
          } else {
@@ -1264,6 +1255,8 @@ process_instruction(pr_opt_ctx& ctx, aco_ptr<Instruction>& instr)
    try_combine_dpp(ctx, instr);
 
    try_reassign_split_vector(ctx, instr);
+
+   try_convert_fma_to_vop2(ctx, instr);
 
    try_eliminate_scc_copy(ctx, instr);
 

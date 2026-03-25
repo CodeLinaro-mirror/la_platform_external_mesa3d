@@ -145,7 +145,7 @@ pub fn side_effect_type(op: &Op) -> SideEffect {
         }
 
         // Move ops
-        Op::Mov(_) | Op::Prmt(_) | Op::Sel(_) | Op::Sgxt(_) => SideEffect::None,
+        Op::Mov(_) | Op::Prmt(_) | Op::Sel(_) => SideEffect::None,
         Op::Shfl(_) => SideEffect::None,
 
         // Predicate ops
@@ -172,7 +172,6 @@ pub fn side_effect_type(op: &Op) -> SideEffect {
         // Memory ops
         Op::Ipa(_) | Op::Ldc(_) => SideEffect::None,
         Op::Ld(_)
-        | Op::Ldsm(_)
         | Op::LdSharedLock(_)
         | Op::St(_)
         | Op::StSCheckUnlock(_)
@@ -185,7 +184,7 @@ pub fn side_effect_type(op: &Op) -> SideEffect {
         | Op::MemBar(_) => SideEffect::Memory,
 
         // Matrix ops
-        Op::Imma(_) | Op::Hmma(_) | Op::Movm(_) => SideEffect::None,
+        Op::Imma(_) | Op::Hmma(_) => SideEffect::None,
 
         // Control-flow ops
         Op::BClear(_)
@@ -213,7 +212,6 @@ pub fn side_effect_type(op: &Op) -> SideEffect {
         | Op::TexDepBar(_)
         | Op::CS2R(_)
         | Op::Isberd(_)
-        | Op::Isbewr(_)
         | Op::ViLd(_)
         | Op::Kill(_)
         | Op::S2R(_) => SideEffect::Barrier,
@@ -242,9 +240,8 @@ pub fn side_effect_type(op: &Op) -> SideEffect {
     }
 }
 
-pub fn estimate_block_weight(cfg: &CFG<BasicBlock>, block_idx: usize) -> u64 {
-    let loop_depth = cfg.loop_depth(block_idx) as f32;
-    10_f32.powf((loop_depth + 1.0).log2()) as u64
+pub fn estimate_block_weight(cfg: &CFG<BasicBlock>, block_idx: usize) -> u32 {
+    10_u32.pow(cfg.loop_depth(block_idx).try_into().unwrap())
 }
 
 /// Try to guess how many cycles a variable latency instruction will take
@@ -254,11 +251,7 @@ pub fn estimate_block_weight(cfg: &CFG<BasicBlock>, block_idx: usize) -> u64 {
 /// Memory instructions were copied from L1 data cache latencies.
 /// For instructions not mentioned in the paper, I made up numbers.
 /// This could probably be improved.
-pub fn estimate_variable_latency(sm: &ShaderModelInfo, op: &Op) -> u32 {
-    if !sm.op_needs_scoreboard(op) {
-        return 0;
-    }
-
+pub fn estimate_variable_latency(sm: u8, op: &Op) -> u32 {
     match op {
         // Multi-function unit
         Op::Rro(_) | Op::MuFu(_) => 15,
@@ -270,7 +263,7 @@ pub fn estimate_variable_latency(sm: &ShaderModelInfo, op: &Op) -> u32 {
         // Integer ALU
         Op::BRev(_) | Op::Flo(_) | Op::PopC(_) => 15,
         Op::IMad(_) | Op::IMul(_) => {
-            assert!(sm.sm() < 70);
+            assert!(sm < 70);
             86
         }
 
@@ -302,8 +295,6 @@ pub fn estimate_variable_latency(sm: &ShaderModelInfo, op: &Op) -> u32 {
         Op::Ldc(_) => 4,
 
         Op::Ld(_)
-        | Op::Ldsm(_)
-        | Op::Movm(_)
         | Op::LdSharedLock(_)
         | Op::St(_)
         | Op::StSCheckUnlock(_)
@@ -330,7 +321,6 @@ pub fn estimate_variable_latency(sm: &ShaderModelInfo, op: &Op) -> u32 {
         | Op::TexDepBar(_)
         | Op::CS2R(_)
         | Op::Isberd(_)
-        | Op::Isbewr(_)
         | Op::ViLd(_)
         | Op::Kill(_)
         | Op::PixLd(_)

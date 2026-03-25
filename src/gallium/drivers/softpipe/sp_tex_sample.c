@@ -675,7 +675,7 @@ compute_lambda_vert(const struct sp_sampler_view *sview,
 
 compute_lambda_from_grad_func
 softpipe_get_lambda_from_grad_func(const struct pipe_sampler_view *view,
-                                   mesa_shader_stage shader)
+                                   enum pipe_shader_type shader)
 {
    switch (view->target) {
    case PIPE_BUFFER:
@@ -3554,9 +3554,9 @@ softpipe_create_sampler_state(struct pipe_context *pipe,
 
 compute_lambda_func
 softpipe_get_lambda_func(const struct pipe_sampler_view *view,
-                         mesa_shader_stage shader)
+                         enum pipe_shader_type shader)
 {
-   if (shader != MESA_SHADER_FRAGMENT)
+   if (shader != PIPE_SHADER_FRAGMENT)
       return compute_lambda_vert;
 
    switch (view->target) {

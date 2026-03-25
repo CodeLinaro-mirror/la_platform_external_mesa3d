@@ -16,7 +16,8 @@ use std::os::raw::c_char;
 /// See https://doc.rust-lang.org/std/ffi/struct.CStr.html#safety for further details.
 unsafe fn isa_parse(
     c_str: *const c_char,
-    func: impl FnOnce(&str, &mut etna_asm_result),
+    dual_16_mode: bool,
+    func: impl FnOnce(&str, bool, &mut etna_asm_result),
 ) -> *mut etna_asm_result {
     let mut result = Box::new(etna_asm_result::default());
 
@@ -29,7 +30,7 @@ unsafe fn isa_parse(
     let c_str_safe = unsafe { CStr::from_ptr(c_str) };
 
     if let Ok(str) = c_str_safe.to_str() {
-        func(str, &mut result);
+        func(str, dual_16_mode, &mut result);
     } else {
         result.set_error("Failed to convert CStr to &str");
         result.success = false;
@@ -43,9 +44,12 @@ unsafe fn isa_parse(
 /// `c_str` must point to a valid nul-termintated string not longer than `isize::MAX` bytes.
 /// See https://doc.rust-lang.org/std/ffi/struct.CStr.html#safety for further details.
 #[no_mangle]
-pub unsafe extern "C" fn isa_parse_str(c_str: *const c_char) -> *mut etna_asm_result {
+pub unsafe extern "C" fn isa_parse_str(
+    c_str: *const c_char,
+    dual_16_mode: bool,
+) -> *mut etna_asm_result {
     // SAFETY: As per the safety section, the caller has to uphold these requirements
-    unsafe { isa_parse(c_str, asm_process_str) }
+    unsafe { isa_parse(c_str, dual_16_mode, asm_process_str) }
 }
 
 /// # Safety
@@ -53,9 +57,12 @@ pub unsafe extern "C" fn isa_parse_str(c_str: *const c_char) -> *mut etna_asm_re
 /// `c_filepath` must point to a valid nul-termintated string not longer than `isize::MAX` bytes.
 /// See https://doc.rust-lang.org/std/ffi/struct.CStr.html#safety for further details.
 #[no_mangle]
-pub unsafe extern "C" fn isa_parse_file(c_filepath: *const c_char) -> *mut etna_asm_result {
+pub unsafe extern "C" fn isa_parse_file(
+    c_filepath: *const c_char,
+    dual_16_mode: bool,
+) -> *mut etna_asm_result {
     // SAFETY: As per the safety section, the caller has to uphold these requirements
-    unsafe { isa_parse(c_filepath, asm_process_file) }
+    unsafe { isa_parse(c_filepath, dual_16_mode, asm_process_file) }
 }
 
 /// # Safety

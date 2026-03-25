@@ -65,15 +65,6 @@ const float lp_sample_pos_4x[4][2] = { { 0.375, 0.125 },
                                        { 0.125, 0.625 },
                                        { 0.625, 0.875 } };
 
-const float lp_sample_pos_8x[8][2] = { { 0.5625, 0.3125 },
-                                       { 0.4375, 0.6875 },
-                                       { 0.8125, 0.5625 },
-                                       { 0.3125, 0.1875 },
-                                       { 0.1875, 0.8125 },
-                                       { 0.0625, 0.4375 },
-                                       { 0.6875, 0.9375 },
-                                       { 0.9375, 0.0625 } };
-
 /**
  * Begin rasterizing a scene.
  * Called once per scene by one thread.
@@ -360,10 +351,9 @@ lp_rast_shade_tile(struct lp_rasterizer_task *task,
             depth_sample_stride = scene->zsbuf.sample_stride;
          }
 
-         static_assert(LP_MAX_SAMPLES <= 8, "Code below assumes max of 8 samples");
-         uint64_t mask[2] = { 0, 0 };
-         for (unsigned i = 0; i < MIN2(scene->fb_max_samples, LP_MAX_SAMPLES); i++)
-            mask[i / 4] |= (uint64_t)(0xffff) << (16 * (i % 4));
+         uint64_t mask = 0;
+         for (unsigned i = 0; i < scene->fb_max_samples; i++)
+            mask |= (uint64_t)(0xffff) << (16 * i);
 
          /* Propagate non-interpolated raster state. */
          task->thread_data.raster_state.viewport_index = inputs->viewport_index;
@@ -380,7 +370,7 @@ lp_rast_shade_tile(struct lp_rasterizer_task *task,
                                             GET_DADY(inputs),
                                             color,
                                             depth,
-                                            mask[0], mask[1],
+                                            mask,
                                             &task->thread_data,
                                             stride,
                                             depth_stride,
@@ -422,7 +412,7 @@ void
 lp_rast_shade_quads_mask_sample(struct lp_rasterizer_task *task,
                                 const struct lp_rast_shader_inputs *inputs,
                                 unsigned x, unsigned y,
-                                const uint64_t mask[2])
+                                uint64_t mask)
 {
    const struct lp_rast_state *state = task->state;
    const struct lp_fragment_shader_variant *variant = state->variant;
@@ -489,7 +479,7 @@ lp_rast_shade_quads_mask_sample(struct lp_rasterizer_task *task,
                                             GET_DADY(inputs),
                                             color,
                                             depth,
-                                            mask[0], mask[1],
+                                            mask,
                                             &task->thread_data,
                                             stride,
                                             depth_stride,
@@ -506,10 +496,9 @@ lp_rast_shade_quads_mask(struct lp_rasterizer_task *task,
                          unsigned x, unsigned y,
                          unsigned mask)
 {
-   static_assert(LP_MAX_SAMPLES <= 8, "Code below assumes max of 8 samples");
-   uint64_t new_mask[2] = { 0, 0 };
-   for (unsigned i = 0; i < MIN2(task->scene->fb_max_samples, LP_MAX_SAMPLES); i++)
-      new_mask[i / 4] |= ((uint64_t)mask) << (16 * (i % 4));
+   uint64_t new_mask = 0;
+   for (unsigned i = 0; i < task->scene->fb_max_samples; i++)
+      new_mask |= ((uint64_t)mask) << (16 * i);
    lp_rast_shade_quads_mask_sample(task, inputs, x, y, new_mask);
 }
 

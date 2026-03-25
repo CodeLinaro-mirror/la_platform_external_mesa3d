@@ -309,7 +309,7 @@ struct crocus_uncompiled_shader {
    struct pipe_stream_output_info stream_output;
 
    /* A SHA1 of the serialized NIR for the disk cache. */
-   unsigned char nir_sha1[SHA1_DIGEST_LENGTH];
+   unsigned char nir_sha1[20];
 
    unsigned program_id;
 
@@ -431,10 +431,6 @@ struct crocus_shader_state {
    uint32_t writable_ssbos;
 
    uint32_t sampler_offset;
-};
-
-struct crocus_scissor_state {
-   uint16_t minx, miny, maxx, maxy;
 };
 
 /**
@@ -574,7 +570,7 @@ struct crocus_context {
       struct pipe_blend_color blend_color;
       struct pipe_poly_stipple poly_stipple;
       struct pipe_viewport_state viewports[CROCUS_MAX_VIEWPORTS];
-      struct crocus_scissor_state scissors[CROCUS_MAX_VIEWPORTS];
+      struct pipe_scissor_state scissors[CROCUS_MAX_VIEWPORTS];
       struct pipe_stencil_ref stencil_ref;
       PIPE_FB_SURFACES; //STOP USING THIS
       struct pipe_framebuffer_state framebuffer;
@@ -842,10 +838,10 @@ void crocus_init_flush_functions(struct pipe_context *ctx);
 
 /* crocus_program.c */
 const struct shader_info *crocus_get_shader_info(const struct crocus_context *ice,
-                                                 mesa_shader_stage stage);
+                                                 gl_shader_stage stage);
 struct crocus_bo *crocus_get_scratch_space(struct crocus_context *ice,
                                            unsigned per_thread_scratch,
-                                           mesa_shader_stage stage);
+                                           gl_shader_stage stage);
 /**
  * Map a <group, index> pair to a binding table index.
  *
@@ -947,7 +943,7 @@ bool crocus_blorp_upload_shader(struct blorp_batch *blorp_batch,
 void crocus_predraw_resolve_inputs(struct crocus_context *ice,
                                    struct crocus_batch *batch,
                                    bool *draw_aux_buffer_disabled,
-                                   mesa_shader_stage stage,
+                                   gl_shader_stage stage,
                                    bool consider_framebuffer);
 void crocus_predraw_resolve_framebuffer(struct crocus_context *ice,
                                         struct crocus_batch *batch,

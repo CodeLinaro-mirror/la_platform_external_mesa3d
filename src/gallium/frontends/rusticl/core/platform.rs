@@ -1,6 +1,3 @@
-// Copyright 2020 Red Hat.
-// SPDX-License-Identifier: MIT
-
 use crate::api::icd::CLResult;
 use crate::api::icd::DISPATCH;
 use crate::core::device::*;
@@ -277,16 +274,6 @@ impl Platform {
         #[allow(static_mut_refs)]
         PLATFORM_ONCE.call_once(|| unsafe { PLATFORM.init() });
     }
-
-    pub fn all_devs_have_semaphores(&self) -> bool {
-        self.devs.iter().all(|dev| dev.are_semaphores_supported())
-    }
-
-    pub fn all_devs_have_external_semaphores(&self) -> bool {
-        self.devs
-            .iter()
-            .all(|dev| dev.are_external_semaphores_supported())
-    }
 }
 
 impl Drop for Platform {
@@ -341,19 +328,5 @@ macro_rules! perf_warning {
             $crate::core::platform::PerfDebugLevel::Spam => perf_warning!(@PRINT $format, $($arg)*),
             _ => (),
         }
-    };
-}
-
-#[macro_export]
-macro_rules! rusticl_warn_once {
-    (@PRINT $format:tt, $($arg:tt)*) => {
-        eprintln!(std::concat!("=== Rusticl warning: ", $format, " ==="), $($arg)*)
-    };
-
-    ($format:tt $(, $arg:tt)*) => {
-        static WARN_ONCE: std::sync::Once = std::sync::Once::new();
-        WARN_ONCE.call_once(|| {
-            rusticl_warn_once!(@PRINT $format, $($arg)*);
-        });
     };
 }

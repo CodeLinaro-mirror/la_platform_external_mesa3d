@@ -8,7 +8,7 @@ radv-stoney-vkcts:
     - .radv-stoney-test:x86_64
   parallel: 5
   variables:
-    DEQP_SUITE: radv
+    DEQP_SUITE: radv-stoney
     DEQP_FRACTION: 18
 
 radv-stoney-angle:
@@ -56,7 +56,7 @@ radv-raven-vkcts:
     - .lava-asus-CM1400CXA-dalboz:x86_64
   parallel: 9
   variables:
-    DEQP_SUITE: radv
+    DEQP_SUITE: radv-raven
     DEQP_FRACTION: 6
 
 amd-raven-skqp:
@@ -128,14 +128,28 @@ radeonsi-raven-va:
     - .lava-x86_64-test-video
     - .radeonsi-raven-test:x86_64
     - .radeonsi-vaapi-rules
-    - .test-fluster
     - .lava-hp-x360-14a-cb0001xx-zork:x86_64
   variables:
-    DEQP_SUITE: vaapi
-    GPU_VERSION: radeonsi-raven-va
+    HWCI_TEST_SCRIPT: "/install/gtest-runner.sh"
     # While the tests don't need Xorg, it's an easy way to keep DRM open so we don't
     # spend all our time in drm_lastclose()'s modesetting.
     HWCI_START_WESTON: 1
+    GTEST: test_va_api
+    # The big 10-surface 10k allocations oomkill us at around 2.5G of GPU memory
+    # allocated if we run at the normal 4 threads.
+    # https://github.com/intel/libva-utils/issues/248
+    FDO_CI_CONCURRENT: 1
+
+radeonsi-raven-vaapi-fluster:
+  extends:
+    - radeonsi-raven-va
+    - .radeonsi-vaapi-fluster-rules
+  timeout: 30m
+  parallel: 2
+  variables:
+    DEQP_SUITE: fluster-vaapi
+    GPU_VERSION: radeonsi-raven-fluster
+    HWCI_TEST_SCRIPT: install/deqp-runner.sh
 
 radeonsi-mendocino-glcts-piglit:
   extends:
@@ -148,16 +162,6 @@ radeonsi-mendocino-glcts-piglit:
     DEQP_SUITE: radeonsi-mendocino
     GPU_VERSION: radeonsi-mendocino
     HWCI_START_WESTON: 1
-
-radv-cezanne-vkcts-asan:
-  extends:
-    - .lava-x86_64-test-asan-vk
-    - .radv-cezanne-test:x86_64
-    - .radv-collabora-rules
-  parallel: 2
-  variables:
-    DEQP_SUITE: radv
-    DEQP_FRACTION: 25
 
 ############### VKCTS tests ###############
 
@@ -180,6 +184,7 @@ radv-tahiti-vkcts:
   timeout: 1h
   variables:
     CI_TRON_TIMEOUT__OVERALL__MINUTES: 50
+    RADV_PERFTEST: video_decode,video_encode
 
 radv-hawaii-vkcts:
   extends:
@@ -189,6 +194,7 @@ radv-hawaii-vkcts:
   timeout: 1h
   variables:
     CI_TRON_TIMEOUT__OVERALL__MINUTES: 50
+    RADV_PERFTEST: video_decode,video_encode
 
 radv-polaris10-vkcts:
   extends:
@@ -255,28 +261,27 @@ radv-vangogh-vkcts:
     RADV_PERFTEST: transfer_queue,hic
     CI_TRON_TIMEOUT__OVERALL__MINUTES: 89
 
-radeonsi-vangogh-glcts:
+radeonsi-vangogh-glcts-full:
   extends:
     - .ci-tron-x86_64-test-gl
     - .ci-tron-test-amdgpu
     - .test-piglit
     - .vangogh-test-valve
-    - .radeonsi-valve-rules
-  timeout: 20m
-  variables:
-    GPU_VERSION: radeonsi-vangogh
-    DEQP_SUITE: radeonsi-vangogh
-    DEQP_FRACTION: 6
-    CI_TRON_TIMEOUT__OVERALL__MINUTES: 19
-
-radeonsi-vangogh-glcts-full:
-  extends:
-    - radeonsi-vangogh-glcts
     - .radeonsi-valve-manual-rules
   timeout: 90m
   variables:
-    DEQP_FRACTION: 1
+    GPU_VERSION: radeonsi-vangogh
+    DEQP_SUITE: radeonsi-vangogh
     CI_TRON_TIMEOUT__OVERALL__MINUTES: 89
+
+radeonsi-vangogh-glcts:
+  extends:
+    - radeonsi-vangogh-glcts-full
+    - .radeonsi-valve-rules
+  timeout: 20m
+  variables:
+    DEQP_FRACTION: 6
+    CI_TRON_TIMEOUT__OVERALL__MINUTES: 19
 
 radv-raphael-vkcts:
   extends:
@@ -297,34 +302,24 @@ radv-navi31-vkcts:
     - .radv-valve-rules
   variables:
     RADV_DEBUG: nomeshshader # Disable mesh shaders until task shaders stop hanging
-    RADV_PERFTEST: transfer_queue,hic
+    # TODO: Remove video_encode,video_decode with next kernel.
+    RADV_PERFTEST: transfer_queue,video_decode,video_encode,hic
     CI_TRON_TIMEOUT__OVERALL__MINUTES: 20
 
 
 radv-gfx1201-vkcts:
-  timeout: 25m
-  parallel: 3
+  timeout: 30m
+  parallel: 2
   extends:
     - .ci-tron-test-radv-vk
     - .gfx1201-test-valve
-    - .radv-valve-rules
+    - .radv-valve-manual-rules
   variables:
     # TODO: Verify that task shaders don't hang.
-    RADV_DEBUG: nomeshshader
+    # TODO: Fix GPU hangs with video
+    RADV_DEBUG: nomeshshader,novideo
     RADV_PERFTEST: transfer_queue,hic
-    CI_TRON_TIMEOUT__OVERALL__MINUTES: 20
-
-radv-gfx1201-fluster:
-  extends:
-    - .ci-tron-x86_64-test-video
-    - .ci-tron-test-radv
-    - .gfx1201-test-valve
-    - .radv-valve-manual-rules
-    - .test-fluster
-  timeout: 10m
-  variables:
-    CI_TRON_TIMEOUT__OVERALL__MINUTES: 8  # normal runtime: 50-60sec, but let's leave room for more tests
-    DEQP_SUITE: radv-fluster
+    CI_TRON_TIMEOUT__OVERALL__MINUTES: 25
 
 ############### Fossilize
 radv-fossils:
@@ -358,8 +353,8 @@ radv-fossils:
     # RDNA3 (GFX11)
     - AMDGPU_GPU_ID="NAVI31"
       ./install/fossilize-runner.sh
-    # RDNA3.5 (STRIX1)
-    - AMDGPU_GPU_ID="STRIX1"
+    # RDNA3.5 (GFX1150)
+    - AMDGPU_GPU_ID="GFX1150"
       ./install/fossilize-runner.sh
 
 ############### vkd3d-proton

@@ -43,7 +43,6 @@
 #include "program/prog_parameter.h"
 #include "util/ralloc.h"
 #include "util/u_atomic.h"
-#include "util/u_range_remap.h"
 
 /**********************************************************************/
 /*** Shader object functions                                        ***/
@@ -103,7 +102,7 @@ _mesa_reference_shader(struct gl_context *ctx, struct gl_shader **ptr,
  * Allocate a new gl_shader object, initialize it.
  */
 struct gl_shader *
-_mesa_new_shader(GLuint name, mesa_shader_stage stage)
+_mesa_new_shader(GLuint name, gl_shader_stage stage)
 {
    struct gl_shader *shader;
    shader = rzalloc(NULL, struct gl_shader);
@@ -292,6 +291,8 @@ init_shader_program(struct gl_shader_program *prog)
    prog->FragDataIndexBindings = string_to_uint_map_ctor();
 
    prog->TransformFeedback.BufferMode = GL_INTERLEAVED_ATTRIBS;
+
+   ir_exec_list_make_empty(&prog->EmptyUniformLocations);
 }
 
 /**
@@ -322,16 +323,18 @@ void
 _mesa_clear_shader_program_data(struct gl_context *ctx,
                                 struct gl_shader_program *shProg)
 {
-   for (mesa_shader_stage sh = 0; sh < MESA_SHADER_MESH_STAGES; sh++) {
+   for (gl_shader_stage sh = 0; sh < MESA_SHADER_STAGES; sh++) {
       if (shProg->_LinkedShaders[sh] != NULL) {
          _mesa_delete_linked_shader(ctx, shProg->_LinkedShaders[sh]);
          shProg->_LinkedShaders[sh] = NULL;
       }
    }
 
-   shProg->UniformRemapTable =
-      util_reset_range_remap(shProg->UniformRemapTable);
-   ir_exec_list_make_empty(&shProg->EmptyUniformLocations);
+   if (shProg->UniformRemapTable) {
+      ralloc_free(shProg->UniformRemapTable);
+      shProg->NumUniformRemapTable = 0;
+      shProg->UniformRemapTable = NULL;
+   }
 
    if (shProg->data)
       _mesa_program_resource_hash_destroy(shProg);
@@ -354,11 +357,6 @@ _mesa_free_shader_program_data(struct gl_context *ctx,
    assert(shProg->Type == GL_SHADER_PROGRAM_MESA);
 
    _mesa_clear_shader_program_data(ctx, shProg);
-
-   if (shProg->UniformRemapTable) {
-      ralloc_free(shProg->UniformRemapTable);
-      shProg->UniformRemapTable = NULL;
-   }
 
    if (shProg->AttributeBindings) {
       string_to_uint_map_dtor(shProg->AttributeBindings);

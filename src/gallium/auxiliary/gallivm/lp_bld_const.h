@@ -37,6 +37,8 @@
 #define LP_BLD_CONST_H
 
 
+#include "util/compiler.h"
+#include "gallivm/lp_bld.h"
 #include "gallivm/lp_bld_init.h"
 
 
@@ -100,8 +102,8 @@ LLVMValueRef
 lp_build_const_channel_vec(struct gallivm_state *gallivm, struct lp_type type);
 
 LLVMValueRef
-lp_build_const_aos(struct gallivm_state *gallivm, struct lp_type type,
-                   double r, double g, double b, double a,
+lp_build_const_aos(struct gallivm_state *gallivm, struct lp_type type, 
+                   double r, double g, double b, double a, 
                    const unsigned char *swizzle);
 
 

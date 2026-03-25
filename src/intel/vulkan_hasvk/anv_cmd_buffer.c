@@ -248,7 +248,7 @@ mem_update(void *dst, const void *src, size_t size)
 
 static void
 set_dirty_for_bind_map(struct anv_cmd_buffer *cmd_buffer,
-                       mesa_shader_stage stage,
+                       gl_shader_stage stage,
                        const struct anv_pipeline_bind_map *map)
 {
    assert(stage < ARRAY_SIZE(cmd_buffer->state.surface_sha1s));
@@ -409,45 +409,27 @@ anv_cmd_buffer_bind_descriptor_set(struct anv_cmd_buffer *cmd_buffer,
    cmd_buffer->state.push_constants_dirty |= dirty_stages;
 }
 
-void anv_CmdBindDescriptorSets2KHR(
+void anv_CmdBindDescriptorSets(
     VkCommandBuffer                             commandBuffer,
-    const VkBindDescriptorSetsInfoKHR*          pInfo)
+    VkPipelineBindPoint                         pipelineBindPoint,
+    VkPipelineLayout                            _layout,
+    uint32_t                                    firstSet,
+    uint32_t                                    descriptorSetCount,
+    const VkDescriptorSet*                      pDescriptorSets,
+    uint32_t                                    dynamicOffsetCount,
+    const uint32_t*                             pDynamicOffsets)
 {
    ANV_FROM_HANDLE(anv_cmd_buffer, cmd_buffer, commandBuffer);
-   ANV_FROM_HANDLE(anv_pipeline_layout, pipeline_layout, pInfo->layout);
+   ANV_FROM_HANDLE(anv_pipeline_layout, layout, _layout);
 
-   assert(pInfo->firstSet + pInfo->descriptorSetCount <= MAX_SETS);
+   assert(firstSet + descriptorSetCount <= MAX_SETS);
 
-   if (pInfo->stageFlags & VK_SHADER_STAGE_COMPUTE_BIT) {
-      uint32_t dynamicOffsetCount = pInfo->dynamicOffsetCount;
-      const uint32_t *pDynamicOffsets = pInfo->pDynamicOffsets;
-
-      for (uint32_t i = 0; i < pInfo->descriptorSetCount; i++) {
-         ANV_FROM_HANDLE(anv_descriptor_set, set, pInfo->pDescriptorSets[i]);
-         if (set == NULL)
-            continue;
-         anv_cmd_buffer_bind_descriptor_set(cmd_buffer,
-                                            VK_PIPELINE_BIND_POINT_COMPUTE,
-                                            pipeline_layout, pInfo->firstSet + i, set,
-                                            &dynamicOffsetCount,
-                                            &pDynamicOffsets);
-      }
-   }
-
-   if (pInfo->stageFlags & VK_SHADER_STAGE_ALL_GRAPHICS) {
-      uint32_t dynamicOffsetCount = pInfo->dynamicOffsetCount;
-      const uint32_t *pDynamicOffsets = pInfo->pDynamicOffsets;
-
-      for (uint32_t i = 0; i < pInfo->descriptorSetCount; i++) {
-         ANV_FROM_HANDLE(anv_descriptor_set, set, pInfo->pDescriptorSets[i]);
-         if (set == NULL)
-            continue;
-         anv_cmd_buffer_bind_descriptor_set(cmd_buffer,
-                                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                            pipeline_layout, pInfo->firstSet + i, set,
-                                            &dynamicOffsetCount,
-                                            &pDynamicOffsets);
-      }
+   for (uint32_t i = 0; i < descriptorSetCount; i++) {
+      ANV_FROM_HANDLE(anv_descriptor_set, set, pDescriptorSets[i]);
+      anv_cmd_buffer_bind_descriptor_set(cmd_buffer, pipelineBindPoint,
+                                         layout, firstSet + i, set,
+                                         &dynamicOffsetCount,
+                                         &pDynamicOffsets);
    }
 }
 
@@ -527,7 +509,8 @@ anv_isl_format_for_descriptor_type(const struct anv_device *device,
    switch (type) {
    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-      return ISL_FORMAT_R32G32B32A32_FLOAT;
+      return device->physical->compiler->indirect_ubos_use_sampler ?
+             ISL_FORMAT_R32G32B32A32_FLOAT : ISL_FORMAT_RAW;
 
    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
@@ -606,7 +589,7 @@ anv_cmd_buffer_cs_push_constants(struct anv_cmd_buffer *cmd_buffer)
    const unsigned push_constant_alignment =
       cmd_buffer->device->info->ver < 8 ? 32 : 64;
    const unsigned aligned_total_push_constants_size =
-      align(total_push_constants_size, push_constant_alignment);
+      ALIGN(total_push_constants_size, push_constant_alignment);
    struct anv_state state =
       anv_cmd_buffer_alloc_dynamic_state(cmd_buffer,
                                          aligned_total_push_constants_size,
@@ -637,28 +620,30 @@ anv_cmd_buffer_cs_push_constants(struct anv_cmd_buffer *cmd_buffer)
    return state;
 }
 
-void anv_CmdPushConstants2KHR(
+void anv_CmdPushConstants(
     VkCommandBuffer                             commandBuffer,
-    const VkPushConstantsInfoKHR*               pInfo)
+    VkPipelineLayout                            layout,
+    VkShaderStageFlags                          stageFlags,
+    uint32_t                                    offset,
+    uint32_t                                    size,
+    const void*                                 pValues)
 {
    ANV_FROM_HANDLE(anv_cmd_buffer, cmd_buffer, commandBuffer);
 
-   if (pInfo->stageFlags & VK_SHADER_STAGE_ALL_GRAPHICS) {
+   if (stageFlags & VK_SHADER_STAGE_ALL_GRAPHICS) {
       struct anv_cmd_pipeline_state *pipe_state =
          &cmd_buffer->state.gfx.base;
 
-      memcpy(pipe_state->push_constants.client_data + pInfo->offset,
-             pInfo->pValues, pInfo->size);
+      memcpy(pipe_state->push_constants.client_data + offset, pValues, size);
    }
-   if (pInfo->stageFlags & VK_SHADER_STAGE_COMPUTE_BIT) {
+   if (stageFlags & VK_SHADER_STAGE_COMPUTE_BIT) {
       struct anv_cmd_pipeline_state *pipe_state =
          &cmd_buffer->state.compute.base;
 
-      memcpy(pipe_state->push_constants.client_data + pInfo->offset,
-             pInfo->pValues, pInfo->size);
+      memcpy(pipe_state->push_constants.client_data + offset, pValues, size);
    }
 
-   cmd_buffer->state.push_constants_dirty |= pInfo->stageFlags;
+   cmd_buffer->state.push_constants_dirty |= stageFlags;
 }
 
 static struct anv_descriptor_set *
@@ -749,26 +734,30 @@ anv_cmd_buffer_push_descriptor_set(struct anv_cmd_buffer *cmd_buffer,
    return set;
 }
 
-static void
-anv_cmd_buffer_push_descriptor_sets(struct anv_cmd_buffer *cmd_buffer,
-                                    VkPipelineBindPoint bind_point,
-                                    const VkPushDescriptorSetInfoKHR *pInfo)
+void anv_CmdPushDescriptorSetKHR(
+    VkCommandBuffer commandBuffer,
+    VkPipelineBindPoint pipelineBindPoint,
+    VkPipelineLayout _layout,
+    uint32_t _set,
+    uint32_t descriptorWriteCount,
+    const VkWriteDescriptorSet* pDescriptorWrites)
 {
-   ANV_FROM_HANDLE(anv_pipeline_layout, pipeline_layout, pInfo->layout);
+   ANV_FROM_HANDLE(anv_cmd_buffer, cmd_buffer, commandBuffer);
+   ANV_FROM_HANDLE(anv_pipeline_layout, layout, _layout);
 
-   assert(pInfo->set < MAX_SETS);
+   assert(_set < MAX_SETS);
 
-   struct anv_descriptor_set_layout *set_layout = pipeline_layout->set[pInfo->set].layout;
+   struct anv_descriptor_set_layout *set_layout = layout->set[_set].layout;
 
    struct anv_descriptor_set *set =
-      anv_cmd_buffer_push_descriptor_set(cmd_buffer, bind_point,
-                                         set_layout, pInfo->set);
+      anv_cmd_buffer_push_descriptor_set(cmd_buffer, pipelineBindPoint,
+                                         set_layout, _set);
    if (!set)
       return;
 
    /* Go through the user supplied descriptors. */
-   for (uint32_t i = 0; i < pInfo->descriptorWriteCount; i++) {
-      const VkWriteDescriptorSet *write = &pInfo->pDescriptorWrites[i];
+   for (uint32_t i = 0; i < descriptorWriteCount; i++) {
+      const VkWriteDescriptorSet *write = &pDescriptorWrites[i];
 
       switch (write->descriptorType) {
       case VK_DESCRIPTOR_TYPE_SAMPLER:
@@ -822,51 +811,37 @@ anv_cmd_buffer_push_descriptor_sets(struct anv_cmd_buffer *cmd_buffer,
       }
    }
 
-   anv_cmd_buffer_bind_descriptor_set(cmd_buffer, bind_point,
-                                      pipeline_layout, pInfo->set, set,
-                                      NULL, NULL);
+   anv_cmd_buffer_bind_descriptor_set(cmd_buffer, pipelineBindPoint,
+                                      layout, _set, set, NULL, NULL);
 }
 
-void anv_CmdPushDescriptorSet2KHR(
-   VkCommandBuffer                            commandBuffer,
-   const VkPushDescriptorSetInfoKHR*          pInfo)
-{
-   ANV_FROM_HANDLE(anv_cmd_buffer, cmd_buffer, commandBuffer);
-
-   if (pInfo->stageFlags & VK_SHADER_STAGE_COMPUTE_BIT)
-      anv_cmd_buffer_push_descriptor_sets(cmd_buffer,
-                                          VK_PIPELINE_BIND_POINT_COMPUTE,
-                                          pInfo);
-
-   if (pInfo->stageFlags & VK_SHADER_STAGE_ALL_GRAPHICS)
-      anv_cmd_buffer_push_descriptor_sets(cmd_buffer,
-                                          VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                          pInfo); 
-}
-
-void anv_CmdPushDescriptorSetWithTemplate2KHR(
-    VkCommandBuffer                                commandBuffer,
-    const VkPushDescriptorSetWithTemplateInfoKHR*  pInfo)
+void anv_CmdPushDescriptorSetWithTemplateKHR(
+    VkCommandBuffer                             commandBuffer,
+    VkDescriptorUpdateTemplate                  descriptorUpdateTemplate,
+    VkPipelineLayout                            _layout,
+    uint32_t                                    _set,
+    const void*                                 pData)
 {
    ANV_FROM_HANDLE(anv_cmd_buffer, cmd_buffer, commandBuffer);
    VK_FROM_HANDLE(vk_descriptor_update_template, template,
-                  pInfo->descriptorUpdateTemplate);
-   ANV_FROM_HANDLE(anv_pipeline_layout, pipeline_layout, pInfo->layout);
+                  descriptorUpdateTemplate);
+   ANV_FROM_HANDLE(anv_pipeline_layout, layout, _layout);
 
-   assert(pInfo->set < MAX_PUSH_DESCRIPTORS);
+   assert(_set < MAX_PUSH_DESCRIPTORS);
 
-   struct anv_descriptor_set_layout *set_layout = pipeline_layout->set[pInfo->set].layout;
+   struct anv_descriptor_set_layout *set_layout = layout->set[_set].layout;
+
    struct anv_descriptor_set *set =
       anv_cmd_buffer_push_descriptor_set(cmd_buffer, template->bind_point,
-                                         set_layout, pInfo->set);
+                                         set_layout, _set);
    if (!set)
       return;
 
    anv_descriptor_set_write_template(cmd_buffer->device, set,
                                      &cmd_buffer->surface_state_stream,
                                      template,
-                                     pInfo->pData);
+                                     pData);
 
    anv_cmd_buffer_bind_descriptor_set(cmd_buffer, template->bind_point,
-                                      pipeline_layout, pInfo->set, set, NULL, NULL);
+                                      layout, _set, set, NULL, NULL);
 }

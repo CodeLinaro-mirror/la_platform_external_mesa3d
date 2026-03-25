@@ -27,8 +27,6 @@
 #include <unknwn.h>
 #include <GL/gl.h>
 
-#include "util/os_misc.h"
-
 #undef GetMessage
 
 class window
@@ -73,7 +71,7 @@ window::window(uint32_t width, uint32_t height)
 
    _hdc = ::GetDC(_window);
 
-   os_set_option("D3D12_DEBUG", "singleton,debuglayer", true);
+   putenv("D3D12_DEBUG=singleton,debuglayer");
 
    PIXELFORMATDESCRIPTOR pfd = {
        sizeof(PIXELFORMATDESCRIPTOR),  /* size */

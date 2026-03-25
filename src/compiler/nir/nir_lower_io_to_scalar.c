@@ -86,6 +86,7 @@ lower_load_to_scalar(nir_builder *b, nir_intrinsic_instr *intr)
    b->cursor = nir_before_instr(&intr->instr);
 
    nir_def *loads[NIR_MAX_VEC_COMPONENTS];
+   nir_def *base_offset = nir_get_io_offset_src(intr)->ssa;
 
    for (unsigned i = 0; i < intr->num_components; i++) {
       nir_intrinsic_instr *chan_intr =
@@ -113,9 +114,8 @@ lower_load_to_scalar(nir_builder *b, nir_intrinsic_instr *intr)
          chan_intr->src[j] = nir_src_for_ssa(intr->src[j].ssa);
 
       /* increment offset per component */
-      nir_io_offset offset =
-         nir_io_offset_iadd(b, intr, i * (intr->def.bit_size / 8));
-      nir_set_io_offset(chan_intr, offset);
+      nir_def *offset = nir_iadd_imm(b, base_offset, i * (intr->def.bit_size / 8));
+      *nir_get_io_offset_src(chan_intr) = nir_src_for_ssa(offset);
 
       nir_builder_instr_insert(b, &chan_intr->instr);
 
@@ -144,10 +144,11 @@ lower_store_output_to_scalar(nir_builder *b, nir_intrinsic_instr *intr)
       bool has_xfb = false;
 
       if (nir_intrinsic_has_io_xfb(intr)) {
-         nir_io_xfb xfb = nir_intrinsic_io_xfb(intr);
          /* Find out which components are written via xfb. */
          for (unsigned c = 0; c <= new_component; c++) {
-            if (new_component < c + xfb.out[c].num_components) {
+            nir_io_xfb xfb = c < 2 ? nir_intrinsic_io_xfb(intr) : nir_intrinsic_io_xfb2(intr);
+
+            if (new_component < c + xfb.out[c % 2].num_components) {
                has_xfb = true;
                break;
             }
@@ -186,17 +187,21 @@ lower_store_output_to_scalar(nir_builder *b, nir_intrinsic_instr *intr)
 
       if (nir_intrinsic_has_io_xfb(intr)) {
          /* Scalarize transform feedback info. */
-         nir_io_xfb xfb = nir_intrinsic_io_xfb(intr);
          for (unsigned c = 0; c <= new_component; c++) {
-            if (new_component < c + xfb.out[c].num_components) {
+            nir_io_xfb xfb = c < 2 ? nir_intrinsic_io_xfb(intr) : nir_intrinsic_io_xfb2(intr);
+
+            if (new_component < c + xfb.out[c % 2].num_components) {
                nir_io_xfb scalar_xfb;
 
                memset(&scalar_xfb, 0, sizeof(scalar_xfb));
-               scalar_xfb.out[new_component].num_components = is_64bit ? 2 : 1;
-               scalar_xfb.out[new_component].buffer = xfb.out[c].buffer;
-               scalar_xfb.out[new_component].offset = xfb.out[c].offset +
+               scalar_xfb.out[new_component % 2].num_components = is_64bit ? 2 : 1;
+               scalar_xfb.out[new_component % 2].buffer = xfb.out[c % 2].buffer;
+               scalar_xfb.out[new_component % 2].offset = xfb.out[c % 2].offset +
                                                           new_component - c;
-               nir_intrinsic_set_io_xfb(chan_intr, scalar_xfb);
+               if (new_component < 2)
+                  nir_intrinsic_set_io_xfb(chan_intr, scalar_xfb);
+               else
+                  nir_intrinsic_set_io_xfb2(chan_intr, scalar_xfb);
                break;
             }
          }
@@ -225,6 +230,7 @@ lower_store_to_scalar(nir_builder *b, nir_intrinsic_instr *intr)
    b->cursor = nir_before_instr(&intr->instr);
 
    nir_def *value = intr->src[0].ssa;
+   nir_def *base_offset = nir_get_io_offset_src(intr)->ssa;
 
    /* iterate wrmask instead of num_components to handle split components */
    u_foreach_bit(i, nir_intrinsic_write_mask(intr)) {
@@ -251,9 +257,8 @@ lower_store_to_scalar(nir_builder *b, nir_intrinsic_instr *intr)
          chan_intr->src[j] = nir_src_for_ssa(intr->src[j].ssa);
 
       /* increment offset per component */
-      nir_io_offset offset =
-         nir_io_offset_iadd(b, intr, i * (value->bit_size / 8));
-      nir_set_io_offset(chan_intr, offset);
+      nir_def *offset = nir_iadd_imm(b, base_offset, i * (value->bit_size / 8));
+      *nir_get_io_offset_src(chan_intr) = nir_src_for_ssa(offset);
 
       nir_builder_instr_insert(b, &chan_intr->instr);
    }
@@ -263,14 +268,19 @@ lower_store_to_scalar(nir_builder *b, nir_intrinsic_instr *intr)
 
 struct scalarize_state {
    nir_variable_mode mask;
-   nir_intrin_filter_cb filter;
+   nir_instr_filter_cb filter;
    void *filter_data;
 };
 
 static bool
-nir_lower_io_to_scalar_instr(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+nir_lower_io_to_scalar_instr(nir_builder *b, nir_instr *instr, void *data)
 {
    struct scalarize_state *state = data;
+
+   if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
 
    if (intr->num_components == 1)
       return false;
@@ -281,7 +291,7 @@ nir_lower_io_to_scalar_instr(nir_builder *b, nir_intrinsic_instr *intr, void *da
         intr->intrinsic == nir_intrinsic_load_interpolated_input ||
         intr->intrinsic == nir_intrinsic_load_input_vertex) &&
        (state->mask & nir_var_shader_in) &&
-       (!state->filter || state->filter(intr, state->filter_data))) {
+       (!state->filter || state->filter(instr, state->filter_data))) {
       lower_load_input_to_scalar(b, intr);
       return true;
    }
@@ -291,7 +301,7 @@ nir_lower_io_to_scalar_instr(nir_builder *b, nir_intrinsic_instr *intr, void *da
         intr->intrinsic == nir_intrinsic_load_per_view_output ||
         intr->intrinsic == nir_intrinsic_load_per_primitive_output) &&
        (state->mask & nir_var_shader_out) &&
-       (!state->filter || state->filter(intr, state->filter_data))) {
+       (!state->filter || state->filter(instr, state->filter_data))) {
       lower_load_input_to_scalar(b, intr);
       return true;
    }
@@ -301,7 +311,7 @@ nir_lower_io_to_scalar_instr(nir_builder *b, nir_intrinsic_instr *intr, void *da
         (intr->intrinsic == nir_intrinsic_load_global && (state->mask & nir_var_mem_global)) ||
         (intr->intrinsic == nir_intrinsic_load_shared && (state->mask & nir_var_mem_shared)) ||
         (intr->intrinsic == nir_intrinsic_load_push_constant && (state->mask & nir_var_mem_push_const))) &&
-       (!state->filter || state->filter(intr, state->filter_data))) {
+       (!state->filter || state->filter(instr, state->filter_data))) {
       lower_load_to_scalar(b, intr);
       return true;
    }
@@ -311,7 +321,7 @@ nir_lower_io_to_scalar_instr(nir_builder *b, nir_intrinsic_instr *intr, void *da
         intr->intrinsic == nir_intrinsic_store_per_view_output ||
         intr->intrinsic == nir_intrinsic_store_per_primitive_output) &&
        state->mask & nir_var_shader_out &&
-       (!state->filter || state->filter(intr, state->filter_data))) {
+       (!state->filter || state->filter(instr, state->filter_data))) {
       lower_store_output_to_scalar(b, intr);
       return true;
    }
@@ -319,7 +329,7 @@ nir_lower_io_to_scalar_instr(nir_builder *b, nir_intrinsic_instr *intr, void *da
    if (((intr->intrinsic == nir_intrinsic_store_ssbo && (state->mask & nir_var_mem_ssbo)) ||
         (intr->intrinsic == nir_intrinsic_store_global && (state->mask & nir_var_mem_global)) ||
         (intr->intrinsic == nir_intrinsic_store_shared && (state->mask & nir_var_mem_shared))) &&
-       (!state->filter || state->filter(intr, state->filter_data))) {
+       (!state->filter || state->filter(instr, state->filter_data))) {
       lower_store_to_scalar(b, intr);
       return true;
    }
@@ -328,15 +338,15 @@ nir_lower_io_to_scalar_instr(nir_builder *b, nir_intrinsic_instr *intr, void *da
 }
 
 bool
-nir_lower_io_to_scalar(nir_shader *shader, nir_variable_mode mask, nir_intrin_filter_cb filter, void *filter_data)
+nir_lower_io_to_scalar(nir_shader *shader, nir_variable_mode mask, nir_instr_filter_cb filter, void *filter_data)
 {
    struct scalarize_state state = {
       mask,
       filter,
       filter_data
    };
-   return nir_shader_intrinsics_pass(shader,
-                                     nir_lower_io_to_scalar_instr,
-                                     nir_metadata_control_flow,
-                                     &state);
+   return nir_shader_instructions_pass(shader,
+                                       nir_lower_io_to_scalar_instr,
+                                       nir_metadata_control_flow,
+                                       &state);
 }

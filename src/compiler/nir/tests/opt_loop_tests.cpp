@@ -136,8 +136,7 @@ TEST_F(nir_opt_loop_test, opt_loop_merge_terminators_break_in_then)
    check_nir_string(NIR_REFERENCE_SHADER(R"(
       shader: MESA_SHADER_FRAGMENT
       name: nir_opt_loop_test
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_var shader_in INTERP_MODE_SMOOTH none int in (VARYING_SLOT_POS.x, 0, 0)
       decl_var shader_out INTERP_MODE_NONE none int out (FRAG_RESULT_DEPTH.x, 0, 0)
       decl_var ubo INTERP_MODE_NONE none int ubo1 (0, 0, 0)
@@ -192,8 +191,7 @@ TEST_F(nir_opt_loop_test, opt_loop_merge_terminators_break_in_else)
    check_nir_string(NIR_REFERENCE_SHADER(R"(
       shader: MESA_SHADER_FRAGMENT
       name: nir_opt_loop_test
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_var shader_in INTERP_MODE_SMOOTH none int in (VARYING_SLOT_POS.x, 0, 0)
       decl_var shader_out INTERP_MODE_NONE none int out (FRAG_RESULT_DEPTH.x, 0, 0)
       decl_var ubo INTERP_MODE_NONE none int ubo1 (0, 0, 0)
@@ -266,8 +264,7 @@ TEST_F(nir_opt_loop_test, opt_loop_merge_terminators_deref_after_first_if)
    check_nir_string(NIR_REFERENCE_SHADER(R"(
       shader: MESA_SHADER_FRAGMENT
       name: nir_opt_loop_test
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_var shader_in INTERP_MODE_SMOOTH none int in (VARYING_SLOT_POS.x, 0, 0)
       decl_var shader_out INTERP_MODE_NONE none int out (FRAG_RESULT_DEPTH.x, 0, 0)
       decl_var ubo INTERP_MODE_NONE none int ubo1 (0, 0, 0)
@@ -346,8 +343,7 @@ TEST_F(nir_opt_loop_test, opt_loop_merge_terminators_deref_phi_index)
    check_nir_string(NIR_REFERENCE_SHADER(R"(
       shader: MESA_SHADER_FRAGMENT
       name: nir_opt_loop_test
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_var shader_in INTERP_MODE_SMOOTH none int in (VARYING_SLOT_POS.x, 0, 0)
       decl_var shader_out INTERP_MODE_NONE none int out (FRAG_RESULT_DEPTH.x, 0, 0)
       decl_var ubo INTERP_MODE_NONE none int ubo1 (0, 0, 0)
@@ -431,8 +427,7 @@ TEST_F(nir_opt_loop_test, opt_loop_merge_terminators_skip_merge_if_phis)
    check_nir_string(NIR_REFERENCE_SHADER(R"(
       shader: MESA_SHADER_FRAGMENT
       name: nir_opt_loop_test
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_var shader_in INTERP_MODE_SMOOTH none int in (VARYING_SLOT_POS.x, 0, 0)
       decl_var shader_out INTERP_MODE_NONE none int out (FRAG_RESULT_DEPTH.x, 0, 0)
       decl_var ubo INTERP_MODE_NONE none int ubo1 (0, 0, 0)
@@ -511,8 +506,7 @@ TEST_F(nir_opt_loop_test, opt_loop_merge_terminators_skip_merge_if_phis_nested_l
    check_nir_string(NIR_REFERENCE_SHADER(R"(
       shader: MESA_SHADER_FRAGMENT
       name: nir_opt_loop_test
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_var shader_in INTERP_MODE_SMOOTH none int in (VARYING_SLOT_POS.x, 0, 0)
       decl_var shader_out INTERP_MODE_NONE none int out (FRAG_RESULT_DEPTH.x, 0, 0)
       decl_var ubo INTERP_MODE_NONE none int ubo1 (0, 0, 0)
@@ -587,8 +581,7 @@ TEST_F(nir_opt_loop_test, opt_loop_peel_initial_break_ends_with_jump)
    check_nir_string(NIR_REFERENCE_SHADER(R"(
       shader: MESA_SHADER_FRAGMENT
       name: nir_opt_loop_test
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_var shader_in INTERP_MODE_SMOOTH none int in (VARYING_SLOT_POS.x, 0, 0)
       decl_var shader_out INTERP_MODE_NONE none int out (FRAG_RESULT_DEPTH.x, 0, 0)
       decl_var ubo INTERP_MODE_NONE none int ubo1 (0, 0, 0)
@@ -659,8 +652,7 @@ TEST_F(nir_opt_loop_test, opt_loop_peel_initial_break_nontrivial_break)
    check_nir_string(NIR_REFERENCE_SHADER(R"(
       shader: MESA_SHADER_FRAGMENT
       name: nir_opt_loop_test
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_var shader_in INTERP_MODE_SMOOTH none int in (VARYING_SLOT_POS.x, 0, 0)
       decl_var shader_out INTERP_MODE_NONE none int out (FRAG_RESULT_DEPTH.x, 0, 0)
       decl_var ubo INTERP_MODE_NONE none int ubo1 (0, 0, 0)
@@ -733,8 +725,7 @@ TEST_F(nir_opt_loop_test, opt_loop_peel_initial_break_deref)
    check_nir_string(NIR_REFERENCE_SHADER(R"(
       shader: MESA_SHADER_FRAGMENT
       name: nir_opt_loop_test
-      max_subgroup_size: 128
-      min_subgroup_size: 1
+      subgroup_size: 0
       decl_var shader_in INTERP_MODE_SMOOTH none int in (VARYING_SLOT_POS.x, 0, 0)
       decl_var shader_out INTERP_MODE_NONE none int out (FRAG_RESULT_DEPTH.x, 0, 0)
       decl_var ubo INTERP_MODE_NONE none int ubo1 (0, 0, 0)

@@ -39,16 +39,14 @@
 extern struct pipe_screen *
 d3d10_create_screen(void);
 
-static HDC
-d3d10_gdi_acquire_hdc(void *winsys_drawable_handle) {
+HDC d3d10_gdi_acquire_hdc(void *winsys_drawable_handle) {
    D3DKMT_PRESENT *pPresentInfo = (D3DKMT_PRESENT *)winsys_drawable_handle;
 
    HWND hWnd = pPresentInfo->hWindow;
    return GetDC(hWnd);
 }
 
-static void
-d3d10_gdi_release_hdc(void *winsys_drawable_handle, HDC hDC) {
+void d3d10_gdi_release_hdc(void *winsys_drawable_handle, HDC hDC) {
    D3DKMT_PRESENT *pPresentInfo = (D3DKMT_PRESENT *)winsys_drawable_handle;
 
    HWND hWnd = pPresentInfo->hWindow;

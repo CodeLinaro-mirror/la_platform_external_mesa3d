@@ -71,10 +71,6 @@ intel_48b_address(uint64_t v)
    return (uint64_t)(v << shift) >> shift;
 }
 
-#ifdef HAVE_INTEL_VIRTIO
-extern int intel_virtio_ioctl(int fd, unsigned long request, void *arg);
-#endif
-
 /**
  * Call ioctl, restarting if it is interrupted
  */
@@ -84,11 +80,7 @@ intel_ioctl(int fd, unsigned long request, void *arg)
     int ret;
 
     do {
-#ifdef HAVE_INTEL_VIRTIO
-      ret = intel_virtio_ioctl(fd, request, arg);
-#else
-      ret = ioctl(fd, request, arg);
-#endif
+        ret = ioctl(fd, request, arg);
     } while (ret == -1 && (errno == EINTR || errno == EAGAIN));
     return ret;
 }
@@ -139,18 +131,6 @@ bool intel_gem_create_context_ext(int fd, enum intel_gem_create_context_flags fl
                                   uint32_t *ctx_id);
 bool intel_gem_supports_protected_context(int fd,
                                           enum intel_kmd_type kmd_type);
-
-/* Definitions used by the execbuf ioctl wrappers in the backends.
- * With the values below, after 80 retries we have slept ~16s, and the warning
- * is given at ~2s.
- */
-#define INTEL_EXEC_IOCTL_MAX_RETRIES 80
-#define INTEL_EXEC_IOCTL_RETRY_WARN 40
-static inline int
-intel_exec_ioctl_sleep_us(int retries)
-{
-   return 100 * retries * retries;
-}
 
 #define DRM_IOCTL_I915_LAST             DRM_IO(DRM_COMMAND_END - 1)
 

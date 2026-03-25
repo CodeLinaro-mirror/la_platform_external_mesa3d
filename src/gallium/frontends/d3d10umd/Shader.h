@@ -40,11 +40,11 @@ struct Shader;
 
 void *
 CreateEmptyShader(Device *pDevice,
-                  mesa_shader_stage processor);
+                  enum pipe_shader_type processor);
 
 void
 DeleteEmptyShader(Device *pDevice,
-                  mesa_shader_stage processor, void *handle);
+                  enum pipe_shader_type processor, void *handle);
 
 unsigned
 ShaderFindOutputMapping(Shader *shader, unsigned registerIndex);

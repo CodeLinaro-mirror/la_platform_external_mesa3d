@@ -391,9 +391,6 @@ propagate_parallelcopy(struct ra_val_ctx *ctx, struct ir3_instruction *pcopy)
       size += reg_size(pcopy->srcs[i]);
    }
 
-   if (size == 0)
-      return;
-
    struct reg_state srcs[size];
 
    unsigned offset = 0;

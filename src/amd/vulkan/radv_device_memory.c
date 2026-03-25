@@ -53,8 +53,6 @@ radv_free_memory(struct radv_device *device, const VkAllocationCallbacks *pAlloc
 #endif
 
    if (mem->bo) {
-      radv_va_validation_update_page(device, radv_buffer_get_va(mem->bo), mem->alloc_size, false);
-
       if (device->overallocation_disallowed) {
          mtx_lock(&device->overallocation_mutex);
          device->allocated_memory_size[mem->heap_index] -= mem->alloc_size;
@@ -120,21 +118,14 @@ radv_alloc_memory(struct radv_device *device, const VkMemoryAllocateInfo *pAlloc
       mem->buffer = NULL;
    }
 
-   if (wsi_info) {
-      /* Even if the WSI is managing implicit-sync fencing on the dma-buf with
-       * dma-buf fence import/export, RADEON_FLAG_IMPLICIT_SYNC also controls
-       * whether other users of the BO (such as an X server using an
-       * implicit-syncing GL driver for rendering) will respect the BO's
-       * implicit sync.
-       */
-      if (wsi_info->implicit_sync || wsi_info->dma_buf_sync_file)
-         flags |= RADEON_FLAG_IMPLICIT_SYNC;
+   if (wsi_info && wsi_info->implicit_sync) {
+      flags |= RADEON_FLAG_IMPLICIT_SYNC;
 
       /* Mark the linear prime buffer (aka the destination of the prime blit
        * as uncached.
        */
       if (mem->buffer)
-         flags |= RADEON_FLAG_GL2_BYPASS;
+         flags |= RADEON_FLAG_VA_UNCACHED;
    }
 
    float priority_float = 0.5;
@@ -240,10 +231,6 @@ radv_alloc_memory(struct radv_device *device, const VkMemoryAllocateInfo *pAlloc
           radv_device_should_clear_vram(device))
          flags |= RADEON_FLAG_ZERO_VRAM;
 
-      /* Only apply the workaround for BOs created by the application, not by the driver. */
-      if (instance->drirc.debug.wait_for_vm_map_updates)
-         flags |= RADEON_FLAG_VM_UPDATE_WAIT;
-
       /* On GFX12, DCC is transparent to the userspace driver and PTE.DCC is
        * set per buffer allocation. Only VRAM can have DCC. When the kernel
        * moves a buffer from VRAM->GTT it decompresses. When the kernel moves
@@ -251,7 +238,8 @@ radv_alloc_memory(struct radv_device *device, const VkMemoryAllocateInfo *pAlloc
        * (see DCC tiling flags).
        */
       if (pdev->info.gfx_level >= GFX12 && pdev->info.gfx12_supports_dcc_write_compress_disable &&
-          domain == RADEON_DOMAIN_VRAM && (flags & RADEON_FLAG_NO_CPU_ACCESS) && !radv_is_dcc_disabled(pdev)) {
+          domain == RADEON_DOMAIN_VRAM && (flags & RADEON_FLAG_NO_CPU_ACCESS) &&
+          !(instance->debug_flags & RADV_DEBUG_NO_DCC)) {
          flags |= RADEON_FLAG_GFX12_ALLOW_DCC;
       }
 
@@ -304,8 +292,6 @@ radv_alloc_memory(struct radv_device *device, const VkMemoryAllocateInfo *pAlloc
 
       mem->heap_index = heap_index;
       mem->alloc_size = alloc_size;
-
-      radv_va_validation_update_page(device, radv_buffer_get_va(mem->bo), alloc_size, true);
    }
 
    if (!wsi_info) {
@@ -373,7 +359,7 @@ radv_MapMemory2(VkDevice _device, const VkMemoryMapInfo *pMemoryMapInfo, void **
       *ppData = device->ws->buffer_map(device->ws, mem->bo, use_fixed_address, fixed_address);
 
    if (*ppData) {
-      vk_rmv_log_cpu_map(&device->vk, radv_buffer_get_va(mem->bo), false);
+      vk_rmv_log_cpu_map(&device->vk, mem->bo->va, false);
       *ppData = (uint8_t *)*ppData + pMemoryMapInfo->offset;
       return VK_SUCCESS;
    }
@@ -387,7 +373,7 @@ radv_UnmapMemory2(VkDevice _device, const VkMemoryUnmapInfo *pMemoryUnmapInfo)
    VK_FROM_HANDLE(radv_device, device, _device);
    VK_FROM_HANDLE(radv_device_memory, mem, pMemoryUnmapInfo->memory);
 
-   vk_rmv_log_cpu_map(&device->vk, radv_buffer_get_va(mem->bo), true);
+   vk_rmv_log_cpu_map(&device->vk, mem->bo->va, true);
    if (mem->user_ptr == NULL)
       device->ws->buffer_unmap(device->ws, mem->bo, (pMemoryUnmapInfo->flags & VK_MEMORY_UNMAP_RESERVE_BIT_EXT));
 

@@ -53,12 +53,6 @@ struct vn_renderer_info {
       VkPhysicalDevicePCIBusInfoPropertiesEXT props;
    } pci;
 
-   struct {
-      bool has_luid;
-      uint32_t node_mask;
-      uint8_t luid[VK_LUID_SIZE];
-   } id;
-
    bool has_dma_buf_import;
    bool has_external_sync;
    bool has_implicit_fencing;
@@ -165,13 +159,8 @@ struct vn_renderer_bo_ops {
    int (*export_dma_buf)(struct vn_renderer *renderer,
                          struct vn_renderer_bo *bo);
 
-   int (*export_sync_file)(struct vn_renderer *renderer,
-                           struct vn_renderer_bo *bo);
-
    /* map is not thread-safe */
-   void *(*map)(struct vn_renderer *renderer,
-                struct vn_renderer_bo *bo,
-                void *placed_addr);
+   void *(*map)(struct vn_renderer *renderer, struct vn_renderer_bo *bo);
 
    void (*flush)(struct vn_renderer *renderer,
                  struct vn_renderer_bo *bo,
@@ -378,19 +367,10 @@ vn_renderer_bo_export_dma_buf(struct vn_renderer *renderer,
    return renderer->bo_ops.export_dma_buf(renderer, bo);
 }
 
-static inline int
-vn_renderer_bo_export_sync_file(struct vn_renderer *renderer,
-                                struct vn_renderer_bo *bo)
-{
-   return renderer->bo_ops.export_sync_file(renderer, bo);
-}
-
 static inline void *
-vn_renderer_bo_map(struct vn_renderer *renderer,
-                   struct vn_renderer_bo *bo,
-                   void *placed_addr)
+vn_renderer_bo_map(struct vn_renderer *renderer, struct vn_renderer_bo *bo)
 {
-   return renderer->bo_ops.map(renderer, bo, placed_addr);
+   return renderer->bo_ops.map(renderer, bo);
 }
 
 static inline void

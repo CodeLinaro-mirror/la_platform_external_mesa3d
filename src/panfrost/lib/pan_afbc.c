@@ -1,10 +1,11 @@
 /*
  * Copyright © 2023-2025 Amazon.com, Inc. or its affiliates.
+ *
  * SPDX-License-Identifier: MIT
  */
 
 #include "pan_afbc.h"
-#include "pan_trace.h"
+#include "util/perf/cpu_trace.h"
 #include "util/detect_arch.h"
 #include "util/u_cpu_detect.h"
 
@@ -27,7 +28,7 @@ pan_afbc_payload_layout_packed(unsigned arch,
                                uint32_t nr_blocks, enum pipe_format format,
                                uint64_t modifier)
 {
-   PAN_TRACE_FUNC(PAN_TRACE_LIB_AFBC);
+   MESA_TRACE_FUNC();
 
    uint32_t uncompressed_size =
       pan_afbc_payload_uncompressed_size(format, modifier);
@@ -99,7 +100,7 @@ pan_afbc_payload_layout_packed(unsigned arch,
                                uint32_t nr_blocks, enum pipe_format format,
                                uint64_t modifier)
 {
-   PAN_TRACE_FUNC(PAN_TRACE_LIB_AFBC);
+   MESA_TRACE_FUNC();
 
    uint32_t uncompressed_size =
       pan_afbc_payload_uncompressed_size(format, modifier);

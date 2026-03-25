@@ -73,7 +73,8 @@ struct pvr_srv_winsys {
    struct pvr_device *presignaled_sync_device;
    struct pvr_srv_sync *presignaled_sync;
 
-   struct pvr_device_info dev_info;
+   /* Packed bvnc */
+   uint64_t bvnc;
 
    void *server_memctx;
    void *server_memctx_data;

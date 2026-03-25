@@ -1,9 +1,10 @@
 /*
  * Copyright © 2024 Collabora Ltd.
+ *
  * SPDX-License-Identifier: MIT
  */
 
-#include "bifrost/bifrost_compile.h"
+#include "bifrost_compile.h"
 #include "pan_desc.h"
 #include "pan_encoder.h"
 #include "panvk_cmd_alloc.h"
@@ -20,16 +21,7 @@ panvk_per_arch(dispatch_precomp)(struct panvk_precomp_ctx *ctx,
                                  enum libpan_shaders_program idx, void *data,
                                  size_t data_size)
 {
-   ASSERTED enum panlib_barrier supported_barriers =
-      PANLIB_BARRIER_JM_BARRIER | PANLIB_BARRIER_JM_SUPPRESS_PREFETCH;
-   assert(!(barrier & ~supported_barriers) && "Unsupported barrier flags");
-
    struct panvk_cmd_buffer *cmdbuf = ctx->cmdbuf;
-
-   /* Make sure we have a batch opened to queue our COMPUTE job to. */
-   if (!cmdbuf->cur_batch)
-      panvk_per_arch(cmd_open_batch)(cmdbuf);
-
    struct panvk_batch *batch = cmdbuf->cur_batch;
    struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
    const struct panvk_shader_variant *shader =
@@ -79,13 +71,12 @@ panvk_per_arch(dispatch_precomp)(struct panvk_precomp_ctx *ctx,
       cfg.thread_storage = tld;
    }
 
-   util_dynarray_append(&batch->jobs, job.cpu);
+   util_dynarray_append(&batch->jobs, void *, job.cpu);
 
    bool job_barrier = (barrier & PANLIB_BARRIER_JM_BARRIER) != 0;
    bool suppress_prefetch =
       (barrier & PANLIB_BARRIER_JM_SUPPRESS_PREFETCH) != 0;
 
    pan_jc_add_job(&batch->vtc_jc, MALI_JOB_TYPE_COMPUTE, job_barrier,
-                  suppress_prefetch, grid.jm.local_dep, grid.jm.global_dep,
-                  &job, false);
+                  suppress_prefetch, 0, 0, &job, false);
 }

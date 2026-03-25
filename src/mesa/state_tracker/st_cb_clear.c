@@ -107,14 +107,14 @@ st_destroy_clear(struct st_context *st)
  * Helper function to set the clear color fragment shader.
  */
 static void
-set_clearcolor_fs(struct st_context *st, union pipe_color_union *color,
-                  struct pipe_resource **releasebuf)
+set_clearcolor_fs(struct st_context *st, union pipe_color_union *color)
 {
    struct pipe_constant_buffer cb = {
       .user_buffer = color->f,
       .buffer_size = 4 * sizeof(float),
    };
-   pipe_upload_constant_buffer0(st->pipe, MESA_SHADER_FRAGMENT, &cb, releasebuf);
+   st->pipe->set_constant_buffer(st->pipe, PIPE_SHADER_FRAGMENT, 0,
+                                false, &cb);
 
    if (!st->clear.fs) {
       st->clear.fs = st_nir_make_clearcolor_shader(st);
@@ -226,8 +226,7 @@ clear_with_quad(struct gl_context *ctx, unsigned clear_buffers)
                         CSO_BIT_STREAM_OUTPUTS |
                         CSO_BIT_VERTEX_ELEMENTS |
                         (st->active_queries ? CSO_BIT_PAUSE_QUERIES : 0) |
-                        CSO_BIT_MESH_SHADER |
-                        CSO_BITS_VERTEX_PIPE_SHADERS));
+                        CSO_BITS_ALL_SHADERS));
 
    /* blend state: RGBA masking */
    {
@@ -295,11 +294,9 @@ clear_with_quad(struct gl_context *ctx, unsigned clear_buffers)
                          _mesa_fb_orientation(fb) == Y_0_TOP);
 
    /* Set constant buffer */
-   struct pipe_resource *releasebuf = NULL;
-   set_clearcolor_fs(st, (union pipe_color_union*)&ctx->Color.ClearColor, &releasebuf);
+   set_clearcolor_fs(st, (union pipe_color_union*)&ctx->Color.ClearColor);
    cso_set_tessctrl_shader_handle(cso, NULL);
    cso_set_tesseval_shader_handle(cso, NULL);
-   cso_set_mesh_shader_handle(cso, NULL);
 
    if (num_layers > 1)
       set_vertex_shader_layered(st);
@@ -322,12 +319,11 @@ clear_with_quad(struct gl_context *ctx, unsigned clear_buffers)
       _mesa_error(ctx, GL_OUT_OF_MEMORY, "glClear");
    }
 
-   pipe_resource_release(cso->pipe, releasebuf);
-
    /* Restore pipe state */
    cso_restore_state(cso, 0);
    ctx->Array.NewVertexElements = true;
-   ST_SET_STATE2(ctx->NewDriverState, ST_NEW_VERTEX_ARRAYS, ST_NEW_FS_CONSTANTS);
+   ctx->NewDriverState |= ST_NEW_VERTEX_ARRAYS |
+                          ST_NEW_FS_CONSTANTS;
 }
 
 
@@ -392,8 +388,6 @@ st_Clear(struct gl_context *ctx, GLbitfield mask)
       = ctx->DrawBuffer->Attachment[BUFFER_DEPTH].Renderbuffer;
    struct gl_renderbuffer *stencilRb
       = ctx->DrawBuffer->Attachment[BUFFER_STENCIL].Renderbuffer;
-   uint32_t color_clear_mask = ctx->Color.ColorMask;
-   uint8_t stencil_clear_mask = ctx->Stencil.WriteMask[0] & 0xff;
    GLbitfield quad_buffers = 0x0;
    GLbitfield clear_buffers = 0x0;
    bool have_scissor_buffers = false;
@@ -403,8 +397,7 @@ st_Clear(struct gl_context *ctx, GLbitfield mask)
    st_invalidate_readpix_cache(st);
 
    /* This makes sure the pipe has the latest scissor, etc values */
-   ST_PIPELINE_CLEAR_STATE_MASK(pipeline_mask);
-   st_validate_state(st, pipeline_mask);
+   st_validate_state(st, ST_PIPELINE_CLEAR_STATE_MASK);
 
    if (mask & BUFFER_BITS_COLOR) {
       for (i = 0; i < ctx->DrawBuffer->_NumColorDrawBuffers; i++) {
@@ -431,7 +424,7 @@ st_Clear(struct gl_context *ctx, GLbitfield mask)
             bool scissor = is_scissor_enabled(ctx, rb);
             if ((scissor && !st->can_scissor_clear) ||
                 is_window_rectangle_enabled(ctx) ||
-                (((colormask & surf_colormask) != surf_colormask) && !st->pipe->screen->caps.clear_masked))
+                ((colormask & surf_colormask) != surf_colormask))
                quad_buffers |= PIPE_CLEAR_COLOR0 << i;
             else
                clear_buffers |= PIPE_CLEAR_COLOR0 << i;
@@ -456,7 +449,7 @@ st_Clear(struct gl_context *ctx, GLbitfield mask)
          bool scissor = is_scissor_enabled(ctx, stencilRb);
          if ((scissor && !st->can_scissor_clear) ||
              is_window_rectangle_enabled(ctx) ||
-             (is_stencil_masked(ctx, stencilRb) && !st->pipe->screen->caps.clear_masked))
+             is_stencil_masked(ctx, stencilRb))
             quad_buffers |= PIPE_CLEAR_STENCIL;
          else
             clear_buffers |= PIPE_CLEAR_STENCIL;
@@ -510,9 +503,7 @@ st_Clear(struct gl_context *ctx, GLbitfield mask)
       /* We can't translate the clear color to the colorbuffer format,
        * because different colorbuffers may have different formats.
        */
-      st->pipe->clear(st->pipe, clear_buffers,
-                      color_clear_mask, stencil_clear_mask,
-                      have_scissor_buffers ? &scissor_state : NULL,
+      st->pipe->clear(st->pipe, clear_buffers, have_scissor_buffers ? &scissor_state : NULL,
                       (union pipe_color_union*)&ctx->Color.ClearColor,
                       ctx->Depth.Clear, ctx->Stencil.Clear);
    }

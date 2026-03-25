@@ -111,6 +111,15 @@ asahi_fill_vdm_command(struct hk_device *dev, struct hk_cs *cs,
    c->vdm_ctrl_stream_base = cs->addr;
 
    agx_pack(&c->ppp_ctrl, CR_PPP_CONTROL, cfg) {
+      /* If largePoints is not enabled, we optimize out point size writes so
+       * need to force points to have size 1.0 with this bit.
+       *
+       * If largePoints is enabled, we can't set this bit since our point size
+       * writes will get ignored.
+       *
+       * Yes, the hardware engineers messed this up. Dates back to IMG days.
+       */
+      cfg.default_point_size = !dev->vk.enabled_features.largePoints;
       cfg.enable_w_clamp = true;
       cfg.fixed_point_format = 1;
    }
@@ -146,7 +155,8 @@ asahi_fill_vdm_command(struct hk_device *dev, struct hk_cs *cs,
       c->flags |= DRM_ASAHI_RENDER_NO_VERTEX_CLUSTERING;
    }
 
-   agx_tilebuffer_set_drm_cmd(c, &cs->tib);
+   c->utile_width_px = cs->tib.tile_size.width;
+   c->utile_height_px = cs->tib.tile_size.height;
 
    /* Can be 0 for attachmentless rendering with no draws */
    c->samples = MAX2(cs->tib.nr_samples, 1);
@@ -257,10 +267,9 @@ max_commands_per_submit(struct hk_device *dev)
 }
 
 static VkResult
-queue_submit_single(struct hk_device *dev, struct drm_asahi_submit *submit,
-                    unsigned ring_idx)
+queue_submit_single(struct hk_device *dev, struct drm_asahi_submit *submit)
 {
-   struct agx_submit_virt virt = {.ring_idx = ring_idx};
+   struct agx_submit_virt virt = {0};
 
    if (dev->dev.is_virtio) {
       u_rwlock_rdlock(&dev->external_bos.lock);
@@ -291,7 +300,7 @@ queue_submit_single(struct hk_device *dev, struct drm_asahi_submit *submit,
  */
 static VkResult
 queue_submit_looped(struct hk_device *dev, struct drm_asahi_submit *submit,
-                    unsigned command_count, unsigned ring_idx)
+                    unsigned command_count)
 {
    uint8_t *cmdbuf = (uint8_t *)(uintptr_t)submit->cmdbuf;
    uint32_t offs = 0;
@@ -364,7 +373,7 @@ queue_submit_looped(struct hk_device *dev, struct drm_asahi_submit *submit,
          .out_sync_count = has_out_syncs ? submit->out_sync_count : 0,
       };
 
-      VkResult result = queue_submit_single(dev, &submit_ioctl, ring_idx);
+      VkResult result = queue_submit_single(dev, &submit_ioctl);
       if (result != VK_SUCCESS)
          return result;
 
@@ -404,7 +413,7 @@ hk_bind_builder(struct hk_device *dev, struct vk_object_base *obj_base,
       .image = image,
    };
 
-   b.binds = UTIL_DYNARRAY_INIT;
+   util_dynarray_init(&b.binds, NULL);
    return b;
 }
 
@@ -487,7 +496,7 @@ hk_flush_bind(struct hk_bind_builder *b)
       };
    }
 
-   util_dynarray_append(&b->binds, op);
+   util_dynarray_append(&b->binds, struct drm_asahi_gem_bind_op, op);
 
    /* Shadow a read-only mapping to the upper half */
    op.flags &= ~DRM_ASAHI_BIND_WRITE;
@@ -497,7 +506,7 @@ hk_flush_bind(struct hk_bind_builder *b)
       op.handle = b->dev->dev.zero_bo->uapi_handle;
    }
 
-   util_dynarray_append(&b->binds, op);
+   util_dynarray_append(&b->binds, struct drm_asahi_gem_bind_op, op);
 
    return VK_SUCCESS;
 }
@@ -809,7 +818,13 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
    };
 
    /* Now setup the command structs */
-   struct util_dynarray payload = UTIL_DYNARRAY_INIT;
+   struct util_dynarray payload;
+   util_dynarray_init(&payload, NULL);
+   union drm_asahi_cmd *cmds = malloc(sizeof(*cmds) * command_count);
+   if (cmds == NULL) {
+      free(cmds);
+      return vk_error(dev, VK_ERROR_OUT_OF_HOST_MEMORY);
+   }
 
    unsigned nr_vdm = 0, nr_cdm = 0;
 
@@ -822,7 +837,7 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
          struct drm_asahi_cmd_header header =
             agx_cmd_header(cs->type == HK_CS_CDM, nr_vdm, nr_cdm);
 
-         util_dynarray_append(&payload, header);
+         util_dynarray_append(&payload, struct drm_asahi_cmd_header, header);
 
          if (cs->type == HK_CS_CDM) {
             perf_debug(
@@ -836,7 +851,7 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
 
             struct drm_asahi_cmd_compute cmd;
             asahi_fill_cdm_command(dev, cs, &cmd);
-            util_dynarray_append(&payload, cmd);
+            util_dynarray_append(&payload, struct drm_asahi_cmd_compute, cmd);
             nr_cdm++;
          } else {
             assert(cs->type == HK_CS_VDM);
@@ -847,7 +862,7 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
 
             struct drm_asahi_cmd_render cmd;
             asahi_fill_vdm_command(dev, cs, &cmd);
-            util_dynarray_append(&payload, cmd);
+            util_dynarray_append(&payload, struct drm_asahi_cmd_render, cmd);
             nr_vdm++;
          }
       }
@@ -871,13 +886,10 @@ queue_submit(struct hk_device *dev, struct hk_queue *queue,
    };
 
    VkResult result;
-   if (command_count <= max_commands_per_submit(dev)) {
-      result =
-         queue_submit_single(dev, &submit_ioctl, queue->drm.virt_ring_idx);
-   } else {
-      result = queue_submit_looped(dev, &submit_ioctl, command_count,
-                                   queue->drm.virt_ring_idx);
-   }
+   if (command_count <= max_commands_per_submit(dev))
+      result = queue_submit_single(dev, &submit_ioctl);
+   else
+      result = queue_submit_looped(dev, &submit_ioctl, command_count);
 
    util_dynarray_fini(&payload);
    return result;
@@ -936,18 +948,14 @@ translate_priority(VkQueueGlobalPriorityKHR prio)
 }
 
 VkResult
-hk_queue_init(struct hk_device *dev, const VkDeviceQueueCreateInfo *pCreateInfo,
+hk_queue_init(struct hk_device *dev, struct hk_queue *queue,
+              const VkDeviceQueueCreateInfo *pCreateInfo,
               uint32_t index_in_family)
 {
    struct hk_physical_device *pdev = hk_device_physical(dev);
    VkResult result;
 
    assert(pCreateInfo->queueFamilyIndex < pdev->queue_family_count);
-
-   struct hk_queue *queue = vk_zalloc(&dev->vk.alloc, sizeof(struct hk_queue),
-                                      8, VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
-   if (!queue)
-      return VK_ERROR_OUT_OF_HOST_MEMORY;
 
    const VkDeviceQueueGlobalPriorityCreateInfoKHR *priority_info =
       vk_find_struct_const(pCreateInfo->pNext,
@@ -971,7 +979,6 @@ hk_queue_init(struct hk_device *dev, const VkDeviceQueueCreateInfo *pCreateInfo,
    queue->vk.driver_submit = hk_queue_submit;
 
    queue->drm.id = agx_create_command_queue(&dev->dev, drm_priority);
-   queue->drm.virt_ring_idx = drm_priority + 1;
 
    if (drmSyncobjCreate(dev->dev.fd, 0, &queue->drm.syncobj)) {
       mesa_loge("drmSyncobjCreate() failed %d\n", errno);
@@ -999,5 +1006,4 @@ hk_queue_finish(struct hk_device *dev, struct hk_queue *queue)
    drmSyncobjDestroy(dev->dev.fd, queue->drm.syncobj);
    agx_destroy_command_queue(&dev->dev, queue->drm.id);
    vk_queue_finish(&queue->vk);
-   vk_free(&dev->vk.alloc, queue);
 }

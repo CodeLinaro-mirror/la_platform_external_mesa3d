@@ -24,7 +24,7 @@ impl ShaderModel70 {
     fn instr_latency(&self, op: &Op, dst_idx: usize) -> u32 {
         let file = match &op.dsts_as_slice()[dst_idx] {
             Dst::None => return 0,
-            Dst::SSA(vec) => vec.file(),
+            Dst::SSA(vec) => vec.file().unwrap(),
             Dst::Reg(reg) => reg.file(),
         };
 
@@ -136,7 +136,6 @@ impl ShaderModel for ShaderModel70 {
             | Op::Prmt(_)
             | Op::PSetP(_)
             | Op::Sel(_)
-            | Op::Sgxt(_)
             | Op::Shf(_)
             | Op::Shl(_)
             | Op::Shr(_)
@@ -257,16 +256,6 @@ impl ShaderModel for ShaderModel70 {
             }
         } else {
             13
-        }
-    }
-
-    fn latency_upper_bound(&self) -> u32 {
-        if self.is_blackwell() || self.is_ampere() || self.is_ada() {
-            30
-        } else if self.is_turing() {
-            25
-        } else {
-            15
         }
     }
 

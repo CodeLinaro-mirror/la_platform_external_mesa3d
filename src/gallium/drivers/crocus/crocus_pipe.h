@@ -26,16 +26,16 @@
 #include "pipe/p_defines.h"
 #include "compiler/shader_enums.h"
 
-static inline mesa_shader_stage
-stage_from_pipe(mesa_shader_stage pstage)
+static inline gl_shader_stage
+stage_from_pipe(enum pipe_shader_type pstage)
 {
-   return (mesa_shader_stage)pstage;
+   return (gl_shader_stage)pstage;
 }
 
-static inline mesa_shader_stage
-stage_to_pipe(mesa_shader_stage stage)
+static inline enum pipe_shader_type
+stage_to_pipe(gl_shader_stage stage)
 {
-   return (mesa_shader_stage)stage;
+   return (enum pipe_shader_type)stage;
 }
 
 /**

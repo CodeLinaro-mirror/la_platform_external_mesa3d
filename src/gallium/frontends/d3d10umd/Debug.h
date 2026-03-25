@@ -1,14 +1,8 @@
 #pragma once
 
-#ifdef __MINGW32__
-#undef WIN32_LEAN_AND_MEAN /* for DEFINE_GUID macro */
-#define _NO_OLDNAMES       /* avoid defining ssize_t */
-#include <stdio.h>         /* for vsnprintf */
-#undef fileno              /* we redefine this in vm_basic_defs.h */
-#endif
-
-#include <windows.h>
+#include "DriverIncludes.h"
 #include "util/u_debug.h"
+
 
 #ifdef __cplusplus
 extern "C" {

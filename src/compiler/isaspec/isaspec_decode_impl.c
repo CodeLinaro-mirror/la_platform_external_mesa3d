@@ -519,7 +519,7 @@ isa_decode_field(struct decode_scope *scope, const char *field_name)
 	bitmask_t val;
 	const struct isa_field *field = resolve_field(scope, field_name, strlen(field_name), &val);
 	if (!field) {
-		decode_error(scope->state, "no field '%s' in '%s'", field_name, scope->bitset->name);
+		decode_error(scope->state, "no field '%s'", field_name);
 		return 0;
 	}
 
@@ -638,23 +638,14 @@ display_field(struct decode_scope *scope, const char *field_name)
 			isa_print(print, "+%"PRIu64, val);
 		}
 		break;
-	case TYPE_FLOAT: {
-		float f;
-		const char *fmt;
+	case TYPE_FLOAT:
 		if (width == 16) {
-			f = _mesa_half_to_float(val);
-			fmt = "%.5g";
+			isa_print(print, "%f", _mesa_half_to_float(val));
 		} else {
 			assert(width == 32);
-			f = uif(val);
-			fmt = "%.9g";
+			isa_print(print, "%f", uif(val));
 		}
-		if (f == truncf(f) && isfinite(f))
-			isa_print(print, "%.1f", f);
-		else
-			isa_print(print, fmt, f);
 		break;
-	}
 	case TYPE_BOOL:
 		if (field->display) {
 			if (val) {
@@ -976,8 +967,10 @@ isa_disasm(void *bin, int sz, FILE *out, const struct isa_decode_options *option
 	state->num_instr = sz / (BITMASK_WORDS * sizeof(BITSET_WORD));
 
 	if (state->options->branch_labels) {
-		state->branch_targets = BITSET_RZALLOC(state, state->num_instr);
-		state->call_targets = BITSET_RZALLOC(state, state->num_instr);
+		state->branch_targets = rzalloc_size(state,
+				sizeof(BITSET_WORD) * BITSET_WORDS(state->num_instr));
+		state->call_targets = rzalloc_size(state,
+				sizeof(BITSET_WORD) * BITSET_WORDS(state->num_instr));
 
 		/* Do a pre-pass to find all the branch targets: */
 		state->print.out = fopen("/dev/null", "w");

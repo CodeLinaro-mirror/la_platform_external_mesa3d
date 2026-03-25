@@ -131,8 +131,7 @@ nir_lower_reg_intrinsics_to_ssa_impl(nir_function_impl *impl)
       return nir_no_progress(impl);
    }
 
-   nir_metadata_require(impl,
-                        nir_metadata_block_index | nir_metadata_dominance);
+   nir_metadata_require(impl, nir_metadata_control_flow);
    nir_index_ssa_defs(impl);
 
    void *dead_ctx = ralloc_context(NULL);

@@ -231,7 +231,7 @@ vbo_save_playback_vertex_list_gallium(struct gl_context *ctx,
     */
    struct gl_program *vp = ctx->VertexProgram._Current;
 
-   if ((vp->info.inputs_read & ~(uint64_t)enabled) || vp->DualSlotInputs)
+   if (vp->info.inputs_read & ~enabled || vp->DualSlotInputs)
       return USE_SLOW_PATH;
 
    struct pipe_vertex_state *state = node->state[mode];
@@ -281,8 +281,7 @@ vbo_save_playback_vertex_list_gallium(struct gl_context *ctx,
    /* Set edge flags. */
    _mesa_update_edgeflag_state_explicit(ctx, enabled & VERT_BIT_EDGEFLAG);
 
-   ST_PIPELINE_RENDER_STATE_MASK_NO_VARRAYS(mask);
-   st_prepare_draw(ctx, mask);
+   st_prepare_draw(ctx, ST_PIPELINE_RENDER_STATE_MASK_NO_VARRAYS);
 
    struct pipe_context *pipe = ctx->pipe;
    uint32_t velem_mask = ctx->VertexProgram._Current->info.inputs_read;
@@ -378,8 +377,7 @@ vbo_save_playback_vertex_list(struct gl_context *ctx, void *data, bool copy_to_c
 
    struct pipe_draw_info *info = (struct pipe_draw_info *) &node->cold->info;
 
-   ST_PIPELINE_RENDER_STATE_MASK(mask);
-   st_prepare_draw(ctx, mask);
+   st_prepare_draw(ctx, ST_PIPELINE_RENDER_STATE_MASK);
 
    if (node->modes) {
       ctx->Driver.DrawGalliumMultiMode(ctx, info,

@@ -866,7 +866,8 @@ main(int argc, char *argv[])
    close(1);
    wait(NULL);
 
-   free(xml_path);
+   if (xml_path)
+      free(xml_path);
 
    return EXIT_SUCCESS;
 }

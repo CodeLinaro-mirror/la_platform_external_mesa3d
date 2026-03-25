@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <ctype.h>
 #include "nir.h"
 #include "nir_builder.h"
 
@@ -19,7 +18,7 @@
  *
  * Mangling allows for multiple definitions of the same instruction with
  * different vector lengths and bit sizes. This could be combined with
- * __attribute__((overloadable)) for seamless overloads.
+ * __attribute_((overloadable)) for seamless overloads.
  *
  * In effect, this pass re-implements nir_builder dynamically. This exposes
  * low-level hardware intrinsics to internal driver programs. It is intended for
@@ -98,23 +97,9 @@ lower(nir_builder *b, nir_instr *instr, void *data)
 
    nir_call_instr *call = nir_instr_as_call(instr);
    nir_function *func = call->callee;
-   const char *intr_name = func->name;
-   unsigned len = strlen(intr_name);
-
-   /* If the function name has been (IA64) mangled,
-    * parse out its length and unmangled name.
-    */
-   if (!strncmp("_Z", intr_name, strlen("_Z")) && isdigit(intr_name[2])) {
-      char *endptr;
-      len = strtol(&intr_name[2], &endptr, 10);
-      intr_name = endptr;
-   }
-
-   const char *nir_prefix = "nir_";
-   const unsigned nir_prefix_len = strlen(nir_prefix);
 
    /* We reserve all functions prefixed nir_* as builtins needing lowering. */
-   if (strncmp(nir_prefix, intr_name, nir_prefix_len) != 0)
+   if (strncmp("nir_", func->name, strlen("nir_")) != 0)
       return false;
 
    /* Strip the nir_ prefix to give the name of an ALU opcode or intrinsic. Also
@@ -122,9 +107,9 @@ lower(nir_builder *b, nir_instr *instr, void *data)
     * can recover vector lengths / bit sizes from the NIR.  This implements a
     * crude form of function overloading.
     */
-   intr_name += nir_prefix_len;
+   const char *intr_name = func->name + strlen("nir_");
    const char *suffix = strstr(intr_name, "__");
-   len = (suffix != NULL) ? (suffix - intr_name) : (len - nir_prefix_len);
+   unsigned len = (suffix != NULL) ? (suffix - intr_name) : strlen(intr_name);
 
    /* From this point on, we must not fail. Remove the call. */
    b->cursor = nir_instr_remove(&call->instr);
@@ -150,7 +135,7 @@ lower(nir_builder *b, nir_instr *instr, void *data)
    }
 
    /* We must have matched something! */
-   fprintf(stderr, "unknown opcode %.*s\n", len, intr_name);
+   fprintf(stderr, "unknown opcode %s\n", func->name);
    UNREACHABLE("invalid nir opcode/intrinsic");
 }
 

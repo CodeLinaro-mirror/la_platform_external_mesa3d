@@ -18,20 +18,14 @@ struct nir_reference_shader {
    const char *file;
 };
 
-static inline void
-delete_annotation(hash_entry *he)
-{
-   free(he->data);
-}
-
 class nir_test : public ::testing::Test {
-public:
+ protected:
    nir_test(const char *name)
       : nir_test(name, MESA_SHADER_COMPUTE)
    {
    }
 
-   nir_test(const char *name, mesa_shader_stage stage)
+   nir_test(const char *name, gl_shader_stage stage)
    {
       glsl_type_singleton_init_or_ref();
 
@@ -46,10 +40,8 @@ public:
    {
       if (HasFailure()) {
          printf("\nShader from the failed test:\n\n");
-         nir_print_shader_annotated(b->shader, stdout, annotations);
+         nir_print_shader(b->shader, stdout);
       }
-
-      _mesa_hash_table_destroy(annotations, delete_annotation);
 
       ralloc_free(b->shader);
 
@@ -136,8 +128,6 @@ public:
    nir_shader_compiler_options options = {};
    nir_builder _b;
    nir_builder *b;
-
-   hash_table *annotations = nullptr;
 };
 
 #define NIR_REFERENCE_SHADER(expected) nir_reference_shader{.string = expected, .file = __FILE__}

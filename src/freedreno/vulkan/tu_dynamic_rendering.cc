@@ -80,7 +80,8 @@ get_cmd_buffer(struct tu_device *dev, struct tu_cmd_buffer **cmd_buffer_out)
       .fence = ++dev->dynamic_rendering_fence,
    };
 
-   util_dynarray_append(&dev->dynamic_rendering_pending, entry);
+   util_dynarray_append(&dev->dynamic_rendering_pending,
+                        struct dynamic_rendering_entry, entry);
    *cmd_buffer_out = cmd_buffer;
 
    return VK_SUCCESS;
@@ -89,7 +90,7 @@ get_cmd_buffer(struct tu_device *dev, struct tu_cmd_buffer **cmd_buffer_out)
 VkResult
 tu_init_dynamic_rendering(struct tu_device *dev)
 {
-   dev->dynamic_rendering_pending = UTIL_DYNARRAY_INIT;
+   util_dynarray_init(&dev->dynamic_rendering_pending, NULL);
    dev->dynamic_rendering_fence = 0;
 
    const VkCommandPoolCreateInfo create_info = {
@@ -157,12 +158,12 @@ tu_insert_dynamic_cmdbufs(struct tu_device *dev,
          tu_cs_emit(&cmd_buffer->cs, dev->dynamic_rendering_fence);
 
          TU_CALLX(dev, tu_EndCommandBuffer)(tu_cmd_buffer_to_handle(cmd_buffer));
-         util_dynarray_append(&cmds, cmd_buffer);
+         util_dynarray_append(&cmds, struct tu_cmd_buffer *, cmd_buffer);
          cmd_buffer = NULL;
          break;
       }
 
-      util_dynarray_append(&cmds, old_cmds[i]);
+      util_dynarray_append(&cmds, struct tu_cmd_buffer *, old_cmds[i]);
 
       switch (old_cmds[i]->state.suspend_resume) {
       case SR_NONE:

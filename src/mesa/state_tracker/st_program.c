@@ -72,32 +72,33 @@ static void
 destroy_program_variants(struct st_context *st, struct gl_program *target);
 
 static void
-set_affected_state_flags(struct gl_program *prog,
-                         unsigned new_constants,
-                         unsigned new_sampler_views,
-                         unsigned new_samplers,
-                         unsigned new_images,
-                         unsigned new_ubos,
-                         unsigned new_ssbos,
-                         unsigned new_atomics)
+set_affected_state_flags(uint64_t *states,
+                         struct gl_program *prog,
+                         uint64_t new_constants,
+                         uint64_t new_sampler_views,
+                         uint64_t new_samplers,
+                         uint64_t new_images,
+                         uint64_t new_ubos,
+                         uint64_t new_ssbos,
+                         uint64_t new_atomics)
 {
    if (prog->Parameters->NumParameters)
-      ST_SET_STATE(prog->affected_states, new_constants);
+      *states |= new_constants;
 
    if (prog->info.num_textures)
-      ST_SET_STATE2(prog->affected_states, new_sampler_views, new_samplers);
+      *states |= new_sampler_views | new_samplers;
 
    if (prog->info.num_images)
-      ST_SET_STATE(prog->affected_states, new_images);
+      *states |= new_images;
 
    if (prog->info.num_ubos)
-      ST_SET_STATE(prog->affected_states, new_ubos);
+      *states |= new_ubos;
 
    if (prog->info.num_ssbos)
-      ST_SET_STATE(prog->affected_states, new_ssbos);
+      *states |= new_ssbos;
 
    if (prog->info.num_abos)
-      ST_SET_STATE(prog->affected_states, new_atomics);
+      *states |= new_atomics;
 }
 
 /**
@@ -106,14 +107,17 @@ set_affected_state_flags(struct gl_program *prog,
 void
 st_set_prog_affected_state_flags(struct gl_program *prog)
 {
-   BITSET_ZERO(prog->affected_states);
+   uint64_t *states;
 
    switch (prog->info.stage) {
    case MESA_SHADER_VERTEX:
-      ST_SET_STATE3(prog->affected_states, ST_NEW_VS_STATE,
-                    ST_NEW_RASTERIZER, ST_NEW_VERTEX_ARRAYS);
+      states = &prog->affected_states;
 
-      set_affected_state_flags(prog,
+      *states = ST_NEW_VS_STATE |
+                ST_NEW_RASTERIZER |
+                ST_NEW_VERTEX_ARRAYS;
+
+      set_affected_state_flags(states, prog,
                                ST_NEW_VS_CONSTANTS,
                                ST_NEW_VS_SAMPLER_VIEWS,
                                ST_NEW_VS_SAMPLERS,
@@ -124,9 +128,11 @@ st_set_prog_affected_state_flags(struct gl_program *prog)
       break;
 
    case MESA_SHADER_TESS_CTRL:
-      ST_SET_STATE(prog->affected_states, ST_NEW_TCS_STATE);
+      states = &prog->affected_states;
 
-      set_affected_state_flags(prog,
+      *states = ST_NEW_TCS_STATE;
+
+      set_affected_state_flags(states, prog,
                                ST_NEW_TCS_CONSTANTS,
                                ST_NEW_TCS_SAMPLER_VIEWS,
                                ST_NEW_TCS_SAMPLERS,
@@ -137,10 +143,12 @@ st_set_prog_affected_state_flags(struct gl_program *prog)
       break;
 
    case MESA_SHADER_TESS_EVAL:
-      ST_SET_STATE2(prog->affected_states, ST_NEW_TES_STATE,
-                    ST_NEW_RASTERIZER);
+      states = &prog->affected_states;
 
-      set_affected_state_flags(prog,
+      *states = ST_NEW_TES_STATE |
+                ST_NEW_RASTERIZER;
+
+      set_affected_state_flags(states, prog,
                                ST_NEW_TES_CONSTANTS,
                                ST_NEW_TES_SAMPLER_VIEWS,
                                ST_NEW_TES_SAMPLERS,
@@ -151,10 +159,12 @@ st_set_prog_affected_state_flags(struct gl_program *prog)
       break;
 
    case MESA_SHADER_GEOMETRY:
-      ST_SET_STATE2(prog->affected_states, ST_NEW_GS_STATE,
-                    ST_NEW_RASTERIZER);
+      states = &prog->affected_states;
 
-      set_affected_state_flags(prog,
+      *states = ST_NEW_GS_STATE |
+                ST_NEW_RASTERIZER;
+
+      set_affected_state_flags(states, prog,
                                ST_NEW_GS_CONSTANTS,
                                ST_NEW_GS_SAMPLER_VIEWS,
                                ST_NEW_GS_SAMPLERS,
@@ -165,11 +175,14 @@ st_set_prog_affected_state_flags(struct gl_program *prog)
       break;
 
    case MESA_SHADER_FRAGMENT:
-      /* gl_FragCoord and glDrawPixels always use constants. */
-      ST_SET_STATE3(prog->affected_states, ST_NEW_FS_STATE,
-                    ST_NEW_SAMPLE_SHADING, ST_NEW_FS_CONSTANTS);
+      states = &prog->affected_states;
 
-      set_affected_state_flags(prog,
+      /* gl_FragCoord and glDrawPixels always use constants. */
+      *states = ST_NEW_FS_STATE |
+                ST_NEW_SAMPLE_SHADING |
+                ST_NEW_FS_CONSTANTS;
+
+      set_affected_state_flags(states, prog,
                                ST_NEW_FS_CONSTANTS,
                                ST_NEW_FS_SAMPLER_VIEWS,
                                ST_NEW_FS_SAMPLERS,
@@ -180,9 +193,11 @@ st_set_prog_affected_state_flags(struct gl_program *prog)
       break;
 
    case MESA_SHADER_COMPUTE:
-      ST_SET_STATE(prog->affected_states, ST_NEW_CS_STATE);
+      states = &prog->affected_states;
 
-      set_affected_state_flags(prog,
+      *states = ST_NEW_CS_STATE;
+
+      set_affected_state_flags(states, prog,
                                ST_NEW_CS_CONSTANTS,
                                ST_NEW_CS_SAMPLER_VIEWS,
                                ST_NEW_CS_SAMPLERS,
@@ -190,33 +205,6 @@ st_set_prog_affected_state_flags(struct gl_program *prog)
                                ST_NEW_CS_UBOS,
                                ST_NEW_CS_SSBOS,
                                ST_NEW_CS_ATOMICS);
-      break;
-
-   case MESA_SHADER_TASK:
-      ST_SET_STATE(prog->affected_states, ST_NEW_TS_STATE);
-
-      set_affected_state_flags(prog,
-                               ST_NEW_TS_CONSTANTS,
-                               ST_NEW_TS_SAMPLER_VIEWS,
-                               ST_NEW_TS_SAMPLERS,
-                               ST_NEW_TS_IMAGES,
-                               ST_NEW_TS_UBOS,
-                               ST_NEW_TS_SSBOS,
-                               ST_NEW_TS_ATOMICS);
-      break;
-
-   case MESA_SHADER_MESH:
-      ST_SET_STATE2(prog->affected_states, ST_NEW_MS_STATE,
-                    ST_NEW_RASTERIZER);
-
-      set_affected_state_flags(prog,
-                               ST_NEW_MS_CONSTANTS,
-                               ST_NEW_MS_SAMPLER_VIEWS,
-                               ST_NEW_MS_SAMPLERS,
-                               ST_NEW_MS_IMAGES,
-                               ST_NEW_MS_UBOS,
-                               ST_NEW_MS_SSBOS,
-                               ST_NEW_MS_ATOMICS);
       break;
 
    default:
@@ -260,12 +248,6 @@ delete_variant(struct st_context *st, struct st_variant *v, unsigned stage)
          case MESA_SHADER_COMPUTE:
             st->pipe->delete_compute_state(st->pipe, v->driver_shader);
             break;
-         case MESA_SHADER_TASK:
-            st->pipe->delete_ts_state(st->pipe, v->driver_shader);
-            break;
-         case MESA_SHADER_MESH:
-            st->pipe->delete_ms_state(st->pipe, v->driver_shader);
-            break;
          default:
             UNREACHABLE("bad shader type in delete_basic_variant");
          }
@@ -289,35 +271,27 @@ st_unbind_program(struct st_context *st, struct gl_program *p)
    switch (p->info.stage) {
    case MESA_SHADER_VERTEX:
       cso_set_vertex_shader_handle(st->cso_context, NULL);
-      ST_SET_STATE(ctx->NewDriverState, ST_NEW_VS_STATE);
+      ctx->NewDriverState |= ST_NEW_VS_STATE;
       break;
    case MESA_SHADER_TESS_CTRL:
       cso_set_tessctrl_shader_handle(st->cso_context, NULL);
-      ST_SET_STATE(ctx->NewDriverState, ST_NEW_TCS_STATE);
+      ctx->NewDriverState |= ST_NEW_TCS_STATE;
       break;
    case MESA_SHADER_TESS_EVAL:
       cso_set_tesseval_shader_handle(st->cso_context, NULL);
-      ST_SET_STATE(ctx->NewDriverState, ST_NEW_TES_STATE);
+      ctx->NewDriverState |= ST_NEW_TES_STATE;
       break;
    case MESA_SHADER_GEOMETRY:
       cso_set_geometry_shader_handle(st->cso_context, NULL);
-      ST_SET_STATE(ctx->NewDriverState, ST_NEW_GS_STATE);
+      ctx->NewDriverState |= ST_NEW_GS_STATE;
       break;
    case MESA_SHADER_FRAGMENT:
       cso_set_fragment_shader_handle(st->cso_context, NULL);
-      ST_SET_STATE(ctx->NewDriverState, ST_NEW_FS_STATE);
+      ctx->NewDriverState |= ST_NEW_FS_STATE;
       break;
    case MESA_SHADER_COMPUTE:
       cso_set_compute_shader_handle(st->cso_context, NULL);
-      ST_SET_STATE(ctx->NewDriverState, ST_NEW_CS_STATE);
-      break;
-   case MESA_SHADER_TASK:
-      cso_set_task_shader_handle(st->cso_context, NULL);
-      ST_SET_STATE(ctx->NewDriverState, ST_NEW_TS_STATE);
-      break;
-   case MESA_SHADER_MESH:
-      cso_set_mesh_shader_handle(st->cso_context, NULL);
-      ST_SET_STATE(ctx->NewDriverState, ST_NEW_MS_STATE);
+      ctx->NewDriverState |= ST_NEW_CS_STATE;
       break;
    default:
       UNREACHABLE("invalid shader type");
@@ -395,14 +369,12 @@ st_prog_to_nir_postprocess(struct st_context *st, nir_shader *nir,
    /* This must be done after optimizations to assign IO bases. */
    nir_recompute_io_bases(nir, nir_var_shader_in | nir_var_shader_out);
 
-   st_update_state_param_locations(st->ctx, prog, nir);
-
    if (st->allow_st_finalize_nir_twice) {
       st_serialize_base_nir(prog, nir);
       st_finalize_nir(st, prog, NULL, nir, true, false);
 
       if (screen->finalize_nir)
-         screen->finalize_nir(screen, nir, false);
+         screen->finalize_nir(screen, nir);
    }
 
    nir_validate_shader(nir, "after st/glsl finalize_nir");
@@ -492,7 +464,7 @@ st_create_nir_shader(struct st_context *st, struct pipe_shader_state *state)
 
    assert(state->type == PIPE_SHADER_IR_NIR);
    nir_shader *nir = state->ir.nir;
-   mesa_shader_stage stage = nir->info.stage;
+   gl_shader_stage stage = nir->info.stage;
 
    /* Renumber SSA defs to make it easier to run diff on printed NIR. */
    nir_foreach_function_impl(impl, nir) {
@@ -555,12 +527,6 @@ st_create_nir_shader(struct st_context *st, struct pipe_shader_state *state)
    case MESA_SHADER_FRAGMENT:
       shader = pipe->create_fs_state(pipe, state);
       break;
-   case MESA_SHADER_TASK:
-      shader = pipe->create_ts_state(pipe, state);
-      break;
-   case MESA_SHADER_MESH:
-      shader = pipe->create_ms_state(pipe, state);
-      break;
    case MESA_SHADER_COMPUTE: {
       /* We'd like to use this for all stages but we need to rework streamout in
        * gallium first.
@@ -586,12 +552,12 @@ st_translate_vertex_program(struct st_context *st,
    /* This determines which states will be updated when the assembly
       * shader is bound.
       */
-   BITSET_ZERO(prog->affected_states);
-   ST_SET_STATE3(prog->affected_states, ST_NEW_VS_STATE,
-                 ST_NEW_RASTERIZER, ST_NEW_VERTEX_ARRAYS);
+   prog->affected_states = ST_NEW_VS_STATE |
+                           ST_NEW_RASTERIZER |
+                           ST_NEW_VERTEX_ARRAYS;
 
    if (prog->Parameters->NumParameters)
-      ST_SET_STATE(prog->affected_states, ST_NEW_VS_CONSTANTS);
+      prog->affected_states |= ST_NEW_VS_CONSTANTS;
 
    if (prog->arb.Instructions && prog->nir)
       ralloc_free(prog->nir);
@@ -654,6 +620,7 @@ static const struct nir_shader_compiler_options draw_nir_options = {
    .max_unroll_iterations = 32,
    .lower_to_scalar = true,
    .lower_uniforms_to_ubo = true,
+   .lower_vector_cmp = true,
    .lower_device_index_to_zero = true,
    .support_16bit_alu = true,
    .lower_fisnormal = true,
@@ -666,9 +633,6 @@ get_nir_shader(struct st_context *st, struct gl_program *prog, bool is_draw)
 {
    if ((!is_draw || !st->ctx->Const.PackedDriverUniformStorage) && prog->nir) {
       nir_shader *nir = prog->nir;
-
-      if (nir->info.stage == MESA_SHADER_VERTEX)
-         assert(prog->base_serialized_nir && prog->base_serialized_nir_size);
 
       /* The first shader variant takes ownership of NIR, so that there is
        * no cloning. Additional shader variants are always generated from
@@ -683,7 +647,8 @@ get_nir_shader(struct st_context *st, struct gl_program *prog, bool is_draw)
    const struct nir_shader_compiler_options *options =
       is_draw ? &draw_nir_options : st->screen->nir_options[prog->info.stage];
 
-   if (is_draw && st->ctx->Const.PackedDriverUniformStorage) {
+   if (is_draw && st->ctx->Const.PackedDriverUniformStorage &&
+       (!prog->shader_program || prog->shader_program->data->LinkStatus != LINKING_SKIPPED)) {
       assert(prog->base_serialized_nir);
       blob_reader_init(&blob_reader, prog->base_serialized_nir, prog->base_serialized_nir_size);
    } else {
@@ -714,6 +679,7 @@ lower_ucp(struct st_context *st,
             clipplane_state[i][0] = STATE_CLIP_INTERNAL;
             clipplane_state[i][1] = i;
          }
+         _mesa_add_state_reference(params, clipplane_state[i]);
       }
 
       if (nir->info.stage == MESA_SHADER_VERTEX ||
@@ -724,24 +690,20 @@ lower_ucp(struct st_context *st,
          NIR_PASS(_, nir, nir_lower_clip_gs, ucp_enables,
                     can_compact, clipplane_state);
       }
-
-      nir_foreach_variable_with_modes(uniform, nir, nir_var_uniform |
-                                      nir_var_image) {
-         if (!uniform->state_slots)
-            continue;
-
-         for (int plane = 0; plane < MAX_CLIP_PLANES; plane++) {
-            char tmp[100];
-            snprintf(tmp, ARRAY_SIZE(tmp), "gl_ClipPlane%dMESA", plane);
-            if (strcmp(uniform->name, tmp) == 0) {
-               unsigned loc =
-                  _mesa_add_state_reference(params, clipplane_state[plane]);
-               uniform->data.driver_location = st->ctx->Const.PackedDriverUniformStorage ?
-                  params->Parameters[loc].ValueOffset : loc;
-            }
-         }
-      }
    }
+}
+
+static bool
+force_persample_shading(struct nir_builder *b, nir_intrinsic_instr *intr,
+                        void *data)
+{
+   if (intr->intrinsic == nir_intrinsic_load_barycentric_pixel ||
+       intr->intrinsic == nir_intrinsic_load_barycentric_centroid) {
+      intr->intrinsic = nir_intrinsic_load_barycentric_sample;
+      return true;
+   }
+
+   return false;
 }
 
 static int
@@ -820,17 +782,18 @@ st_create_common_variant(struct st_context *st,
 
    if (key->clamp_color) {
       NIR_PASS(_, state.ir.nir, nir_lower_clamp_color_outputs);
+      finalize = true;
    }
    if (key->passthrough_edgeflags) {
-      NIR_PASS(finalize, state.ir.nir, nir_lower_passthrough_edgeflags);
+      NIR_PASS(_, state.ir.nir, nir_lower_passthrough_edgeflags);
+      finalize = true;
    }
 
    if (key->export_point_size) {
       /* if flag is set, shader must export psiz */
       _mesa_add_state_reference(params, point_size_state);
-      NIR_PASS(_, state.ir.nir, st_nir_lower_point_size_mov,
-               point_size_state, prog->Parameters,
-               st->ctx->Const.PackedDriverUniformStorage);
+      NIR_PASS(_, state.ir.nir, nir_lower_point_size_mov,
+                  point_size_state);
 
       finalize = true;
    }
@@ -847,7 +810,7 @@ st_create_common_variant(struct st_context *st,
       tex_opts.saturate_s = key->gl_clamp[0];
       tex_opts.saturate_t = key->gl_clamp[1];
       tex_opts.saturate_r = key->gl_clamp[2];
-      NIR_PASS(finalize, state.ir.nir, nir_lower_tex, &tex_opts);
+      NIR_PASS(_, state.ir.nir, nir_lower_tex, &tex_opts);
    }
 
    if (finalize || !st->allow_st_finalize_nir_twice || key->is_draw_shader) {
@@ -856,7 +819,6 @@ st_create_common_variant(struct st_context *st,
    }
 
    assert(state.ir.nir->info.stage == MESA_SHADER_COMPUTE ||
-          state.ir.nir->info.stage == MESA_SHADER_TASK ||
           state.ir.nir->info.io_lowered);
 
    /* This should be after all passes that touch IO. */
@@ -869,7 +831,7 @@ st_create_common_variant(struct st_context *st,
        * are still counted as enabled IO, which breaks things.
        */
       NIR_PASS(_, state.ir.nir, nir_opt_dce);
-      NIR_PASS(_, state.ir.nir, nir_unlower_io_to_vars, false);
+      NIR_PASS(_, state.ir.nir, st_nir_unlower_io_to_vars);
 
       if (state.ir.nir->info.stage == MESA_SHADER_TESS_CTRL &&
           state.ir.nir->options->compact_arrays &&
@@ -883,7 +845,7 @@ st_create_common_variant(struct st_context *st,
    if (finalize || !st->allow_st_finalize_nir_twice || key->is_draw_shader) {
       struct pipe_screen *screen = st->screen;
       if (!key->is_draw_shader && screen->finalize_nir)
-         screen->finalize_nir(screen, state.ir.nir, false);
+         screen->finalize_nir(screen, state.ir.nir);
 
       /* Clip lowering and edgeflags may have introduced new varyings, so
        * update the inputs_read/outputs_written. However, with
@@ -998,19 +960,19 @@ st_translate_fragment_program(struct st_context *st,
     *
     * fragment.position and glDrawPixels always use constants.
     */
-   BITSET_ZERO(prog->affected_states);
-   ST_SET_STATE3(prog->affected_states, ST_NEW_FS_STATE,
-                 ST_NEW_SAMPLE_SHADING, ST_NEW_FS_CONSTANTS);
+   prog->affected_states = ST_NEW_FS_STATE |
+                           ST_NEW_SAMPLE_SHADING |
+                           ST_NEW_FS_CONSTANTS;
 
    if (prog->ati_fs) {
       /* Just set them for ATI_fs unconditionally. */
-      ST_SET_STATE2(prog->affected_states, ST_NEW_FS_SAMPLER_VIEWS,
-                    ST_NEW_FS_SAMPLERS);
+      prog->affected_states |= ST_NEW_FS_SAMPLER_VIEWS |
+                               ST_NEW_FS_SAMPLERS;
    } else {
       /* ARB_fp */
       if (prog->SamplersUsed)
-         ST_SET_STATE2(prog->affected_states, ST_NEW_FS_SAMPLER_VIEWS,
-                       ST_NEW_FS_SAMPLERS);
+         prog->affected_states |= ST_NEW_FS_SAMPLER_VIEWS |
+                                  ST_NEW_FS_SAMPLERS;
    }
 
    /* Translate to NIR. */
@@ -1080,8 +1042,7 @@ st_create_fp_variant(struct st_context *st,
 
    if (fp->ati_fs) {
       if (key->fog) {
-         NIR_PASS(_, state.ir.nir, st_nir_lower_fog, key->fog, fp->Parameters,
-                  st->ctx->Const.PackedDriverUniformStorage);
+         NIR_PASS(_, state.ir.nir, st_nir_lower_fog, key->fog, fp->Parameters);
       }
 
       NIR_PASS(_, state.ir.nir, st_nir_lower_atifs_samplers, key->texture_index);
@@ -1091,27 +1052,31 @@ st_create_fp_variant(struct st_context *st,
 
    if (key->clamp_color) {
       NIR_PASS(_, state.ir.nir, nir_lower_clamp_color_outputs);
+      finalize = true;
    }
 
    if (key->lower_flatshade) {
       NIR_PASS(_, state.ir.nir, nir_lower_flatshade);
+      finalize = true;
    }
 
    if (key->lower_alpha_func != COMPARE_FUNC_ALWAYS) {
       _mesa_add_state_reference(params, alpha_ref_state);
-      NIR_PASS(_, state.ir.nir, st_nir_lower_alpha_test, key->lower_alpha_func,
-               false, alpha_ref_state, fp->Parameters,
-               st->ctx->Const.PackedDriverUniformStorage);
+      NIR_PASS(_, state.ir.nir, nir_lower_alpha_test, key->lower_alpha_func,
+                  false, alpha_ref_state);
       finalize = true;
    }
 
    if (key->lower_two_sided_color) {
       bool face_sysval = st->ctx->Const.GLSLFrontFacingIsSysVal;
       NIR_PASS(_, state.ir.nir, nir_lower_two_sided_color, face_sysval);
+      finalize = true;
    }
 
    if (key->persample_shading) {
       nir_shader *shader = state.ir.nir;
+      nir_shader_intrinsics_pass(shader, force_persample_shading,
+                                 nir_metadata_all, NULL);
 
       /* In addition to requiring per-sample interpolation, sample shading
        * changes the behaviour of gl_SampleMaskIn, so we need per-sample shading
@@ -1119,7 +1084,8 @@ st_create_fp_variant(struct st_context *st,
        * uses_sample_shading won't be set by glsl_to_nir. We need to do so here.
        */
       shader->info.fs.uses_sample_shading = true;
-      nir_lower_sample_shading(shader);
+
+      finalize = true;
    }
 
    if (st->emulate_gl_clamp &&
@@ -1128,7 +1094,8 @@ st_create_fp_variant(struct st_context *st,
       tex_opts.saturate_s = key->gl_clamp[0];
       tex_opts.saturate_t = key->gl_clamp[1];
       tex_opts.saturate_r = key->gl_clamp[2];
-      NIR_PASS(finalize, state.ir.nir, nir_lower_tex, &tex_opts);
+      NIR_PASS(_, state.ir.nir, nir_lower_tex, &tex_opts);
+      finalize = true;
    }
 
    assert(!(key->bitmap && key->drawpixels));
@@ -1141,7 +1108,8 @@ st_create_fp_variant(struct st_context *st,
       options.sampler = variant->bitmap_sampler;
       options.swizzle_xxxx = st->bitmap.tex_format == PIPE_FORMAT_R8_UNORM;
 
-      NIR_PASS(finalize, state.ir.nir, nir_lower_bitmap, &options);
+      NIR_PASS(_, state.ir.nir, nir_lower_bitmap, &options);
+      finalize = true;
    }
 
    /* glDrawPixels (color only) */
@@ -1174,8 +1142,7 @@ st_create_fp_variant(struct st_context *st,
       memcpy(options.texcoord_state_tokens, texcoord_state,
                sizeof(options.texcoord_state_tokens));
 
-      NIR_PASS(_, state.ir.nir, st_nir_lower_drawpixels, &options,
-               fp->Parameters, st->ctx->Const.PackedDriverUniformStorage);
+      NIR_PASS(_, state.ir.nir, nir_lower_drawpixels, &options);
       finalize = true;
    }
 
@@ -1250,12 +1217,9 @@ st_create_fp_variant(struct st_context *st,
        * are still counted as enabled IO, which breaks things.
        */
       NIR_PASS(_, state.ir.nir, nir_opt_dce);
-      NIR_PASS(_, state.ir.nir, nir_unlower_io_to_vars, false);
+      NIR_PASS(_, state.ir.nir, st_nir_unlower_io_to_vars);
       gl_nir_opts(state.ir.nir);
       finalize = true;
-   } else {
-      NIR_PASS(_, state.ir.nir, nir_recompute_io_bases,
-               nir_var_shader_in | nir_var_shader_out);
    }
 
    if (finalize || !st->allow_st_finalize_nir_twice) {
@@ -1265,7 +1229,7 @@ st_create_fp_variant(struct st_context *st,
 
       struct pipe_screen *screen = st->screen;
       if (screen->finalize_nir)
-         screen->finalize_nir(screen, state.ir.nir, false);
+         screen->finalize_nir(screen, state.ir.nir);
    }
 
    variant->base.driver_shader = st_create_nir_shader(st, &state);
@@ -1395,8 +1359,6 @@ destroy_shader_program_variants_cb(void *data, void *userData)
    case GL_TESS_CONTROL_SHADER:
    case GL_TESS_EVALUATION_SHADER:
    case GL_COMPUTE_SHADER:
-   case GL_TASK_SHADER_EXT:
-   case GL_MESH_SHADER_EXT:
       break;
    default:
       assert(0);
@@ -1455,9 +1417,7 @@ st_precompile_shader_variant(struct st_context *st,
    case MESA_SHADER_TESS_CTRL:
    case MESA_SHADER_TESS_EVAL:
    case MESA_SHADER_GEOMETRY:
-   case MESA_SHADER_COMPUTE:
-   case MESA_SHADER_TASK:
-   case MESA_SHADER_MESH: {
+   case MESA_SHADER_COMPUTE: {
       struct st_common_variant_key key;
 
       memset(&key, 0, sizeof(key));
@@ -1540,41 +1500,25 @@ st_finalize_program(struct st_context *st, struct gl_program *prog,
 
    MESA_TRACE_FUNC();
 
-   switch (prog->info.stage) {
-   case MESA_SHADER_VERTEX:
+   if (prog->info.stage == MESA_SHADER_VERTEX)
       is_bound = prog == ctx->VertexProgram._Current;
-      break;
-   case MESA_SHADER_TESS_CTRL:
+   else if (prog->info.stage == MESA_SHADER_TESS_CTRL)
       is_bound = prog == ctx->TessCtrlProgram._Current;
-      break;
-   case MESA_SHADER_TESS_EVAL:
+   else if (prog->info.stage == MESA_SHADER_TESS_EVAL)
       is_bound = prog == ctx->TessEvalProgram._Current;
-      break;
-   case MESA_SHADER_GEOMETRY:
+   else if (prog->info.stage == MESA_SHADER_GEOMETRY)
       is_bound = prog == ctx->GeometryProgram._Current;
-      break;
-   case MESA_SHADER_FRAGMENT:
+   else if (prog->info.stage == MESA_SHADER_FRAGMENT)
       is_bound = prog == ctx->FragmentProgram._Current;
-      break;
-   case MESA_SHADER_COMPUTE:
+   else if (prog->info.stage == MESA_SHADER_COMPUTE)
       is_bound = prog == ctx->ComputeProgram._Current;
-      break;
-   case MESA_SHADER_TASK:
-      is_bound = prog == ctx->TaskProgram._Current;
-      break;
-   case MESA_SHADER_MESH:
-      is_bound = prog == ctx->MeshProgram._Current;
-      break;
-   default:
-      UNREACHABLE("invalid program");
-   }
 
    if (is_bound) {
       if (prog->info.stage == MESA_SHADER_VERTEX) {
          ctx->Array.NewVertexElements = true;
-         ST_SET_VERTEX_PROGRAM_STATES(ctx->NewDriverState, ctx, prog);
+         ctx->NewDriverState |= ST_NEW_VERTEX_PROGRAM(ctx, prog);
       } else {
-         ST_SET_STATES(ctx->NewDriverState, prog->affected_states);
+         ctx->NewDriverState |= prog->affected_states;
       }
    }
 

@@ -5,7 +5,7 @@
 
 set -uex
 
-section_start libdrm "Building libdrm"
+uncollapsed_section_start libdrm "Building libdrm"
 
 export LIBDRM_VERSION=libdrm-2.4.122
 

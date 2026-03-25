@@ -46,6 +46,7 @@
 #include <llvm/Config/llvm-config.h>
 
 #include "util/u_debug.h"
+#include "util/u_string.h"
 #include "util/bitscan.h"
 
 #include "lp_bld_const.h"

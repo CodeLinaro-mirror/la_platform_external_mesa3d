@@ -101,8 +101,7 @@
  */
 #define UNREACHABLE(str)                                                       \
    do {                                                                        \
-      (void)"" str; /* str must be a string literal */                         \
-      assert(!str);                                                            \
+      assert(!"" str);                                                         \
       __builtin_unreachable();                                                 \
    } while (0)
 

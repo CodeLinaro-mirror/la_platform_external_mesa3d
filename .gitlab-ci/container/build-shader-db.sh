@@ -6,7 +6,7 @@
 
 set -ex
 
-section_start shader-db "Building shader-db"
+uncollapsed_section_start shader-db "Building shader-db"
 
 pushd /usr/local
 git clone https://gitlab.freedesktop.org/mesa/shader-db.git --depth 1

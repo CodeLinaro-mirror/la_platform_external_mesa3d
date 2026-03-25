@@ -73,12 +73,11 @@ bool IntelDriver::init_perfcnt()
     */
    this->clock_id = intel_pps_clock_id(drm_device.gpu_num);
 
-   if (perf)
-      return true;
+   assert(!perf && "Intel perf should not be initialized at this point");
 
    perf = std::make_unique<IntelPerf>(drm_device.fd);
 
-   const char *metric_set_name = os_get_option("INTEL_PERFETTO_METRIC_SET");
+   const char *metric_set_name = getenv("INTEL_PERFETTO_METRIC_SET");
 
    struct intel_perf_query_info *default_query = nullptr;
    selected_query = nullptr;
@@ -116,7 +115,6 @@ bool IntelDriver::init_perfcnt()
       Counter counter_desc = {};
       counter_desc.id = counters.size();
       counter_desc.name = counter.symbol_name;
-      counter_desc.description = counter.desc;
       counter_desc.group = group.id;
       counter_desc.getter = [counter, this](
          const Counter &c, const Driver &dri) -> Counter::Value {
@@ -182,7 +180,7 @@ void IntelDriver::disable_perfcnt()
 /// @return True if the duration is at least close to the sampling period
 static bool close_enough(uint64_t duration, uint64_t sampling_period)
 {
-   return duration > sampling_period - 1000;
+   return duration > sampling_period - 100000;
 }
 
 /// @brief Transforms the raw data received in from the driver into records

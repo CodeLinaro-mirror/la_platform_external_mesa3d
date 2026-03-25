@@ -1,5 +1,3 @@
--- SPDX-License-Identifier: MIT
---
 -- A script that compares a set of equivalent cmdstream captures from
 -- various generations, looking for equivalencies between registers.
 --

@@ -90,9 +90,7 @@ vk_enum_to_str = custom_target(
   output : ['vk_enum_to_str.c', 'vk_enum_to_str.h', 'vk_enum_defines.h'],
   command : [
     prog_python, '@INPUT0@', '--xml', '@INPUT1@',
-    '--out-c', '@OUTPUT0@',
-    '--out-h', '@OUTPUT1@',
-    '--out-d', '@OUTPUT2@',
+    '--outdir', meson.current_build_dir(),
     '--beta', with_vulkan_beta.to_string()
   ],
   depend_files : vk_enum_to_str_depend_files,
@@ -104,7 +102,7 @@ vk_struct_type_cast = custom_target(
   output : ['vk_struct_type_cast.h'],
   command : [
     prog_python, '@INPUT0@', '--xml', '@INPUT1@',
-    '--out', '@OUTPUT@',
+    '--outdir', meson.current_build_dir(),
     '--beta', with_vulkan_beta.to_string()
   ],
   depend_files : vk_struct_type_cast_depend_files,
@@ -133,7 +131,7 @@ libvulkan_util = static_library(
 )
 
 idep_vulkan_util_headers = declare_dependency(
-  sources : [vk_dispatch_table[1], vk_enum_to_str[1], vk_enum_to_str[2],
+  sources : [vk_dispatch_table[1], vk_enum_to_str[1],
              vk_struct_type_cast[0], vk_extensions[1]],
   include_directories : include_directories('.')
 )

@@ -1,18 +1,18 @@
-// Copyright 2020 Red Hat.
-// SPDX-License-Identifier: MIT
-
 use crate::compiler::nir::*;
 use crate::pipe::fence::*;
 use crate::pipe::resource::*;
 use crate::pipe::screen::*;
 use crate::pipe::transfer::*;
 
+use mesa_rust_gen::pipe_fd_type::*;
 use mesa_rust_gen::*;
 use mesa_rust_util::has_required_feature;
 
+use std::mem::size_of;
 use std::os::raw::*;
 use std::ptr;
 use std::ptr::*;
+use std::sync::Arc;
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -30,6 +30,7 @@ impl From<PipeContextPrio> for u32 {
 
 pub struct PipeContext {
     pipe: NonNull<pipe_context>,
+    screen: Arc<PipeScreen>,
     pub prio: PipeContextPrio,
 }
 
@@ -50,11 +51,14 @@ impl From<RWFlags> for pipe_map_flags {
 }
 
 impl PipeContext {
-    pub fn new(prio: PipeContextPrio, screen: &PipeScreen) -> Option<Self> {
-        let screen = screen.to_owned();
-        let context = screen.create_context(prio);
+    pub(super) fn new(
+        context: *mut pipe_context,
+        prio: PipeContextPrio,
+        screen: &Arc<PipeScreen>,
+    ) -> Option<Self> {
         let s = Self {
             pipe: NonNull::new(context)?,
+            screen: Arc::clone(screen),
             prio: prio,
         };
 
@@ -63,10 +67,6 @@ impl PipeContext {
             return None;
         }
 
-        // As the raw type already stores the pointer we can safely leak it here and turn it back
-        // into the owned wrapper on `drop`.
-        let ptr = screen.into_raw();
-        assert_eq!(ptr, s.screen().pipe());
         Some(s)
     }
 
@@ -74,14 +74,9 @@ impl PipeContext {
         self.pipe
     }
 
-    pub fn screen(&self) -> &PipeScreen {
-        // SAFETY: self.pipe() is a valid pointer.
-        PipeScreen::from_raw(&unsafe { self.pipe().as_ref() }.screen)
-    }
-
     pub fn buffer_subdata(
         &self,
-        res: &PipeResourceOwned,
+        res: &PipeResource,
         offset: c_uint,
         data: *const c_void,
         size: c_uint,
@@ -100,7 +95,7 @@ impl PipeContext {
 
     pub fn texture_subdata(
         &self,
-        res: &PipeResourceOwned,
+        res: &PipeResource,
         bx: &pipe_box,
         data: *const c_void,
         stride: u32,
@@ -120,7 +115,7 @@ impl PipeContext {
         }
     }
 
-    pub fn clear_buffer(&self, res: &PipeResourceOwned, pattern: &[u8], offset: u32, size: u32) {
+    pub fn clear_buffer(&self, res: &PipeResource, pattern: &[u8], offset: u32, size: u32) {
         unsafe {
             self.pipe
                 .as_ref()
@@ -138,7 +133,7 @@ impl PipeContext {
 
     pub fn clear_image_buffer(
         &self,
-        res: &PipeResourceOwned,
+        res: &PipeResource,
         pattern: &[u32],
         offset_bytes: u32,
         region: &[usize; 3],
@@ -166,7 +161,7 @@ impl PipeContext {
         }
     }
 
-    pub fn clear_texture(&self, res: &PipeResourceOwned, pattern: &[u32], bx: &pipe_box) {
+    pub fn clear_texture(&self, res: &PipeResource, pattern: &[u32], bx: &pipe_box) {
         unsafe {
             let clear_texture = self
                 .pipe
@@ -185,8 +180,8 @@ impl PipeContext {
 
     fn resource_copy_region(
         &self,
-        src: &PipeResourceOwned,
-        dst: &PipeResourceOwned,
+        src: &PipeResource,
+        dst: &PipeResource,
         dst_offset: &[u32; 3],
         bx: &pipe_box,
     ) {
@@ -207,9 +202,9 @@ impl PipeContext {
 
     pub fn resource_copy_buffer(
         &self,
-        src: &PipeResourceOwned,
+        src: &PipeResource,
         src_offset: i32,
-        dst: &PipeResourceOwned,
+        dst: &PipeResource,
         dst_offset: u32,
         width: i32,
     ) {
@@ -229,8 +224,8 @@ impl PipeContext {
 
     pub fn resource_copy_texture(
         &self,
-        src: &PipeResourceOwned,
-        dst: &PipeResourceOwned,
+        src: &PipeResource,
+        dst: &PipeResource,
         dst_offset: &[u32; 3],
         bx: &pipe_box,
     ) {
@@ -248,8 +243,8 @@ impl PipeContext {
     /// ([Self::has_buffer_texture_copies]).
     pub fn resource_copy_buffer_texture(
         &self,
-        src: &PipeResourceOwned,
-        dst: &PipeResourceOwned,
+        src: &PipeResource,
+        dst: &PipeResource,
         buffer_offset: u32,
         bx: &pipe_box,
     ) {
@@ -271,11 +266,11 @@ impl PipeContext {
 
     fn resource_map(
         &self,
-        res: &PipeResourceOwned,
+        res: &PipeResource,
         bx: &pipe_box,
         flags: pipe_map_flags,
         is_buffer: bool,
-    ) -> Option<PipeTransfer<'_>> {
+    ) -> Option<PipeTransfer> {
         let mut out: *mut pipe_transfer = ptr::null_mut();
 
         let ptr = unsafe {
@@ -297,11 +292,11 @@ impl PipeContext {
 
     pub fn buffer_map_flags(
         &self,
-        res: &PipeResourceOwned,
+        res: &PipeResource,
         offset: i32,
         size: i32,
         flags: pipe_map_flags,
-    ) -> Option<PipeTransfer<'_>> {
+    ) -> Option<PipeTransfer> {
         let b = pipe_box {
             x: offset,
             width: size,
@@ -315,11 +310,11 @@ impl PipeContext {
 
     pub fn buffer_map(
         &self,
-        res: &PipeResourceOwned,
+        res: &PipeResource,
         offset: i32,
         size: i32,
         rw: RWFlags,
-    ) -> Option<PipeTransfer<'_>> {
+    ) -> Option<PipeTransfer> {
         self.buffer_map_flags(res, offset, size, rw.into())
     }
 
@@ -329,19 +324,19 @@ impl PipeContext {
 
     pub fn texture_map_flags(
         &self,
-        res: &PipeResourceOwned,
+        res: &PipeResource,
         bx: &pipe_box,
         flags: pipe_map_flags,
-    ) -> Option<PipeTransfer<'_>> {
+    ) -> Option<PipeTransfer> {
         self.resource_map(res, bx, flags, false)
     }
 
     pub fn texture_map(
         &self,
-        res: &PipeResourceOwned,
+        res: &PipeResource,
         bx: &pipe_box,
         rw: RWFlags,
-    ) -> Option<PipeTransfer<'_>> {
+    ) -> Option<PipeTransfer> {
         self.texture_map_flags(res, bx, rw.into())
     }
 
@@ -400,7 +395,7 @@ impl PipeContext {
         unsafe {
             self.pipe.as_ref().bind_sampler_states.unwrap()(
                 self.pipe.as_ptr(),
-                mesa_shader_stage::MESA_SHADER_COMPUTE,
+                pipe_shader_type::PIPE_SHADER_COMPUTE,
                 0,
                 samplers.len() as u32,
                 samplers.as_mut_ptr(),
@@ -413,7 +408,7 @@ impl PipeContext {
         unsafe {
             self.pipe.as_ref().bind_sampler_states.unwrap()(
                 self.pipe.as_ptr(),
-                mesa_shader_stage::MESA_SHADER_COMPUTE,
+                pipe_shader_type::PIPE_SHADER_COMPUTE,
                 0,
                 count,
                 samplers.as_mut_ptr(),
@@ -425,7 +420,7 @@ impl PipeContext {
         unsafe { self.pipe.as_ref().delete_sampler_state.unwrap()(self.pipe.as_ptr(), ptr) }
     }
 
-    pub fn bind_constant_buffer(&self, idx: u32, res: &PipeResourceOwned) {
+    pub fn bind_constant_buffer(&self, idx: u32, res: &PipeResource) {
         let cb = pipe_constant_buffer {
             buffer: res.pipe(),
             buffer_offset: 0,
@@ -435,8 +430,9 @@ impl PipeContext {
         unsafe {
             self.pipe.as_ref().set_constant_buffer.unwrap()(
                 self.pipe.as_ptr(),
-                mesa_shader_stage::MESA_SHADER_COMPUTE,
+                pipe_shader_type::PIPE_SHADER_COMPUTE,
                 idx,
+                false,
                 &cb,
             )
         }
@@ -452,8 +448,9 @@ impl PipeContext {
         unsafe {
             self.pipe.as_ref().set_constant_buffer.unwrap()(
                 self.pipe.as_ptr(),
-                mesa_shader_stage::MESA_SHADER_COMPUTE,
+                pipe_shader_type::PIPE_SHADER_COMPUTE,
                 idx,
+                false,
                 if data.is_empty() { ptr::null() } else { &cb },
             )
         }
@@ -471,7 +468,6 @@ impl PipeContext {
 
         unsafe {
             let stream = self.pipe.as_ref().stream_uploader;
-            let mut releasebuf = ptr::null_mut();
             u_upload_data(
                 stream,
                 0,
@@ -480,7 +476,6 @@ impl PipeContext {
                 data.as_ptr().cast(),
                 &mut cb.buffer_offset,
                 &mut cb.buffer,
-                &mut releasebuf,
             );
             u_upload_unmap(stream);
 
@@ -490,12 +485,11 @@ impl PipeContext {
 
             self.pipe.as_ref().set_constant_buffer.unwrap()(
                 self.pipe.as_ptr(),
-                mesa_shader_stage::MESA_SHADER_COMPUTE,
+                pipe_shader_type::PIPE_SHADER_COMPUTE,
                 idx,
+                true,
                 &cb,
             );
-
-            pipe_resource_release(self.pipe.as_ptr(), releasebuf);
 
             true
         }
@@ -507,7 +501,7 @@ impl PipeContext {
         block: [u32; 3],
         grid: [u32; 3],
         variable_local_mem: u32,
-        globals: &[&PipeResourceOwned],
+        globals: &[&PipeResource],
     ) {
         let mut globals: Vec<*mut pipe_resource> = globals.iter().map(|res| res.pipe()).collect();
         let info = pipe_grid_info {
@@ -522,18 +516,14 @@ impl PipeContext {
         unsafe { self.pipe.as_ref().launch_grid.unwrap()(self.pipe.as_ptr(), &info) }
     }
 
-    pub fn set_global_binding(&self, res: &mut [&PipeResource], out: &mut [*mut u32]) {
-        let len = res.len();
-        let res = PipeResource::slice_as_mut_ptr_slice(res);
-        // SAFETY: We can safely cast the *mut *const pointer to *mut *mut as drivers aren't going
-        //         to change any of the pipe_resource fields, but merely allows them to change
-        //         fields of their own subclass.
+    pub fn set_global_binding(&self, res: &[&PipeResource], out: &mut [*mut u32]) {
+        let mut res: Vec<_> = res.iter().copied().map(PipeResource::pipe).collect();
         unsafe {
             self.pipe.as_ref().set_global_binding.unwrap()(
                 self.pipe.as_ptr(),
                 0,
-                len as u32,
-                res.cast(),
+                res.len() as u32,
+                res.as_mut_ptr(),
                 out.as_mut_ptr(),
             )
         }
@@ -551,15 +541,15 @@ impl PipeContext {
         }
     }
 
-    pub fn set_sampler_views(&self, views: &mut [PipeSamplerView], unbind_trailing: u32) {
+    pub fn set_sampler_views(&self, mut views: Vec<PipeSamplerView>, unbind_trailing: u32) {
         unsafe {
             self.pipe.as_ref().set_sampler_views.unwrap()(
                 self.pipe.as_ptr(),
-                mesa_shader_stage::MESA_SHADER_COMPUTE,
+                pipe_shader_type::PIPE_SHADER_COMPUTE,
                 0,
                 views.len() as u32,
                 unbind_trailing,
-                PipeSamplerView::as_pipe(views),
+                PipeSamplerView::as_pipe(views.as_mut_slice()),
             );
         }
     }
@@ -569,7 +559,7 @@ impl PipeContext {
         unsafe {
             self.pipe.as_ref().set_sampler_views.unwrap()(
                 self.pipe.as_ptr(),
-                mesa_shader_stage::MESA_SHADER_COMPUTE,
+                pipe_shader_type::PIPE_SHADER_COMPUTE,
                 0,
                 count,
                 0,
@@ -583,7 +573,7 @@ impl PipeContext {
         unsafe {
             self.pipe.as_ref().set_shader_images.unwrap()(
                 self.pipe.as_ptr(),
-                mesa_shader_stage::MESA_SHADER_COMPUTE,
+                pipe_shader_type::PIPE_SHADER_COMPUTE,
                 0,
                 images.len() as u32,
                 unbind_trailing,
@@ -596,7 +586,7 @@ impl PipeContext {
         unsafe {
             self.pipe.as_ref().set_shader_images.unwrap()(
                 self.pipe.as_ptr(),
-                mesa_shader_stage::MESA_SHADER_COMPUTE,
+                pipe_shader_type::PIPE_SHADER_COMPUTE,
                 0,
                 count,
                 0,
@@ -643,21 +633,20 @@ impl PipeContext {
         unsafe {
             let mut fence = ptr::null_mut();
             self.pipe.as_ref().flush.unwrap()(self.pipe.as_ptr(), &mut fence, 0);
-            // TODO: handle properly
-            PipeFence::new(fence, self.screen()).unwrap()
+            PipeFence::new(fence, &self.screen)
         }
     }
 
-    pub fn import_fence(&self, fence_fd: &FenceFd, fence_type: pipe_fd_type) -> Option<PipeFence> {
+    pub fn import_fence(&self, fence_fd: &FenceFd) -> PipeFence {
         unsafe {
             let mut fence = ptr::null_mut();
             self.pipe.as_ref().create_fence_fd.unwrap()(
                 self.pipe.as_ptr(),
                 &mut fence,
                 fence_fd.fd,
-                fence_type,
+                PIPE_FD_TYPE_NATIVE_SYNC,
             );
-            PipeFence::new(fence, self.screen())
+            PipeFence::new(fence, &self.screen)
         }
     }
 
@@ -692,25 +681,14 @@ impl PipeContext {
             }
         }
     }
-
-    pub fn has_fence_server(&self) -> bool {
-        let pipe = unsafe { self.pipe().as_ref() };
-        pipe.fence_server_signal.is_some() && pipe.fence_server_sync.is_some()
-    }
 }
 
 impl Drop for PipeContext {
     fn drop(&mut self) {
         self.flush().wait();
-        let screen = self.screen().pipe();
         unsafe {
             self.pipe.as_ref().destroy.unwrap()(self.pipe.as_ptr());
         }
-
-        // In new we check that screen is identical to the pointer we retrieved from into_raw. We
-        // convert the pointer back to an owned reference so we release our reference to prevent
-        // leaking memory.
-        unsafe { PipeScreenOwned::from_raw(screen) };
     }
 }
 
@@ -734,7 +712,7 @@ fn has_required_cbs(context: &pipe_context) -> bool {
         & has_required_feature!(context, launch_grid)
         & has_required_feature!(context, memory_barrier)
         & has_required_feature!(context, resource_copy_region)
-        // implicitly used through pipe_sampler_view_release
+        // implicitly used through pipe_sampler_view_reference
         & has_required_feature!(context, sampler_view_destroy)
         & has_required_feature!(context, set_constant_buffer)
         & has_required_feature!(context, set_global_binding)

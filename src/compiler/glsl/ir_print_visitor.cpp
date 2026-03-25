@@ -209,22 +209,20 @@ void ir_print_visitor::visit(ir_variable *ir)
    const char *const memory_volatile = (ir->data.memory_volatile) ? "volatile " : "";
    const char *const memory_restrict = (ir->data.memory_restrict) ? "restrict " : "";
    const char *const mode[] = { "", "uniform ", "shader_storage ",
-                                "shader_shared ", "task_payload ", "shader_in ", "shader_out ",
-                                "shader_pixel_local ",
+                                "shader_shared ", "shader_in ", "shader_out ",
                                 "in ", "out ", "inout ",
-                                "const_in ", "sys ", "temporary " };
-   const char *const per_primitive = (ir->data.per_primitive) ? "per_primitive " : "";
+			        "const_in ", "sys ", "temporary " };
    STATIC_ASSERT(ARRAY_SIZE(mode) == ir_var_mode_count);
    const char *const interp[] = { "", "smooth", "flat", "noperspective", "explicit" };
    STATIC_ASSERT(ARRAY_SIZE(interp) == INTERP_MODE_COUNT);
    const char *const precision[] = { "", "highp ", "mediump ", "lowp "};
 
-   fprintf(f, "(%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s) ",
+   fprintf(f, "(%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s) ",
            binding, loc, component, cent, bindless, bound,
            image_format, memory_read_only, memory_write_only,
            memory_coherent, memory_volatile, memory_restrict,
-           samp, patc, inv, explicit_inv, prec, per_primitive,
-           mode[ir->data.mode], stream,
+           samp, patc, inv, explicit_inv, prec, mode[ir->data.mode],
+           stream,
            interp[ir->data.interpolation], precision[ir->data.precision]);
 
    glsl_print_type(f, ir->type);
@@ -648,12 +646,6 @@ ir_print_visitor::visit(ir_loop *ir)
    indentation++;
 
    ir_foreach_in_list(ir_instruction, inst, &ir->body_instructions) {
-      indent();
-      inst->accept(this);
-      fprintf(f, "\n");
-   }
-   fprintf(stderr, ") continue (\n");
-   ir_foreach_in_list(ir_instruction, inst, &ir->continue_instructions) {
       indent();
       inst->accept(this);
       fprintf(f, "\n");

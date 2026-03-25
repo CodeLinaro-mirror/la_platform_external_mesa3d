@@ -1,5 +1,3 @@
--- SPDX-License-Identifier: MIT
---
 -- Parse logs from test-quad-textured-3d.c to exctract layer/level
 -- offsets
 --
@@ -61,7 +59,7 @@ function draw(primtype, nindx)
   nallblits = nallblits + 1
 end
 
-function A6XX_TEX_MEMOBJ(pkt, size)
+function A6XX_TEX_CONST(pkt, size)
   -- ignore any texture state w/ DEPTH=1, these aren't the 3d tex state we
   -- are looking for
   if pkt[5].DEPTH <= 1 then

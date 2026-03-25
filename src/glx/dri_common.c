@@ -45,7 +45,6 @@
 #include <xcb/xproto.h>
 #include "dri_util.h"
 #include "pipe-loader/pipe_loader.h"
-#include "x11/x11_display.h"
 
 #define __ATTRIB(attrib, field) \
     { attrib, offsetof(struct glx_config, field) }
@@ -888,8 +887,7 @@ dri_create_context_attribs(struct glx_screen *base,
                               num_ctx_attribs / 2,
                               ctx_attribs,
                               error,
-                              pcp,
-                              x11_xlib_display_is_thread_safe(base->dpy));
+                              pcp);
 
    *error = dri_context_error_to_glx_error(*error);
 

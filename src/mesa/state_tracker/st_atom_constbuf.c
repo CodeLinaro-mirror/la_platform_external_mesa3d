@@ -52,12 +52,12 @@
  * dangling pointers to old (potentially deleted) shaders in the driver.
  */
 static void
-st_unbind_unused_cb0(struct st_context *st, mesa_shader_stage shader_type)
+st_unbind_unused_cb0(struct st_context *st, enum pipe_shader_type shader_type)
 {
    if (st->state.constbuf0_enabled_shader_mask & (1 << shader_type)) {
       struct pipe_context *pipe = st->pipe;
 
-      pipe->set_constant_buffer(pipe, shader_type, 0, NULL);
+      pipe->set_constant_buffer(pipe, shader_type, 0, false, NULL);
       st->state.constbuf0_enabled_shader_mask &= ~(1 << shader_type);
    }
 }
@@ -67,26 +67,25 @@ st_unbind_unused_cb0(struct st_context *st, mesa_shader_stage shader_type)
  * constant buffer.
  */
 void
-st_upload_constants(struct st_context *st, struct gl_program *prog, mesa_shader_stage stage)
+st_upload_constants(struct st_context *st, struct gl_program *prog, gl_shader_stage stage)
 {
+   enum pipe_shader_type shader_type = pipe_shader_type_from_mesa(stage);
    if (!prog) {
-      st_unbind_unused_cb0(st, stage);
+      st_unbind_unused_cb0(st, shader_type);
       return;
    }
 
    struct gl_program_parameter_list *params = prog->Parameters;
 
-   assert(stage == MESA_SHADER_VERTEX ||
-          stage == MESA_SHADER_FRAGMENT ||
-          stage == MESA_SHADER_GEOMETRY ||
-          stage == MESA_SHADER_TESS_CTRL ||
-          stage == MESA_SHADER_TESS_EVAL ||
-          stage == MESA_SHADER_COMPUTE ||
-          stage == MESA_SHADER_TASK ||
-          stage == MESA_SHADER_MESH);
+   assert(shader_type == PIPE_SHADER_VERTEX ||
+          shader_type == PIPE_SHADER_FRAGMENT ||
+          shader_type == PIPE_SHADER_GEOMETRY ||
+          shader_type == PIPE_SHADER_TESS_CTRL ||
+          shader_type == PIPE_SHADER_TESS_EVAL ||
+          shader_type == PIPE_SHADER_COMPUTE);
 
    /* update the ATI constants before rendering */
-   if (stage == MESA_SHADER_FRAGMENT && prog->ati_fs) {
+   if (shader_type == PIPE_SHADER_FRAGMENT && prog->ati_fs) {
       struct ati_fragment_shader *ati_fs = prog->ati_fs;
       unsigned c;
 
@@ -120,10 +119,8 @@ st_upload_constants(struct st_context *st, struct gl_program *prog, mesa_shader_
       cb.buffer_offset = 0;
       cb.buffer_size = paramBytes;
 
-      /* this path cannot be used with select/feedback draws */
       if (st->prefer_real_buffer_in_constbuf0) {
          struct pipe_context *pipe = st->pipe;
-         struct pipe_resource *releasebuf = NULL;
          uint32_t *ptr;
 
          const unsigned alignment = MAX2(
@@ -134,7 +131,7 @@ st_upload_constants(struct st_context *st, struct gl_program *prog, mesa_shader_
           * to compensate for the fetch_state defect.
           */
          u_upload_alloc(pipe->const_uploader, 0, paramBytes + 12,
-            alignment, &cb.buffer_offset, &cb.buffer, &releasebuf, (void**)&ptr);
+            alignment, &cb.buffer_offset, &cb.buffer, (void**)&ptr);
 
          int uniform_bytes = params->UniformBytes;
          if (uniform_bytes)
@@ -147,7 +144,7 @@ st_upload_constants(struct st_context *st, struct gl_program *prog, mesa_shader_
             _mesa_upload_state_parameters(st->ctx, params, ptr);
 
          u_upload_unmap(pipe->const_uploader);
-         pipe->set_constant_buffer(pipe, stage, 0, &cb);
+         pipe->set_constant_buffer(pipe, shader_type, 0, true, &cb);
 
          /* Set inlinable constants. This is more involved because state
           * parameters are uploaded directly above instead of being loaded
@@ -171,11 +168,10 @@ st_upload_constants(struct st_context *st, struct gl_program *prog, mesa_shader_
                values[i] = constbuf[prog->info.inlinable_uniform_dw_offsets[i]].u;
             }
 
-            pipe->set_inlinable_constants(pipe, stage,
+            pipe->set_inlinable_constants(pipe, shader_type,
                                           prog->info.num_inlinable_uniforms,
                                           values);
          }
-         st_add_releasebuf(st, releasebuf);
       } else {
          struct pipe_context *pipe = st->pipe;
 
@@ -187,7 +183,7 @@ st_upload_constants(struct st_context *st, struct gl_program *prog, mesa_shader_
          if (params->StateFlags)
             _mesa_load_state_parameters(st->ctx, params);
 
-         pipe->set_constant_buffer(pipe, stage, 0, &cb);
+         pipe->set_constant_buffer(pipe, shader_type, 0, false, &cb);
 
          /* Set inlinable constants. */
          unsigned num_inlinable_uniforms = prog->info.num_inlinable_uniforms;
@@ -198,15 +194,15 @@ st_upload_constants(struct st_context *st, struct gl_program *prog, mesa_shader_
             for (unsigned i = 0; i < num_inlinable_uniforms; i++)
                values[i] = constbuf[prog->info.inlinable_uniform_dw_offsets[i]].u;
 
-            pipe->set_inlinable_constants(pipe, stage,
+            pipe->set_inlinable_constants(pipe, shader_type,
                                           prog->info.num_inlinable_uniforms,
                                           values);
          }
       }
 
-      st->state.constbuf0_enabled_shader_mask |= 1 << stage;
+      st->state.constbuf0_enabled_shader_mask |= 1 << shader_type;
    } else {
-      st_unbind_unused_cb0(st, stage);
+      st_unbind_unused_cb0(st, shader_type);
    }
 }
 
@@ -268,27 +264,9 @@ st_update_cs_constants(struct st_context *st)
                        MESA_SHADER_COMPUTE);
 }
 
-/* Task shader:
- */
-void
-st_update_ts_constants(struct st_context *st)
-{
-   st_upload_constants(st, st->ctx->TaskProgram._Current,
-                       MESA_SHADER_TASK);
-}
-
-/* Mesh shader:
- */
-void
-st_update_ms_constants(struct st_context *st)
-{
-   st_upload_constants(st, st->ctx->MeshProgram._Current,
-                       MESA_SHADER_MESH);
-}
-
 static void
 st_bind_ubos(struct st_context *st, struct gl_program *prog,
-             mesa_shader_stage shader_type)
+             enum pipe_shader_type shader_type)
 {
    unsigned i;
    struct pipe_constant_buffer cb = { 0 };
@@ -305,7 +283,8 @@ st_bind_ubos(struct st_context *st, struct gl_program *prog,
          &st->ctx->UniformBufferBindings[prog->sh.UniformBlocks[i]->Binding];
 
       if (binding->BufferObject) {
-         cb.buffer = binding->BufferObject->buffer;
+         cb.buffer = _mesa_get_bufferobj_reference(st->ctx,
+                                                   binding->BufferObject);
       } else {
          cb.buffer = NULL;
       }
@@ -325,7 +304,7 @@ st_bind_ubos(struct st_context *st, struct gl_program *prog,
          cb.buffer_size = 0;
       }
 
-      pipe->set_constant_buffer(pipe, shader_type, 1 + i, &cb);
+      pipe->set_constant_buffer(pipe, shader_type, 1 + i, true, &cb);
    }
 }
 
@@ -335,7 +314,7 @@ st_bind_vs_ubos(struct st_context *st)
    struct gl_program *prog =
       st->ctx->_Shader->CurrentProgram[MESA_SHADER_VERTEX];
 
-   st_bind_ubos(st, prog, MESA_SHADER_VERTEX);
+   st_bind_ubos(st, prog, PIPE_SHADER_VERTEX);
 }
 
 void
@@ -344,7 +323,7 @@ st_bind_fs_ubos(struct st_context *st)
    struct gl_program *prog =
       st->ctx->_Shader->CurrentProgram[MESA_SHADER_FRAGMENT];
 
-   st_bind_ubos(st, prog, MESA_SHADER_FRAGMENT);
+   st_bind_ubos(st, prog, PIPE_SHADER_FRAGMENT);
 }
 
 void
@@ -353,7 +332,7 @@ st_bind_gs_ubos(struct st_context *st)
    struct gl_program *prog =
       st->ctx->_Shader->CurrentProgram[MESA_SHADER_GEOMETRY];
 
-   st_bind_ubos(st, prog, MESA_SHADER_GEOMETRY);
+   st_bind_ubos(st, prog, PIPE_SHADER_GEOMETRY);
 }
 
 void
@@ -362,7 +341,7 @@ st_bind_tcs_ubos(struct st_context *st)
    struct gl_program *prog =
       st->ctx->_Shader->CurrentProgram[MESA_SHADER_TESS_CTRL];
 
-   st_bind_ubos(st, prog, MESA_SHADER_TESS_CTRL);
+   st_bind_ubos(st, prog, PIPE_SHADER_TESS_CTRL);
 }
 
 void
@@ -371,7 +350,7 @@ st_bind_tes_ubos(struct st_context *st)
    struct gl_program *prog =
       st->ctx->_Shader->CurrentProgram[MESA_SHADER_TESS_EVAL];
 
-   st_bind_ubos(st, prog, MESA_SHADER_TESS_EVAL);
+   st_bind_ubos(st, prog, PIPE_SHADER_TESS_EVAL);
 }
 
 void
@@ -380,23 +359,5 @@ st_bind_cs_ubos(struct st_context *st)
    struct gl_program *prog =
       st->ctx->_Shader->CurrentProgram[MESA_SHADER_COMPUTE];
 
-   st_bind_ubos(st, prog, MESA_SHADER_COMPUTE);
-}
-
-void
-st_bind_ts_ubos(struct st_context *st)
-{
-   struct gl_program *prog =
-      st->ctx->_Shader->CurrentProgram[MESA_SHADER_TASK];
-
-   st_bind_ubos(st, prog, MESA_SHADER_TASK);
-}
-
-void
-st_bind_ms_ubos(struct st_context *st)
-{
-   struct gl_program *prog =
-      st->ctx->_Shader->CurrentProgram[MESA_SHADER_MESH];
-
-   st_bind_ubos(st, prog, MESA_SHADER_MESH);
+   st_bind_ubos(st, prog, PIPE_SHADER_COMPUTE);
 }

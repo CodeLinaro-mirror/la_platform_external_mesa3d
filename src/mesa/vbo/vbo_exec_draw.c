@@ -341,8 +341,7 @@ vbo_exec_vtx_flush(struct vbo_exec_context *exec)
             printf("%s %d %d\n", __func__, exec->vtx.prim_count,
                    exec->vtx.vert_count);
 
-         ST_PIPELINE_RENDER_STATE_MASK(mask);
-         st_prepare_draw(ctx, mask);
+         st_prepare_draw(ctx, ST_PIPELINE_RENDER_STATE_MASK);
 
          ctx->Driver.DrawGalliumMultiMode(ctx, &exec->vtx.info,
                                           exec->vtx.draw,

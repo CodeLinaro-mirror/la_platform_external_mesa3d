@@ -563,7 +563,7 @@ class VulkanType(object):
 
     def shouldSkip(self) -> bool:
         return ("api" in self.attribs.keys()
-                and "vulkan" not in self.attribs["api"].split(','))
+                and not "vulkan" == self.attribs["api"])
 
 # Is an S-expression w/ the following spec:
 # From https://gist.github.com/pib/240957
@@ -1051,7 +1051,7 @@ class VulkanTypeInfo(object):
                     }
 
             for member in typeinfo.elem.findall(".//member"):
-                if "api" in member.attrib and "vulkan" not in member.attrib["api"].split(','):
+                if "api" in member.attrib.keys() and not "vulkan" == member.attrib["api"]:
                     continue
                 vulkanType = makeVulkanTypeFromXMLTag(self, typeName, member)
                 initialEnv[vulkanType.paramName] = {

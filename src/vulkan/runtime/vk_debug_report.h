@@ -26,22 +26,14 @@
 #ifndef VK_DEBUG_REPORT_H
 #define VK_DEBUG_REPORT_H
 
-#include "vk_object.h"
-
-#include "util/simple_mtx.h"
-#include "util/list.h"
+#include "vk_instance.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct vk_debug_report {
-   mtx_t callbacks_mutex;
-   struct list_head callbacks;
-};
-
 void
-vk_debug_report(struct vk_debug_report *debug_report,
+vk_debug_report(struct vk_instance *instance,
                 VkDebugReportFlagsEXT flags,
                 const struct vk_object_base *object,
                 size_t location,

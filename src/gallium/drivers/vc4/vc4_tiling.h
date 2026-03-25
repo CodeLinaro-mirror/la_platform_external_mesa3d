@@ -26,7 +26,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "util/detect_arch.h"
 #include "util/macros.h"
 #include "util/u_cpu_detect.h"
 
@@ -90,7 +89,7 @@ vc4_load_lt_image(void *dst, uint32_t dst_stride,
                   void *src, uint32_t src_stride,
                   int cpp, const struct pipe_box *box)
 {
-#if DETECT_ARCH_ARM
+#ifdef USE_ARM_ASM
         if (util_get_cpu_caps()->has_neon) {
                 vc4_load_lt_image_neon(dst, dst_stride, src, src_stride,
                                        cpp, box);
@@ -106,7 +105,7 @@ vc4_store_lt_image(void *dst, uint32_t dst_stride,
                    void *src, uint32_t src_stride,
                    int cpp, const struct pipe_box *box)
 {
-#if DETECT_ARCH_ARM
+#ifdef USE_ARM_ASM
         if (util_get_cpu_caps()->has_neon) {
                 vc4_store_lt_image_neon(dst, dst_stride, src, src_stride,
                                         cpp, box);

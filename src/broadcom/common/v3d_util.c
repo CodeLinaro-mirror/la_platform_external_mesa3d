@@ -29,24 +29,17 @@
  */
 uint32_t
 v3d_csd_choose_workgroups_per_supergroup(struct v3d_device_info *devinfo,
-                                         bool can_use_supergroups,
+                                         bool has_subgroups,
                                          bool has_tsy_barrier,
                                          uint32_t threads,
                                          uint32_t num_wgs,
                                          uint32_t wg_size)
 {
-   /* FIXME: Some subgroups may restrict supergroup packing. For now,
-    * if the shader has subgroups, we only allow the ones that support
-    * supergroup packing.
+   /* FIXME: subgroups may restrict supergroup packing. For now, we disable it
+    * completely if the shader uses subgroups.
     */
-   if (!can_use_supergroups)
+   if (has_subgroups)
            return 1;
-
-   /* If the workgroup size is a multiple of 16 (elements per batch),
-    * the lane occupancy is already maximized.
-    */
-   if (wg_size % 16 == 0)
-      return 1;
 
    /* Compute maximum number of batches in a supergroup for this workgroup size.
     * Each batch is 16 elements, and we can have up to 16 work groups in a
@@ -63,13 +56,11 @@ v3d_csd_choose_workgroups_per_supergroup(struct v3d_device_info *devinfo,
     * available, so we can have at least 2 supergroups executing in parallel
     * and we don't stall all our QPU threads when a supergroup hits a barrier.
     */
-   uint32_t max_wgs_per_sg = 16;
-
    if (has_tsy_barrier) {
       uint32_t max_qpu_threads = devinfo->qpu_count * threads;
       max_batches_per_sg = MIN2(max_batches_per_sg, max_qpu_threads / 2);
-      max_wgs_per_sg = max_batches_per_sg * 16 / wg_size;
    }
+   uint32_t max_wgs_per_sg = max_batches_per_sg * 16 / wg_size;
 
    uint32_t best_wgs_per_sg = 1;
    uint32_t best_unused_lanes = 16;

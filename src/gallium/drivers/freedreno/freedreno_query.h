@@ -83,7 +83,6 @@ skip_begin_query(int type)
 {
    switch (type) {
    case PIPE_QUERY_TIMESTAMP:
-   case PIPE_QUERY_TIMESTAMP_RAW:
    case PIPE_QUERY_GPU_FINISHED:
       return true;
    default:
@@ -109,19 +108,17 @@ pidx(unsigned query_type)
       return 3;
    case PIPE_QUERY_TIMESTAMP:
       return 4;
-   case PIPE_QUERY_TIMESTAMP_RAW:
-      return 5;
 
    case PIPE_QUERY_PRIMITIVES_GENERATED:
-      return 6;
+      return 5;
    case PIPE_QUERY_PRIMITIVES_EMITTED:
-      return 7;
+      return 6;
    case PIPE_QUERY_SO_OVERFLOW_ANY_PREDICATE:
-      return 8;
+      return 7;
    case PIPE_QUERY_SO_OVERFLOW_PREDICATE:
-      return 9;
+      return 8;
    case PIPE_QUERY_PIPELINE_STATISTICS_SINGLE:
-      return 10;
+      return 9;
 
    default:
       return -1;
