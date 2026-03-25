@@ -25,6 +25,7 @@
 #pragma once
 
 #include "vpe_types.h"
+#include "hw_shared.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -90,6 +91,8 @@ struct mpcc_blnd_cfg {
     int top_gain;
     int bottom_inside_gain;
     int bottom_outside_gain;
+
+    enum mpcc_blend_mode blend_mode;
 };
 
 enum mpc_output_csc_mode {

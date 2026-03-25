@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: MIT
+--
 -- Parse logs from https://github.com/freedreno/freedreno/
 -- test-texturator.c to generate a src/freedreno/fdl/fd6_layout_test.c
 -- block.  We figure out the offsets from blits, but there may be some
@@ -92,7 +94,7 @@ function draw(primtype, nindx)
   nallblits = nallblits + 1
 end
 
-function A6XX_TEX_CONST(pkt, size)
+function A6XX_TEX_MEMOBJ(pkt, size)
   -- ignore any texture state w/ DEPTH=1, these aren't the 3d tex state we
   -- are looking for
 

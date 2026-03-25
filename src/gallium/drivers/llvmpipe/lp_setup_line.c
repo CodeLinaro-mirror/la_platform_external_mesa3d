@@ -505,7 +505,7 @@ try_setup_line(struct lp_setup_context *setup,
           * the comparisons against zero are not mirroring what actually happens
           * when rasterizing using the plane equations).
           */
-         
+
          bool will_draw_start;
          bool will_draw_end;
 
@@ -710,8 +710,7 @@ try_setup_line(struct lp_setup_context *setup,
    }
 
    if (nr_planes > 4) {
-      lp_setup_add_scissor_planes(scissor, &plane[4], s_planes,
-                                  setup->multisample);
+      lp_setup_add_scissor_planes(scissor, &plane[4], s_planes);
    }
 
    return lp_setup_bin_triangle(setup, line, use_32bits, false,

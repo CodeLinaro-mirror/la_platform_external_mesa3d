@@ -15,6 +15,7 @@
 #include "util/u_cpu_detect.h"
 #include "util/u_hash_table.h"
 #include "util/hash_table.h"
+#include "util/log.h"
 #include "util/thread_sched.h"
 #include "util/xmlconfig.h"
 #include "drm-uapi/amdgpu_drm.h"
@@ -23,6 +24,13 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "sid.h"
+
+char amdgpu_userq_str[AMDGPU_MAX_QUEUES][8] = {
+   "gfx",
+   "gfx_hi",
+   "comp",
+   "sdma"
+};
 
 static struct hash_table *dev_tab = NULL;
 static simple_mtx_t dev_tab_mutex = SIMPLE_MTX_INITIALIZER;
@@ -36,12 +44,14 @@ static bool do_winsys_init(struct amdgpu_winsys *aws,
                            const struct pipe_screen_config *config,
                            int fd)
 {
-   if (ac_query_gpu_info(fd, aws->dev, &aws->info, false) != AC_QUERY_GPU_INFO_SUCCESS)
+   if (ac_query_gpu_info(fd, aws->dev, &aws->info, false) != AC_QUERY_GPU_INFO_SUCCESS) {
+      mesa_loge("amdgpu: ac_query_gpu_info failed.\n");
       goto fail;
+   }
 
    aws->addrlib = ac_addrlib_create(&aws->info, &aws->info.max_alignment);
    if (!aws->addrlib) {
-      fprintf(stderr, "amdgpu: Cannot create addrlib.\n");
+      mesa_loge("amdgpu: Cannot create addrlib.\n");
       goto fail;
    }
 
@@ -56,6 +66,7 @@ static bool do_winsys_init(struct amdgpu_winsys *aws,
                       strstr(debug_get_option("AMD_DEBUG", ""), "sqtt") != NULL;
    aws->zero_all_vram_allocs = strstr(debug_get_option("R600_DEBUG", ""), "zerovram") != NULL ||
                               driQueryOptionb(config->options, "radeonsi_zerovram");
+   aws->userq_job_log = strstr(debug_get_option("AMD_DEBUG", ""), "userqjoblog") != NULL;
 
    for (unsigned i = 0; i < ARRAY_SIZE(aws->queues); i++)
       simple_mtx_init(&aws->queues[i].userq.lock, mtx_plain);
@@ -63,6 +74,9 @@ static bool do_winsys_init(struct amdgpu_winsys *aws,
    /* TODO: Enable this once the kernel handles it efficiently. */
    if (!aws->info.userq_ip_mask)
       aws->info.has_vm_always_valid = false;
+
+   if (aws->userq_job_log)
+      amdgpu_userq_start_job_log_thread(aws);
 
    return true;
 
@@ -76,6 +90,11 @@ static void do_winsys_deinit(struct amdgpu_winsys *aws)
 {
    if (aws->reserve_vmid)
       ac_drm_vm_unreserve_vmid(aws->dev, 0);
+
+   if (aws->userq_job_log) {
+      aws->userq_job_log = false;
+      pthread_join(aws->userq_job_log_thread, NULL);
+   }
 
    for (unsigned i = 0; i < ARRAY_SIZE(aws->queues); i++) {
       for (unsigned j = 0; j < ARRAY_SIZE(aws->queues[i].fences); j++)
@@ -104,6 +123,7 @@ static void do_winsys_deinit(struct amdgpu_winsys *aws)
    ac_drm_cs_destroy_syncobj(aws->dev, aws->vm_timeline_syncobj);
    ac_drm_device_deinitialize(aws->dev);
    simple_mtx_destroy(&aws->bo_fence_lock);
+   simple_mtx_destroy(&aws->stats_lock);
 
    FREE(aws);
 }
@@ -397,8 +417,7 @@ amdgpu_winsys_create(int fd, const struct pipe_screen_config *config,
     * for the same fd. */
    r = ac_drm_device_initialize(fd, is_virtio, &drm_major, &drm_minor, &dev);
    if (r) {
-      fprintf(stderr, "amdgpu: amd%s_device_initialize failed.\n",
-         is_virtio ? "vgpu" : "gpu");
+      mesa_loge("amdgpu: amd%s_device_initialize failed.\n", is_virtio ? "vgpu" : "gpu");
       goto fail;
    }
 
@@ -507,6 +526,7 @@ amdgpu_winsys_create(int fd, const struct pipe_screen_config *config,
       (void) simple_mtx_init(&aws->global_bo_list_lock, mtx_plain);
 #endif
       (void) simple_mtx_init(&aws->bo_fence_lock, mtx_plain);
+      (void) simple_mtx_init(&aws->stats_lock, mtx_plain);
       (void) simple_mtx_init(&aws->bo_export_table_lock, mtx_plain);
 
       if (!util_queue_init(&aws->cs_queue, "cs", 8, 1,

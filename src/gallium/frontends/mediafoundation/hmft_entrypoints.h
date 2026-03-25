@@ -37,6 +37,7 @@
 #include <codecapi.h>
 #include <combaseapi.h>
 #include <concrt.h>
+#include <d3d9types.h>
 #include <initguid.h>
 #include <mfapi.h>
 #include <mfd3d12.h>   // For IMFD3D12SynchronizationObjectCommands
@@ -64,7 +65,7 @@ using namespace concurrency;
 using namespace Microsoft::WRL;
 using Microsoft::WRL::ComPtr;
 
-#define ENCODE_WITH_TWO_PASS_LOWEST_RES               1
+#define ENCODE_WITH_TWO_PASS_LOWEST_RES 1
 
 #define NUM_INPUT_TYPES 3
 
@@ -247,39 +248,6 @@ typedef enum IntraRefreshMode
    HMFT_INTRA_REFRESH_MODE_MAX
 } IntraRefreshMode;
 
-#ifndef CODECAPI_AVEncVideoEnableFramePsnrYuv
-// AVEncVideoEnableFramePsnrYuv (BOOL)
-// Indicates whether to enable or disable reporting frame PSNR of YUV planes for video encoding.
-// VARIANT_FALSE: disable; VARIANT_TRUE: enable
-DEFINE_CODECAPI_GUID( AVEncVideoEnableFramePsnrYuv,
-                      "2BBCDD1D-BC47-430E-B2E8-64801B47F5F0",
-                      0x2bbcdd1d,
-                      0xbc47,
-                      0x430e,
-                      0xb2,
-                      0xe8,
-                      0x64,
-                      0x80,
-                      0x1b,
-                      0x47,
-                      0xf5,
-                      0xf0 )
-#define CODECAPI_AVEncVideoEnableFramePsnrYuv DEFINE_CODECAPI_GUIDNAMED( AVEncVideoEnableFramePsnrYuv )
-
-typedef struct _MFSampleExtensionPsnrYuv
-{
-   FLOAT psnrY;   // PSNR for Y plane
-   FLOAT psnrU;   // PSNR for U plane
-   FLOAT psnrV;   // PSNR for V plane
-} MFSampleExtensionPsnrYuv;
-
-// MFSampleExtension_FramePsnrYuv {1C633A3D-566F-4752-833B-2907DF5415E1}
-// Type: IMFMediaBuffer
-// A MFSampleExtensionPsnrYuv structure that specifies the PSNR data of YUV planes of an encoded video frame.
-DEFINE_GUID( MFSampleExtension_FramePsnrYuv, 0x1c633a3d, 0x566f, 0x4752, 0x83, 0x3b, 0x29, 0x07, 0xdf, 0x54, 0x15, 0xe1 );
-
-#endif
-
 #ifndef CODECAPI_AVEncVideoEnableSpatialAdaptiveQuantization
 // AVEncVideoEnableSpatialAdaptiveQuantization (BOOL)
 // Indicates whether to enable or disable spatial adaptive quantization for video encoding.
@@ -301,84 +269,51 @@ DEFINE_CODECAPI_GUID( AVEncVideoEnableSpatialAdaptiveQuantization,
    DEFINE_CODECAPI_GUIDNAMED( AVEncVideoEnableSpatialAdaptiveQuantization )
 #endif
 
-#ifndef CODECAPI_AVEncVideoOutputQPMapBlockSize
-// AVEncVideoOutputQPMapBlockSize (VT_UI4)
-// The block size used in reporting the output QP map for each block in an encoded video frame.
-// ulVal should be zero or power of 2, such as 16 or 32, etc.
-// Zero value is used to disable the QP map reporting.
-DEFINE_CODECAPI_GUID( AVEncVideoOutputQPMapBlockSize,
-                      "97038743-4AE3-44C3-A0F2-5BD58A4634EF",
-                      0x97038743,
-                      0x4ae3,
-                      0x44c3,
-                      0xa0,
-                      0xf2,
-                      0x5b,
-                      0xd5,
-                      0x8a,
-                      0x46,
-                      0x34,
-                      0xef )
-#define CODECAPI_AVEncVideoOutputQPMapBlockSize DEFINE_CODECAPI_GUIDNAMED( AVEncVideoOutputQPMapBlockSize )
+#ifndef CODECAPI_AVEncVideoD3D12ReconstructedPictureOutputMode
 
-// MFSampleExtension_VideoEncodeQPMap {2C68A331-B712-49CA-860A-3A1D58237D88}
+// MFSampleExtension_VideoEncodeD3D12ReconstructedPicture {3E8A1B7F-5C92-4D6E-B834-F0A729E65C48}
 // Type: IMFMediaBuffer
-// The QP map of an encoded video frame.
-DEFINE_GUID( MFSampleExtension_VideoEncodeQPMap, 0x2c68a331, 0xb712, 0x49ca, 0x86, 0x0a, 0x3a, 0x1d, 0x58, 0x23, 0x7d, 0x88 );
+// The reconstructed picture data of an encoded video frame from a D3D12-based MFT (Experimental).
+DEFINE_GUID( MFSampleExtension_VideoEncodeD3D12ReconstructedPicture,
+             0x3e8a1b7f,
+             0x5c92,
+             0x4d6e,
+             0xb8,
+             0x34,
+             0xf0,
+             0xa7,
+             0x29,
+             0xe6,
+             0x5c,
+             0x48 );
 
-#endif
+enum eAVEncVideoD3D12ReconstructedPictureOutputMode
+{
+   eAVEncVideoEncodeD3D12ReconstructedPictureMode_None = 0,   // Does not return a D3D12 reconstructed buffer.
+   eAVEncVideoEncodeD3D12ReconstructedPictureMode_Copy =
+      1,   // Returns a copy of the D3D12 reconstructed buffer used by the encoder.
+   eAVEncVideoEncodeD3D12ReconstructedPictureMode_Shared =
+      2   // Returns the D3D12 reconstructed buffer written by the encoder without a copy.
+};
 
-#ifndef CODECAPI_AVEncVideoOutputBitsUsedMapBlockSize
-// AVEncVideoOutputBitsUsedMapBlockSize (VT_UI4)
-// The block size used in reporting the output bits used map for each block in an encoded video frame.
-// ulVal should be zero or power of 2, such as 16 or 32, etc.
-// Zero value is used to disable the bits used map reporting.
-DEFINE_CODECAPI_GUID( AVEncVideoOutputBitsUsedMapBlockSize,
-                      "6C2CD11A-CA3B-44BD-9A9E-93B03634C36E",
-                      0x6c2cd11a,
-                      0xca3b,
-                      0x44bd,
-                      0x9a,
-                      0x9e,
-                      0x93,
-                      0xb0,
-                      0x36,
-                      0x34,
-                      0xc3,
-                      0x6e )
-#define CODECAPI_AVEncVideoOutputBitsUsedMapBlockSize DEFINE_CODECAPI_GUIDNAMED( AVEncVideoOutputBitsUsedMapBlockSize )
-
-// MFSampleExtension_VideoEncodeBitsUsedMap {6894263D-E6E2-4BCC-849D-8570365F5114}
-// Type: IMFMediaBuffer
-// The bits used map of an encoded video frame.
-DEFINE_GUID( MFSampleExtension_VideoEncodeBitsUsedMap, 0x6894263d, 0xe6e2, 0x4bcc, 0x84, 0x9d, 0x85, 0x70, 0x36, 0x5f, 0x51, 0x14 );
-
-#endif
-
-#ifndef CODECAPI_AVEncVideoSatdMapBlockSize
-// AVEncVideoSatdMapBlockSize (VT_UI4)
-// The block size used in reporting the output SATD map for each block in an encoded video frame.
-// ulVal should be zero or power of 2, such as 16 or 32.
-// A zero value disables the SATD map reporting.
-DEFINE_CODECAPI_GUID( AVEncVideoSatdMapBlockSize,
-                      "596F1106-8CE0-4302-AF79-C4EC67AADC6D",
-                      0x596f1106,
-                      0x8ce0,
-                      0x4302,
-                      0xaf,
-                      0x79,
-                      0xc4,
-                      0xec,
-                      0x67,
-                      0xaa,
-                      0xdc,
-                      0x6d )
-#define CODECAPI_AVEncVideoSatdMapBlockSize DEFINE_CODECAPI_GUIDNAMED( AVEncVideoSatdMapBlockSize )
-
-// MFSampleExtension_VideoEncodeSatdMap {ADF61D96-C2D3-4B57-A138-DDE4D351EAA9}
-// Type: IMFMediaBuffer
-// The SATD map of an encoded video frame.
-DEFINE_GUID( MFSampleExtension_VideoEncodeSatdMap, 0xadf61d96, 0xc2d3, 0x4b57, 0xa1, 0x38, 0xdd, 0xe4, 0xd3, 0x51, 0xea, 0xa9 );
+// AVEncVideoD3D12ReconstructedPictureOutputMode (VT_UI4) (Experimental, Testing only)
+// This property controls the output of D3D12 reconstructed picture data from a D3D12-based encoder.
+// ulVal must be a value from the eAVEncVideoD3D12ReconstructedPictureOutputMode enumeration.
+DEFINE_CODECAPI_GUID( AVEncVideoD3D12ReconstructedPictureOutputMode,
+                      "4A7B2E8F-1D93-4C6A-B548-91E2F8C5A7D3",
+                      0x4a7b2e8f,
+                      0x1d93,
+                      0x4c6a,
+                      0xb5,
+                      0x48,
+                      0x91,
+                      0xe2,
+                      0xf8,
+                      0xc5,
+                      0xa7,
+                      0xd3 )
+#define CODECAPI_AVEncVideoD3D12ReconstructedPictureOutputMode                                                                     \
+   DEFINE_CODECAPI_GUIDNAMED( AVEncVideoD3D12ReconstructedPictureOutputMode )
 
 #endif
 
@@ -387,35 +322,49 @@ DEFINE_GUID( MFSampleExtension_VideoEncodeSatdMap, 0xadf61d96, 0xc2d3, 0x4b57, 0
 // Read-only parameter that specifies the settings that the encoder MFT supports with respect to delta QP values as input.
 // Use ICodecAPI::GetValue to determine supported settings for Input Delta QP.
 // See usage of InputQPSettings within mfapi.h to retrieve block size & qp details
-DEFINE_CODECAPI_GUID(AVEncVideoInputDeltaQPBlockSettings, "5A4787DC-0648-47AA-B945-552BFAD2A6D8", 0x5a4787dc, 0x648, 0x47aa, 0xb9, 0x45, 0x55, 0x2b, 0xfa, 0xd2, 0xa6, 0xd8 )
+DEFINE_CODECAPI_GUID( AVEncVideoInputDeltaQPBlockSettings,
+                      "5A4787DC-0648-47AA-B945-552BFAD2A6D8",
+                      0x5a4787dc,
+                      0x648,
+                      0x47aa,
+                      0xb9,
+                      0x45,
+                      0x55,
+                      0x2b,
+                      0xfa,
+                      0xd2,
+                      0xa6,
+                      0xd8 )
 
-#define CODECAPI_AVEncVideoInputDeltaQPBlockSettings    DEFINE_CODECAPI_GUIDNAMED( AVEncVideoInputDeltaQPBlockSettings )
+#define CODECAPI_AVEncVideoInputDeltaQPBlockSettings DEFINE_CODECAPI_GUIDNAMED( AVEncVideoInputDeltaQPBlockSettings )
 
-typedef enum _eAVEncVideoQPMapElementDataType {
-    CODEC_API_QP_MAP_INT8   = 0x00000000,
-    CODEC_API_QP_MAP_INT16  = 0x00000001,
-    CODEC_API_QP_MAP_INT32  = 0x00000002,
-    CODEC_API_QP_MAP_UINT8  = 0x80000000,
-    CODEC_API_QP_MAP_UINT16 = 0x80000001,
-    CODEC_API_QP_MAP_UINT32 = 0x80000002,
+typedef enum _eAVEncVideoQPMapElementDataType
+{
+   CODEC_API_QP_MAP_INT8 = 0x00000000,
+   CODEC_API_QP_MAP_INT16 = 0x00000001,
+   CODEC_API_QP_MAP_INT32 = 0x00000002,
+   CODEC_API_QP_MAP_UINT8 = 0x80000000,
+   CODEC_API_QP_MAP_UINT16 = 0x80000001,
+   CODEC_API_QP_MAP_UINT32 = 0x80000002,
 } eAVEncVideoQPMapElementDataType;
 
-typedef struct _inputQPSettings {
-    UINT32                         minBlockSize;
-    UINT32                         maxBlockSize;
-    UINT32                         stepsBlockSize;
-    eAVEncVideoQPMapElementDataType dataType;
-    INT16                          minValue;
-    INT16                          maxValue;
-    UINT16                         steps;
+typedef struct _inputQPSettings
+{
+   UINT32 minBlockSize;
+   UINT32 maxBlockSize;
+   UINT32 stepsBlockSize;
+   eAVEncVideoQPMapElementDataType dataType;
+   INT16 minValue;
+   INT16 maxValue;
+   UINT16 step;
 } InputQPSettings;
 
 // MFSampleExtension_VideoEncodeInputDeltaQPMap   {DAB419C3-BF21-4B46-8692-9A7BF0A71769}
 // Type: IMFMediaBuffer
 // MFSampleExtension_VideoEncodeInputDeltaQPMap specifies the input delta QP map of the frame.
 // The delta QP map must use one of the block sizes specified by CODECAPI_AVEncVideoInputDeltaQPBlockSize.
-DEFINE_GUID(MFSampleExtension_VideoEncodeInputDeltaQPMap,
-0xdab419c3, 0xbf21, 0x4b46, 0x86, 0x92, 0x9a, 0x7b, 0xf0, 0xa7, 0x17, 0x69);
+DEFINE_GUID(
+   MFSampleExtension_VideoEncodeInputDeltaQPMap, 0xdab419c3, 0xbf21, 0x4b46, 0x86, 0x92, 0x9a, 0x7b, 0xf0, 0xa7, 0x17, 0x69 );
 
 #endif /* CODECAPI_AVEncVideoInputDeltaQPBlockSettings */
 
@@ -424,7 +373,19 @@ DEFINE_GUID(MFSampleExtension_VideoEncodeInputDeltaQPMap,
 // Read-only parameter that specifies the settings that the encoder MFT supports with respect to absolute QP values as input.
 // Use ICodecAPI::GetValue to determine supported settings for Input Absolute QP.
 // See usage of InputQPSettings within mfapi.h to retrieve block size & qp details
-DEFINE_CODECAPI_GUID(AVEncVideoInputAbsoluteQPBlockSettings, "EF95A145-4F91-4DEA-8173-ACFF11434210", 0xef95a145, 0x4f91, 0x4dea, 0x81, 0x73, 0xac, 0xff, 0x11, 0x43, 0x42, 0x10 )
+DEFINE_CODECAPI_GUID( AVEncVideoInputAbsoluteQPBlockSettings,
+                      "EF95A145-4F91-4DEA-8173-ACFF11434210",
+                      0xef95a145,
+                      0x4f91,
+                      0x4dea,
+                      0x81,
+                      0x73,
+                      0xac,
+                      0xff,
+                      0x11,
+                      0x43,
+                      0x42,
+                      0x10 )
 
 #define CODECAPI_AVEncVideoInputAbsoluteQPBlockSettings DEFINE_CODECAPI_GUIDNAMED( AVEncVideoInputAbsoluteQPBlockSettings )
 
@@ -432,8 +393,8 @@ DEFINE_CODECAPI_GUID(AVEncVideoInputAbsoluteQPBlockSettings, "EF95A145-4F91-4DEA
 // Type: IMFMediaBuffer
 // MFSampleExtension_VideoEncodeInputExtAbsDeltaQPMap specifies the absolute QP map of the frame.
 // The absolute QP map must use one of the block sizes specified by CODECAPI_AVEncVideoInputAbsQPBlockSize.
-DEFINE_GUID(MFSampleExtension_VideoEncodeInputAbsoluteQPMap,
-0x432a6e9a, 0xf1ed, 0x456e, 0x8d, 0xc3, 0x6f, 0x89, 0x85, 0x64, 0x9e, 0xb9);
+DEFINE_GUID(
+   MFSampleExtension_VideoEncodeInputAbsoluteQPMap, 0x432a6e9a, 0xf1ed, 0x456e, 0x8d, 0xc3, 0x6f, 0x89, 0x85, 0x64, 0x9e, 0xb9 );
 
 #endif /* CODECAPI_AVEncVideoInputAbsoluteQPBlockSettings */
 
@@ -478,6 +439,45 @@ DEFINE_CODECAPI_GUID( AVEncVideoRateControlFramePreAnalysisExternalReconDownscal
    DEFINE_CODECAPI_GUIDNAMED( AVEncVideoRateControlFramePreAnalysisExternalReconDownscale )
 #endif
 
+#ifndef CODECAPI_AVEncWorkGlobalPriority
+// AVEncWorkGlobalPriority (VT_UI4) (Experimental, Testing only)
+// Indicates global priority for all work submitted by the encoder to the GPU
+// VARIANT_FALSE: disable; VARIANT_TRUE: enable
+DEFINE_CODECAPI_GUID( AVEncWorkGlobalPriority,
+                      "CA123CAA-A17B-4BBA-9E08-269F3CF5D636",
+                      0xca123caa,
+                      0xa17b,
+                      0x4bba,
+                      0x9e,
+                      0x8,
+                      0x26,
+                      0x9f,
+                      0x3c,
+                      0xf5,
+                      0xd6,
+                      0x36 )
+#define CODECAPI_AVEncWorkGlobalPriority DEFINE_CODECAPI_GUIDNAMED( AVEncWorkGlobalPriority )
+#endif
+
+#ifndef CODECAPI_AVEncWorkProcessPriority
+// AVEncWorkProcessPriority (VT_UI4) (Experimental, Testing only)
+// Indicates global priority for all work submitted by the encoder to the GPU
+// VARIANT_FALSE: disable; VARIANT_TRUE: enable
+DEFINE_CODECAPI_GUID( AVEncWorkProcessPriority,
+                      "FB123CAA-B778-4BBA-9E08-269F3CF5D125",
+                      0xfb123caa,
+                      0xb778,
+                      0x4bba,
+                      0x9e,
+                      0x8,
+                      0x26,
+                      0x9f,
+                      0x3c,
+                      0xf5,
+                      0xd1,
+                      0x25 )
+#define CODECAPI_AVEncWorkProcessPriority DEFINE_CODECAPI_GUIDNAMED( AVEncWorkProcessPriority )
+#endif
 
 #if MFT_CODEC_H264ENC
 #define HMFT_GUID "8994db7c-288a-4c62-a136-a3c3c2a208a8"
@@ -488,6 +488,11 @@ DEFINE_CODECAPI_GUID( AVEncVideoRateControlFramePreAnalysisExternalReconDownscal
 #endif
 
 #define MFT_INPUT_QUEUE_DEPTH 8
+
+// For low latency mode we should only need 2 if we have guarantee that the output sample is returned quickly.  However,
+// when using mp4 sink via SinkWriter, it buffers the input sample so we will hit no resource sample and error out, choosing 11 to
+// be safe.
+#define MFT_STAT_POOL_MIN_SIZE 11
 
 class __declspec( uuid( HMFT_GUID ) ) CDX12EncHMFT : CMFD3DManager,
                                                      public RuntimeClass<RuntimeClassFlags<RuntimeClassType::WinRtClassicComMix>,
@@ -529,6 +534,40 @@ class __declspec( uuid( HMFT_GUID ) ) CDX12EncHMFT : CMFD3DManager,
    HRESULT OnFlush();
 
    HRESULT ConfigureSampleAllocator();
+   HRESULT ConfigureBitstreamOutputSampleAttributes( IMFSample *pSample,
+                                                     const LPDX12EncodeContext pDX12EncodeContext,
+                                                     DWORD dwReceivedInput,
+                                                     BOOL bIsLastSlice,
+                                                     struct codec_unit_location_t *pCodecUnitMetadata,
+                                                     unsigned CodecUnitMetadataCount );
+   HRESULT ConfigureAsyncStatsMetadataOutputSampleAttributes( IMFSample *pSample,
+                                                              pipe_resource *pPipeResourcePSNRStats,
+                                                              pipe_resource *pPipeResourceQPMapStats,
+                                                              pipe_resource *pPipeResourceRCBitAllocMapStats,
+                                                              pipe_resource *pPipeResourceSATDMapStats,
+                                                              ComPtr<ID3D12Fence> &pResolveStatsCompletionFence,
+                                                              UINT64 ResolveStatsCompletionFenceValue,
+                                                              pipe_resource *pPipeResourceReconstructedPicture,
+                                                              UINT PipeResourceReconstructedPictureSubresource,
+                                                              ComPtr<ID3D12Fence> &spReconstructedPictureCompletionFence,
+                                                              UINT64 ReconstructedPictureCompletionFenceValue,
+                                                              ID3D12CommandQueue *pSyncObjectQueue );
+   bool GetSliceBitstreamMetadata( LPDX12EncodeContext pDX12EncodeContext,
+                                   uint32_t slice_idx,
+                                   std::vector<struct codec_unit_location_t> &codec_unit_metadata );
+   bool ProcessSliceBitstreamZeroCopy( LPDX12EncodeContext pDX12EncodeContext,
+                                       uint32_t slice_idx,
+                                       ComPtr<IMFMediaBuffer> &spMediaBuffer,
+                                       std::vector<struct codec_unit_location_t> &mfsample_codec_unit_metadata );
+   void FinalizeAndEmitOutputSample( LPDX12EncodeContext pDX12EncodeContext,
+                                     ComPtr<IMFMediaBuffer> &spMediaBuffer,
+                                     ComPtr<IMFSample> &spOutputSample,
+                                     struct codec_unit_location_t *pCodecUnitMetadata,
+                                     unsigned CodecUnitMetadataCount,
+                                     DWORD dwReceivedInput,
+                                     BOOL bIsLastSlice,
+                                     uint64_t ResolveStatsCompletionFenceValue );
+
    HRESULT UpdateAvailableInputType();
    HRESULT InternalCheckInputType( IMFMediaType *pType );
    HRESULT InternalCheckOutputType( IMFMediaType *pType );
@@ -666,9 +705,27 @@ class __declspec( uuid( HMFT_GUID ) ) CDX12EncHMFT : CMFD3DManager,
    UINT32 m_uiVideoOutputBitsUsedMapBlockSize = 0;
    UINT32 m_uiVideoSatdMapBlockSize = 0;
 
+   typedef enum RECON_PIC_OUTPUT_MODE
+   {
+      RECON_PIC_OUTPUT_MODE_DISABLED = 0,
+      RECON_PIC_OUTPUT_MODE_BLIT_COPY = 1,
+      RECON_PIC_OUTPUT_MODE_READ_ONLY_SHARED_RESOURCE = 2,
+   } RECON_PIC_OUTPUT_MODE;
+
+   RECON_PIC_OUTPUT_MODE m_VideoReconstructedPictureMode = RECON_PIC_OUTPUT_MODE_DISABLED;
+
+   UINT32 m_uiSliceGenerationMode = 0;
+   BOOL m_bSliceGenerationModeSet = FALSE;
+
    BOOL m_bRateControlFramePreAnalysis = FALSE;
    BOOL m_bRateControlFramePreAnalysisExternalReconDownscale = FALSE;
 
+   D3D12_COMMAND_QUEUE_PROCESS_PRIORITY m_WorkProcessPriority = {};
+   BOOL m_bWorkProcessPrioritySet = FALSE;
+   D3D12_COMMAND_QUEUE_GLOBAL_PRIORITY m_WorkGlobalPriority = {};
+   BOOL m_bWorkGlobalPrioritySet = FALSE;
+
+   UINT m_uiMaxOutputBitstreamSize = 0u;
    struct pipe_video_codec *m_pPipeVideoCodec = nullptr;
    struct pipe_video_codec *m_pPipeVideoBlitter = nullptr;
    reference_frames_tracker *m_pGOPTracker = nullptr;
@@ -704,10 +761,32 @@ class __declspec( uuid( HMFT_GUID ) ) CDX12EncHMFT : CMFD3DManager,
    bool m_bUnlocked = false;
    HRESULT IsUnlocked( void );
 
-   HRESULT PrepareForEncodeHelper( LPDX12EncodeContext pDX12EncodeContext, bool dirtyRectFrameNumSet, uint32_t dirtyRectFrameNum );
+#if MFT_CODEC_H264ENC
+   HRESULT UpdateH264EncPictureDesc( pipe_h264_enc_picture_desc *pPicInfo, const uint32_t intra_period, const uint32_t ip_period );
+#endif
+
+#if MFT_CODEC_H265ENC
+   HRESULT UpdateH265EncPictureDesc( pipe_h265_enc_picture_desc *pPicInfo,
+                                     const uint32_t intra_period,
+                                     const uint32_t ip_period,
+                                     const uint8_t log2_max_pic_order_cnt_lsb_minus4,
+                                     const uint16_t pic_width_in_luma_samples,
+                                     const uint16_t pic_height_in_luma_samples );
+#endif
+
+#if MFT_CODEC_AV1ENC
+   HRESULT UpdateAV1EncPictureDesc( pipe_av1_enc_picture_desc *pPicInfo );
+#endif
+
+   HRESULT PrepareForEncodeHelper( LPDX12EncodeContext pDX12EncodeContext,
+                                   bool dirtyRectFrameNumSet,
+                                   uint32_t dirtyRectFrameNum,
+                                   bool moveRegionFrameNumSet,
+                                   uint32_t moveRegionFrameNum );
    HRESULT PrepareForEncode( IMFSample *pSample, LPDX12EncodeContext *ppDX12EncodeContext );
 
    std::vector<BYTE> m_pDirtyRectBlob = std::vector<BYTE>( sizeof( DIRTYRECT_INFO ) );
+   std::vector<BYTE> m_pMoveRegionBlob = std::vector<BYTE>( sizeof( MOVEREGION_INFO ) );
 
  public:
    CDX12EncHMFT();

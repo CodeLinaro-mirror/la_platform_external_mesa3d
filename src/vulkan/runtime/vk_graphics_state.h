@@ -108,6 +108,7 @@ enum mesa_vk_dynamic_graphics_state {
    MESA_VK_DYNAMIC_ATTACHMENT_FEEDBACK_LOOP_ENABLE,
    MESA_VK_DYNAMIC_COLOR_ATTACHMENT_MAP,
    MESA_VK_DYNAMIC_INPUT_ATTACHMENT_MAP,
+   MESA_VK_DYNAMIC_CB_BLEND_ADVANCED,
 
    /* Must be left at the end */
    MESA_VK_DYNAMIC_GRAPHICS_STATE_ENUM_MAX,
@@ -127,10 +128,12 @@ enum mesa_vk_dynamic_graphics_state {
  *
  * :param dynamic:      |out| Bitset to populate
  * :param info:         |in|  VkPipelineDynamicStateCreateInfo or NULL
+ * :param device:       |in|  Device for feature checks
  */
 void
 vk_get_dynamic_graphics_states(BITSET_WORD *dynamic,
-                               const VkPipelineDynamicStateCreateInfo *info);
+                               const VkPipelineDynamicStateCreateInfo *info,
+                               const struct vk_device *device);
 
 /***/
 struct vk_vertex_binding_state {
@@ -656,6 +659,15 @@ struct vk_color_blend_attachment_state {
     * MESA_VK_DYNAMIC_CB_BLEND_EQUATIONS
     */
    VkBlendOp alpha_blend_op;
+
+   /** VkColorBlendAdvancedEXT - advanced blend parameters
+    *
+    * MESA_VK_DYNAMIC_CB_BLEND_ADVANCED
+    */
+   bool src_premultiplied;
+   bool dst_premultiplied;
+   VkBlendOverlapEXT blend_overlap;
+   bool clamp_results;
 };
 
 /***/
@@ -794,6 +806,9 @@ struct vk_render_pass_state {
 
    /** VkAttachmentSampleCountInfoAMD::depthStencilAttachmentSamples */
    uint8_t depth_stencil_attachment_samples;
+
+   /** VkCustomResolveCreateInfoEXT::customResolve */
+   bool custom_resolve;
 };
 
 static inline bool
@@ -1207,7 +1222,7 @@ vk_dynamic_graphics_state_fill(struct vk_dynamic_graphics_state *dyn,
 static inline void
 vk_dynamic_graphics_state_dirty_all(struct vk_dynamic_graphics_state *d)
 {
-   BITSET_SET_RANGE(d->dirty, 0, MESA_VK_DYNAMIC_GRAPHICS_STATE_ENUM_MAX - 1);
+   BITSET_SET_COUNT(d->dirty, 0, MESA_VK_DYNAMIC_GRAPHICS_STATE_ENUM_MAX);
 }
 
 /** Mark all states in the given vk_dynamic_graphics_state not dirty
@@ -1270,6 +1285,21 @@ vk_cmd_set_vertex_binding_strides(struct vk_command_buffer *cmd,
                                   uint32_t first_binding,
                                   uint32_t binding_count,
                                   const VkDeviceSize *strides);
+
+/** Set vertex binding strides on a command buffer
+ *
+ * This is the dynamic state part of vkCmdBindVertexBuffers2().
+ *
+ * :param cmd:            |inout|  Command buffer to update
+ * :param first_binding:  |in|     First binding to update
+ * :param binding_count:  |in|     Number of bindings to update
+ * :param strides:        |in|     binding_count many stride values to set
+ */
+void
+vk_cmd_set_vertex_binding_strides2(struct vk_command_buffer *cmd,
+                                   uint32_t first_binding,
+                                   uint32_t binding_count,
+                                   const VkBindVertexBuffer3InfoKHR *bindings);
 
 /* Set color attachment count for blending on a command buffer.
  *

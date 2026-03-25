@@ -1,0 +1,65 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "u_perfetto_cc_impl",
+    srcs: [
+        "u_perfetto.cc",
+    ],
+}
+
+filegroup {
+    name: "u_trace_c_impl",
+    srcs: [
+        "u_trace.c",
+    ],
+}
+
+filegroup {
+    name: "u_trace_py",
+    srcs: [
+        "u_trace.py",
+    ],
+}
+
+cc_library_headers {
+    name: "u_perfetto_h_headers",
+    vendor: true,
+    export_include_dirs: select((os(), soong_config_variable("aosp_mesa3d", "perfetto")), {
+        ("android", "true"): [
+            ".",
+        ],
+        (default, default): [],
+    }),
+}
+
+cc_library_headers {
+    name: "u_trace_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_trace_priv_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}

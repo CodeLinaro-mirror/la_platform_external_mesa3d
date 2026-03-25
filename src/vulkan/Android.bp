@@ -1,0 +1,52 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "vulkan-android_sym",
+    srcs: [
+        "vulkan-android.sym",
+    ],
+}
+
+filegroup {
+    name: "vulkan_sym",
+    srcs: [
+        "vulkan.sym",
+    ],
+}
+
+cc_defaults {
+    name: "vulkan_wsi_list",
+    vendor: true,
+    host_supported: true,
+    cflags: select(os(), {
+        "android": [
+            "-DVK_USE_PLATFORM_ANDROID_KHR",
+        ],
+        default: [],
+    }) + select((arch(), os(), soong_config_variable("aosp_mesa3d", "perfetto")), {
+        ("x86_64", "linux_glibc", default): [
+            "-DVK_USE_PLATFORM_DISPLAY_KHR",
+        ],
+        ("x86_64", "linux_musl", default): [
+            "-DVK_USE_PLATFORM_DISPLAY_KHR",
+        ],
+        ("arm64", "linux_musl", default): [
+            "-DVK_USE_PLATFORM_DISPLAY_KHR",
+        ],
+        (default, default, default): [],
+    }),
+}

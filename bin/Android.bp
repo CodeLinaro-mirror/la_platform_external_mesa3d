@@ -1,0 +1,53 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "gen_vs_module_defs_py",
+    srcs: [
+        "gen_vs_module_defs.py",
+    ],
+}
+
+filegroup {
+    name: "git_sha1_gen_py",
+    srcs: [
+        "git_sha1_gen.py",
+    ],
+}
+
+python_binary_host {
+    name: "gen_vs_module_defs_py_binary",
+    main: "gen_vs_module_defs.py",
+    srcs: [
+        ":gen_vs_module_defs_py",
+    ],
+    libs: [
+        "mako",
+        "pyyaml",
+    ],
+}
+
+python_binary_host {
+    name: "git_sha1_py_binary",
+    main: "git_sha1_gen.py",
+    srcs: [
+        ":git_sha1_gen_py",
+    ],
+    libs: [
+        "mako",
+        "pyyaml",
+    ],
+}

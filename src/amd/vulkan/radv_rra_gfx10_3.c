@@ -177,9 +177,11 @@ rra_gather_bvh_info_gfx10_3(const uint8_t *bvh, uint32_t node_id, struct rra_bvh
    switch (node_type) {
    case radv_bvh_node_box16:
       dst->internal_nodes_size += sizeof(struct rra_box16_node);
+      dst->box16_count++;
       break;
    case radv_bvh_node_box32:
       dst->internal_nodes_size += sizeof(struct rra_box32_node);
+      dst->box32_count++;
       break;
    case radv_bvh_node_instance:
       dst->leaf_nodes_size += sizeof(struct rra_instance_node);
@@ -283,15 +285,15 @@ rra_transcode_box16_node(struct rra_transcoding_context *ctx, const struct radv_
       vk_aabb bounds = {
          .min =
             {
-               _mesa_half_to_float(src->coords[i][0][0]),
-               _mesa_half_to_float(src->coords[i][0][1]),
-               _mesa_half_to_float(src->coords[i][0][2]),
+               _mesa_half_to_float(src->coords[i].min_x),
+               _mesa_half_to_float(src->coords[i].min_y),
+               _mesa_half_to_float(src->coords[i].min_z),
             },
          .max =
             {
-               _mesa_half_to_float(src->coords[i][1][0]),
-               _mesa_half_to_float(src->coords[i][1][1]),
-               _mesa_half_to_float(src->coords[i][1][2]),
+               _mesa_half_to_float(src->coords[i].max_x),
+               _mesa_half_to_float(src->coords[i].max_y),
+               _mesa_half_to_float(src->coords[i].max_z),
             },
       };
 

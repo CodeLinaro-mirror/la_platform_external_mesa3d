@@ -2,25 +2,7 @@
  * Copyright (C) 2019 Alyssa Rosenzweig
  * Copyright (C) 2017-2018 Lyude Paul
  * Copyright (C) 2019 Collabora, Ltd.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 
 #include <assert.h>
@@ -30,15 +12,15 @@
 #include <string.h>
 #include <sys/mman.h>
 
+#include "lib/pan_props.h"
+#include "util/log.h"
 #include "util/macros.h"
 #include "util/u_debug.h"
 #include "util/u_hexdump.h"
-#include "lib/pan_props.h"
+#include "util/u_process.h"
 #include "decode.h"
 
-#include "compiler/bifrost/disassemble.h"
-#include "compiler/valhall/disassemble.h"
-#include "midgard/disassemble.h"
+#include "compiler/pan_compiler.h"
 
 /* Used to distiguish dumped files, otherwise we would have to print the ctx
  * pointer, which is annoying for the user since it changes with every run */
@@ -61,13 +43,13 @@ pandecode_cmp_key(const struct rb_node *lhs, const void *key)
    if (mem->gpu_va <= *gpu_va && *gpu_va < (mem->gpu_va + mem->length))
       return 0;
    else
-      return mem->gpu_va - *gpu_va;
+      return (mem->gpu_va < *gpu_va) ? -1 : 1;
 }
 
 static int
 pandecode_cmp(const struct rb_node *lhs, const struct rb_node *rhs)
 {
-   return to_mapped_memory(lhs)->gpu_va - to_mapped_memory(rhs)->gpu_va;
+   return (to_mapped_memory(lhs)->gpu_va < to_mapped_memory(rhs)->gpu_va) ? -1 : 1;
 }
 
 static struct pandecode_mapped_memory *
@@ -94,8 +76,7 @@ pandecode_find_mapped_gpu_mem_containing(struct pandecode_context *ctx,
    if (mem && mem->addr && !mem->ro) {
       mprotect(mem->addr, mem->length, PROT_READ);
       mem->ro = true;
-      util_dynarray_append(&ctx->ro_mappings, struct pandecode_mapped_memory *,
-                           mem);
+      util_dynarray_append(&ctx->ro_mappings, mem);
    }
 
    return mem;
@@ -250,8 +231,8 @@ pandecode_dump_file_open(struct pandecode_context *ctx)
 {
    simple_mtx_assert_locked(&ctx->lock);
 
-   /* This does a getenv every frame, so it is possible to use
-    * setenv to change the base at runtime.
+   /* This does a os_get_option every frame, so it is possible to use
+    * os_set_option to change the base at runtime.
     */
    const char *dump_file_base =
       debug_get_option("PANDECODE_DUMP_FILE", "pandecode.dump");
@@ -259,14 +240,24 @@ pandecode_dump_file_open(struct pandecode_context *ctx)
       ctx->dump_stream = stderr;
    else if (!ctx->dump_stream) {
       char buffer[1024];
-      snprintf(buffer, sizeof(buffer), "%s.ctx-%d.%04d", dump_file_base,
-               ctx->id, ctx->dump_frame_count);
-      printf("pandecode: dump command stream to file %s\n", buffer);
+      snprintf(buffer, sizeof(buffer), "%s.%s.ctx-%d.%04d", dump_file_base,
+               util_get_process_name(), ctx->id, ctx->dump_frame_count);
+      mesa_logd("pandecode: dump command stream to file %s", buffer);
       ctx->dump_stream = fopen(buffer, "w");
-      if (!ctx->dump_stream)
-         fprintf(stderr,
-                 "pandecode: failed to open command stream log file %s\n",
-                 buffer);
+      if (!ctx->dump_stream) {
+         mesa_loge("pandecode: failed to open command stream log file %s",
+                   buffer);
+
+         /* Storage access on Android is quite restricted and varies across
+          * different processes. Meanwhile, PANDECODE_DUMP_FILE option is
+          * global on Android. So we have to fallback to log command stream to
+          * stderr (though won't show up in Android logcat) for those unable to
+          * create the dump file but involved during app launch animation (e.g.
+          * system_server priviledged process).
+          */
+         mesa_loge("pandecode: fall back to log command stream to stderr");
+         ctx->dump_stream = stderr;
+      }
    }
 }
 
@@ -299,7 +290,7 @@ pandecode_create_context(bool to_stderr)
    ctx->dump_stream = to_stderr ? stderr : NULL;
 
    rb_tree_init(&ctx->mmap_tree);
-   util_dynarray_init(&ctx->ro_mappings, NULL);
+   ctx->ro_mappings = UTIL_DYNARRAY_INIT;
 
    simple_mtx_t mtx_init = SIMPLE_MTX_INITIALIZER;
    memcpy(&ctx->lock, &mtx_init, sizeof(simple_mtx_t));
@@ -502,12 +493,8 @@ pandecode_shader_disassemble(struct pandecode_context *ctx, uint64_t shader_ptr,
    pandecode_log_cont(ctx, "\nShader %p (GPU VA %" PRIx64 ") sz %" PRId64 "\n",
                       code, shader_ptr, sz);
 
-   if (pan_arch(gpu_id) >= 9) {
-      disassemble_valhall(ctx->dump_stream, (const uint64_t *)code, sz, true);
-   } else if (pan_arch(gpu_id) >= 6)
-      disassemble_bifrost(ctx->dump_stream, code, sz, false);
-   else
-      disassemble_midgard(ctx->dump_stream, code, sz, gpu_id, true);
+   bool verbose = pan_arch(gpu_id) >= 6 && pan_arch(gpu_id) < 9;
+   pan_disassemble(ctx->dump_stream, code, sz, gpu_id, verbose);
 
    pandecode_log_cont(ctx, "\n\n");
 }

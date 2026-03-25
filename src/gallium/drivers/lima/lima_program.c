@@ -81,7 +81,6 @@ static const nir_shader_compiler_options fs_nir_options = {
    .lower_insert_byte = true,
    .lower_insert_word = true,
    .lower_bitops = true,
-   .lower_vector_cmp = true,
    .force_indirect_unrolling = (nir_var_shader_out | nir_var_function_temp),
    .force_indirect_unrolling_sampler = true,
    .max_unroll_iterations = 32,
@@ -91,12 +90,12 @@ static const nir_shader_compiler_options fs_nir_options = {
 };
 
 const void *
-lima_program_get_compiler_options(enum pipe_shader_type shader)
+lima_program_get_compiler_options(mesa_shader_stage shader)
 {
    switch (shader) {
-   case PIPE_SHADER_VERTEX:
+   case MESA_SHADER_VERTEX:
       return &vs_nir_options;
-   case PIPE_SHADER_FRAGMENT:
+   case MESA_SHADER_FRAGMENT:
       return &fs_nir_options;
    default:
       return NULL;
@@ -129,7 +128,7 @@ lima_program_optimize_vs_nir(struct nir_shader *s)
       NIR_PASS(_, s, nir_lower_vars_to_ssa);
       NIR_PASS(progress, s, nir_lower_alu_to_scalar, NULL, NULL);
       NIR_PASS(progress, s, nir_lower_phis_to_scalar, NULL, NULL);
-      NIR_PASS(progress, s, nir_copy_prop);
+      NIR_PASS(progress, s, nir_opt_copy_prop);
       NIR_PASS(progress, s, nir_opt_remove_phis);
       NIR_PASS(progress, s, nir_opt_dce);
       NIR_PASS(progress, s, nir_opt_dead_cf);
@@ -155,7 +154,8 @@ lima_program_optimize_vs_nir(struct nir_shader *s)
    NIR_PASS(progress, s, lima_nir_lower_ftrunc);
    NIR_PASS(_, s, nir_lower_bool_to_float, true);
 
-   NIR_PASS(_, s, nir_copy_prop);
+   NIR_PASS(_, s, nir_opt_copy_prop);
+   NIR_PASS(_, s, nir_opt_algebraic_late);
    NIR_PASS(_, s, nir_opt_dce);
    NIR_PASS(_, s, lima_nir_split_loads);
    NIR_PASS(_, s, nir_convert_from_ssa, true, false);
@@ -172,6 +172,18 @@ lima_alu_to_scalar_filter_cb(const nir_instr *instr, const void *data)
 
    nir_alu_instr *alu = nir_instr_as_alu(instr);
    switch (alu->op) {
+   case nir_op_ball_fequal2:
+   case nir_op_ball_fequal3:
+   case nir_op_ball_fequal4:
+   case nir_op_bany_fnequal2:
+   case nir_op_bany_fnequal3:
+   case nir_op_bany_fnequal4:
+   case nir_op_ball_iequal2:
+   case nir_op_ball_iequal3:
+   case nir_op_ball_iequal4:
+   case nir_op_bany_inequal2:
+   case nir_op_bany_inequal3:
+   case nir_op_bany_inequal4:
    case nir_op_frcp:
    /* nir_op_idiv is lowered to frcp by lower_int_to_floats which
     * will be run later, so lower idiv here
@@ -245,7 +257,7 @@ lima_program_optimize_fs_nir(struct nir_shader *s,
 
       NIR_PASS(_, s, nir_lower_vars_to_ssa);
       NIR_PASS(progress, s, nir_lower_alu_to_scalar, lima_alu_to_scalar_filter_cb, NULL);
-      NIR_PASS(progress, s, nir_copy_prop);
+      NIR_PASS(progress, s, nir_opt_copy_prop);
       NIR_PASS(progress, s, nir_opt_remove_phis);
       NIR_PASS(progress, s, nir_opt_dce);
       NIR_PASS(progress, s, nir_opt_dead_cf);
@@ -280,7 +292,7 @@ lima_program_optimize_fs_nir(struct nir_shader *s,
    NIR_PASS(_, s, nir_opt_algebraic_late);
    NIR_PASS(_, s, lima_nir_ppir_algebraic_late);
 
-   NIR_PASS(_, s, nir_copy_prop);
+   NIR_PASS(_, s, nir_opt_copy_prop);
    NIR_PASS(_, s, nir_opt_dce);
 
    NIR_PASS(_, s, nir_convert_from_ssa, true, false);

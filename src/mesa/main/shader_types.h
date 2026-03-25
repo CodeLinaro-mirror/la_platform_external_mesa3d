@@ -40,6 +40,7 @@
 #include "compiler/shader_info.h"
 #include "compiler/list.h"
 #include "compiler/glsl/ir_list.h"
+#include "state_tracker/st_atom.h"
 
 #include "pipe/p_state.h"
 
@@ -131,6 +132,18 @@ struct gl_shader_info
        */
       enum gl_derivative_group DerivativeGroup;
    } Comp;
+
+   /**
+    * Mesh shader state from EXT_mesh_shader
+    */
+   struct {
+      unsigned LocalSize[3];
+
+      enum mesa_prim OutputType;
+
+      GLint MaxVertices;
+      GLint MaxPrimitives;
+   } Mesh;
 };
 
 /**
@@ -155,7 +168,7 @@ struct gl_shader
     * Must be the first field.
     */
    GLenum16 Type;
-   gl_shader_stage Stage;
+   mesa_shader_stage Stage;
    GLuint Name;  /**< AKA the handle */
    GLint RefCount;  /**< Reference count */
    GLchar *Label;   /**< GL_KHR_debug */
@@ -248,7 +261,7 @@ struct gl_shader
  */
 struct gl_linked_shader
 {
-   gl_shader_stage Stage;
+   mesa_shader_stage Stage;
 
    struct gl_program *Program;  /**< Post-compile assembly code */
 
@@ -311,7 +324,7 @@ struct gl_shader_program_data
    GLint RefCount;  /**< Reference count */
 
    /** SHA1 hash of linked shader program */
-   unsigned char sha1[20];
+   unsigned char sha1[SHA1_DIGEST_LENGTH];
 
    unsigned NumUniformStorage;
    unsigned NumHiddenUniforms;
@@ -438,8 +451,7 @@ struct gl_shader_program
     * UniformStorage entries. Arrays will have multiple contiguous slots
     * in the UniformRemapTable, all pointing to the same UniformStorage entry.
     */
-   unsigned NumUniformRemapTable;
-   struct gl_uniform_storage **UniformRemapTable;
+   struct range_remap *UniformRemapTable;
 
    /**
     * Sometimes there are empty slots left over in UniformRemapTable after we
@@ -464,7 +476,7 @@ struct gl_shader_program
     * \c MESA_SHADER_* defines.  Entries for non-existent stages will be
     * \c NULL.
     */
-   struct gl_linked_shader *_LinkedShaders[MESA_SHADER_STAGES];
+   struct gl_linked_shader *_LinkedShaders[MESA_SHADER_MESH_STAGES];
 
    unsigned GLSL_Version; /**< GLSL version used for linking */
 };
@@ -495,6 +507,9 @@ struct gl_program
 
    /** whether to skip VARYING_SLOT_PSIZ in st_translate_stream_output_info() */
    bool skip_pointsize_xfb;
+
+   /** Determine whether ::sh or ::arb (below) is valid. */
+   bool is_arb_asm;
 
    /** A bitfield indicating which vertex shader inputs consume two slots
     *
@@ -530,7 +545,7 @@ struct gl_program
 
    struct pipe_shader_state state;
    struct ati_fragment_shader *ati_fs;
-   uint64_t affected_states; /**< ST_NEW_* flags to mark dirty when binding */
+   st_state_bitset affected_states; /**< ST_NEW_* flags to mark dirty when binding */
 
    void *serialized_nir;
    unsigned serialized_nir_size;
@@ -687,7 +702,7 @@ struct gl_active_atomic_buffer
    GLuint MinimumSize;
 
    /** Shader stages making use of it. */
-   GLboolean StageReferences[MESA_SHADER_STAGES];
+   GLboolean StageReferences[MESA_SHADER_MESH_STAGES];
 };
 
 struct gl_resource_name
@@ -779,6 +794,9 @@ struct gl_opaque_uniform_index {
 struct gl_uniform_storage {
    struct gl_resource_name name;
 
+   /* The context that first set any uniform values */
+   struct gl_context *first_set_by;
+
    /** Type of this uniform data stored.
     *
     * In the case of an array, it's the type of a single array element.
@@ -793,7 +811,7 @@ struct gl_uniform_storage {
     */
    unsigned array_elements;
 
-   struct gl_opaque_uniform_index opaque[MESA_SHADER_STAGES];
+   struct gl_opaque_uniform_index opaque[MESA_SHADER_MESH_STAGES];
 
    /**
     * Mask of shader stages (1 << MESA_SHADER_xxx) where this uniform is used.
@@ -864,6 +882,11 @@ struct gl_uniform_storage {
     * This is a shader storage buffer variable, not an uniform.
     */
    bool is_shader_storage;
+
+   /* Set to true if the uniform storage has been updated by more than one
+    * context.
+    */
+   bool unknown_src_ctx;
 
    /**
     * Index within gl_shader_program::AtomicBuffers[] of the atomic
@@ -1170,6 +1193,11 @@ struct gl_shader_variable
     * Precision qualifier.
     */
    unsigned precision:2;
+
+   /**
+    * Per-primitive qualifier
+    */
+   unsigned per_primitive:1;
 };
 
 #endif

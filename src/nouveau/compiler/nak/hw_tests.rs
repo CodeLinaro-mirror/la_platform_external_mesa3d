@@ -2,24 +2,26 @@
 // SPDX-License-Identifier: MIT
 
 use crate::api::{GetDebugFlags, ShaderBin, DEBUG};
-use crate::hw_runner::{Runner, CB0};
+use crate::hw_runner::{Context, Runner, BO, CB0};
 use crate::ir::*;
-use crate::sm20::ShaderModel20;
-use crate::sm32::ShaderModel32;
-use crate::sm50::ShaderModel50;
-use crate::sm70::ShaderModel70;
 
 use acorn::Acorn;
 use compiler::bindings::MESA_SHADER_COMPUTE;
 use compiler::cfg::CFGBuilder;
 use nak_bindings::*;
 use rustc_hash::FxBuildHasher;
-use std::mem::offset_of;
+use std::cell::RefCell;
+use std::io;
+use std::mem::{offset_of, size_of};
 use std::str::FromStr;
 use std::sync::OnceLock;
 
+use nv_push_rs::Push as NvPush;
+
+use nvidia_headers::classes::cl90b5::mthd as cl90b5;
+
 struct RunSingleton {
-    sm: Box<dyn ShaderModel + Send + Sync>,
+    sm: ShaderModelInfo,
     run: Runner,
 }
 
@@ -35,17 +37,8 @@ impl RunSingleton {
 
             let run = Runner::new(dev_id);
             let sm_nr = run.dev_info().sm;
-            let sm: Box<dyn ShaderModel + Send + Sync> = if sm_nr >= 70 {
-                Box::new(ShaderModel70::new(sm_nr))
-            } else if sm_nr >= 50 {
-                Box::new(ShaderModel50::new(sm_nr))
-            } else if sm_nr >= 32 {
-                Box::new(ShaderModel32::new(sm_nr))
-            } else if sm_nr >= 20 {
-                Box::new(ShaderModel20::new(sm_nr))
-            } else {
-                panic!("Unsupported shader model");
-            };
+            let sm =
+                ShaderModelInfo::new(sm_nr, run.dev_info().max_warps_per_mp);
             RunSingleton { sm, run }
         })
     }
@@ -54,16 +47,17 @@ impl RunSingleton {
 const LOCAL_SIZE_X: u16 = 32;
 
 pub struct TestShaderBuilder<'a> {
-    sm: &'a dyn ShaderModel,
+    sm: &'a ShaderModelInfo,
     alloc: SSAValueAllocator,
     b: InstrBuilder<'a>,
     start_block: BasicBlock,
     label: Label,
     data_addr: SSARef,
+    shared_size: u16,
 }
 
 impl<'a> TestShaderBuilder<'a> {
-    pub fn new(sm: &'a dyn ShaderModel) -> Self {
+    pub fn new(sm: &'a ShaderModelInfo) -> Self {
         let mut alloc = SSAValueAllocator::new();
         let mut label_alloc = LabelAllocator::new();
         let mut b = SSAInstrBuilder::new(sm, &mut alloc);
@@ -140,7 +134,12 @@ impl<'a> TestShaderBuilder<'a> {
             start_block,
             label: label_alloc.alloc(),
             data_addr,
+            shared_size: 0,
         }
+    }
+
+    pub fn set_shared_size(&mut self, shared_size: u16) {
+        self.shared_size = shared_size;
     }
 
     pub fn ld_test_data(&mut self, offset: u16, mem_type: MemType) -> SSARef {
@@ -155,8 +154,10 @@ impl<'a> TestShaderBuilder<'a> {
         self.push_op(OpLd {
             dst: dst.clone().into(),
             addr: self.data_addr.clone().into(),
+            pred: true.into(),
             offset: offset.into(),
             access: access,
+            stride: OffsetStride::X1,
         });
         dst
     }
@@ -180,6 +181,7 @@ impl<'a> TestShaderBuilder<'a> {
             data: data.into(),
             offset: offset.into(),
             access: access,
+            stride: OffsetStride::X1,
         });
     }
 
@@ -204,7 +206,7 @@ impl<'a> TestShaderBuilder<'a> {
 
         let cs_info = ComputeShaderInfo {
             local_size: [32, 1, 1],
-            smem_size: 0,
+            smem_size: self.shared_size,
         };
         let info = ShaderInfo {
             max_warps_per_sm: 0,
@@ -253,7 +255,7 @@ impl<'a> TestShaderBuilder<'a> {
 }
 
 impl Builder for TestShaderBuilder<'_> {
-    fn push_instr(&mut self, instr: Box<Instr>) -> &mut Instr {
+    fn push_instr(&mut self, instr: Instr) -> &mut Instr {
         self.b.push_instr(instr)
     }
 
@@ -275,7 +277,7 @@ impl SSABuilder for TestShaderBuilder<'_> {
 #[test]
 fn test_sanity() {
     let run = RunSingleton::get();
-    let b = TestShaderBuilder::new(run.sm.as_ref());
+    let b = TestShaderBuilder::new(&run.sm);
     let bin = b.compile();
     unsafe {
         run.run
@@ -311,7 +313,7 @@ pub fn test_foldable_op_with(
     mut rand_u32: impl FnMut(usize) -> u32,
 ) {
     let run = RunSingleton::get();
-    let mut b = TestShaderBuilder::new(run.sm.as_ref());
+    let mut b = TestShaderBuilder::new(&run.sm);
 
     let mut comps = 0_u16;
     let mut fold_src = Vec::new();
@@ -405,7 +407,7 @@ pub fn test_foldable_op_with(
         for ssa in &vec[..] {
             let u = match ssa.file() {
                 RegFile::Pred => b.sel((*ssa).into(), 1.into(), 0.into()),
-                RegFile::GPR => (*ssa).into(),
+                RegFile::GPR => *ssa,
                 RegFile::Carry => {
                     let gpr = b.alloc_ssa(RegFile::GPR);
                     b.push_op(OpIAdd2X {
@@ -414,7 +416,7 @@ pub fn test_foldable_op_with(
                         srcs: [0.into(), 0.into()],
                         carry_in: (*ssa).into(),
                     });
-                    gpr.into()
+                    gpr
                 }
                 file => panic!("Can't auto-test {file:?} data"),
             };
@@ -433,7 +435,7 @@ pub fn test_foldable_op_with(
     // to give us 2500 iterations.
     let invocations = src_comps * src_comps * 100;
 
-    let mut data = Vec::new();
+    let mut data = Vec::with_capacity(invocations * (dst_comps + src_comps));
     for _ in 0..invocations {
         for (i, src) in op.srcs_as_slice().iter().enumerate() {
             let SrcRef::SSA(vec) = &src.src_ref else {
@@ -450,9 +452,7 @@ pub fn test_foldable_op_with(
                 }
             }
         }
-        for _ in 0..dst_comps {
-            data.push(0_u32);
-        }
+        data.extend(std::iter::repeat_n(0_u32, dst_comps));
     }
     debug_assert!(data.len() == invocations * comps);
 
@@ -496,7 +496,7 @@ pub fn test_foldable_op_with(
             srcs: &fold_src,
             dsts: &mut fold_dst,
         };
-        op.fold(&*run.sm, &mut fold);
+        op.fold(&run.sm, &mut fold);
 
         debug_assert!(fold_dst.len() == op.dsts_as_slice().len());
         for (i, dst) in fold_dst.iter().enumerate() {
@@ -841,7 +841,7 @@ fn test_lea64() {
     let invocations = 100;
 
     for shift in 0..64 {
-        let mut b = TestShaderBuilder::new(run.sm.as_ref());
+        let mut b = TestShaderBuilder::new(&run.sm);
 
         let x = Src::from([
             b.ld_test_data(0, MemType::B32)[0],
@@ -978,6 +978,74 @@ fn test_op_shf() {
 }
 
 #[test]
+fn test_op_urol() {
+    let run = RunSingleton::get();
+    if run.sm.sm() < 32 {
+        return;
+    }
+
+    let mut b = TestShaderBuilder::new(&run.sm);
+    let invocations = 100;
+
+    let x = Src::from(b.ld_test_data(0, MemType::B32)[0]);
+    let y = Src::from(b.ld_test_data(4, MemType::B32)[0]);
+
+    let dst = b.urol(x, y);
+    b.st_test_data(8, MemType::B32, dst.into());
+
+    let bin = b.compile();
+
+    let mut a = Acorn::new();
+    let mut data = Vec::new();
+    for _ in 0..invocations {
+        data.push([a.get_u32(), a.get_u32() as u32, 0]);
+    }
+
+    run.run.run(&bin, &mut data).unwrap();
+
+    for d in &data {
+        let x = d[0];
+        let y = d[1];
+        let dst = x.rotate_left(y);
+        assert_eq!(d[2], dst as u32);
+    }
+}
+
+#[test]
+fn test_op_uror() {
+    let run = RunSingleton::get();
+    if run.sm.sm() < 32 {
+        return;
+    }
+
+    let mut b = TestShaderBuilder::new(&run.sm);
+    let invocations = 100;
+
+    let x = Src::from(b.ld_test_data(0, MemType::B32)[0]);
+    let y = Src::from(b.ld_test_data(4, MemType::B32)[0]);
+
+    let dst = b.uror(x, y);
+    b.st_test_data(8, MemType::B32, dst.into());
+
+    let bin = b.compile();
+
+    let mut a = Acorn::new();
+    let mut data = Vec::new();
+    for _ in 0..invocations {
+        data.push([a.get_u32(), a.get_u32() as u32, 0]);
+    }
+
+    run.run.run(&bin, &mut data).unwrap();
+
+    for d in &data {
+        let x = d[0];
+        let y = d[1];
+        let dst = x.rotate_right(y);
+        assert_eq!(d[2], dst as u32);
+    }
+}
+
+#[test]
 fn test_op_shr() {
     let sm = &RunSingleton::get().sm;
     if sm.sm() >= 70 {
@@ -1083,7 +1151,7 @@ fn test_plop2() {
 
     for op in logic_ops {
         for (x_mod, y_mod) in mods {
-            let mut b = TestShaderBuilder::new(run.sm.as_ref());
+            let mut b = TestShaderBuilder::new(&run.sm);
 
             let x = b.ld_test_data(0, MemType::B32)[0];
             let y = b.ld_test_data(4, MemType::B32)[0];
@@ -1147,7 +1215,7 @@ fn test_iadd64() {
     ];
 
     for (x_mod, y_mod) in cases {
-        let mut b = TestShaderBuilder::new(run.sm.as_ref());
+        let mut b = TestShaderBuilder::new(&run.sm);
 
         let mut x = Src::from([
             b.ld_test_data(0, MemType::B32)[0],
@@ -1358,7 +1426,7 @@ fn test_ineg64() {
     let run = RunSingleton::get();
     let invocations = 100;
 
-    let mut b = TestShaderBuilder::new(run.sm.as_ref());
+    let mut b = TestShaderBuilder::new(&run.sm);
 
     let x = SSARef::from([
         b.ld_test_data(0, MemType::B32)[0],
@@ -1402,7 +1470,7 @@ fn test_isetp64() {
     ];
 
     for i in 0..(ops.len() * 2) {
-        let mut b = TestShaderBuilder::new(run.sm.as_ref());
+        let mut b = TestShaderBuilder::new(&run.sm);
 
         let cmp_type = types[i % 2];
         let cmp_op = ops[i / 2];
@@ -1493,7 +1561,7 @@ fn test_shl64() {
 
     let invocations = 100;
 
-    let mut b = TestShaderBuilder::new(run.sm.as_ref());
+    let mut b = TestShaderBuilder::new(&run.sm);
 
     let srcs = SSARef::from([
         b.ld_test_data(0, MemType::B32)[0],
@@ -1534,7 +1602,7 @@ fn test_shr64() {
     let cases = [true, false];
 
     for signed in cases {
-        let mut b = TestShaderBuilder::new(run.sm.as_ref());
+        let mut b = TestShaderBuilder::new(&run.sm);
 
         let srcs = SSARef::from([
             b.ld_test_data(0, MemType::B32)[0],
@@ -1575,7 +1643,7 @@ fn test_f2fp_pack_ab() {
         return;
     }
 
-    let mut b = TestShaderBuilder::new(run.sm.as_ref());
+    let mut b = TestShaderBuilder::new(&run.sm);
 
     let srcs = SSARef::from([
         b.ld_test_data(0, MemType::B32)[0],
@@ -1628,7 +1696,7 @@ fn test_f2fp_pack_ab() {
 #[test]
 pub fn test_gpr_limit_from_local_size() {
     let run = RunSingleton::get();
-    let b = TestShaderBuilder::new(run.sm.as_ref());
+    let b = TestShaderBuilder::new(&run.sm);
     let mut bin = b.compile();
 
     for local_size in 1..=1024 {
@@ -1643,6 +1711,301 @@ pub fn test_gpr_limit_from_local_size() {
 
         run.run.run::<u8>(&bin, &mut [0; 4096]).unwrap_or_else(|_| {
             panic!("Failed with local_size {local_size}, num_gprs {num_gprs}")
+        });
+    }
+}
+
+#[test]
+fn test_op_ldsm() {
+    let run = RunSingleton::get();
+    if run.sm.sm() < 75 {
+        return;
+    }
+
+    let mut b = TestShaderBuilder::new(&run.sm);
+
+    // First load the test data and store it inside shared memory. Each thread handles 8 elements.
+    let input = b.ld_test_data(0, MemType::B128)[0];
+    let lane_id = b.alloc_ssa(RegFile::GPR);
+    b.push_op(OpS2R {
+        dst: lane_id.into(),
+        idx: NAK_SV_LANE_ID,
+    });
+    let offset = b.imul(lane_id.into(), 16.into());
+    b.push_op(OpSt {
+        addr: offset.into(),
+        data: input.into(),
+        offset: 0,
+        access: MemAccess {
+            mem_type: MemType::B128,
+            space: MemSpace::Shared,
+            order: MemOrder::Strong(MemScope::CTA),
+            eviction_priority: MemEvictionPriority::Normal,
+        },
+        stride: OffsetStride::X1,
+    });
+    b.push_op(OpMemBar {
+        scope: MemScope::CTA,
+    });
+
+    let res = b.alloc_ssa_vec(RegFile::GPR, 4);
+    let addr = b.imul(lane_id.into(), 16.into());
+    b.push_op(OpLdsm {
+        dst: res.clone().into(),
+        mat_size: LdsmSize::M8N8,
+        mat_count: 4,
+        addr: addr.into(),
+        offset: 0,
+    });
+    b.st_test_data(16, MemType::B128, res);
+
+    type Data = [u16; 4 * 2 * 2];
+    b.set_shared_size((size_of::<Data>() * 32 / 2) as u16);
+    let bin = b.compile();
+
+    let mut data = Vec::<[u16; 4 * 2 * 2]>::new();
+    for i in 0..32 {
+        let val = i * 4 * 2;
+        data.push([
+            val,
+            val + 1,
+            val + 2,
+            val + 3,
+            val + 4,
+            val + 5,
+            val + 6,
+            val + 7,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ]);
+    }
+    println!("{data:?}");
+    run.run.run(&bin, &mut data).unwrap();
+    println!("{data:?}");
+
+    // the results contains the following values:
+    //   0..32 : matrix 1
+    //  32..64 : matrix 2
+    //  64..96 : matrix 3
+    //  96..128: matrix 4
+    //
+    // and each thread loads from the address from thread (thread_id >> 4)
+    // plus the offset (thread_id & 0x3) * 2
+    #[expect(clippy::erasing_op)]
+    for i in 0..32 {
+        assert_eq!(i * 2 + 64 * 0 + 0, data[i][8].into());
+        assert_eq!(i * 2 + 64 * 0 + 1, data[i][9].into());
+
+        assert_eq!(i * 2 + 64 * 1 + 0, data[i][10].into());
+        assert_eq!(i * 2 + 64 * 1 + 1, data[i][11].into());
+
+        assert_eq!(i * 2 + 64 * 2 + 0, data[i][12].into());
+        assert_eq!(i * 2 + 64 * 2 + 1, data[i][13].into());
+
+        assert_eq!(i * 2 + 64 * 3 + 0, data[i][14].into());
+        assert_eq!(i * 2 + 64 * 3 + 1, data[i][15].into());
+    }
+}
+
+fn expected_render_enable(
+    mode: cl90b5::SetRenderEnableCMode,
+    data: &[u64],
+) -> bool {
+    use cl90b5::SetRenderEnableCMode::*;
+    match mode {
+        True => true,
+        False => false,
+        Conditional => data[0] > u32::MAX.into(),
+        RenderIfEqual => data[0] == data[2],
+        RenderIfNotEqual => data[0] != data[2],
+    }
+}
+
+#[test]
+fn test_render_enable() -> io::Result<()> {
+    let run = RunSingleton::get();
+    let dev = run.run.device();
+    let ctx = Context::new(dev.clone()).expect("Failed to create context");
+
+    let a = RefCell::new(Acorn::new());
+
+    const WRITE_VAL: u32 = 0x01234567;
+
+    let out_offset = 1024;
+    let push_offset = 2048;
+    let bo_size = 4096;
+    let bo = BO::new(dev.clone(), bo_size)?;
+
+    let run = |mode, data: &[u64]| -> io::Result<bool> {
+        // We can read from any aligned offset
+        let in_offset: u64 =
+            ((a.borrow_mut().get_u32() * 16) % (1024 - 32)).into();
+
+        unsafe {
+            let map = bo.map.byte_offset(0);
+            std::ptr::write_bytes(
+                map as *mut u8,
+                0,
+                bo_size.try_into().unwrap(),
+            );
+        }
+        unsafe {
+            let input = bo.map.byte_offset(in_offset.try_into().unwrap());
+            std::ptr::copy_nonoverlapping::<u64>(
+                &data[0],
+                input as *mut u64,
+                data.len(),
+            );
+        }
+
+        let mut p = NvPush::new();
+
+        let in_gpu_addr = bo.addr + in_offset;
+        p.push_method(cl90b5::SetRenderEnableA {
+            upper: (in_gpu_addr >> 32) as u32,
+        });
+        p.push_method(cl90b5::SetRenderEnableB {
+            lower: in_gpu_addr as u32,
+        });
+        p.push_method(cl90b5::SetRenderEnableC { mode });
+
+        let out_gpu_addr = bo.addr + out_offset;
+        p.push_method(cl90b5::OffsetOutUpper {
+            upper: (out_gpu_addr >> 32) as u32,
+        });
+        p.push_method(cl90b5::OffsetOutLower {
+            value: out_gpu_addr as u32,
+        });
+        p.push_method(cl90b5::LineLengthIn { value: 1 });
+        p.push_method(cl90b5::SetRemapConstA { v: WRITE_VAL });
+        p.push_method(cl90b5::SetRemapComponents {
+            component_size: cl90b5::SetRemapComponentsComponentSize::Four,
+            dst_x: cl90b5::SetRemapComponentsDstX::ConstA,
+            dst_y: cl90b5::SetRemapComponentsDstY::NoWrite,
+            dst_z: cl90b5::SetRemapComponentsDstZ::NoWrite,
+            dst_w: cl90b5::SetRemapComponentsDstW::NoWrite,
+            num_src_components: cl90b5::SetRemapComponentsNumSrcComponents::One,
+            num_dst_components: cl90b5::SetRemapComponentsNumDstComponents::One,
+        });
+        p.push_method(cl90b5::LaunchDma {
+            data_transfer_type: cl90b5::LaunchDmaDataTransferType::NonPipelined,
+            flush_enable: true,
+            semaphore_type: cl90b5::LaunchDmaSemaphoreType::None,
+            interrupt_type: cl90b5::LaunchDmaInterruptType::None,
+            src_memory_layout: cl90b5::LaunchDmaSrcMemoryLayout::Pitch,
+            dst_memory_layout: cl90b5::LaunchDmaDstMemoryLayout::Pitch,
+            multi_line_enable: false,
+            remap_enable: true,
+        });
+
+        p.push_method(cl90b5::SetRenderEnableC {
+            mode: cl90b5::SetRenderEnableCMode::True,
+        });
+
+        let push_addr = bo.addr + u64::try_from(push_offset).unwrap();
+        unsafe {
+            let push_map = bo.map.byte_offset(push_offset.try_into().unwrap());
+            std::ptr::copy(p.as_ptr(), push_map.cast(), p.len());
+        }
+
+        ctx.exec(push_addr, (p.len() * 4).try_into().unwrap())?;
+
+        let res = unsafe {
+            let map = bo.map.byte_offset(out_offset.try_into().unwrap());
+            *(map as *const u32)
+        };
+
+        let render_enabled = match res {
+            0 => false,
+            WRITE_VAL => true,
+            _ => panic!("Unexpected memory value {res}"),
+        };
+
+        Ok(render_enabled)
+    };
+    use cl90b5::SetRenderEnableCMode;
+
+    let modes = &[
+        SetRenderEnableCMode::False,
+        SetRenderEnableCMode::True,
+        SetRenderEnableCMode::Conditional,
+        SetRenderEnableCMode::RenderIfEqual,
+        SetRenderEnableCMode::RenderIfNotEqual,
+    ];
+
+    for &mode in modes {
+        let check = |data: &[u64]| -> io::Result<()> {
+            let actual = run(mode, data)?;
+            let expected = expected_render_enable(mode, data);
+            if actual != expected {
+                println!("input: {mode:?} {data:?}");
+            }
+            assert_eq!(actual, expected);
+            Ok(())
+        };
+
+        check(&[0, 0, 0, 0])?;
+
+        // Check all combinations of two bytes set
+        for bit1 in (0..(256 + 64)).step_by(8) {
+            for bit2 in (0..(256 + 64)).step_by(8) {
+                let mut data = [0; 5];
+                data[bit1 / 64] |= 1 << (bit1 % 64);
+                data[bit2 / 64] |= 1 << (bit2 % 64);
+                check(&data)?;
+            }
+        }
+
+        // Check near `Conditional` threshold
+        for i in (u32::MAX as u64) - 2..(u32::MAX as u64) + 2 {
+            check(&[i, 0, 0, 0])?;
+        }
+
+        // Try some random values
+        for _ in 0..2000 {
+            let data: [u64; 4] =
+                std::array::from_fn(|_| a.borrow_mut().get_u64());
+            check(&data)?;
+
+            let mut data_eq: [u64; 4] =
+                std::array::from_fn(|_| a.borrow_mut().get_u64());
+            data_eq[2] = data_eq[0];
+            check(&data)?;
+        }
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_op_sgxt() {
+    let sm = &RunSingleton::get().sm;
+    if sm.sm() < 70 {
+        return;
+    }
+
+    for signed in [false, true] {
+        let op = OpSgxt {
+            dst: Dst::None,
+            a: 0.into(),
+            bits: 0.into(),
+            signed,
+        };
+
+        let bits_idx = op.src_idx(&op.bits);
+        let mut a = Acorn::new();
+        test_foldable_op_with(op, &mut |i| {
+            if i == bits_idx && a.get_bool() {
+                a.get_uint(5) as u32
+            } else {
+                a.get_u32()
+            }
         });
     }
 }

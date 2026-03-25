@@ -34,13 +34,11 @@ struct gl_shader;
 struct gl_linked_shader;
 struct gl_shader_program;
 
-bool do_common_optimization(ir_exec_list *ir, bool linked,
-                            const struct gl_shader_compiler_options *options,
-                            bool native_integers);
+bool do_common_optimization(ir_exec_list *ir, bool linked, mesa_shader_stage stage,
+                            const struct pipe_screen *screen);
 
 bool do_rebalance_tree(ir_exec_list *instructions);
-bool do_algebraic(ir_exec_list *instructions, bool native_integers,
-                  const struct gl_shader_compiler_options *options);
+bool do_algebraic(ir_exec_list *instructions);
 bool do_dead_code(ir_exec_list *instructions);
 bool do_dead_code_local(ir_exec_list *instructions);
 bool do_dead_code_unlinked(ir_exec_list *instructions);
@@ -57,7 +55,7 @@ bool lower_packing_builtins(ir_exec_list *instructions,
                             bool has_shading_language_packing,
                             bool has_gpu_shader5,
                             bool has_half_float_packing);
-bool lower_vector_derefs(gl_shader *shader);
+bool lower_vector_derefs(gl_shader *shader, linear_ctx *linalloc);
 void optimize_dead_builtin_variables(ir_exec_list *instructions,
                                      enum ir_variable_mode other);
 
@@ -67,7 +65,8 @@ bool propagate_invariance(ir_exec_list *instructions);
 
 namespace ir_builder { class ir_factory; };
 
-void lower_precision(const struct gl_shader_compiler_options *options,
+void lower_precision(const struct pipe_screen *screen,
+                     mesa_shader_stage stage,
                      ir_exec_list *instructions);
 
 #endif /* GLSL_IR_OPTIMIZATION_H */

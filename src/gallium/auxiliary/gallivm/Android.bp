@@ -1,0 +1,595 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "lp_bld_arit_c_impl",
+    srcs: [
+        "lp_bld_arit.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_arit_overflow_c_impl",
+    srcs: [
+        "lp_bld_arit_overflow.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_assert_c_impl",
+    srcs: [
+        "lp_bld_assert.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_bitarit_c_impl",
+    srcs: [
+        "lp_bld_bitarit.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_const_c_impl",
+    srcs: [
+        "lp_bld_const.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_conv_c_impl",
+    srcs: [
+        "lp_bld_conv.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_coro_c_impl",
+    srcs: [
+        "lp_bld_coro.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_debug_cpp_impl",
+    srcs: [
+        "lp_bld_debug.cpp",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_flow_c_impl",
+    srcs: [
+        "lp_bld_flow.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_format_aos_array_c_impl",
+    srcs: [
+        "lp_bld_format_aos_array.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_format_aos_c_impl",
+    srcs: [
+        "lp_bld_format_aos.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_format_c_impl",
+    srcs: [
+        "lp_bld_format.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_format_float_c_impl",
+    srcs: [
+        "lp_bld_format_float.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_format_s3tc_c_impl",
+    srcs: [
+        "lp_bld_format_s3tc.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_format_soa_c_impl",
+    srcs: [
+        "lp_bld_format_soa.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_format_srgb_c_impl",
+    srcs: [
+        "lp_bld_format_srgb.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_format_yuv_c_impl",
+    srcs: [
+        "lp_bld_format_yuv.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_gather_c_impl",
+    srcs: [
+        "lp_bld_gather.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_init_c_impl",
+    srcs: [
+        "lp_bld_init.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_init_common_c_impl",
+    srcs: [
+        "lp_bld_init_common.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_intr_c_impl",
+    srcs: [
+        "lp_bld_intr.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_ir_common_c_impl",
+    srcs: [
+        "lp_bld_ir_common.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_jit_sample_c_impl",
+    srcs: [
+        "lp_bld_jit_sample.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_jit_types_c_impl",
+    srcs: [
+        "lp_bld_jit_types.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_logic_c_impl",
+    srcs: [
+        "lp_bld_logic.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_misc_cpp_impl",
+    srcs: [
+        "lp_bld_misc.cpp",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_nir_aos_c_impl",
+    srcs: [
+        "lp_bld_nir_aos.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_nir_c_impl",
+    srcs: [
+        "lp_bld_nir.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_nir_soa_c_impl",
+    srcs: [
+        "lp_bld_nir_soa.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_pack_c_impl",
+    srcs: [
+        "lp_bld_pack.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_passmgr_c_impl",
+    srcs: [
+        "lp_bld_passmgr.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_printf_c_impl",
+    srcs: [
+        "lp_bld_printf.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_quad_c_impl",
+    srcs: [
+        "lp_bld_quad.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_sample_aos_c_impl",
+    srcs: [
+        "lp_bld_sample_aos.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_sample_c_impl",
+    srcs: [
+        "lp_bld_sample.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_sample_soa_c_impl",
+    srcs: [
+        "lp_bld_sample_soa.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_struct_c_impl",
+    srcs: [
+        "lp_bld_struct.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_swizzle_c_impl",
+    srcs: [
+        "lp_bld_swizzle.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_tgsi_action_c_impl",
+    srcs: [
+        "lp_bld_tgsi_action.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_tgsi_c_impl",
+    srcs: [
+        "lp_bld_tgsi.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_tgsi_info_c_impl",
+    srcs: [
+        "lp_bld_tgsi_info.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_tgsi_soa_c_impl",
+    srcs: [
+        "lp_bld_tgsi_soa.c",
+    ],
+}
+
+filegroup {
+    name: "lp_bld_type_c_impl",
+    srcs: [
+        "lp_bld_type.c",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_arit_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_arit_overflow_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_assert_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_bitarit_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_const_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_conv_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_coro_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_debug_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_flow_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_format_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_gather_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_init_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_intr_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_ir_common_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_jit_types_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_limits_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_logic_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_misc_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_nir_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_pack_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_passmgr_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_printf_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_quad_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_sample_aos_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_sample_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_struct_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_swizzle_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_tgsi_action_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_tgsi_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "lp_bld_type_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}

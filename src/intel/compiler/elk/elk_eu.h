@@ -1,33 +1,10 @@
 /*
- Copyright (C) Intel Corp.  2006.  All Rights Reserved.
- Intel funded Tungsten Graphics to
- develop this 3D driver.
-
- Permission is hereby granted, free of charge, to any person obtaining
- a copy of this software and associated documentation files (the
- "Software"), to deal in the Software without restriction, including
- without limitation the rights to use, copy, modify, merge, publish,
- distribute, sublicense, and/or sell copies of the Software, and to
- permit persons to whom the Software is furnished to do so, subject to
- the following conditions:
-
- The above copyright notice and this permission notice (including the
- next paragraph) shall be included in all copies or substantial
- portions of the Software.
-
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- IN NO EVENT SHALL THE COPYRIGHT OWNER(S) AND/OR ITS SUPPLIERS BE
- LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
- **********************************************************************/
- /*
-  * Authors:
-  *   Keith Whitwell <keithw@vmware.com>
-  */
+ * Copyright © 2006 Intel Corporation
+ * SPDX-License-Identifier: MIT
+ *
+ * Intel funded Tungsten Graphics to develop this 3D driver.
+ * File originally authored by: Keith Whitwell <keithw@vmware.com>
+ */
 
 #pragma once
 
@@ -137,7 +114,7 @@ struct elk_codegen {
    int loop_stack_depth;
    int loop_stack_array_size;
 
-   struct elk_shader_reloc *relocs;
+   struct intel_shader_reloc *relocs;
    int num_relocs;
    int reloc_array_size;
 };
@@ -174,7 +151,7 @@ void elk_init_codegen(const struct elk_isa_info *isa,
 bool elk_has_jip(const struct intel_device_info *devinfo, enum elk_opcode opcode);
 bool elk_has_uip(const struct intel_device_info *devinfo, enum elk_opcode opcode);
 bool elk_has_branch_ctrl(const struct intel_device_info *devinfo, enum elk_opcode opcode);
-const struct elk_shader_reloc *elk_get_shader_relocs(struct elk_codegen *p,
+const struct intel_shader_reloc *elk_get_shader_relocs(struct elk_codegen *p,
                                                      unsigned *num_relocs);
 const unsigned *elk_get_program( struct elk_codegen *p, unsigned *sz );
 
@@ -190,7 +167,7 @@ int elk_append_data(struct elk_codegen *p, void *data,
                     unsigned size, unsigned alignment);
 elk_inst *elk_next_insn(struct elk_codegen *p, unsigned opcode);
 void elk_add_reloc(struct elk_codegen *p, uint32_t id,
-                   enum elk_shader_reloc_type type,
+                   enum intel_shader_reloc_type type,
                    uint32_t offset, uint32_t delta);
 void elk_set_dest(struct elk_codegen *p, elk_inst *insn, struct elk_reg dest);
 void elk_set_src0(struct elk_codegen *p, elk_inst *insn, struct elk_reg reg);

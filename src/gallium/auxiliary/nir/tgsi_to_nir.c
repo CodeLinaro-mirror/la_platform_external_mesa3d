@@ -289,7 +289,7 @@ ttn_emit_declaration(struct ttn_compile *c)
 
       for (i = 0; i < array_size; i++) {
          unsigned idx = decl->Range.First + i;
-         nir_variable *var = rzalloc(b->shader, nir_variable);
+         nir_variable *var = nir_variable_create_zeroed(b->shader);
 
          var->data.driver_location = idx;
 
@@ -301,9 +301,9 @@ ttn_emit_declaration(struct ttn_compile *c)
          case TGSI_FILE_INPUT:
             var->data.read_only = true;
             var->data.mode = nir_var_shader_in;
-            var->name = ralloc_asprintf(var, "in_%d", idx);
+            nir_variable_set_namef(b->shader, var, "in_%d", idx);
 
-            if (c->scan->processor == PIPE_SHADER_FRAGMENT) {
+            if (c->scan->processor == MESA_SHADER_FRAGMENT) {
                if (decl->Semantic.Name == TGSI_SEMANTIC_FACE) {
                   var->type = glsl_bool_type();
                   if (c->cap_face_is_sysval) {
@@ -359,7 +359,7 @@ ttn_emit_declaration(struct ttn_compile *c)
                                             is_array ? array_size : 0);
 
             var->data.mode = nir_var_shader_out;
-            var->name = ralloc_asprintf(var, "out_%d", idx);
+            nir_variable_set_namef(b->shader, var, "out_%d", idx);
             var->data.index = 0;
             var->data.interpolation =
                ttn_translate_interp_mode(decl->Interp.Interpolate);
@@ -367,7 +367,7 @@ ttn_emit_declaration(struct ttn_compile *c)
                               semantic_name == TGSI_SEMANTIC_TESSOUTER ||
                               semantic_name == TGSI_SEMANTIC_PATCH;
 
-            if (c->scan->processor == PIPE_SHADER_FRAGMENT) {
+            if (c->scan->processor == MESA_SHADER_FRAGMENT) {
                switch (semantic_name) {
                case TGSI_SEMANTIC_COLOR: {
                   /* TODO tgsi loses some information, so we cannot
@@ -446,7 +446,7 @@ ttn_emit_declaration(struct ttn_compile *c)
             break;
          case TGSI_FILE_CONSTANT:
             var->data.mode = nir_var_uniform;
-            var->name = ralloc_asprintf(var, "uniform_%d", idx);
+            nir_variable_set_namef(b->shader, var, "uniform_%d", idx);
             var->data.location = idx;
             break;
          default:
@@ -622,12 +622,6 @@ ttn_src_for_file_and_index(struct ttn_compile *c, unsigned file, unsigned index,
       case TGSI_SEMANTIC_CS_USER_DATA_AMD:
          load = nir_load_user_data_amd(b);
          break;
-      case TGSI_SEMANTIC_TESS_DEFAULT_INNER_LEVEL:
-         load = nir_load_tess_level_inner_default(b);
-         break;
-      case TGSI_SEMANTIC_TESS_DEFAULT_OUTER_LEVEL:
-         load = nir_load_tess_level_outer_default(b);
-         break;
       case TGSI_SEMANTIC_SAMPLEID:
          load = nir_load_sample_id(b);
          b->shader->info.fs.uses_sample_shading = true;
@@ -646,15 +640,15 @@ ttn_src_for_file_and_index(struct ttn_compile *c, unsigned file, unsigned index,
    }
 
    case TGSI_FILE_INPUT:
-      if (c->scan->processor == PIPE_SHADER_FRAGMENT &&
+      if (c->scan->processor == MESA_SHADER_FRAGMENT &&
           c->scan->input_semantic_name[index] == TGSI_SEMANTIC_FACE) {
          assert(!c->cap_face_is_sysval && c->input_var_face);
          return nir_src_for_ssa(ttn_emulate_tgsi_front_face(c));
-      } else if (c->scan->processor == PIPE_SHADER_FRAGMENT &&
+      } else if (c->scan->processor == MESA_SHADER_FRAGMENT &&
           c->scan->input_semantic_name[index] == TGSI_SEMANTIC_POSITION) {
          assert(!c->cap_position_is_sysval && c->input_var_position);
          return nir_src_for_ssa(nir_load_var(&c->build, c->input_var_position));
-      } else if (c->scan->processor == PIPE_SHADER_FRAGMENT &&
+      } else if (c->scan->processor == MESA_SHADER_FRAGMENT &&
           c->scan->input_semantic_name[index] == TGSI_SEMANTIC_PCOORD) {
          assert(!c->cap_point_is_sysval && c->input_var_point);
          return nir_src_for_ssa(nir_load_var(&c->build, c->input_var_point));
@@ -668,7 +662,7 @@ ttn_src_for_file_and_index(struct ttn_compile *c, unsigned file, unsigned index,
       break;
 
    case TGSI_FILE_OUTPUT:
-      if (c->scan->processor == PIPE_SHADER_FRAGMENT) {
+      if (c->scan->processor == MESA_SHADER_FRAGMENT) {
          c->outputs[index]->data.fb_fetch_output = 1;
          nir_deref_instr *deref = nir_build_deref_var(&c->build,
                                                       c->outputs[index]);
@@ -973,10 +967,10 @@ ttn_kill(nir_builder *b)
 static void
 ttn_kill_if(nir_builder *b, nir_def **src)
 {
-   /* flt must be exact, because NaN shouldn't discard. (apps rely on this) */
-   b->exact = true;
+   /* Apps rely on NaN not discarding. */
+   b->fp_math_ctrl = nir_fp_preserve_nan | nir_fp_preserve_inf;
    nir_def *cmp = nir_bany(b, nir_flt_imm(b, src[0], 0.0));
-   b->exact = false;
+   b->fp_math_ctrl = nir_fp_fast_math;
 
    nir_discard_if(b, cmp);
    b->shader->info.fs.uses_discard = true;
@@ -1699,7 +1693,7 @@ static const nir_op op_trans[TGSI_OPCODE_LAST] = {
 
    /* No function calls, yet. */
    [TGSI_OPCODE_CAL] = 0, /* XXX */
-   [TGSI_OPCODE_RET] = 0, /* XXX */
+   [TGSI_OPCODE_RET] = 0, /* Handled with nir_lower_returns */
 
    [TGSI_OPCODE_SSG] = nir_op_fsign,
    [TGSI_OPCODE_CMP] = 0,
@@ -2036,6 +2030,16 @@ ttn_emit_instruction(struct ttn_compile *c)
       dst = nir_ddy_fine(b, src[0]);
       break;
 
+   case TGSI_OPCODE_RET:
+      /* NIR returns must be at the end of the block, while TGSI returns may not
+       * be. Guarantee that by putting it inside a trivial if, which will be
+       * cleaned up by nir_opt_dead_cf.
+       */
+      nir_push_if(b, nir_imm_true(b));
+      nir_jump(b, nir_jump_return);
+      nir_pop_if(b, NULL);
+      break;
+
    default:
       if (op_trans[tgsi_op] != 0 || tgsi_op == TGSI_OPCODE_MOV) {
          dst = ttn_alu(b, op_trans[tgsi_op], dst_bitsize, src);
@@ -2198,6 +2202,11 @@ ttn_parse_tgsi(struct ttn_compile *c, const void *tgsi_tokens)
          break;
 
       case TGSI_TOKEN_TYPE_INSTRUCTION:
+         if (parser.FullToken.FullInstruction.Instruction.Opcode == TGSI_OPCODE_RET) {
+            /* We have to be conservative and add output stores before each return.
+             * Hopefully stores will be optimized out later if not actually required */
+            ttn_add_output_stores(c);
+         }
          ttn_emit_instruction(c);
          break;
 
@@ -2251,8 +2260,8 @@ ttn_compile_init(const void *tgsi_tokens,
    if (!options)
       options = screen->nir_options[scan.processor];
 
-   c->build = nir_builder_init_simple_shader(tgsi_processor_to_shader_stage(scan.processor),
-                                             options, "TTN%d", (int)p_atomic_inc_return(&ttn_sh_counter));
+   c->build = nir_builder_init_simple_shader(scan.processor, options, "TTN%d",
+                                             (int)p_atomic_inc_return(&ttn_sh_counter));
 
    s = c->build.shader;
    _mesa_blake3_compute(&scan, sizeof(scan), s->info.source_blake3);
@@ -2264,8 +2273,6 @@ ttn_compile_init(const void *tgsi_tokens,
        * so it makes sense to preserve that behavior so users don't break. */
       c->cap_face_is_sysval = true;
    }
-
-   s->info.subgroup_size = SUBGROUP_SIZE_UNIFORM;
 
    if (s->info.stage == MESA_SHADER_FRAGMENT)
       s->info.fs.untyped_color_outputs = true;
@@ -2311,7 +2318,7 @@ ttn_compile_init(const void *tgsi_tokens,
             s->info.vs.window_space_position = value;
          break;
       case TGSI_PROPERTY_NEXT_SHADER:
-         s->info.next_stage = tgsi_processor_to_shader_stage(value);
+         s->info.next_stage = value;
          break;
       case TGSI_PROPERTY_VS_BLIT_SGPRS_AMD:
          if (s->info.stage == MESA_SHADER_VERTEX)
@@ -2347,6 +2354,8 @@ ttn_compile_init(const void *tgsi_tokens,
          }
       }
    }
+
+   s->info.api_subgroup_size_draw_uniform = s->info.stage != MESA_SHADER_COMPUTE;
 
    if (s->info.stage == MESA_SHADER_COMPUTE &&
        (!s->info.workgroup_size[0] ||
@@ -2406,12 +2415,12 @@ ttn_optimize_nir(nir_shader *nir)
 
       NIR_PASS(progress, nir, nir_lower_alu);
       NIR_PASS(progress, nir, nir_lower_pack);
-      NIR_PASS(progress, nir, nir_copy_prop);
+      NIR_PASS(progress, nir, nir_opt_copy_prop);
       NIR_PASS(progress, nir, nir_opt_remove_phis);
       NIR_PASS(progress, nir, nir_opt_dce);
       if (nir_opt_loop(nir)) {
          progress = true;
-         NIR_PASS(progress, nir, nir_copy_prop);
+         NIR_PASS(progress, nir, nir_opt_copy_prop);
          NIR_PASS(progress, nir, nir_opt_dce);
       }
       NIR_PASS(progress, nir, nir_opt_if, nir_opt_if_optimize_phi_true_false);
@@ -2436,16 +2445,8 @@ ttn_optimize_nir(nir_shader *nir)
             (nir->options->lower_flrp64 ? 64 : 0);
 
          if (lower_flrp) {
-            bool lower_flrp_progress = false;
-
-            NIR_PASS(lower_flrp_progress, nir, nir_lower_flrp,
-                     lower_flrp,
-                     false /* always_precise */);
-            if (lower_flrp_progress) {
-               NIR_PASS(progress, nir,
-                        nir_opt_constant_folding);
-               progress = true;
-            }
+            NIR_PASS(progress, nir, nir_lower_flrp,
+                     lower_flrp, false /* always_precise */);
          }
 
          /* Nothing should rematerialize any flrps, so we only need to do this
@@ -2536,6 +2537,7 @@ ttn_finalize_nir(struct ttn_compile *c, struct pipe_screen *screen)
 
    MESA_TRACE_FUNC();
 
+   NIR_PASS(_, nir, nir_lower_returns);
    NIR_PASS(_, nir, nir_lower_vars_to_ssa);
    NIR_PASS(_, nir, nir_lower_reg_intrinsics_to_ssa);
 
@@ -2567,7 +2569,7 @@ ttn_finalize_nir(struct ttn_compile *c, struct pipe_screen *screen)
       NIR_PASS(_, nir, nir_lower_samplers);
 
    if (screen->finalize_nir) {
-      screen->finalize_nir(screen, nir);
+      screen->finalize_nir(screen, nir, true);
    } else {
       ttn_optimize_nir(nir);
    }

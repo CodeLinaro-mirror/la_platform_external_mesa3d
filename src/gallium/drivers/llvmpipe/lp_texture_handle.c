@@ -211,14 +211,14 @@ replace_function_cache_locked(struct lp_function_cache *cache, struct hash_table
    uint64_t old_value = p_atomic_xchg(&cache->latest_cache.value, (uint64_t)(uintptr_t)new_cache);
    /* Like RCU pointers, defer cleanup of old values until we know no readers are left. */
    struct hash_table *old_cache = (struct hash_table *)(uintptr_t)old_value;
-   util_dynarray_append(&cache->trash_caches, struct hash_table *, old_cache);
+   util_dynarray_append(&cache->trash_caches, old_cache);
 }
 
 static void
 lp_function_cache_init(struct lp_function_cache *cache, struct hash_table *initial_cache)
 {
    p_atomic_set(&cache->latest_cache.value, (uint64_t)(uintptr_t)initial_cache);
-   util_dynarray_init(&cache->trash_caches, NULL);
+   cache->trash_caches = UTIL_DYNARRAY_INIT;
 }
 
 void
@@ -231,7 +231,7 @@ llvmpipe_init_sampler_matrix(struct llvmpipe_context *ctx)
 
    struct lp_sampler_matrix *matrix = &ctx->sampler_matrix;
 
-   util_dynarray_init(&matrix->gallivms, NULL);
+   matrix->gallivms = UTIL_DYNARRAY_INIT;
 
    matrix->ctx = ctx;
 
@@ -322,7 +322,7 @@ compile_function(struct llvmpipe_context *ctx, struct gallivm_state *gallivm, LL
 
    gallivm_free_ir(gallivm);
 
-   util_dynarray_append(&ctx->sampler_matrix.gallivms, struct gallivm_state *, gallivm);
+   util_dynarray_append(&ctx->sampler_matrix.gallivms, gallivm);
 
    return function_ptr;
 }
@@ -449,7 +449,7 @@ compile_image_function(struct llvmpipe_context *ctx, struct lp_static_texture_st
    LLVMPositionBuilderAtEnd(gallivm->builder, block);
 
    LLVMValueRef outdata[5] = { 0 };
-   lp_build_img_op_soa(&local_texture, lp_build_image_soa_dynamic_state(image_soa), gallivm, &params, outdata);
+   lp_build_img_op_soa(&local_texture, lp_build_image_soa_dynamic_state(image_soa), gallivm, &params, is64, outdata);
 
    for (uint32_t i = 1; i < 4; i++)
       if (!outdata[i])
@@ -591,8 +591,17 @@ compile_sample_function(struct llvmpipe_context *ctx, struct lp_texture_handle_s
          offsets[i] = LLVMGetParam(function, arg_index++);
 
    LLVMValueRef lod = NULL;
-   if (lod_control == LP_SAMPLER_LOD_BIAS || lod_control == LP_SAMPLER_LOD_EXPLICIT)
+   struct lp_derivatives derivs;
+   struct lp_derivatives *deriv_ptr = NULL;
+   if (lod_control == LP_SAMPLER_LOD_BIAS || lod_control == LP_SAMPLER_LOD_EXPLICIT) {
       lod = LLVMGetParam(function, arg_index++);
+   } else if (lod_control == LP_SAMPLER_LOD_DERIVATIVES) {
+      for (unsigned i = 0; i < 3; i++) {
+         derivs.ddx[i] = LLVMGetParam(function, arg_index++);
+         derivs.ddy[i] = LLVMGetParam(function, arg_index++);
+      }
+      deriv_ptr = &derivs;
+   }
 
    LLVMValueRef min_lod = NULL;
    if (sample_key & LP_SAMPLER_MIN_LOD)
@@ -609,7 +618,7 @@ compile_sample_function(struct llvmpipe_context *ctx, struct lp_texture_handle_s
    if (supported) {
       lp_build_sample_soa_code(gallivm, &texture->static_state, sampler, lp_build_sampler_soa_dynamic_state(sampler_soa),
                                type, sample_key, 0, 0, cs.jit_resources_type, NULL, cs.jit_cs_thread_data_type,
-                               NULL, coords, offsets, NULL, lod, min_lod, ms_index, texel_out);
+                               NULL, coords, offsets, deriv_ptr, lod, min_lod, ms_index, texel_out);
    } else {
       lp_build_sample_nop(gallivm, lp_build_texel_type(type, util_format_description(texture->static_state.format)), coords, texel_out);
    }

@@ -43,8 +43,7 @@ lower_alu_instr(nir_builder *b, nir_alu_instr *instr, UNUSED void *cb_data)
    nir_def *lowered = NULL;
 
    b->cursor = nir_before_instr(&instr->instr);
-   b->exact = instr->exact;
-   b->fp_fast_math = instr->fp_fast_math;
+   b->fp_math_ctrl = instr->fp_math_ctrl;
 
    switch (instr->op) {
    case nir_op_bitfield_reverse:
@@ -134,58 +133,27 @@ lower_alu_instr(nir_builder *b, nir_alu_instr *instr, UNUSED void *cb_data)
          } else {
             nir_def *cshift = nir_imm_int(b, src0->bit_size / 2);
             nir_def *cmask = nir_imm_intN_t(b, (1ull << (src0->bit_size / 2)) - 1, src0->bit_size);
-            nir_def *different_signs = NULL;
-            if (instr->op == nir_op_imul_high) {
-               nir_def *c0 = nir_imm_intN_t(b, 0, src0->bit_size);
-               different_signs = nir_ixor(b,
-                                          nir_ilt(b, src0, c0),
-                                          nir_ilt(b, src1, c0));
-               src0 = nir_iabs(b, src0);
-               src1 = nir_iabs(b, src1);
-            }
 
-            /*   ABCD
-             * * EFGH
-             * ======
-             * (GH * CD) + (GH * AB) << 16 + (EF * CD) << 16 + (EF * AB) << 32
-             *
-             * Start by splitting into the 4 multiplies.
+            /* Taken from Figure 8-2 in Hacker's Delight, which is derived
+             * from Knuth's Algorithm M.
              */
+            bool is_signed = instr->op == nir_op_imul_high;
             nir_def *src0l = nir_iand(b, src0, cmask);
             nir_def *src1l = nir_iand(b, src1, cmask);
-            nir_def *src0h = nir_ushr(b, src0, cshift);
-            nir_def *src1h = nir_ushr(b, src1, cshift);
+            nir_def *src0h = nir_shr(b, is_signed, src0, cshift);
+            nir_def *src1h = nir_shr(b, is_signed, src1, cshift);
 
             nir_def *lo = nir_imul(b, src0l, src1l);
             nir_def *m1 = nir_imul(b, src0l, src1h);
             nir_def *m2 = nir_imul(b, src0h, src1l);
             nir_def *hi = nir_imul(b, src0h, src1h);
 
-            nir_def *tmp;
-
-            tmp = nir_ishl(b, m1, cshift);
-            hi = nir_iadd(b, hi, nir_uadd_carry(b, lo, tmp));
-            lo = nir_iadd(b, lo, tmp);
-            hi = nir_iadd(b, hi, nir_ushr(b, m1, cshift));
-
-            tmp = nir_ishl(b, m2, cshift);
-            hi = nir_iadd(b, hi, nir_uadd_carry(b, lo, tmp));
-            lo = nir_iadd(b, lo, tmp);
-            hi = nir_iadd(b, hi, nir_ushr(b, m2, cshift));
-
-            if (instr->op == nir_op_imul_high) {
-               /* For channels where different_signs is set we have to perform a
-                * 64-bit negation.  This is *not* the same as just negating the
-                * high 32-bits.  Consider -3 * 2.  The high 32-bits is 0, but the
-                * desired result is -1, not -0!  Recall -x == ~x + 1.
-                */
-               nir_def *c1 = nir_imm_intN_t(b, 1, src0->bit_size);
-               hi = nir_bcsel(b, different_signs,
-                              nir_iadd(b,
-                                       nir_inot(b, hi),
-                                       nir_uadd_carry(b, nir_inot(b, lo), c1)),
-                              hi);
-            }
+            nir_def *t = nir_iadd(b, m2, nir_ushr(b, lo, cshift));
+            nir_def *w1 = nir_iand(b, t, cmask);
+            nir_def *w2 = nir_shr(b, is_signed, t, cshift);
+            w1 = nir_iadd(b, m1, w1);
+            hi = nir_iadd(b, hi,
+                          nir_iadd(b, nir_shr(b, is_signed, w1, cshift), w2));
 
             lowered = hi;
          }
@@ -207,9 +175,9 @@ lower_alu_instr(nir_builder *b, nir_alu_instr *instr, UNUSED void *cb_data)
        * nir_lower_alu is idempotent, and allows the backend to implement
        * soundly the no_signed_zero subset of fmin/fmax.
        */
-      b->fp_fast_math &= ~FLOAT_CONTROLS_SIGNED_ZERO_PRESERVE;
+      b->fp_math_ctrl &= ~nir_fp_preserve_signed_zero;
       nir_def *fminmax = max ? nir_fmax(b, s0, s1) : nir_fmin(b, s0, s1);
-      b->fp_fast_math = instr->fp_fast_math;
+      b->fp_math_ctrl = instr->fp_math_ctrl;
 
       /* If we have a constant source, we can usually optimize */
       if (s0->num_components == 1 && s0->bit_size == 32) {
@@ -229,14 +197,18 @@ lower_alu_instr(nir_builder *b, nir_alu_instr *instr, UNUSED void *cb_data)
                 */
                lowered = fminmax;
             } else if (pos_zero && max) {
+               b->fp_math_ctrl &= ~nir_fp_preserve_signed_zero;
                /* max(x, +0.0) = +0.0 < x ? x : +0.0 */
                lowered = nir_bcsel(b, nir_flt(b, zero, other), other, zero);
             } else if (neg_zero && !max) {
+               b->fp_math_ctrl &= ~nir_fp_preserve_signed_zero;
                /* min(x, -0.0) = x < -0.0 ? x : -0.0 */
                lowered = nir_bcsel(b, nir_flt(b, other, zero), other, zero);
             }
          }
       }
+
+      b->fp_math_ctrl = instr->fp_math_ctrl;
 
       /* Fallback on the emulation */
       if (!lowered) {

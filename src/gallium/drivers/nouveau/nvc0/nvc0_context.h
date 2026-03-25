@@ -296,12 +296,12 @@ static inline unsigned
 nvc0_shader_stage(unsigned pipe)
 {
    switch (pipe) {
-   case PIPE_SHADER_VERTEX: return 0;
-   case PIPE_SHADER_TESS_CTRL: return 1;
-   case PIPE_SHADER_TESS_EVAL: return 2;
-   case PIPE_SHADER_GEOMETRY: return 3;
-   case PIPE_SHADER_FRAGMENT: return 4;
-   case PIPE_SHADER_COMPUTE: return 5;
+   case MESA_SHADER_VERTEX: return 0;
+   case MESA_SHADER_TESS_CTRL: return 1;
+   case MESA_SHADER_TESS_EVAL: return 2;
+   case MESA_SHADER_GEOMETRY: return 3;
+   case MESA_SHADER_FRAGMENT: return 4;
+   case MESA_SHADER_COMPUTE: return 5;
    default:
       assert(!"invalid PIPE_SHADER type");
       return 0;
@@ -378,6 +378,7 @@ bool nvc0_state_validate_3d(struct nvc0_context *, uint32_t);
 
 /* nvc0_surface.c */
 extern void nvc0_clear(struct pipe_context *, unsigned buffers,
+                       uint32_t color_clear_mask, uint8_t stencil_clear_mask,
                        const struct pipe_scissor_state *scissor_state,
                        const union pipe_color_union *color,
                        double depth, unsigned stencil);

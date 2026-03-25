@@ -22,6 +22,7 @@
  */
 
 #include "nir.h"
+#include "nir_builder.h"
 #include "nir_clc_helpers.h"
 #include "nir_serialize.h"
 #include "nir_spirv.h"
@@ -87,7 +88,7 @@ get_libclc_file(unsigned ptr_bit_size)
 struct clc_data {
    const struct clc_file *file;
 
-   unsigned char cache_key[20];
+   unsigned char cache_key[SHA1_DIGEST_LENGTH];
 
    int fd;
    const void *data;
@@ -262,7 +263,7 @@ libclc_add_generic_variants(nir_shader *shader)
       if (strstr(func->name, "async_work_group_strided_copy"))
          continue;
 
-      char *U3AS1 = strstr(func->name, "U3AS1");
+      const char *U3AS1 = strstr(func->name, "U3AS1");
       if (U3AS1 == NULL)
          continue;
 
@@ -315,6 +316,13 @@ libclc_add_generic_variants(nir_shader *shader)
    }
 
    return progress;
+}
+
+static bool
+mark_exact(nir_builder *b, nir_alu_instr *alu, UNUSED void *_)
+{
+   alu->fp_math_ctrl |= nir_op_valid_fp_math_ctrl(alu->op, nir_fp_exact);
+   return true;
 }
 
 nir_shader *
@@ -374,6 +382,16 @@ nir_load_libclc_shader(unsigned ptr_bit_size,
 
    NIR_PASS(_, nir, libclc_add_generic_variants);
 
+   /* libclc relies on precise floating point behaviour to meet CL precision
+    * requirements, but the SPIR-V does not disable contractions etc. Forcing
+    * the exact bit across libclc effectively compiles libclc without fast-math,
+    * which works around a large class of (current and future) libclc bugs.
+    *
+    * Kernels using CL are unaffected, this only affects the high-precision
+    * floating point routines inside libclc. Fast variants bypass libclc anyway.
+    */
+   NIR_PASS(_, nir, nir_shader_alu_pass, mark_exact, nir_metadata_all, NULL);
+
    /* Run some optimization passes. Those used here should be considered safe
     * for all use cases and drivers.
     */
@@ -386,7 +404,7 @@ nir_load_libclc_shader(unsigned ptr_bit_size,
          NIR_PASS(progress, nir, nir_opt_copy_prop_vars);
          NIR_PASS(progress, nir, nir_lower_var_copies);
          NIR_PASS(progress, nir, nir_lower_vars_to_ssa);
-         NIR_PASS(progress, nir, nir_copy_prop);
+         NIR_PASS(progress, nir, nir_opt_copy_prop);
          NIR_PASS(progress, nir, nir_opt_remove_phis);
          NIR_PASS(progress, nir, nir_opt_dce);
          NIR_PASS(progress, nir, nir_opt_if, false);

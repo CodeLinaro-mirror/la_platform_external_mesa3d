@@ -57,6 +57,7 @@ _nil_bindings_rs = rust.bindgen(
     '--allowlist-type', 'nil_format_support_flags',
     '--allowlist-type', 'nv_device_info',
     '--allowlist-type', 'nv_device_type',
+    '--allowlist-type', 'nv_zcull_device_info',
     '--allowlist-type', 'pipe_format',
     '--allowlist-type', 'pipe_swizzle',
     '--allowlist-var', 'nil_format_table',
@@ -75,7 +76,7 @@ _libnil_rs_bindings = static_library(
 )
 
 _libnil = static_library(
-  'libnil',
+  'nil',
   files('lib.rs'),
   gnu_symbol_visibility: 'hidden',
   rust_abi: 'c',
@@ -83,6 +84,20 @@ _libnil = static_library(
   link_with: [_libnil_format_table, _libnil_rs_bindings],
   dependencies: _libnil_deps,
 )
+
+# TODO: Linking Rust executables (such as unit tests) doesn't play nicely
+# with the sanitizers because meson doesn't know to pass -fsanitize to the
+# Rust linker.  See also https://github.com/mesonbuild/meson/issues/11741
+if with_tests and get_option('b_sanitize') == 'none'
+  rust.test(
+    'nil',
+    _libnil,
+    suite : ['nouveau'],
+    # This is needed to ensure we link against glibc
+    # See also https://gitlab.freedesktop.org/mesa/mesa/-/issues/11632
+    rust_args: ['-C', 'default-linker-libraries'],
+  )
+endif
 
 _nil_h = custom_target(
   'nil_h',
