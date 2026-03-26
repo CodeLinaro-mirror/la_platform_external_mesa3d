@@ -240,13 +240,13 @@ vc4_emit_gl_shader_state(struct vc4_context *vc4,
         }
 
         vc4_write_uniforms(vc4, vc4->prog.fs,
-                           &vc4->constbuf[PIPE_SHADER_FRAGMENT],
+                           &vc4->constbuf[MESA_SHADER_FRAGMENT],
                            &vc4->fragtex);
         vc4_write_uniforms(vc4, vc4->prog.vs,
-                           &vc4->constbuf[PIPE_SHADER_VERTEX],
+                           &vc4->constbuf[MESA_SHADER_VERTEX],
                            &vc4->verttex);
         vc4_write_uniforms(vc4, vc4->prog.cs,
-                           &vc4->constbuf[PIPE_SHADER_VERTEX],
+                           &vc4->constbuf[MESA_SHADER_VERTEX],
                            &vc4->verttex);
 
         vc4->last_index_bias = index_bias + extra_index_bias;
@@ -403,7 +403,7 @@ vc4_draw_vbo(struct pipe_context *pctx, const struct pipe_draw_info *info,
                         if (info->has_user_indices) {
                                 unsigned start_offset = draws[0].start * info->index_size;
                                 prsc = NULL;
-                                u_upload_data(vc4->uploader, start_offset,
+                                u_upload_data_ref(vc4->uploader, start_offset,
                                               draws[0].count * index_size, 4,
                                               (char*)info->index.user + start_offset,
                                               &offset, &prsc);
@@ -541,7 +541,9 @@ pack_rgba(enum pipe_format format, const float *rgba)
 }
 
 static void
-vc4_clear(struct pipe_context *pctx, unsigned buffers, const struct pipe_scissor_state *scissor_state,
+vc4_clear(struct pipe_context *pctx, unsigned buffers,
+          uint32_t color_clear_mask, uint8_t stencil_clear_mask,
+          const struct pipe_scissor_state *scissor_state,
           const union pipe_color_union *color, double depth, unsigned stencil)
 {
         struct vc4_context *vc4 = vc4_context(pctx);

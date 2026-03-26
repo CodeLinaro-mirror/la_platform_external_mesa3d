@@ -36,7 +36,7 @@ get_ubo_load_range(nir_shader *nir, nir_intrinsic_instr *instr,
       return false;
 
    r->start = ROUND_DOWN_TO(offset, alignment * 16);
-   r->end = ALIGN(offset + size, alignment * 16);
+   r->end = align(offset + size, alignment * 16);
 
    return true;
 }
@@ -214,7 +214,7 @@ gather_ubo_ranges(nir_shader *nir, nir_intrinsic_instr *instr,
 static void
 handle_partial_const(nir_builder *b, nir_def **srcp, int *offp)
 {
-   if ((*srcp)->parent_instr->type != nir_instr_type_alu)
+   if (!nir_def_is_alu(*srcp))
       return;
 
    nir_alu_instr *alu = nir_def_as_alu((*srcp));
@@ -617,7 +617,7 @@ ir3_nir_analyze_ubo_ranges(nir_shader *nir, struct ir3_shader_variant *v)
                               ptrs_vec4, 1);
    }
 
-   uint32_t align_vec4 = compiler->load_shader_consts_via_preamble
+   uint32_t align_vec4 = compiler->info->props.load_shader_consts_via_preamble
                             ? 1
                             : compiler->const_upload_unit;
 

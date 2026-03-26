@@ -305,7 +305,7 @@ vk_common_SetDebugUtilsObjectNameEXT(
 {
    VK_FROM_HANDLE(vk_device, device, _device);
 
-#if DETECT_OS_ANDROID
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
    if (pNameInfo->objectType == VK_OBJECT_TYPE_SWAPCHAIN_KHR ||
        pNameInfo->objectType == VK_OBJECT_TYPE_SURFACE_KHR) {
 #else
@@ -352,7 +352,7 @@ vk_common_append_debug_label(struct vk_device *device,
                              struct util_dynarray *labels,
                              const VkDebugUtilsLabelEXT *pLabelInfo)
 {
-   util_dynarray_append(labels, VkDebugUtilsLabelEXT, *pLabelInfo);
+   util_dynarray_append(labels, *pLabelInfo);
    VkDebugUtilsLabelEXT *current_label =
       util_dynarray_top_ptr(labels, VkDebugUtilsLabelEXT);
    current_label->pLabelName =
@@ -433,13 +433,10 @@ vk_common_CmdInsertDebugUtilsLabelEXT(
    command_buffer->region_begin = false;
 }
 
-VKAPI_ATTR void VKAPI_CALL
-vk_common_QueueBeginDebugUtilsLabelEXT(
-   VkQueue _queue,
-   const VkDebugUtilsLabelEXT *pLabelInfo)
+void
+vk_queue_begin_debug_utils_label(struct vk_queue *queue,
+                                 const VkDebugUtilsLabelEXT *pLabelInfo)
 {
-   VK_FROM_HANDLE(vk_queue, queue, _queue);
-
    /* If the latest label was submitted by QueueInsertDebugUtilsLabelEXT, we
     * should remove it first.
     */
@@ -453,10 +450,20 @@ vk_common_QueueBeginDebugUtilsLabelEXT(
 }
 
 VKAPI_ATTR void VKAPI_CALL
-vk_common_QueueEndDebugUtilsLabelEXT(VkQueue _queue)
+vk_common_QueueBeginDebugUtilsLabelEXT(
+   VkQueue _queue,
+   const VkDebugUtilsLabelEXT *pLabelInfo)
 {
    VK_FROM_HANDLE(vk_queue, queue, _queue);
 
+   vk_queue_lock(queue);
+   vk_queue_begin_debug_utils_label(queue, pLabelInfo);
+   vk_queue_unlock(queue);
+}
+
+void
+vk_queue_end_debug_utils_label(struct vk_queue *queue)
+{
    /* If the latest label was submitted by QueueInsertDebugUtilsLabelEXT, we
     * should remove it first.
     */
@@ -468,12 +475,19 @@ vk_common_QueueEndDebugUtilsLabelEXT(VkQueue _queue)
 }
 
 VKAPI_ATTR void VKAPI_CALL
-vk_common_QueueInsertDebugUtilsLabelEXT(
-   VkQueue _queue,
-   const VkDebugUtilsLabelEXT *pLabelInfo)
+vk_common_QueueEndDebugUtilsLabelEXT(VkQueue _queue)
 {
    VK_FROM_HANDLE(vk_queue, queue, _queue);
 
+   vk_queue_lock(queue);
+   vk_queue_end_debug_utils_label(queue);
+   vk_queue_unlock(queue);
+}
+
+static void
+vk_queue_insert_debug_utils_label(struct vk_queue *queue,
+                                  const VkDebugUtilsLabelEXT *pLabelInfo)
+{
    /* If the latest label was submitted by QueueInsertDebugUtilsLabelEXT, we
     * should remove it first.
     */
@@ -484,6 +498,18 @@ vk_common_QueueInsertDebugUtilsLabelEXT(
                                 &queue->labels,
                                 pLabelInfo);
    queue->region_begin = false;
+}
+
+VKAPI_ATTR void VKAPI_CALL
+vk_common_QueueInsertDebugUtilsLabelEXT(
+   VkQueue _queue,
+   const VkDebugUtilsLabelEXT *pLabelInfo)
+{
+   VK_FROM_HANDLE(vk_queue, queue, _queue);
+
+   vk_queue_lock(queue);
+   vk_queue_insert_debug_utils_label(queue, pLabelInfo);
+   vk_queue_unlock(queue);
 }
 
 VkResult

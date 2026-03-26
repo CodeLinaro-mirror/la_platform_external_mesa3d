@@ -1,0 +1,256 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+genrule {
+    name: "fill.comp.spv.h",
+    out: [
+        "src/vulkan/runtime/radix_sort/shaders/fill.comp.spv.h",
+    ],
+    srcs: [
+        "bufref.h",
+        "config.h",
+        "fill.comp",
+        "prefix.h",
+        "prefix_limits.h",
+        "push.h",
+        "scatter.glsl",
+    ],
+    tools: [
+        "glslangValidator",
+    ],
+    export_include_dirs: [
+        "src",
+        "src/vulkan",
+        "src/vulkan/runtime",
+        "src/vulkan/runtime/radix_sort",
+        "src/vulkan/runtime/radix_sort/shaders",
+    ],
+    cmd: "$(location glslangValidator) -V --target-env spirv1.5 -x -o $(location " +
+        "src/vulkan/runtime/radix_sort/shaders/fill.comp.spv.h) $(location " +
+        "fill.comp) -DRS_KEYVAL_DWORDS=2 --quiet",
+}
+
+genrule {
+    name: "histogram.comp.spv.h",
+    out: [
+        "src/vulkan/runtime/radix_sort/shaders/histogram.comp.spv.h",
+    ],
+    srcs: [
+        "bufref.h",
+        "config.h",
+        "histogram.comp",
+        "prefix.h",
+        "prefix_limits.h",
+        "push.h",
+        "scatter.glsl",
+    ],
+    tools: [
+        "glslangValidator",
+    ],
+    export_include_dirs: [
+        "src",
+        "src/vulkan",
+        "src/vulkan/runtime",
+        "src/vulkan/runtime/radix_sort",
+        "src/vulkan/runtime/radix_sort/shaders",
+    ],
+    cmd: "$(location glslangValidator) -V --target-env spirv1.5 -x -o $(location " +
+        "src/vulkan/runtime/radix_sort/shaders/histogram.comp.spv.h) $(location " +
+        "histogram.comp) -DRS_KEYVAL_DWORDS=2 --quiet",
+}
+
+genrule {
+    name: "init.comp.spv.h",
+    out: [
+        "src/vulkan/runtime/radix_sort/shaders/init.comp.spv.h",
+    ],
+    srcs: [
+        "bufref.h",
+        "config.h",
+        "init.comp",
+        "prefix.h",
+        "prefix_limits.h",
+        "push.h",
+        "scatter.glsl",
+    ],
+    tools: [
+        "glslangValidator",
+    ],
+    export_include_dirs: [
+        "src",
+        "src/vulkan",
+        "src/vulkan/runtime",
+        "src/vulkan/runtime/radix_sort",
+        "src/vulkan/runtime/radix_sort/shaders",
+    ],
+    cmd: "$(location glslangValidator) -V --target-env spirv1.5 -x -o $(location " +
+        "src/vulkan/runtime/radix_sort/shaders/init.comp.spv.h) $(location " +
+        "init.comp) -DRS_KEYVAL_DWORDS=2 --quiet",
+}
+
+genrule {
+    name: "prefix.comp.spv.h",
+    out: [
+        "src/vulkan/runtime/radix_sort/shaders/prefix.comp.spv.h",
+    ],
+    srcs: [
+        "bufref.h",
+        "config.h",
+        "prefix.comp",
+        "prefix.h",
+        "prefix_limits.h",
+        "push.h",
+        "scatter.glsl",
+    ],
+    tools: [
+        "glslangValidator",
+    ],
+    export_include_dirs: [
+        "src",
+        "src/vulkan",
+        "src/vulkan/runtime",
+        "src/vulkan/runtime/radix_sort",
+        "src/vulkan/runtime/radix_sort/shaders",
+    ],
+    cmd: "$(location glslangValidator) -V --target-env spirv1.5 -x -o $(location " +
+        "src/vulkan/runtime/radix_sort/shaders/prefix.comp.spv.h) $(location " +
+        "prefix.comp) -DRS_KEYVAL_DWORDS=2 --quiet",
+}
+
+genrule {
+    name: "scatter_0_even.comp.spv.h",
+    out: [
+        "src/vulkan/runtime/radix_sort/shaders/scatter_0_even.comp.spv.h",
+    ],
+    srcs: [
+        "bufref.h",
+        "config.h",
+        "prefix.h",
+        "prefix_limits.h",
+        "push.h",
+        "scatter.glsl",
+        "scatter_0_even.comp",
+    ],
+    tools: [
+        "glslangValidator",
+    ],
+    export_include_dirs: [
+        "src",
+        "src/vulkan",
+        "src/vulkan/runtime",
+        "src/vulkan/runtime/radix_sort",
+        "src/vulkan/runtime/radix_sort/shaders",
+    ],
+    cmd: "$(location glslangValidator) -V --target-env spirv1.5 -x -o $(location " +
+        "src/vulkan/runtime/radix_sort/shaders/scatter_0_even.comp.spv.h) " +
+        "$(location scatter_0_even.comp) -DRS_KEYVAL_DWORDS=2 --quiet",
+}
+
+genrule {
+    name: "scatter_0_odd.comp.spv.h",
+    out: [
+        "src/vulkan/runtime/radix_sort/shaders/scatter_0_odd.comp.spv.h",
+    ],
+    srcs: [
+        "bufref.h",
+        "config.h",
+        "prefix.h",
+        "prefix_limits.h",
+        "push.h",
+        "scatter.glsl",
+        "scatter_0_odd.comp",
+    ],
+    tools: [
+        "glslangValidator",
+    ],
+    export_include_dirs: [
+        "src",
+        "src/vulkan",
+        "src/vulkan/runtime",
+        "src/vulkan/runtime/radix_sort",
+        "src/vulkan/runtime/radix_sort/shaders",
+    ],
+    cmd: "$(location glslangValidator) -V --target-env spirv1.5 -x -o $(location " +
+        "src/vulkan/runtime/radix_sort/shaders/scatter_0_odd.comp.spv.h) " +
+        "$(location scatter_0_odd.comp) -DRS_KEYVAL_DWORDS=2 --quiet",
+}
+
+genrule {
+    name: "scatter_1_even.comp.spv.h",
+    out: [
+        "src/vulkan/runtime/radix_sort/shaders/scatter_1_even.comp.spv.h",
+    ],
+    srcs: [
+        "bufref.h",
+        "config.h",
+        "prefix.h",
+        "prefix_limits.h",
+        "push.h",
+        "scatter.glsl",
+        "scatter_1_even.comp",
+    ],
+    tools: [
+        "glslangValidator",
+    ],
+    export_include_dirs: [
+        "src",
+        "src/vulkan",
+        "src/vulkan/runtime",
+        "src/vulkan/runtime/radix_sort",
+        "src/vulkan/runtime/radix_sort/shaders",
+    ],
+    cmd: "$(location glslangValidator) -V --target-env spirv1.5 -x -o $(location " +
+        "src/vulkan/runtime/radix_sort/shaders/scatter_1_even.comp.spv.h) " +
+        "$(location scatter_1_even.comp) -DRS_KEYVAL_DWORDS=2 --quiet",
+}
+
+genrule {
+    name: "scatter_1_odd.comp.spv.h",
+    out: [
+        "src/vulkan/runtime/radix_sort/shaders/scatter_1_odd.comp.spv.h",
+    ],
+    srcs: [
+        "bufref.h",
+        "config.h",
+        "prefix.h",
+        "prefix_limits.h",
+        "push.h",
+        "scatter.glsl",
+        "scatter_1_odd.comp",
+    ],
+    tools: [
+        "glslangValidator",
+    ],
+    export_include_dirs: [
+        "src",
+        "src/vulkan",
+        "src/vulkan/runtime",
+        "src/vulkan/runtime/radix_sort",
+        "src/vulkan/runtime/radix_sort/shaders",
+    ],
+    cmd: "$(location glslangValidator) -V --target-env spirv1.5 -x -o $(location " +
+        "src/vulkan/runtime/radix_sort/shaders/scatter_1_odd.comp.spv.h) " +
+        "$(location scatter_1_odd.comp) -DRS_KEYVAL_DWORDS=2 --quiet",
+}
+
+cc_library_headers {
+    name: "push_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}

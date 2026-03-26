@@ -7,9 +7,11 @@
     - changes: &etnaviv_file_list
         - src/etnaviv/*
         - src/etnaviv/ci/gitlab-ci.yml
+        - src/etnaviv/ci/gitlab-ci-inc.yml
         - src/etnaviv/ci/deqp-$DEQP_SUITE.toml
         - src/etnaviv/ci/$GPU_VERSION-fails.txt
         - src/etnaviv/ci/$GPU_VERSION-flakes.txt
+        - src/etnaviv/ci/$GPU_VERSION-gles2-extensions.txt
         - src/etnaviv/ci/$GPU_VERSION-skips.txt
         - src/etnaviv/drm/**/*
         - src/etnaviv/drm-shim/**/*
@@ -45,6 +47,8 @@
     - .austriancoder-ci-tron
   variables:
     CI_TRON__B2C_DISKLESS_IMAGESTORE_PLATFORM: linux/arm/v7
+    CI_TRON_KERNEL__URL: '$KERNEL_IMAGE_BASE/armhf/zImage'
+    CI_TRON_DTB__0__URL: '$KERNEL_IMAGE_BASE/armhf/imx6q-cubox-i.dtb'
     VIVANTE_MODEL_TAG: "vivante:model:2000"
     VIVANTE_REVISION_TAG: "vivante:revision:5108"
     GPU_VERSION: "etnaviv-gc2000-r5108"
@@ -57,6 +61,7 @@
     FDO_CI_CONCURRENT: 2
   tags:
     - farm:$RUNNER_FARM_LOCATION
+    - ci-tron:priority:$CI_TRON_JOB_PRIORITY
     - cpu:cores:2
     - $VIVANTE_MODEL_TAG
     - $VIVANTE_REVISION_TAG
@@ -69,6 +74,7 @@
     FDO_CI_CONCURRENT: 4
   tags:
     - farm:$RUNNER_FARM_LOCATION
+    - ci-tron:priority:$CI_TRON_JOB_PRIORITY
     - cpu:cores:4
     - $VIVANTE_MODEL_TAG
     - $VIVANTE_REVISION_TAG
@@ -80,11 +86,14 @@
   variables:
     FDO_CI_CONCURRENT: 4
     CI_TRON__B2C_DISKLESS_IMAGESTORE_PLATFORM: linux/arm/v7
+    CI_TRON_KERNEL__URL: '$KERNEL_IMAGE_BASE/armhf/zImage'
+    CI_TRON_DTB__0__URL: '$KERNEL_IMAGE_BASE/armhf/imx6qp-nitrogen6_max.dtb'
     VIVANTE_MODEL_TAG: "vivante:model:3000"
     VIVANTE_REVISION_TAG: "vivante:revision:5450"
     GPU_VERSION: "etnaviv-gc3000-r5450"
   tags:
     - farm:$RUNNER_FARM_LOCATION
+    - ci-tron:priority:$CI_TRON_JOB_PRIORITY
     - $VIVANTE_MODEL_TAG
     - $VIVANTE_REVISION_TAG
 
@@ -95,11 +104,14 @@
   variables:
     FDO_CI_CONCURRENT: 4
     CI_TRON__B2C_DISKLESS_IMAGESTORE_PLATFORM: linux/arm64/v8
+    CI_TRON_KERNEL__URL: '$KERNEL_IMAGE_BASE/arm64/Image.gz'
+    CI_TRON_DTB__0__URL: '$KERNEL_IMAGE_BASE/arm64/imx8mq-nitrogen.dtb'
     VIVANTE_MODEL_TAG: "vivante:model:7000"
     VIVANTE_REVISION_TAG: "vivante:revision:6214"
     GPU_VERSION: "etnaviv-gc7000-r6214"
   tags:
     - farm:$RUNNER_FARM_LOCATION
+    - ci-tron:priority:$CI_TRON_JOB_PRIORITY
     - $VIVANTE_MODEL_TAG
     - $VIVANTE_REVISION_TAG
 
@@ -114,4 +126,3 @@
     BOOT_METHOD: barebox
     RUNNER_TAG: mesa-ci-x86-64-lava-imx8mp-tqma8mpql-mba8mpxl
     VISIBILITY_GROUP: "mesa-ci"
-

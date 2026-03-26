@@ -298,6 +298,14 @@ vk_format_to_pipe_format(VkFormat vkformat)
          return PIPE_FORMAT_X6G10_X6B10X6R10_420_UNORM;
       case VK_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16:
          return PIPE_FORMAT_X4G12_X4B12X4R12_420_UNORM;
+      case VK_FORMAT_G8_B8R8_2PLANE_444_UNORM:
+         return PIPE_FORMAT_G8_B8R8_444_UNORM;
+      case VK_FORMAT_G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16:
+         return PIPE_FORMAT_X6G10_X6B10X6R10_444_UNORM;
+      case VK_FORMAT_G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16:
+         return PIPE_FORMAT_X4G12_X4B12X4R12_444_UNORM;
+      case VK_FORMAT_G16_B16R16_2PLANE_444_UNORM:
+         return PIPE_FORMAT_Y16_U16V16_444_UNORM;
       case VK_FORMAT_A4R4G4B4_UNORM_PACK16:
          return PIPE_FORMAT_B4G4R4A4_UNORM;
       case VK_FORMAT_A4B4G4R4_UNORM_PACK16:
@@ -642,6 +650,24 @@ vk_format_get_plane_format(VkFormat format, unsigned plane_id)
 }
 
 VkFormat
+vk_format_get_plane_aspect_format(VkFormat format, const VkImageAspectFlags aspect)
+{
+   assert(aspect & vk_format_aspects(format));
+
+   switch(aspect) {
+   case VK_IMAGE_ASPECT_PLANE_0_BIT:
+      return vk_format_get_plane_format(format, 0);
+   case VK_IMAGE_ASPECT_PLANE_1_BIT:
+      return vk_format_get_plane_format(format, 1);
+   case VK_IMAGE_ASPECT_PLANE_2_BIT:
+      return vk_format_get_plane_format(format, 2);
+   default:
+      assert(vk_format_get_plane_count(format) == 1);
+      return format;
+   }
+}
+
+VkFormat
 vk_format_get_aspect_format(VkFormat format, const VkImageAspectFlags aspect)
 {
    assert(util_bitcount(aspect) == 1);
@@ -655,11 +681,9 @@ vk_format_get_aspect_format(VkFormat format, const VkImageAspectFlags aspect)
    case VK_IMAGE_ASPECT_STENCIL_BIT:
       return vk_format_stencil_only(format);
    case VK_IMAGE_ASPECT_PLANE_0_BIT:
-      return vk_format_get_plane_format(format, 0);
    case VK_IMAGE_ASPECT_PLANE_1_BIT:
-      return vk_format_get_plane_format(format, 1);
    case VK_IMAGE_ASPECT_PLANE_2_BIT:
-      return vk_format_get_plane_format(format, 2);
+      return vk_format_get_plane_aspect_format(format, aspect);
    default:
       UNREACHABLE("Cannot translate format aspect");
    }
@@ -908,18 +932,4 @@ vk_swizzle_color_value(VkClearColorValue color,
       swizzled_color_component(&color, swizzle.b, 2, is_int),
       swizzled_color_component(&color, swizzle.a, 3, is_int),
    }};
-}
-
-VkFormat
-vk_select_android_external_format(const void *next, VkFormat default_format)
-{
-   const VkExternalFormatANDROID *android_format = vk_find_struct_const(next, EXTERNAL_FORMAT_ANDROID);
-
-   if (android_format && android_format->externalFormat) {
-      assert(default_format == VK_FORMAT_UNDEFINED);
-      assert((VkFormat)android_format->externalFormat != VK_FORMAT_UNDEFINED);
-      return (VkFormat)android_format->externalFormat;
-   }
-
-   return default_format;
 }

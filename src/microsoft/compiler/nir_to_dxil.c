@@ -1312,7 +1312,7 @@ emit_srv(struct ntd_context *ctx, nir_variable *var, unsigned count)
    if (!srv_meta)
       return false;
 
-   util_dynarray_append(&ctx->srv_metadata_nodes, const struct dxil_mdnode *, srv_meta);
+   util_dynarray_append(&ctx->srv_metadata_nodes, srv_meta);
    add_resource(ctx, res_type, res_kind, &layout);
    if (res_type == DXIL_RES_SRV_RAW)
       ctx->mod.raw_and_structured_buffers = true;
@@ -1336,7 +1336,7 @@ emit_uav(struct ntd_context *ctx, unsigned binding, unsigned space, unsigned cou
    if (!uav_meta)
       return false;
 
-   util_dynarray_append(&ctx->uav_metadata_nodes, const struct dxil_mdnode *, uav_meta);
+   util_dynarray_append(&ctx->uav_metadata_nodes, uav_meta);
    if (ctx->mod.minor_validator < 6 &&
        util_dynarray_num_elements(&ctx->uav_metadata_nodes, const struct dxil_mdnode *) > 8)
       ctx->mod.feats.use_64uavs = 1;
@@ -1494,7 +1494,7 @@ emit_global_consts(struct ntd_context *ctx)
 
    nir_foreach_variable_with_modes(var, ctx->shader, nir_var_mem_constant) {
       if (!var->name)
-         var->name = ralloc_asprintf(var, "const_%d", var->data.driver_location);
+         nir_variable_set_namef(ctx->shader, var, "const_%d", var->data.driver_location);
 
       const struct dxil_value *agg_vals =
          get_value_for_const_aggregate(&ctx->mod, var->constant_initializer, var->type);
@@ -1525,7 +1525,7 @@ emit_shared_vars(struct ntd_context *ctx)
 
    nir_foreach_variable_with_modes(var, ctx->shader, nir_var_mem_shared) {
       if (!var->name)
-         var->name = ralloc_asprintf(var, "shared_%d", var->data.driver_location);
+         nir_variable_set_namef(ctx->shader, var, "shared_%d", var->data.driver_location);
       const struct dxil_value *gvar = dxil_add_global_ptr_var(&ctx->mod, var->name,
                                                               get_type_for_glsl_type(&ctx->mod, var->type),
                                                               DXIL_AS_GROUPSHARED, 16,
@@ -1560,7 +1560,7 @@ emit_cbv(struct ntd_context *ctx, unsigned binding, unsigned space,
    if (!cbv_meta)
       return false;
 
-   util_dynarray_append(&ctx->cbv_metadata_nodes, const struct dxil_mdnode *, cbv_meta);
+   util_dynarray_append(&ctx->cbv_metadata_nodes, cbv_meta);
    add_resource(ctx, DXIL_RES_CBV, DXIL_RESOURCE_KIND_CBUFFER, &layout);
 
    return true;
@@ -1606,7 +1606,7 @@ emit_sampler(struct ntd_context *ctx, nir_variable *var, unsigned count)
    if (!sampler_meta)
       return false;
 
-   util_dynarray_append(&ctx->sampler_metadata_nodes, const struct dxil_mdnode *, sampler_meta);
+   util_dynarray_append(&ctx->sampler_metadata_nodes, sampler_meta);
    add_resource(ctx, DXIL_RES_SAMPLER, DXIL_RESOURCE_KIND_SAMPLER, &layout);
 
    return true;
@@ -1800,7 +1800,7 @@ static const struct dxil_mdnode *
 emit_wave_size(struct ntd_context *ctx)
 {
    const nir_shader *s = ctx->shader;
-   const struct dxil_mdnode *wave_size_node = dxil_get_metadata_int32(&ctx->mod, s->info.subgroup_size);
+   const struct dxil_mdnode *wave_size_node = dxil_get_metadata_int32(&ctx->mod, s->info.min_subgroup_size);
    return dxil_get_metadata_node(&ctx->mod, &wave_size_node, 1);
 }
 
@@ -1809,7 +1809,7 @@ emit_wave_size_range(struct ntd_context *ctx)
 {
    const nir_shader *s = ctx->shader;
    const struct dxil_mdnode *wave_size_nodes[3];
-   wave_size_nodes[0] = dxil_get_metadata_int32(&ctx->mod, s->info.subgroup_size);
+   wave_size_nodes[0] = dxil_get_metadata_int32(&ctx->mod, s->info.min_subgroup_size);
    wave_size_nodes[1] = wave_size_nodes[0];
    wave_size_nodes[2] = wave_size_nodes[0];
    return dxil_get_metadata_node(&ctx->mod, wave_size_nodes, ARRAY_SIZE(wave_size_nodes));
@@ -2040,7 +2040,9 @@ emit_metadata(struct ntd_context *ctx)
       if (!emit_tag(ctx, DXIL_SHADER_TAG_NUM_THREADS, emit_threads(ctx)))
          return false;
       if (ctx->mod.minor_version >= 6 &&
-          ctx->shader->info.subgroup_size >= SUBGROUP_SIZE_REQUIRE_4) {
+          ctx->shader->info.min_subgroup_size == ctx->shader->info.max_subgroup_size &&
+          ctx->shader->info.min_subgroup_size == ctx->shader->info.api_subgroup_size &&
+          ctx->shader->info.min_subgroup_size > 1) {
          if (ctx->mod.minor_version < 8) {
             if (!emit_tag(ctx, DXIL_SHADER_TAG_WAVE_SIZE, emit_wave_size(ctx)))
                return false;
@@ -2273,7 +2275,7 @@ emit_binop(struct ntd_context *ctx, nir_alu_instr *alu,
    bool is_float_op = nir_alu_type_get_base_type(nir_op_infos[alu->op].output_type) == nir_type_float;
 
    enum dxil_opt_flags flags = 0;
-   if (is_float_op && !alu->exact)
+   if (is_float_op && !nir_alu_instr_is_exact(alu))
       flags |= DXIL_UNSAFE_ALGEBRA;
 
    const struct dxil_value *v = dxil_emit_binop(&ctx->mod, opcode, op0, op1, flags);
@@ -2716,15 +2718,8 @@ emit_b2f64(struct ntd_context *ctx, nir_alu_instr *alu, const struct dxil_value 
 }
 
 static bool
-emit_f16tof32(struct ntd_context *ctx, nir_alu_instr *alu, const struct dxil_value *val, bool shift)
+emit_f16tof32(struct ntd_context *ctx, nir_alu_instr *alu, const struct dxil_value *val)
 {
-   if (shift) {
-      val = dxil_emit_binop(&ctx->mod, DXIL_BINOP_LSHR, val,
-         dxil_module_get_int32_const(&ctx->mod, 16), 0);
-      if (!val)
-         return false;
-   }
-
    const struct dxil_func *func = dxil_get_function(&ctx->mod,
                                                     "dx.op.legacyF16ToF32",
                                                     DXIL_NONE);
@@ -3013,8 +3008,7 @@ emit_alu(struct ntd_context *ctx, nir_alu_instr *alu)
    case nir_op_ubfe: return emit_tertiary_intin(ctx, alu, DXIL_INTR_UBFE, src[2], src[1], src[0]);
    case nir_op_bitfield_insert: return emit_bitfield_insert(ctx, alu, src[0], src[1], src[2], src[3]);
 
-   case nir_op_unpack_half_2x16_split_x: return emit_f16tof32(ctx, alu, src[0], false);
-   case nir_op_unpack_half_2x16_split_y: return emit_f16tof32(ctx, alu, src[0], true);
+   case nir_op_unpack_half_x_dxil: return emit_f16tof32(ctx, alu, src[0]);
    case nir_op_pack_half_2x16_split: return emit_f32tof16(ctx, alu, src[0], src[1]);
 
    case nir_op_sdot_4x8_iadd: return emit_dot4add_packed(ctx, alu, DXIL_INTR_DOT4_ADD_I8_PACKED, src[0], src[1], src[2]);
@@ -6312,9 +6306,10 @@ optimize_nir(struct nir_shader *s, const struct nir_to_dxil_options *opts)
    do {
       progress = false;
       NIR_PASS(progress, s, nir_lower_vars_to_ssa);
-      NIR_PASS(progress, s, nir_lower_indirect_derefs, nir_var_function_temp, 4);
+      NIR_PASS(progress, s, nir_lower_indirect_derefs_to_if_else_trees,
+               nir_var_function_temp, 4);
       NIR_PASS(progress, s, nir_lower_alu_to_scalar, NULL, NULL);
-      NIR_PASS(progress, s, nir_copy_prop);
+      NIR_PASS(progress, s, nir_opt_copy_prop);
       NIR_PASS(progress, s, nir_opt_copy_prop_vars);
       NIR_PASS(progress, s, nir_lower_bit_size, lower_bit_size_callback, (void*)opts);
       NIR_PASS(progress, s, dxil_nir_lower_8bit_conv);
@@ -6370,12 +6365,7 @@ void dxil_fill_validation_state(struct ntd_context *ctx,
    struct dxil_psv_runtime_info_2 *psv2 = &psv3->psv2;
    struct dxil_psv_runtime_info_1 *psv1 = &psv2->psv1;
    struct dxil_psv_runtime_info_0 *psv0 = &psv1->psv0;
-   if (ctx->shader->info.subgroup_size >= SUBGROUP_SIZE_REQUIRE_4) {
-      psv0->max_expected_wave_lane_count = ctx->shader->info.subgroup_size;
-      psv0->min_expected_wave_lane_count = ctx->shader->info.subgroup_size;
-   } else {
-      psv0->max_expected_wave_lane_count = UINT_MAX;
-   }
+   psv0->max_expected_wave_lane_count = UINT_MAX;
    psv1->shader_stage = (uint8_t)ctx->mod.shader_kind;
    psv1->uses_view_id = (uint8_t)ctx->mod.feats.view_id;
    psv1->sig_input_elements = (uint8_t)ctx->mod.num_sig_inputs;
@@ -6395,6 +6385,12 @@ void dxil_fill_validation_state(struct ntd_context *ctx,
       psv2->num_threads_x = MAX2(ctx->shader->info.workgroup_size[0], 1);
       psv2->num_threads_y = MAX2(ctx->shader->info.workgroup_size[1], 1);
       psv2->num_threads_z = MAX2(ctx->shader->info.workgroup_size[2], 1);
+      if (ctx->shader->info.min_subgroup_size == ctx->shader->info.max_subgroup_size &&
+          ctx->shader->info.min_subgroup_size == ctx->shader->info.api_subgroup_size &&
+          ctx->shader->info.min_subgroup_size > 1) {
+         psv0->max_expected_wave_lane_count = ctx->shader->info.min_subgroup_size;
+         psv0->min_expected_wave_lane_count = ctx->shader->info.min_subgroup_size;
+      }
       break;
    case DXIL_GEOMETRY_SHADER:
       psv1->max_vertex_count = ctx->shader->info.gs.vertices_out;
@@ -6437,7 +6433,7 @@ add_sysvalue(struct ntd_context *ctx,
               int driver_location)
 {
 
-   nir_variable *var = rzalloc(ctx->shader, nir_variable);
+   nir_variable *var = nir_variable_create_zeroed(ctx->shader);
    if (!var)
       return NULL;
    var->data.driver_location = driver_location;
@@ -6477,7 +6473,7 @@ struct sysvalue_name {
    gl_system_value value;
    int slot;
    char *name;
-   gl_shader_stage only_in_shader;
+   mesa_shader_stage only_in_shader;
 } possible_sysvalues[] = {
    {SYSTEM_VALUE_VERTEX_ID_ZERO_BASE, -1, "SV_VertexID", MESA_SHADER_NONE},
    {SYSTEM_VALUE_INSTANCE_ID, -1, "SV_InstanceID", MESA_SHADER_NONE},
@@ -6632,6 +6628,8 @@ nir_to_dxil(struct nir_shader *s, const struct nir_to_dxil_options *opts,
    NIR_PASS(_, s, nir_lower_frexp);
    NIR_PASS(_, s, nir_lower_flrp, 16 | 32 | 64, true);
    NIR_PASS(_, s, nir_lower_io, nir_var_shader_in | nir_var_shader_out, type_size_vec4, nir_lower_io_lower_64bit_to_32);
+   s->info.disable_input_offset_src_constant_folding = true;
+   s->info.disable_output_offset_src_constant_folding = true;
    NIR_PASS(_, s, dxil_nir_ensure_position_writes);
    NIR_PASS(_, s, dxil_nir_lower_system_values);
    NIR_PASS(_, s, nir_lower_io_to_scalar, nir_var_shader_in | nir_var_system_value | nir_var_shader_out, NULL, NULL);

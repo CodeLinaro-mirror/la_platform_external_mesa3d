@@ -28,8 +28,6 @@
 #include <sstream>
 #include <mutex>
 
-#include "util/ralloc.h"
-#include "util/set.h"
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/IR/DiagnosticPrinter.h>
 #include <llvm/IR/DiagnosticInfo.h>
@@ -68,7 +66,18 @@
 #include <llvm/Support/VirtualFileSystem.h>
 #endif
 
+#if LLVM_VERSION_MAJOR >= 22
+#include <clang/Options/OptionUtils.h>
+#endif
+
+/* We have to include our own headers after LLVM/clang as they seem to use
+ * `UNUSED` within enum definitions:
+ * https://github.com/llvm/llvm-project/blob/ea443eeb2ab8ed49ffb783c2025fed6629a36f10/clang/include/clang/Basic/OffloadArch.h#L19
+ */
 #include "util/macros.h"
+#include "util/ralloc.h"
+#include "util/set.h"
+#include "util/u_dl.h"
 #include "glsl_types.h"
 
 #include "spirv.h"
@@ -866,7 +875,7 @@ clc_compile_to_llvm_module(LLVMContext &llvm_ctx,
    c->getDiagnosticOpts().ShowCarets = false;
 
    c->createDiagnostics(
-#if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 20 && LLVM_VERSION_MAJOR < 22
                    *llvm::vfs::getRealFileSystem(),
 #endif
                    new clang::TextDiagnosticPrinter(
@@ -905,14 +914,7 @@ clc_compile_to_llvm_module(LLVMContext &llvm_ctx,
          ::llvm::MemoryBuffer::getMemBuffer(llvm::StringRef(opencl_c_source, ARRAY_SIZE(opencl_c_source) - 1)).release());
    }
 #else
-
-   Dl_info info;
-   if (dladdr((void *)clang::CompilerInvocation::CreateFromArgs, &info) == 0) {
-      clc_error(logger, "Couldn't find libclang path.\n");
-      return {};
-   }
-
-   char *clang_path = realpath(info.dli_fname, NULL);
+   char *clang_path = util_dl_get_path_from_proc((const void *)clang::CompilerInvocation::CreateFromArgs);
    if (clang_path == nullptr) {
       clc_error(logger, "Couldn't find libclang path.\n");
       return {};
@@ -921,7 +923,9 @@ clc_compile_to_llvm_module(LLVMContext &llvm_ctx,
    // GetResourcePath is a way to retrieve the actual libclang resource dir based on a given binary
    // or library.
    auto tmp_res_path =
-#if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 22
+      clang::GetResourcesPath(std::string(clang_path));
+#elif LLVM_VERSION_MAJOR >= 20
       Driver::GetResourcesPath(std::string(clang_path));
 #else
       Driver::GetResourcesPath(std::string(clang_path), CLANG_RESOURCE_DIR);
@@ -965,6 +969,12 @@ clc_compile_to_llvm_module(LLVMContext &llvm_ctx,
    c->getPreprocessorOpts().addMacroDef("cl_khr_expect_assume=1");
 
    bool needs_opencl_c_h = false;
+   if (args->features.atomic_order_seq_cst) {
+      c->getTargetOpts().OpenCLExtensionsAsWritten.push_back("+__opencl_c_atomic_order_seq_cst");
+   }
+   if (args->features.atomic_scope_device) {
+      c->getTargetOpts().OpenCLExtensionsAsWritten.push_back("+__opencl_c_atomic_scope_device");
+   }
    if (args->features.extended_bit_ops) {
       c->getPreprocessorOpts().addMacroDef("cl_khr_extended_bit_ops=1");
    }
@@ -974,6 +984,9 @@ clc_compile_to_llvm_module(LLVMContext &llvm_ctx,
    if (args->features.fp64) {
       c->getTargetOpts().OpenCLExtensionsAsWritten.push_back("+cl_khr_fp64");
       c->getTargetOpts().OpenCLExtensionsAsWritten.push_back("+__opencl_c_fp64");
+   }
+   if (args->features.generic_address_space) {
+      c->getTargetOpts().OpenCLExtensionsAsWritten.push_back("+__opencl_c_generic_address_space");
    }
    if (args->features.int64) {
       c->getTargetOpts().OpenCLExtensionsAsWritten.push_back("+cles_khr_int64");
@@ -1030,14 +1043,32 @@ clc_compile_to_llvm_module(LLVMContext &llvm_ctx,
    }
    if (args->features.subgroups) {
       c->getTargetOpts().OpenCLExtensionsAsWritten.push_back("+__opencl_c_subgroups");
+      if (args->features.subgroups_ballot) {
+         c->getPreprocessorOpts().addMacroDef("cl_khr_subgroup_ballot=1");
+      }
+      if (args->features.subgroups_clustered) {
+         c->getPreprocessorOpts().addMacroDef("cl_khr_subgroup_clustered_reduce=1");
+      }
+      if (args->features.subgroups_extended_types) {
+         c->getPreprocessorOpts().addMacroDef("cl_khr_subgroup_extended_types=1");
+      }
+      if (args->features.subgroups_named_barrier) {
+         c->getPreprocessorOpts().addMacroDef("cl_khr_subgroup_named_barrier=1");
+      }
+      if (args->features.subgroups_non_uniform_arithmetic) {
+         c->getPreprocessorOpts().addMacroDef("cl_khr_subgroup_non_uniform_arithmetic=1");
+      }
+      if (args->features.subgroups_non_uniform_vote) {
+         c->getPreprocessorOpts().addMacroDef("cl_khr_subgroup_non_uniform_vote=1");
+      }
+      if (args->features.subgroups_rotate) {
+         c->getPreprocessorOpts().addMacroDef("cl_khr_subgroup_rotate=1");
+      }
       if (args->features.subgroups_shuffle) {
          c->getPreprocessorOpts().addMacroDef("cl_khr_subgroup_shuffle=1");
       }
       if (args->features.subgroups_shuffle_relative) {
          c->getPreprocessorOpts().addMacroDef("cl_khr_subgroup_shuffle_relative=1");
-      }
-      if (args->features.subgroups_ballot) {
-         c->getPreprocessorOpts().addMacroDef("cl_khr_subgroup_ballot=1");
       }
    }
    if (args->features.subgroups_ifp) {

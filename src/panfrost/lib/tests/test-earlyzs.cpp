@@ -1,28 +1,11 @@
 /*
  * Copyright (C) 2022 Collabora, Ltd.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 
-#include "util/pan_ir.h"
+#include "compiler/pan_compiler.h"
 #include "pan_earlyzs.h"
+#include "genxml/gen_macros.h"
 
 #include <gtest/gtest.h>
 
@@ -48,7 +31,7 @@
 #define ARCH_HAS_STATE_TRACK_OPT BITFIELD_BIT(11)
 
 static void
-test(enum pan_earlyzs expected_update, enum pan_earlyzs expected_kill,
+test(enum mali_pixel_kill expected_update, enum mali_pixel_kill expected_kill,
      bool expected_shader_readonly_zs, uint32_t flags)
 {
    enum pan_earlyzs_zs_tilebuf_read zs_read = PAN_EARLYZS_ZS_TILEBUF_NOT_READ;
@@ -84,11 +67,11 @@ test(enum pan_earlyzs expected_update, enum pan_earlyzs expected_kill,
 }
 
 #define CASE(expected_update, expected_kill, flags)                            \
-   test(PAN_EARLYZS_##expected_update, PAN_EARLYZS_##expected_kill, false,     \
+   test(MALI_PIXEL_KILL_##expected_update, MALI_PIXEL_KILL_##expected_kill, false,     \
         flags)
 
 #define CASE_RO_ZS(expected_update, expected_kill, expected_ro_zs, flags)      \
-   test(PAN_EARLYZS_##expected_update, PAN_EARLYZS_##expected_kill,            \
+   test(MALI_PIXEL_KILL_##expected_update, MALI_PIXEL_KILL_##expected_kill,            \
         expected_ro_zs, flags)
 
 TEST(EarlyZS, APIForceEarly)

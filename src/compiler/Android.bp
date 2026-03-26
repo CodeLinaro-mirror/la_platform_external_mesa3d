@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2024 The Android Open Source Project
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * Submit patches, do not hand-edit.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package {
@@ -19,8 +14,68 @@ package {
     default_applicable_licenses: ["external_mesa3d_license"],
 }
 
+python_binary_host {
+    name: "builtin_types_c_py_binary",
+    main: "builtin_types_c.py",
+    srcs: [
+        "builtin_types.py",
+        "builtin_types_c.py",
+    ],
+    libs: [
+        "mako",
+        "pyyaml",
+    ],
+}
+
+python_binary_host {
+    name: "builtin_types_h_py_binary",
+    main: "builtin_types_h.py",
+    srcs: [
+        "builtin_types.py",
+        "builtin_types_h.py",
+    ],
+    libs: [
+        "mako",
+        "pyyaml",
+    ],
+}
+
+genrule {
+    name: "builtin_types.c",
+    out: [
+        "builtin_types.c",
+    ],
+    tools: [
+        "builtin_types_c_py_binary",
+    ],
+    cmd: "$(location builtin_types_c_py_binary) $(location builtin_types.c)",
+}
+
+genrule {
+    name: "builtin_types.h",
+    out: [
+        "builtin_types.h",
+    ],
+    tools: [
+        "builtin_types_h_py_binary",
+    ],
+    cmd: "$(location builtin_types_h_py_binary) $(location builtin_types.h)",
+}
+
+genrule {
+    name: "ir_expression_operation.h",
+    out: [
+        "ir_expression_operation.h",
+    ],
+    tools: [
+        "ir_expression_operation_py_binary",
+    ],
+    cmd: "$(location ir_expression_operation_py_binary) enum > $(location " +
+        "ir_expression_operation.h)",
+}
+
 cc_library_headers {
-    name: "mesa_compiler_headers",
+    name: "inc_compiler",
     vendor: true,
     host_supported: true,
     export_include_dirs: [
@@ -28,96 +83,29 @@ cc_library_headers {
     ],
 }
 
-filegroup {
-    name: "mesa_float64_glsl",
-    srcs: ["glsl/float64.glsl"],
-}
-
-python_binary_host {
-    name: "ir_expression_operation_gen",
-    main: "glsl/ir_expression_operation.py",
-    srcs: [
-        "glsl/ir_expression_operation.py",
-    ],
-    libs: [
-        "mako",
-    ],
-}
-
-genrule {
-    name: "ir_expression_operation_header",
-    out: ["ir_expression_operation.h"],
-    tools: ["ir_expression_operation_gen"],
-    cmd: "python3 $(location ir_expression_operation_gen) enum" +
-        "&> $(location ir_expression_operation.h)",
-}
-
-python_binary_host {
-    name: "builtin_types_header_gen",
-    main: "builtin_types_h.py",
-    srcs: [
-        "builtin_types_h.py",
-        "builtin_types.py",
-    ],
-    libs: [
-        "mako",
-    ],
-    embedded_launcher: false,
-}
-
-python_binary_host {
-    name: "builtin_types_impl_gen",
-    main: "builtin_types_c.py",
-    srcs: [
-        "builtin_types_c.py",
-        "builtin_types.py",
-    ],
-    libs: [
-        "mako",
-    ],
-    embedded_launcher: false,
-}
-
-genrule {
-    name: "builtin_types_header",
-    out: ["builtin_types.h"],
-    tools: ["builtin_types_header_gen"],
-    cmd: "python3 $(location builtin_types_header_gen) " +
-        "$(location builtin_types.h)",
-}
-
-genrule {
-    name: "builtin_types_impl",
-    out: ["builtin_types.c"],
-    tools: ["builtin_types_impl_gen"],
-    cmd: "python3 $(location builtin_types_impl_gen) " +
-        "$(location builtin_types.c)",
-}
-
 cc_library_static {
-    name: "mesa_compiler",
+    name: "compiler",
     vendor: true,
+    c_std: "c11",
     host_supported: true,
     defaults: [
-        "mesa_common_defaults",
-    ],
-    static_libs: [
-        "mesa_util_c11",
-    ],
-    generated_headers: [
-        "ir_expression_operation_header",
-        "builtin_types_header",
-        "u_format_gen_header",
-    ],
-    generated_sources: [
-        "builtin_types_impl",
+        "_trial_msvc",
+        "aosp_mesa3d_c_link_args",
+        "aosp_mesa3d_c_project_args",
+        "no_override_init_args",
     ],
     header_libs: [
-        "mesa_gallium_auxiliary_headers",
-        "mesa_gallium_headers",
-        "mesa_src_headers",
-        "mesa_compiler_headers",
-        "mesa_common_headers",
+        "inc_compiler",
+        "inc_include",
+        "inc_src",
+    ],
+    generated_headers: [
+        "builtin_types.h",
+        "ir_expression_operation.h",
+        "u_format_gen.h",
+    ],
+    generated_sources: [
+        "builtin_types.c",
     ],
     srcs: [
         "glsl_types.c",

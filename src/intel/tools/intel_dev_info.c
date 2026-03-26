@@ -38,7 +38,7 @@
 #include "dev/intel_device_info.h"
 #include "dev/intel_device_info_serialize.h"
 #include "dev/intel_hwconfig.h"
-#include "compiler/brw_compiler.h"
+#include "compiler/brw/brw_compiler.h"
 
 static int
 error(char *fmt, ...)
@@ -96,6 +96,7 @@ print_base_devinfo(const struct intel_device_info *devinfo)
            devinfo->ver >= 20 ? 16 : devinfo->ver >= 12 ? 8 : 4);
 
    fprintf(stdout, "   EU threads: %u\n", n_eus * devinfo->num_thread_per_eu);
+   fprintf(stdout, "   GRF size: %u\n", devinfo->grf_size);
 
    fprintf(stdout, "   LLC: %u\n", devinfo->has_llc);
    fprintf(stdout, "   threads per EU: %u\n", devinfo->num_thread_per_eu);
@@ -110,9 +111,18 @@ print_base_devinfo(const struct intel_device_info *devinfo)
            devinfo->timestamp_frequency, 1000000000.0 / devinfo->timestamp_frequency);
 
    fprintf(stdout, "   URB size: %u\n", devinfo->urb.size);
-   static const char *stage_names[4] = {
-      "VS", "HS", "DS", "GS",
+   static const char *stage_names[] = {
+      [MESA_SHADER_VERTEX]    = "VS",
+      [MESA_SHADER_TESS_CTRL] = "HS",
+      [MESA_SHADER_TESS_EVAL] = "DS",
+      [MESA_SHADER_GEOMETRY]  = "GS",
+      [MESA_SHADER_FRAGMENT]  = "FS",
+      [MESA_SHADER_COMPUTE]   = "CS",
+      [MESA_SHADER_TASK]      = "TS",
+      [MESA_SHADER_MESH]      = "MS",
    };
+   STATIC_ASSERT(ARRAY_SIZE(stage_names) ==
+                 ARRAY_SIZE(devinfo->urb.min_entries));
    for (unsigned s = 0; s < ARRAY_SIZE(devinfo->urb.min_entries); s++) {
       fprintf(stdout, "      URB.entries[%s] = [%4u, %4u]\n",
               stage_names[s],
@@ -271,7 +281,7 @@ main(int argc, char *argv[])
              */
             if (devinfo.ver >= 9) {
                JSON_Object *obj = json_object(json);
-               char device_info_sha[41];
+               char device_info_sha[SHA1_DIGEST_STRING_LENGTH];
                brw_device_sha1(device_info_sha, &devinfo);
                json_object_set_string(obj, "shader_cache_sha1", device_info_sha);
             }

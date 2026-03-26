@@ -20,6 +20,9 @@
 #include "ir3_parser.h"
 #include "ir3_shader.h"
 
+#include "nir/nir.h"
+#include "nir/nir_xfb_info.h"
+
 #include "freedreno/isa/ir3-isa.h"
 #include "isa/isa.h"
 
@@ -37,14 +40,14 @@ ir3_const_ensure_imm_size(struct ir3_shader_variant *v, unsigned size)
    /* Immediates are uploaded in units of vec4 so make sure our buffer is large
     * enough.
     */
-   size = ALIGN(size, 4);
+   size = align(size, 4);
 
    /* Pre-a7xx, the immediates that get lowered to const registers are
     * emitted as part of the const state so the total size of immediates
     * should be the same for the binning and non-binning variants. Make sure
     * we don't increase the size beyond that of the non-binning variant.
     */
-   if (v->binning_pass && !v->compiler->load_shader_consts_via_preamble &&
+   if (v->binning_pass && !v->compiler->info->props.load_shader_consts_via_preamble &&
        size > v->nonbinning->imm_state.size) {
       return false;
    }
@@ -179,8 +182,7 @@ ir3_shader_assemble(struct ir3_shader_variant *v)
     * index.
     */
    v->pvtmem_per_wave = compiler->gen >= 6 && !info->multi_dword_ldp_stp &&
-                        ((v->type == MESA_SHADER_COMPUTE) ||
-                         (v->type == MESA_SHADER_KERNEL));
+                        ir3_shader_compute(v);
 
    return bin;
 }
@@ -395,7 +397,7 @@ assemble_variant(struct ir3_shader_variant *v, bool internal)
 {
    v->bin = ir3_shader_assemble(v);
 
-   unsigned char sha1[21];
+   unsigned char sha1[SHA1_DIGEST_LENGTH + 1];
 
    struct mesa_sha1 ctx;
 
@@ -406,7 +408,8 @@ assemble_variant(struct ir3_shader_variant *v, bool internal)
    _mesa_sha1_final(&ctx, sha1);
    _mesa_sha1_format(v->sha1_str, sha1);
 
-   bool dbg_enabled = shader_debug_enabled(v->type, internal);
+   bool dbg_enabled = shader_debug_enabled(v->type, internal) ||
+                      ir3_shader_bisect_disasm_select(v);
    if (dbg_enabled || ir3_shader_override_path || v->disasm_info.write_disasm) {
       bool shader_overridden =
          ir3_shader_override_path && try_override_shader_variant(v, v->sha1_str);
@@ -510,6 +513,7 @@ alloc_variant(struct ir3_shader *shader, const struct ir3_shader_key *key,
       return NULL;
 
    v->id = ++shader->variant_count;
+   v->shader = shader;
    v->shader_id = shader->id;
    v->binning_pass = !!nonbinning;
    v->nonbinning = nonbinning;
@@ -616,9 +620,13 @@ create_variant(struct ir3_shader *shader, const struct ir3_shader_key *key,
       shader->nir_finalized = true;
    }
 
-   if (v->type == MESA_SHADER_COMPUTE ||
-       v->type == MESA_SHADER_KERNEL) {
+   if (ir3_shader_compute(v)) {
       v->cs.force_linear_dispatch = shader->cs.force_linear_dispatch;
+
+      v->local_size[0] = shader->nir->info.workgroup_size[0];
+      v->local_size[1] = shader->nir->info.workgroup_size[1];
+      v->local_size[2] = shader->nir->info.workgroup_size[2];
+      v->local_size_variable = shader->nir->info.workgroup_size_variable;
    }
 
    struct ir3_const_state *const_state = ir3_const_state_mut(v);
@@ -660,9 +668,10 @@ shader_variant(struct ir3_shader *shader, const struct ir3_shader_key *key)
 }
 
 struct ir3_shader_variant *
-ir3_shader_get_variant(struct ir3_shader *shader,
-                       const struct ir3_shader_key *key, bool binning_pass,
-                       bool write_disasm, bool *created)
+ir3_shader_get_variant(struct ir3_shader *shader, const struct ir3_shader_key *key,
+                       bool binning_pass, bool write_disasm,
+                       void (*upload)(struct ir3_shader_variant *v, void *),
+                       void *arg)
 {
    MESA_TRACE_FUNC();
 
@@ -675,7 +684,11 @@ ir3_shader_get_variant(struct ir3_shader *shader,
       if (v) {
          v->next = shader->variants;
          shader->variants = v;
-         *created = true;
+         if (upload) {
+            upload(v, arg);
+            if (v->binning)
+               upload(v->binning, arg);
+         }
       }
    }
 
@@ -698,23 +711,26 @@ ir3_shader_passthrough_tcs(struct ir3_shader *vs, unsigned patch_vertices)
 
    unsigned n = patch_vertices - 1;
    if (!vs->vs.passthrough_tcs[n]) {
+      unsigned locations[MAX_VARYING];
+      unsigned num_locations = 0;
+
+      u_foreach_bit64 (slot, vs->nir->info.outputs_written) {
+         locations[num_locations++] = slot;
+      }
+
       const nir_shader_compiler_options *options =
             ir3_get_compiler_options(vs->compiler);
       nir_shader *tcs =
-            nir_create_passthrough_tcs(options, vs->nir, patch_vertices);
+            nir_create_passthrough_tcs_impl(options, locations, num_locations,
+                                            patch_vertices);
 
       /* Technically it is an internal shader but it is confusing to
        * not have it show up in debug output
        */
       tcs->info.internal = false;
 
-      nir_assign_io_var_locations(tcs, nir_var_shader_in,
-                                  &tcs->num_inputs,
-                                  tcs->info.stage);
-
-      nir_assign_io_var_locations(tcs, nir_var_shader_out,
-                                  &tcs->num_outputs,
-                                  tcs->info.stage);
+      nir_assign_io_var_locations(tcs, nir_var_shader_in);
+      nir_assign_io_var_locations(tcs, nir_var_shader_out);
 
       NIR_PASS(_, tcs, nir_lower_system_values);
 
@@ -723,9 +739,10 @@ ir3_shader_passthrough_tcs(struct ir3_shader *vs, unsigned patch_vertices)
       struct ir3_shader_options ir3_options = {};
 
       ir3_finalize_nir(vs->compiler, &ir3_options.nir_options, tcs);
+      ir3_nir_lower_io(tcs);
 
       vs->vs.passthrough_tcs[n] =
-            ir3_shader_from_nir(vs->compiler, tcs, &ir3_options, NULL);
+            ir3_shader_from_nir(vs->compiler, tcs, &ir3_options);
 
       vs->vs.passthrough_tcs_compiled |= BITFIELD_BIT(n);
    }
@@ -769,7 +786,8 @@ ir3_setup_used_key(struct ir3_shader *shader)
     * ucp_enables to determine whether to lower legacy clip planes to
     * gl_ClipDistance.
     */
-   if (info->stage != MESA_SHADER_COMPUTE && (info->stage != MESA_SHADER_FRAGMENT || !shader->compiler->has_clip_cull))
+   if (!mesa_shader_stage_is_compute(info->stage) &&
+       (info->stage != MESA_SHADER_FRAGMENT || !shader->compiler->has_clip_cull))
       key->ucp_enables = 0xff;
 
    if (info->stage == MESA_SHADER_FRAGMENT) {
@@ -796,7 +814,7 @@ ir3_setup_used_key(struct ir3_shader *shader)
        * enabled:
        */
       key->force_dual_color_blend = shader->compiler->options.dual_color_blend_by_location;
-   } else if (info->stage == MESA_SHADER_COMPUTE) {
+   } else if (mesa_shader_stage_is_compute(info->stage)) {
       key->fastc_srgb = ~0;
       key->fsamples = ~0;
       memset(key->fsampler_swizzles, 0xff, sizeof(key->fsampler_swizzles));
@@ -828,11 +846,12 @@ trim_constlens(unsigned *constlens, unsigned first_stage, unsigned last_stage,
       cur_total += constlens[i];
    }
 
-   unsigned max_stage = 0;
-   unsigned max_const = 0;
    uint32_t trimmed = 0;
 
    while (cur_total > combined_limit) {
+      unsigned max_stage = 0;
+      unsigned max_const = 0;
+
       for (unsigned i = first_stage; i <= last_stage; i++) {
          if (constlens[i] >= max_const) {
             max_stage = i;
@@ -902,10 +921,38 @@ ir3_trim_constlen(const struct ir3_shader_variant **variants,
    return trimmed;
 }
 
+static void
+translate_xfb_info(nir_shader *nir, struct ir3_stream_output_info *info)
+{
+   if (!nir->xfb_info)
+      return;
+
+   nir_xfb_info *xfb = nir->xfb_info;
+
+   assert(xfb->output_count <= IR3_MAX_SO_OUTPUTS);
+   info->num_outputs = xfb->output_count;
+
+   for (int i = 0; i < IR3_MAX_SO_BUFFERS; i++) {
+      info->stride[i] = xfb->buffers[i].stride / 4;
+      info->buffer_to_stream[i] = xfb->buffer_to_stream[i];
+   }
+
+   info->streams_written = xfb->streams_written;
+
+   for (int i = 0; i < xfb->output_count; i++) {
+      info->output[i].location = xfb->outputs[i].location;
+      info->output[i].start_component = xfb->outputs[i].component_offset;
+      info->output[i].num_components =
+                           util_bitcount(xfb->outputs[i].component_mask);
+      info->output[i].output_buffer  = xfb->outputs[i].buffer;
+      info->output[i].dst_offset = xfb->outputs[i].offset / 4;
+      info->output[i].stream = xfb->buffer_to_stream[xfb->outputs[i].buffer];
+   }
+}
+
 struct ir3_shader *
 ir3_shader_from_nir(struct ir3_compiler *compiler, nir_shader *nir,
-                    const struct ir3_shader_options *options,
-                    struct ir3_stream_output_info *stream_output)
+                    const struct ir3_shader_options *options)
 {
    struct ir3_shader *shader = rzalloc_size(NULL, sizeof(*shader));
 
@@ -913,9 +960,7 @@ ir3_shader_from_nir(struct ir3_compiler *compiler, nir_shader *nir,
    shader->compiler = compiler;
    shader->id = p_atomic_inc_return(&shader->compiler->shader_count);
    shader->type = nir->info.stage;
-   if (stream_output)
-      memcpy(&shader->stream_output, stream_output,
-             sizeof(shader->stream_output));
+   translate_xfb_info(nir, &shader->stream_output);
    shader->options = *options;
    shader->nir = nir;
 
@@ -1093,9 +1138,22 @@ print_raw(FILE *out, const BITSET_WORD *data, size_t size) {
    fprintf(out, "raw 0x%X%X\n", data[0], data[1]);
 }
 
-void
-ir3_shader_disasm(struct ir3_shader_variant *so, uint32_t *bin, FILE *out)
+static void
+pre_instr_cb(void *d, unsigned n, void *instr)
 {
+   struct ir3_disasm_options *options = d;
+
+   if (options->print_raw) {
+      uint32_t *dwords = instr;
+      fprintf(options->out, "%3d[%08x_%08x] ", n, dwords[1], dwords[0]);
+   }
+}
+
+void
+ir3_shader_disasm_options(struct ir3_shader_variant *so, uint32_t *bin,
+                          struct ir3_disasm_options *options)
+{
+   FILE *out = options->out;
    struct ir3 *ir = so->ir;
    struct ir3_register *reg;
    const char *type = ir3_shader_stage(so);
@@ -1144,6 +1202,8 @@ ir3_shader_disasm(struct ir3_shader_variant *so, uint32_t *bin, FILE *out)
                      .show_errors = true,
                      .branch_labels = true,
                      .no_match_cb = print_raw,
+                     .pre_instr_cb = pre_instr_cb,
+                     .cbdata = options,
                   });
 
    fprintf(out, "; %s: outputs:", type);
@@ -1205,6 +1265,13 @@ ir3_shader_disasm(struct ir3_shader_variant *so, uint32_t *bin, FILE *out)
          so->info.preamble_instrs_count, so->info.early_preamble);
    }
 
+   for (unsigned i = 0; i < so->stream_output.num_outputs; i++) {
+      fprintf(out, "; streamout %u offset %u components %u\n",
+              so->stream_output.output[i].location,
+              so->stream_output.output[i].dst_offset,
+              so->stream_output.output[i].num_components);
+   }
+
    /* print shader type specific info: */
    switch (so->type) {
    case MESA_SHADER_VERTEX:
@@ -1246,6 +1313,17 @@ ir3_shader_disasm(struct ir3_shader_variant *so, uint32_t *bin, FILE *out)
    fprintf(out, "\n");
 }
 
+void
+ir3_shader_disasm(struct ir3_shader_variant *so, uint32_t *bin, FILE *out)
+{
+   struct ir3_disasm_options options = {
+      .out = out,
+      .print_raw = false,
+   };
+
+   ir3_shader_disasm_options(so, bin, &options);
+}
+
 uint64_t
 ir3_shader_outputs(const struct ir3_shader *so)
 {
@@ -1255,15 +1333,15 @@ ir3_shader_outputs(const struct ir3_shader *so)
 void
 ir3_shader_get_subgroup_size(const struct ir3_compiler *compiler,
                              const struct ir3_shader_options *options,
-                             gl_shader_stage stage, unsigned *subgroup_size,
+                             mesa_shader_stage stage, unsigned *subgroup_size,
                              unsigned *max_subgroup_size)
 {
    switch (options->api_wavesize) {
    case IR3_SINGLE_ONLY:
-      *subgroup_size = *max_subgroup_size = compiler->threadsize_base;
+      *subgroup_size = *max_subgroup_size = compiler->info->threadsize_base;
       break;
    case IR3_DOUBLE_ONLY:
-      *subgroup_size = *max_subgroup_size = compiler->threadsize_base * 2;
+      *subgroup_size = *max_subgroup_size = compiler->info->threadsize_base * 2;
       break;
    case IR3_SINGLE_OR_DOUBLE:
       /* For vertex stages, we know the wavesize will never be doubled.
@@ -1271,11 +1349,11 @@ ir3_shader_get_subgroup_size(const struct ir3_compiler *compiler,
        * translating from NIR. Otherwise use the "real" wavesize obtained as
        * a driver param.
        */
-      if (stage != MESA_SHADER_COMPUTE && stage != MESA_SHADER_FRAGMENT) {
-         *subgroup_size = *max_subgroup_size = compiler->threadsize_base;
+      if (!is_compute_or_frag(stage)) {
+         *subgroup_size = *max_subgroup_size = compiler->info->threadsize_base;
       } else {
          *subgroup_size = 0;
-         *max_subgroup_size = compiler->threadsize_base * 2;
+         *max_subgroup_size = compiler->info->threadsize_base * 2;
       }
       break;
    }
@@ -1296,7 +1374,7 @@ ir3_link_stream_out(struct ir3_shader_linkage *l,
     */
    for (unsigned i = 0; i < strmout->num_outputs; i++) {
       const struct ir3_stream_output *out = &strmout->output[i];
-      unsigned k = out->register_index;
+      gl_varying_slot slot = out->location;
       unsigned compmask =
          (1 << (out->num_components + out->start_component)) - 1;
       unsigned idx, nextloc = 0;
@@ -1304,19 +1382,29 @@ ir3_link_stream_out(struct ir3_shader_linkage *l,
       /* psize/pos need to be the last entries in linkage map, and will
        * get added link_stream_out, so skip over them:
        */
-      if ((v->outputs[k].slot == VARYING_SLOT_PSIZ) ||
-          (v->outputs[k].slot == VARYING_SLOT_POS))
+      if ((slot == VARYING_SLOT_PSIZ) ||
+          (slot == VARYING_SLOT_POS))
          continue;
 
       for (idx = 0; idx < l->cnt; idx++) {
-         if (l->var[idx].slot == v->outputs[k].slot)
+         if (l->var[idx].slot == slot)
             break;
          nextloc = MAX2(nextloc, l->var[idx].loc + 4);
       }
 
+      unsigned k = 0;
+      for (; k < v->outputs_count; k++) {
+         if (v->outputs[k].slot == slot)
+            break;
+      }
+
+      /* Skip it, if it's an output that was never assigned a register. */
+      if (k >= v->outputs_count || v->outputs[k].regid == INVALID_REG)
+         continue;
+
       /* add if not already in linkage map: */
       if (idx == l->cnt) {
-         ir3_link_add(l, v->outputs[k].slot, v->outputs[k].regid,
+         ir3_link_add(l, slot, v->outputs[k].regid,
                       compmask, nextloc);
       }
 

@@ -454,7 +454,9 @@ nv50_clear_depth_stencil(struct pipe_context *pipe,
 }
 
 void
-nv50_clear(struct pipe_context *pipe, unsigned buffers, const struct pipe_scissor_state *scissor_state,
+nv50_clear(struct pipe_context *pipe, unsigned buffers,
+           uint32_t color_clear_mask, uint8_t stencil_clear_mask,
+           const struct pipe_scissor_state *scissor_state,
            const union pipe_color_union *color,
            double depth, unsigned stencil)
 {
@@ -815,7 +817,7 @@ nv50_blitter_make_vp(struct nv50_blitter *blit)
       0x10000811, 0x0423c789, /* mov b32 o[0x10] s[0x10] */ /* TEXC.z */
    };
 
-   blit->vp.type = PIPE_SHADER_VERTEX;
+   blit->vp.type = MESA_SHADER_VERTEX;
    blit->vp.translated = true;
    blit->vp.code = (uint32_t *)code; /* const_cast */
    blit->vp.code_size = sizeof(code);
@@ -867,7 +869,7 @@ nv50_blitter_make_fp(struct pipe_context *pipe,
 
    const int chipset = nouveau_screen(pipe->screen)->device->chipset;
    const nir_shader_compiler_options *options =
-      nv50_ir_nir_shader_compiler_options(chipset, PIPE_SHADER_FRAGMENT);
+      nv50_ir_nir_shader_compiler_options(chipset, MESA_SHADER_FRAGMENT);
 
    struct nir_builder b =
       nir_builder_init_simple_shader(MESA_SHADER_FRAGMENT, options,

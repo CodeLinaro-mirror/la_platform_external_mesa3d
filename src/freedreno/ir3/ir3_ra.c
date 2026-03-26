@@ -348,7 +348,7 @@ struct ra_ctx {
    struct ir3_block *block;
 
    const struct ir3_compiler *compiler;
-   gl_shader_stage stage;
+   mesa_shader_stage stage;
 
    /* Pending moves of top-level intervals that will be emitted once we're
     * finished:
@@ -615,38 +615,41 @@ ra_interval_dump(struct log_stream *stream, struct ra_interval *interval)
 }
 
 static void
-ra_file_dump(struct log_stream *stream, struct ra_file *file)
+ra_file_dump(struct log_stream *stream, struct ra_file *file, const char *name)
 {
+   mesa_log_stream_printf(stream, "%s:\n", name);
    rb_tree_foreach (struct ra_interval, interval, &file->physreg_intervals,
                     physreg_node) {
       ra_interval_dump(stream, interval);
    }
 
    unsigned start, end;
-   mesa_log_stream_printf(stream, "available:\n");
+   mesa_log_stream_printf(stream, "%s available: ", name);
    BITSET_FOREACH_RANGE (start, end, file->available, file->size) {
       mesa_log_stream_printf(stream, "%u-%u ", start, end);
    }
    mesa_log_stream_printf(stream, "\n");
 
-   mesa_log_stream_printf(stream, "available to evict:\n");
+   mesa_log_stream_printf(stream, "%s available to evict: ", name);
    BITSET_FOREACH_RANGE (start, end, file->available_to_evict, file->size) {
       mesa_log_stream_printf(stream, "%u-%u ", start, end);
    }
    mesa_log_stream_printf(stream, "\n");
-   mesa_log_stream_printf(stream, "start: %u\n", file->start);
+   mesa_log_stream_printf(stream, "%s start: %u\n", name, file->start);
 }
 
 static void
 ra_ctx_dump(struct ra_ctx *ctx)
 {
    struct log_stream *stream = mesa_log_streami();
-   mesa_log_stream_printf(stream, "full:\n");
-   ra_file_dump(stream, &ctx->full);
-   mesa_log_stream_printf(stream, "half:\n");
-   ra_file_dump(stream, &ctx->half);
-   mesa_log_stream_printf(stream, "shared:\n");
-   ra_file_dump(stream, &ctx->shared);
+   ra_file_dump(stream, &ctx->full, "full");
+   if (ctx->half.size != 0) {
+      /* No need to print this file in the mergedregs case when nothing can
+       * allocate to it.
+       */
+      ra_file_dump(stream, &ctx->half, "half");
+   }
+   ra_file_dump(stream, &ctx->shared, "shared");
    mesa_log_stream_destroy(stream);
 }
 
@@ -1237,7 +1240,7 @@ compress_regs_left(struct ra_ctx *ctx, struct ra_file *file,
       }
 
       if (!(cur_reg->flags & IR3_REG_HALF))
-         physreg = ALIGN(physreg, 2);
+         physreg = align(physreg, 2);
 
       d("pushing reg %u physreg %u\n", cur_reg->name, physreg);
 
@@ -1330,7 +1333,9 @@ find_best_gap(struct ra_ctx *ctx, struct ra_file *file,
    BITSET_WORD *available =
       is_early_clobber(dst) ? file->available_to_evict : file->available;
 
-   unsigned start = ALIGN(file->start, alignment) % (file_size - size + alignment);
+   unsigned start = align(file->start, alignment);
+   if (start + size > file_size)
+      start = 0;
    unsigned candidate = start;
    do {
       bool is_available = true;
@@ -1382,6 +1387,34 @@ try_allocate_src(struct ra_ctx *ctx, struct ra_file *file,
    return ~0;
 }
 
+static physreg_t
+try_allocate_src_subreg(struct ra_ctx *ctx, struct ra_file *file,
+                        struct ir3_register *reg,
+                        enum ir3_subreg_move subreg_move)
+{
+   assert(subreg_move != IR3_SUBREG_MOVE_NONE);
+
+   /* Subreg moves always write a half register. */
+   assert(reg_elem_size(reg) == 1);
+
+   struct ir3_register *src = reg->instr->srcs[0];
+   if (!ra_reg_is_src(src) || ra_get_file(ctx, src) != file)
+      return ~0;
+
+   unsigned offset = subreg_move == IR3_SUBREG_MOVE_LOWER ? 0 : 1;
+   struct ra_interval *src_interval = ra_interval_get(ctx, src->def);
+   physreg_t src_physreg = ra_interval_get_physreg(src_interval) + offset;
+   unsigned file_size = reg_file_size(file, reg);
+   unsigned size = reg_size(reg);
+
+   if (src_physreg + size <= file_size &&
+       get_reg_specified(ctx, file, reg, src_physreg, false)) {
+      return src_physreg;
+   }
+
+   return ~0;
+}
+
 static bool
 rpt_has_unique_merge_set(struct ir3_instruction *instr)
 {
@@ -1408,6 +1441,33 @@ rpt_has_unique_merge_set(struct ir3_instruction *instr)
    return true;
 }
 
+/* Handles this case when a reg's merge set has a preferred reg but is currently
+ * unavailable. In this case, it's often preferable to reset its preferred reg
+ * and assign a new one, as this potentially reduces the number of movs needed
+ * for the as of yet unallocated regs.
+ */
+void
+ir3_ra_handle_unavailable_merge_set(struct ir3_register *reg)
+{
+   unsigned num_unallocated = 0;
+
+   for (unsigned i = 0; i < reg->merge_set->regs_count; i++) {
+      if (reg->merge_set->regs[i]->num == INVALID_REG) {
+         num_unallocated++;
+
+         /* Only reset the preferred reg if there are at least two still
+          * unallocated regs. It doesn't make sense to reassign the merge set
+          * for a single reg, and increasing the bound more doesn't seem to
+          * improve shader stats.
+          */
+         if (num_unallocated >= 2) {
+            reg->merge_set->preferred_reg = (physreg_t)~0;
+            return;
+         }
+      }
+   }
+}
+
 /* This is the main entrypoint for picking a register. Pick a free register
  * for "reg", shuffling around sources if necessary. In the normal case where
  * "is_source" is false, this register can overlap with killed sources
@@ -1420,6 +1480,16 @@ rpt_has_unique_merge_set(struct ir3_instruction *instr)
 static physreg_t
 get_reg(struct ra_ctx *ctx, struct ra_file *file, struct ir3_register *reg)
 {
+   /* For subreg moves (see ir3_is_subreg_move), try to allocate half of their
+    * full src for their dst. If this succeeds, the instruction can be removed.
+    */
+   enum ir3_subreg_move subreg_move = ir3_is_subreg_move(reg->instr);
+   if (subreg_move != IR3_SUBREG_MOVE_NONE) {
+      physreg_t src_reg = try_allocate_src_subreg(ctx, file, reg, subreg_move);
+      if (src_reg != (physreg_t)~0)
+         return src_reg;
+   }
+
    unsigned file_size = reg_file_size(file, reg);
    if (reg->merge_set && reg->merge_set->preferred_reg != (physreg_t)~0) {
       physreg_t preferred_reg =
@@ -1428,6 +1498,8 @@ get_reg(struct ra_ctx *ctx, struct ra_file *file, struct ir3_register *reg)
           preferred_reg % reg_elem_size(reg) == 0 &&
           get_reg_specified(ctx, file, reg, preferred_reg, false))
          return preferred_reg;
+
+      ir3_ra_handle_unavailable_merge_set(reg);
    }
 
    /* For repeated instructions whose merge set is unique (i.e., only used for
@@ -2260,6 +2332,17 @@ insert_live_out_moves(struct ra_ctx *ctx)
    insert_file_live_out_moves(ctx, &ctx->shared);
 }
 
+static bool
+has_merge_set_preferred_reg(struct ir3_register *reg)
+{
+   assert(reg->merge_set);
+   assert(reg->num != INVALID_REG);
+
+   return reg->merge_set->preferred_reg != (physreg_t)~0 &&
+          ra_reg_get_physreg(reg) ==
+             reg->merge_set->preferred_reg + reg->merge_set_offset;
+}
+
 static void
 handle_block(struct ra_ctx *ctx, struct ir3_block *block)
 {
@@ -2269,6 +2352,50 @@ handle_block(struct ra_ctx *ctx, struct ir3_block *block)
    ra_file_init(&ctx->full);
    ra_file_init(&ctx->half);
    ra_file_init(&ctx->shared);
+
+   if (block == ir3_after_preamble(block->shader) &&
+       block != ir3_start_block(block->shader)) {
+      /* Reset the file start in the first block after the preamble to make the
+       * main shader independent of the preamble. Without this, the allocated
+       * registers in the main shader will depend on how many registers were
+       * used in the preamble. This in turn may cause more or less copies being
+       * generated or postsched behaving differently due to a difference in
+       * false dependencies. This is undesirable when analyzing compiler changes
+       * that should only affect the preamble as they may also change main
+       * shader stats, generating noise in the shader-db output.
+       */
+      ctx->full.start = 0;
+      ctx->half.start = 0;
+      ctx->shared.start = 0;
+
+      /* However, make sure the file start accounts for defs that are
+       * live-through the preamble (inputs and tex prefetches). If not, this
+       * could introduce unwanted false dependencies.
+       */
+      foreach_instr (input, &ir3_start_block(block->shader)->instr_list) {
+         if (input->opc != OPC_META_INPUT &&
+             input->opc != OPC_META_TEX_PREFETCH) {
+            break;
+         }
+
+         struct ir3_register *dst = input->dsts[0];
+         assert(dst->num != INVALID_REG);
+
+         physreg_t dst_end;
+
+         if (dst->merge_set && has_merge_set_preferred_reg(dst)) {
+            /* Take the whole merge set into account to prevent its range being
+             * allocated for defs not part of the merge set.
+             */
+            dst_end = dst->merge_set->preferred_reg + dst->merge_set->size;
+         } else {
+            dst_end = ra_reg_get_physreg(dst) + reg_size(dst);
+         }
+
+         struct ra_file *file = ra_get_file(ctx, dst);
+         file->start = MAX2(file->start, dst_end);
+      }
+   }
 
    /* Handle live-ins, phis, and input meta-instructions. These all appear
     * live at the beginning of the block, and interfere with each other
@@ -2584,7 +2711,7 @@ calc_limit_pressure_for_cs_with_barrier(struct ir3_shader_variant *v,
 
    if (v->local_size_variable) {
       if (v->type == MESA_SHADER_KERNEL) {
-         threads_per_wg = compiler->threadsize_base * (double_threadsize ? 2 : 1);
+         threads_per_wg = compiler->info->threadsize_base * (double_threadsize ? 2 : 1);
       } else {
          /* We have to expect the worst case. */
          threads_per_wg = compiler->max_variable_workgroup_size;
@@ -2602,8 +2729,8 @@ calc_limit_pressure_for_cs_with_barrier(struct ir3_shader_variant *v,
     */
 
    unsigned waves_per_wg = DIV_ROUND_UP(
-      threads_per_wg, compiler->threadsize_base * (double_threadsize ? 2 : 1) *
-                         compiler->wave_granularity);
+      threads_per_wg, compiler->info->threadsize_base * (double_threadsize ? 2 : 1) *
+                         compiler->info->wave_granularity);
 
    uint32_t vec4_regs_per_thread =
       compiler->reg_size_vec4 / (waves_per_wg * (double_threadsize ? 2 : 1));
@@ -2620,6 +2747,35 @@ calc_limit_pressure_for_cs_with_barrier(struct ir3_shader_variant *v,
           */
       }
    }
+}
+
+struct ir3_pressure
+ir3_ra_get_reg_file_limits(struct ir3_shader_variant *v)
+{
+   struct ir3_pressure limit_pressure = {
+      .full = RA_FULL_SIZE,
+      .half = RA_HALF_SIZE,
+      .shared = RA_SHARED_SIZE,
+      .shared_half = RA_SHARED_HALF_SIZE,
+   };
+
+   if (mesa_shader_stage_is_compute(v->type) &&
+       v->shader->nir->info.uses_control_barrier) {
+      calc_limit_pressure_for_cs_with_barrier(v, &limit_pressure);
+   }
+
+   /* If the user forces a doubled threadsize, we may have to lower the limit
+    * because on some gens the register file is not big enough to hold a
+    * double-size wave with all 48 registers in use.
+    */
+   if (v->shader_options.real_wavesize == IR3_DOUBLE_ONLY) {
+      limit_pressure.full =
+         MIN2(limit_pressure.full, v->compiler->reg_size_vec4 / 2 * 16);
+   }
+
+   assert(limit_pressure.full <= RA_FULL_SIZE);
+
+   return limit_pressure;
 }
 
 int
@@ -2664,24 +2820,7 @@ ir3_ra(struct ir3_shader_variant *v)
    d("\thalf: %u", max_pressure.half);
    d("\tshared: %u", max_pressure.shared);
 
-   struct ir3_pressure limit_pressure;
-   limit_pressure.full = RA_FULL_SIZE;
-   limit_pressure.half = RA_HALF_SIZE;
-   limit_pressure.shared = RA_SHARED_SIZE;
-   limit_pressure.shared_half = RA_SHARED_HALF_SIZE;
-
-   if (gl_shader_stage_is_compute(v->type) && v->has_barrier) {
-      calc_limit_pressure_for_cs_with_barrier(v, &limit_pressure);
-   }
-
-   /* If the user forces a doubled threadsize, we may have to lower the limit
-    * because on some gens the register file is not big enough to hold a
-    * double-size wave with all 48 registers in use.
-    */
-   if (v->shader_options.real_wavesize == IR3_DOUBLE_ONLY) {
-      limit_pressure.full =
-         MAX2(limit_pressure.full, ctx->compiler->reg_size_vec4 / 2 * 16);
-   }
+   struct ir3_pressure limit_pressure = ir3_ra_get_reg_file_limits(v);
 
    /* If requested, lower the limit so that spilling happens more often. */
    if (ir3_shader_debug & IR3_DBG_SPILLALL)
@@ -2734,6 +2873,7 @@ ir3_ra(struct ir3_shader_variant *v)
    ctx->blocks = rzalloc_array(ctx, struct ra_block_state, live->block_count);
 
    ctx->full.size = calc_target_full_pressure(v, max_pressure.full);
+   assert(ctx->full.size <= RA_FULL_SIZE);
    d("full size: %u", ctx->full.size);
 
    if (!v->mergedregs)

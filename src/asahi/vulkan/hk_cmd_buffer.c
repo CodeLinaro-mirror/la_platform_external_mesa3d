@@ -106,7 +106,7 @@ hk_create_cmd_buffer(struct vk_command_pool *vk_pool,
       return result;
    }
 
-   util_dynarray_init(&cmd->large_bos, NULL);
+   cmd->large_bos = UTIL_DYNARRAY_INIT;
 
    cmd->vk.dynamic_graphics_state.vi = &cmd->state.gfx._dynamic_vi;
    cmd->vk.dynamic_graphics_state.ms.sample_locations =
@@ -143,7 +143,11 @@ hk_reset_cmd_buffer(struct vk_command_buffer *vk_cmd_buffer,
    cmd->current_cs.post_gfx = NULL;
    cmd->current_cs.pre_gfx = NULL;
 
-   /* TODO: clear pool! */
+   assert(!cmd->in_meta);
+   cmd->geom_index_buffer = 0;
+   cmd->geom_index_count = 0;
+   cmd->geom_instance_count = 0;
+   cmd->uses_heap = false;
 
    memset(&cmd->state, 0, sizeof(cmd->state));
 }
@@ -186,7 +190,7 @@ hk_pool_alloc_internal(struct hk_cmd_buffer *cmd, uint32_t size,
       struct agx_bo *bo =
          agx_bo_create(&dev->dev, size, flags, 0, "Large pool allocation");
 
-      util_dynarray_append(&cmd->large_bos, struct agx_bo *, bo);
+      util_dynarray_append(&cmd->large_bos, bo);
       return (struct agx_ptr){
          .gpu = bo->va->addr,
          .cpu = agx_bo_map(bo),
@@ -337,7 +341,7 @@ hk_CmdPipelineBarrier2(VkCommandBuffer commandBuffer,
 
 void
 hk_cmd_bind_shaders(struct vk_command_buffer *vk_cmd, uint32_t stage_count,
-                    const gl_shader_stage *stages,
+                    const mesa_shader_stage *stages,
                     struct vk_shader **const shaders)
 {
    struct hk_cmd_buffer *cmd = container_of(vk_cmd, struct hk_cmd_buffer, vk);
@@ -372,13 +376,10 @@ hk_bind_descriptor_sets(UNUSED struct hk_cmd_buffer *cmd,
     *
     * This means that, if some earlier set gets bound in such a way that
     * it changes set_dynamic_buffer_start[s], this binding is implicitly
-    * invalidated.  Therefore, we can always look at the current value
-    * of set_dynamic_buffer_start[s] as the base of our dynamic buffer
-    * range and it's only our responsibility to adjust all
-    * set_dynamic_buffer_start[p] for p > s as needed.
+    * invalidated.
     */
    uint8_t dyn_buffer_start =
-      desc->root.set_dynamic_buffer_start[info->firstSet];
+      pipeline_layout->dynamic_descriptor_offset[info->firstSet];
 
    uint32_t next_dyn_offset = 0;
    for (uint32_t i = 0; i < info->descriptorSetCount; ++i) {
@@ -406,26 +407,22 @@ hk_bind_descriptor_sets(UNUSED struct hk_cmd_buffer *cmd,
          const struct hk_descriptor_set_layout *set_layout =
             vk_to_hk_descriptor_set_layout(pipeline_layout->set_layouts[s]);
 
-         if (set != NULL && set_layout->dynamic_buffer_count > 0) {
-            for (uint32_t j = 0; j < set_layout->dynamic_buffer_count; j++) {
+         if (set != NULL && set_layout->vk.dynamic_descriptor_count > 0) {
+            for (uint32_t j = 0; j < set_layout->vk.dynamic_descriptor_count; j++) {
                struct hk_buffer_address addr = set->dynamic_buffers[j];
                addr.base_addr += info->pDynamicOffsets[next_dyn_offset + j];
                desc->root.dynamic_buffers[dyn_buffer_start + j] = addr;
             }
-            next_dyn_offset += set->layout->dynamic_buffer_count;
+            next_dyn_offset += set->layout->vk.dynamic_descriptor_count;
          }
 
-         dyn_buffer_start += set_layout->dynamic_buffer_count;
+         dyn_buffer_start += set_layout->vk.dynamic_descriptor_count;
       } else {
          assert(set == NULL);
       }
    }
    assert(dyn_buffer_start <= HK_MAX_DYNAMIC_BUFFERS);
    assert(next_dyn_offset <= info->dynamicOffsetCount);
-
-   for (uint32_t s = info->firstSet + info->descriptorSetCount; s < HK_MAX_SETS;
-        s++)
-      desc->root.set_dynamic_buffer_start[s] = dyn_buffer_start;
 
    desc->root_dirty = true;
 }
@@ -645,11 +642,11 @@ hk_reserve_scratch(struct hk_cmd_buffer *cmd, struct hk_cs *cs,
               _mesa_shader_stage_to_abbrev(s->b.info.stage));
 
    switch (s->b.info.stage) {
-   case PIPE_SHADER_FRAGMENT:
+   case MESA_SHADER_FRAGMENT:
       cs->scratch.fs.main = true;
       cs->scratch.fs.preamble = MAX2(cs->scratch.fs.preamble, preamble_size);
       break;
-   case PIPE_SHADER_VERTEX:
+   case MESA_SHADER_VERTEX:
       cs->scratch.vs.main = true;
       cs->scratch.vs.preamble = MAX2(cs->scratch.vs.preamble, preamble_size);
       break;
@@ -666,7 +663,7 @@ hk_upload_usc_words(struct hk_cmd_buffer *cmd, struct hk_shader *s,
 {
    struct hk_device *dev = hk_cmd_buffer_device(cmd);
 
-   enum pipe_shader_type sw_stage = s->info.stage;
+   mesa_shader_stage sw_stage = s->info.stage;
 
    unsigned constant_push_ranges = DIV_ROUND_UP(s->b.info.rodata.size_16, 64);
    unsigned push_ranges = 2;
@@ -682,7 +679,7 @@ hk_upload_usc_words(struct hk_cmd_buffer *cmd, struct hk_shader *s,
 
    uint64_t root_ptr;
 
-   if (sw_stage == PIPE_SHADER_COMPUTE) {
+   if (sw_stage == MESA_SHADER_COMPUTE) {
       root_ptr = hk_cmd_buffer_upload_root(cmd, VK_PIPELINE_BIND_POINT_COMPUTE);
    } else {
       root_ptr = cmd->state.gfx.root;
@@ -718,8 +715,8 @@ hk_upload_usc_words(struct hk_cmd_buffer *cmd, struct hk_shader *s,
 
       if (linked->sw_indexing) {
          agx_usc_uniform(
-            &b, AGX_ABI_VUNI_INPUT_ASSEMBLY(count), 4,
-            root_ptr + hk_root_descriptor_offset(draw.input_assembly));
+            &b, AGX_ABI_VUNI_VERTEX_PARAMS(count), 4,
+            root_ptr + hk_root_descriptor_offset(draw.vertex_params));
       }
 
       root_unif = AGX_ABI_VUNI_COUNT_VK(count);
@@ -810,7 +807,7 @@ hk_cs_init_graphics(struct hk_cmd_buffer *cmd, struct hk_cs *cs)
    };
 
    size_t size = agx_ppp_update_size(&present);
-   struct agx_ptr T = hk_pool_alloc(cmd, size, 64);
+   struct agx_ptr T = hk_pool_alloc(cmd, size, AGX_PPP_HEADER_ALIGN);
    if (!T.cpu)
       return;
 
@@ -826,8 +823,8 @@ hk_cs_init_graphics(struct hk_cmd_buffer *cmd, struct hk_cs *cs)
    agx_ppp_fini(&map, &ppp);
    cs->current = map;
 
-   util_dynarray_init(&cs->scissor, NULL);
-   util_dynarray_init(&cs->depth_bias, NULL);
+   cs->scissor = UTIL_DYNARRAY_INIT;
+   cs->depth_bias = UTIL_DYNARRAY_INIT;
 
    /* All graphics state must be reemited in each control stream */
    hk_cmd_buffer_dirty_all(cmd);

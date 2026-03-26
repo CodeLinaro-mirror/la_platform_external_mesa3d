@@ -2,25 +2,7 @@
  * Copyright (C) 2018 Alyssa Rosenzweig
  * Copyright (C) 2020 Collabora Ltd.
  * Copyright © 2017 Intel Corporation
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef __PAN_CMDSTREAM_H__
@@ -225,11 +207,20 @@ panfrost_fs_required(struct panfrost_compiled_shader *fs,
    if (fs->info.fs.sidefx)
       return true;
 
+   /* If alpha to coverage is enabled we need to execute, as
+    * writing the pixel can modify occlusion query results. */
+   if (blend->base.alpha_to_coverage)
+      return true;
+
    /* Using an empty FS requires early-z to be enabled, but alpha test
     * needs it disabled. Alpha test is only native on Midgard, so only
     * check there.
     */
    if (PAN_ARCH <= 5 && zsa->base.alpha_func != PIPE_FUNC_ALWAYS)
+      return true;
+
+   /* if pixel local storage is enabled we need to execute */
+   if (state->pls_enabled)
       return true;
 
    /* If colour is written we need to execute */
@@ -249,7 +240,7 @@ panfrost_get_position_shader(struct panfrost_batch *batch,
                              const struct pipe_draw_info *info)
 {
    /* IDVS/points vertex shader */
-   uint64_t vs_ptr = batch->rsd[PIPE_SHADER_VERTEX];
+   uint64_t vs_ptr = batch->rsd[MESA_SHADER_VERTEX];
 
    /* IDVS/triangle vertex shader */
    if (vs_ptr && info->mode != MESA_PRIM_POINTS)
@@ -262,26 +253,13 @@ panfrost_get_position_shader(struct panfrost_batch *batch,
 static inline uint64_t
 panfrost_get_varying_shader(struct panfrost_batch *batch)
 {
-   return batch->rsd[PIPE_SHADER_VERTEX] + (2 * pan_size(SHADER_PROGRAM));
+   return batch->rsd[MESA_SHADER_VERTEX] + (2 * pan_size(SHADER_PROGRAM));
 }
 #endif
 
-static inline unsigned
-panfrost_vertex_attribute_stride(struct panfrost_compiled_shader *vs,
-                                 struct panfrost_compiled_shader *fs)
-{
-   unsigned v = vs->info.varyings.output_count;
-   unsigned f = fs->info.varyings.input_count;
-   unsigned slots = MAX2(v, f);
-   slots += util_bitcount(vs->info.varyings.fixed_varyings);
-
-   /* Assumes 16 byte slots. We could do better. */
-   return slots * 16;
-}
-
 static inline uint64_t
 panfrost_emit_resources(struct panfrost_batch *batch,
-                        enum pipe_shader_type stage)
+                        mesa_shader_stage stage)
 {
    struct panfrost_context *ctx = batch->ctx;
    struct pan_ptr T;
@@ -311,10 +289,10 @@ panfrost_emit_resources(struct panfrost_batch *batch,
    pan_make_resource_table(T, PAN_TABLE_IMAGE, batch->images[stage],
                            util_last_bit(ctx->image_mask[stage]));
 
-   if (stage == PIPE_SHADER_FRAGMENT) {
+   if (stage == MESA_SHADER_FRAGMENT) {
       pan_make_resource_table(T, PAN_TABLE_ATTRIBUTE, batch->attribs[stage],
-                              batch->nr_varying_attribs[PIPE_SHADER_FRAGMENT]);
-   } else if (stage == PIPE_SHADER_VERTEX) {
+                              batch->nr_varying_attribs[MESA_SHADER_FRAGMENT]);
+   } else if (stage == MESA_SHADER_VERTEX) {
       pan_make_resource_table(T, PAN_TABLE_ATTRIBUTE, batch->attribs[stage],
                               ctx->vertex->num_elements);
 

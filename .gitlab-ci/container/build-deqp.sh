@@ -23,10 +23,10 @@ set -x
 # - the GL release produces `glcts`, and
 # - the GLES release produces `deqp-gles*` and `deqp-egl`
 
-DEQP_MAIN_COMMIT=73db56e823f8bf6b9dcab57af43b4216c3ba19b5
-DEQP_VK_VERSION=1.4.1.1
-DEQP_GL_VERSION=4.6.6.0
-DEQP_GLES_VERSION=3.2.12.0
+DEQP_MAIN_COMMIT=4d3bedc74e2258c483cf968753207cff84d9e4fc
+DEQP_VK_VERSION=1.4.4.2
+DEQP_GL_VERSION=4.6.7.0
+DEQP_GLES_VERSION=3.2.13.0
 
 # Patches to VulkanCTS may come from commits in their repo (listed in
 # cts_commits_to_backport) or patch files stored in our repo (in the patch
@@ -46,8 +46,8 @@ main_cts_patch_files=(
 
 # shellcheck disable=SC2034
 vk_cts_commits_to_backport=(
-  # Stop querying device address from unbound buffers
-  046343f46f7d39d53b47842d7fd8ed3279528046
+  # Add an option to print to logcat in Android executable builds
+  fc51668efdfd0dffa30b3eddee34aa26172969fb
 )
 
 # shellcheck disable=SC2034
@@ -56,29 +56,27 @@ vk_cts_patch_files=(
 
 # shellcheck disable=SC2034
 gl_cts_commits_to_backport=(
-  # Add testing for GL_PRIMITIVES_SUBMITTED_ARB query.
-  e075ce73ddc5973aa46a5236c715bb281c9501fa
 )
 
 # shellcheck disable=SC2034
 gl_cts_patch_files=(
   build-deqp-gl_Build-Don-t-build-Vulkan-utilities-for-GL-builds.patch
-  build-deqp-gl_Revert-Add-missing-context-deletion.patch
-  build-deqp-gl_Revert-Fix-issues-with-GLX-reset-notification-strate.patch
-  build-deqp-gl_Revert-Fix-spurious-failures-when-using-a-config-wit.patch
 )
 
 # shellcheck disable=SC2034
 # GLES builds also EGL
 gles_cts_commits_to_backport=(
+  # CMake: Include FindPkgConfig before using pkg_check_modules()
+  e09e0a210b041d0bf7b525620d0068eab3ffa66a
+  # Add an option to print to logcat in Android executable builds
+  fc51668efdfd0dffa30b3eddee34aa26172969fb
+  # Fix EGL render tests for rgba16 and rgb16 unorm fixed point
+  b5ed8718f19492781f8e9be3eb9d3346e961efa9
 )
 
 # shellcheck disable=SC2034
 gles_cts_patch_files=(
   build-deqp-gl_Build-Don-t-build-Vulkan-utilities-for-GL-builds.patch
-  build-deqp-gl_Revert-Add-missing-context-deletion.patch
-  build-deqp-gl_Revert-Fix-issues-with-GLX-reset-notification-strate.patch
-  build-deqp-gl_Revert-Fix-spurious-failures-when-using-a-config-wit.patch
 )
 
 
@@ -109,7 +107,18 @@ git checkout FETCH_HEAD
 DEQP_COMMIT=$(git rev-parse FETCH_HEAD)
 
 if [ "$DEQP_VERSION" = "$DEQP_MAIN_COMMIT" ]; then
-  merge_base="$(curl-with-retry -s https://api.github.com/repos/KhronosGroup/VK-GL-CTS/compare/main...$DEQP_MAIN_COMMIT | jq -r .merge_base_commit.sha)"
+  for i in {5..1}; do
+    if merge_base=$(curl-with-retry -s https://api.github.com/repos/KhronosGroup/VK-GL-CTS/compare/main...$DEQP_MAIN_COMMIT | jq -e -r .merge_base_commit.sha); then
+      break
+    fi
+
+    if [ "$i" -eq 1 ]; then
+      echo "Final attempt to fetch merge base from GitHub failed. VK-GL-CTS GitHub API might be down or rate-limited."
+      exit 1
+    fi
+    sleep 10
+  done
+
   if [[ "$merge_base" != "$DEQP_MAIN_COMMIT" ]]; then
     echo "VK-GL-CTS commit $DEQP_MAIN_COMMIT is not a commit from the main branch."
     exit 1

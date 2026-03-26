@@ -5,6 +5,7 @@
 
 #include "util/bitset.h"
 #include "util/macros.h"
+#include "util/sparse_bitset.h"
 #include "util/u_dynarray.h"
 #include "util/u_math.h"
 #include "util/u_memory.h"
@@ -199,7 +200,7 @@ agx_split_width(const agx_instr *I)
  * linear-time. Depends on liveness information.
  */
 static unsigned
-agx_calc_register_demand(agx_context *ctx)
+agx_calc_register_demand(agx_context *ctx, bool remat)
 {
    /* Print detailed demand calculation, helpful to debug spilling */
    bool debug = false;
@@ -212,6 +213,9 @@ agx_calc_register_demand(agx_context *ctx)
    enum ra_class *classes = calloc(ctx->alloc, sizeof(enum ra_class));
 
    agx_foreach_instr_global(ctx, I) {
+      if (I->op == AGX_OPCODE_MOV_IMM && remat)
+         continue;
+
       agx_foreach_ssa_dest(I, d) {
          unsigned v = I->dest[d].value;
          assert(widths[v] == 0 && "broken SSA");
@@ -230,12 +234,9 @@ agx_calc_register_demand(agx_context *ctx)
       unsigned demand = reserved_size(ctx);
 
       /* Everything live-in */
-      {
-         int i;
-         BITSET_FOREACH_SET(i, block->live_in, ctx->alloc) {
-            if (classes[i] == RA_GPR)
-               demand += widths[i];
-         }
+      U_SPARSE_BITSET_FOREACH_SET(&block->live_in, i) {
+         if (classes[i] == RA_GPR)
+            demand += widths[i];
       }
 
       max_demand = MAX2(demand, max_demand);
@@ -254,6 +255,9 @@ agx_calc_register_demand(agx_context *ctx)
           * set, just skip them so we don't double count.
           */
          if (I->op == AGX_OPCODE_PHI)
+            continue;
+
+         if (I->op == AGX_OPCODE_MOV_IMM && remat)
             continue;
 
          if (debug) {
@@ -327,7 +331,7 @@ find_regs_simple(struct ra_ctx *rctx, enum ra_class cls, unsigned count,
                  unsigned align, unsigned *out)
 {
    for (unsigned reg = 0; reg + count <= rctx->bound[cls]; reg += align) {
-      if (!BITSET_TEST_RANGE(rctx->used_regs[cls], reg, reg + count - 1)) {
+      if (!BITSET_TEST_COUNT(rctx->used_regs[cls], reg, count)) {
          *out = reg;
          return true;
       }
@@ -384,7 +388,7 @@ find_best_region_to_evict(struct ra_ctx *rctx, unsigned size,
       /* Do not evict the same register multiple times. It's not necessary since
        * we're just shuffling, there are enough free registers elsewhere.
        */
-      if (BITSET_TEST_RANGE(already_evicted, base, base + size - 1))
+      if (BITSET_TEST_COUNT(already_evicted, base, size))
          continue;
 
       /* Estimate the number of moves required if we pick this region */
@@ -448,7 +452,7 @@ insert_copy(struct ra_ctx *rctx, struct util_dynarray *copies, unsigned new_reg,
 
       assert((copy.dest % align) == 0 && "new dest must be aligned");
       assert((copy.src.value % align) == 0 && "src must be aligned");
-      util_dynarray_append(copies, struct agx_copy, copy);
+      util_dynarray_append(copies, copy);
    }
 }
 
@@ -517,7 +521,7 @@ assign_regs_by_copying(struct ra_ctx *rctx, agx_index dest, const agx_instr *I,
       /* We are going to allocate to this range, so it is now fully used. Mark
        * it as such so we don't reassign here later.
        */
-      BITSET_SET_RANGE(rctx->used_regs[RA_GPR], new_reg, new_reg + nr - 1);
+      BITSET_SET_COUNT(rctx->used_regs[RA_GPR], new_reg, nr);
 
       /* The first iteration is special: it is the original allocation of a
        * variable. All subsequent iterations pick a new register for a blocked
@@ -530,7 +534,7 @@ assign_regs_by_copying(struct ra_ctx *rctx, agx_index dest, const agx_instr *I,
       /* Mark down the set of clobbered registers, so that killed sources may be
        * handled correctly later.
        */
-      BITSET_SET_RANGE(clobbered, new_reg, new_reg + nr - 1);
+      BITSET_SET_COUNT(clobbered, new_reg, nr);
 
       /* Update bookkeeping for this variable */
       set_ssa_to_reg(rctx, ssa, new_reg);
@@ -609,8 +613,7 @@ find_regs(struct ra_ctx *rctx, agx_instr *I, unsigned dest_idx, unsigned count,
       assert(!rctx->early_killed && "no live range splits with early kill");
       assert(cls == RA_GPR && "no memory live range splits");
 
-      struct util_dynarray copies = {0};
-      util_dynarray_init(&copies, NULL);
+      struct util_dynarray copies = UTIL_DYNARRAY_INIT;
 
       reg = assign_regs_by_copying(rctx, I->dest[dest_idx], I, &copies);
 
@@ -631,7 +634,7 @@ find_regs(struct ra_ctx *rctx, agx_instr *I, unsigned dest_idx, unsigned count,
       util_dynarray_fini(&copies);
 
       /* assign_regs asserts this is cleared, so clear to be reassigned */
-      BITSET_CLEAR_RANGE(rctx->used_regs[cls], reg, reg + count - 1);
+      BITSET_CLEAR_COUNT(rctx->used_regs[cls], reg, count);
       return reg;
    }
 }
@@ -669,8 +672,7 @@ reserve_live_in(struct ra_ctx *rctx)
    agx_builder b =
       agx_init_builder(rctx->shader, agx_before_block(rctx->block));
 
-   int i;
-   BITSET_FOREACH_SET(i, rctx->block->live_in, rctx->shader->alloc) {
+   U_SPARSE_BITSET_FOREACH_SET(&rctx->block->live_in, i) {
       /* Skip values defined in loops when processing the loop header */
       if (!BITSET_TEST(rctx->visited, i))
          continue;
@@ -749,12 +751,12 @@ assign_regs(struct ra_ctx *rctx, agx_index v, unsigned reg)
    assert(!BITSET_TEST(rctx->visited, v.value) && "SSA violated");
    BITSET_SET(rctx->visited, v.value);
 
-   assert(rctx->ncomps[v.value] >= 1);
-   unsigned end = reg + rctx->ncomps[v.value] - 1;
-
-   assert(!BITSET_TEST_RANGE(rctx->used_regs[cls], reg, end) &&
+   unsigned nr = rctx->ncomps[v.value];
+   assert(nr >= 1);
+   assert(!BITSET_TEST_COUNT(rctx->used_regs[cls], reg, nr) &&
           "no interference");
-   BITSET_SET_RANGE(rctx->used_regs[cls], reg, end);
+
+   BITSET_SET_COUNT(rctx->used_regs[cls], reg, nr);
 
    /* Phi webs need to remember which register they're assigned to */
    struct phi_web_node *node =
@@ -813,7 +815,7 @@ try_coalesce_with(struct ra_ctx *rctx, agx_index ssa, unsigned count,
    unsigned base = rctx->ssa_to_reg[ssa.value];
    enum ra_class cls = ra_class_for_index(ssa);
 
-   if (BITSET_TEST_RANGE(rctx->used_regs[cls], base, base + count - 1))
+   if (BITSET_TEST_COUNT(rctx->used_regs[cls], base, count))
       return false;
 
    assert(base + count <= rctx->bound[cls] && "invariant");
@@ -838,7 +840,7 @@ pick_regs(struct ra_ctx *rctx, agx_instr *I, unsigned d)
    if (rctx->phi_web[phi_idx].assigned) {
       unsigned reg = rctx->phi_web[phi_idx].reg;
       if ((reg % align) == 0 && reg + align < rctx->bound[cls] &&
-          !BITSET_TEST_RANGE(rctx->used_regs[cls], reg, reg + align - 1))
+          !BITSET_TEST_COUNT(rctx->used_regs[cls], reg, align))
          return reg;
    }
 
@@ -879,7 +881,7 @@ pick_regs(struct ra_ctx *rctx, agx_instr *I, unsigned d)
          if (base % align)
             continue;
 
-         if (!BITSET_TEST_RANGE(rctx->used_regs[cls], base, base + count - 1))
+         if (!BITSET_TEST_COUNT(rctx->used_regs[cls], base, count))
             return base;
       }
    }
@@ -889,7 +891,7 @@ pick_regs(struct ra_ctx *rctx, agx_instr *I, unsigned d)
    if (collect_phi && collect_phi->op == AGX_OPCODE_EXPORT) {
       unsigned reg = collect_phi->imm;
 
-      if (!BITSET_TEST_RANGE(rctx->used_regs[cls], reg, reg + align - 1) &&
+      if (!BITSET_TEST_COUNT(rctx->used_regs[cls], reg, align) &&
           (reg % align) == 0)
          return reg;
    }
@@ -901,8 +903,7 @@ pick_regs(struct ra_ctx *rctx, agx_instr *I, unsigned d)
          if (exp && exp->op == AGX_OPCODE_EXPORT) {
             unsigned reg = exp->imm;
 
-            if (!BITSET_TEST_RANGE(rctx->used_regs[cls], reg,
-                                   reg + align - 1) &&
+            if (!BITSET_TEST_COUNT(rctx->used_regs[cls], reg, align) &&
                 (reg % align) == 0)
                return reg;
          }
@@ -945,8 +946,7 @@ pick_regs(struct ra_ctx *rctx, agx_instr *I, unsigned d)
             continue;
 
          /* If those registers are free, then choose them */
-         if (!BITSET_TEST_RANGE(rctx->used_regs[cls], our_reg,
-                                our_reg + align - 1))
+         if (!BITSET_TEST_COUNT(rctx->used_regs[cls], our_reg, align))
             return our_reg;
       }
 
@@ -959,8 +959,8 @@ pick_regs(struct ra_ctx *rctx, agx_instr *I, unsigned d)
       for (unsigned base = 0;
            base + (collect->nr_srcs * align) <= rctx->bound[cls];
            base += collect_align) {
-         if (!BITSET_TEST_RANGE(rctx->used_regs[cls], base,
-                                base + (collect->nr_srcs * align) - 1))
+         if (!BITSET_TEST_COUNT(rctx->used_regs[cls], base,
+                                collect->nr_srcs * align))
             return base + offset;
       }
 
@@ -971,7 +971,7 @@ pick_regs(struct ra_ctx *rctx, agx_instr *I, unsigned d)
       if (collect_align > align) {
          for (unsigned reg = offset; reg + collect_align <= rctx->bound[cls];
               reg += collect_align) {
-            if (!BITSET_TEST_RANGE(rctx->used_regs[cls], reg, reg + count - 1))
+            if (!BITSET_TEST_COUNT(rctx->used_regs[cls], reg, count))
                return reg;
          }
       }
@@ -992,7 +992,7 @@ pick_regs(struct ra_ctx *rctx, agx_instr *I, unsigned d)
          unsigned base = phi->dest[0].reg;
 
          if (base + count <= rctx->bound[cls] &&
-             !BITSET_TEST_RANGE(rctx->used_regs[cls], base, base + count - 1))
+             !BITSET_TEST_COUNT(rctx->used_regs[cls], base, count))
             return base;
       }
    }
@@ -1011,7 +1011,7 @@ kill_source(struct ra_ctx *rctx, const agx_instr *I, unsigned s)
    assert(I->op != AGX_OPCODE_PHI && "phis don't use .kill");
    assert(count >= 1);
 
-   BITSET_CLEAR_RANGE(rctx->used_regs[cls], reg, reg + count - 1);
+   BITSET_CLEAR_COUNT(rctx->used_regs[cls], reg, count);
 }
 
 static void
@@ -1072,7 +1072,7 @@ agx_ra_assign_local(struct ra_ctx *rctx)
 
    /* Reserve bottom registers as temporaries for parallel copy lowering */
    if (rctx->shader->has_spill_pcopy_reserved) {
-      BITSET_SET_RANGE(used_regs_gpr, 0, 7);
+      BITSET_SET_COUNT(used_regs_gpr, 0, 8);
    }
 
    agx_foreach_instr_in_block(block, I) {
@@ -1091,20 +1091,15 @@ agx_ra_assign_local(struct ra_ctx *rctx)
 
             /* Free up the source */
             unsigned offset_reg = reg + (d * width);
-            BITSET_CLEAR_RANGE(used_regs_gpr, offset_reg,
-                               offset_reg + width - 1);
+            BITSET_CLEAR_COUNT(used_regs_gpr, offset_reg, width);
 
             /* Assign the destination where the source was */
             if (!agx_is_null(I->dest[d]))
                assign_regs(rctx, I->dest[d], offset_reg);
          }
 
-         unsigned excess =
-            rctx->ncomps[I->src[0].value] - (I->nr_dests * width);
-         if (excess) {
-            BITSET_CLEAR_RANGE(used_regs_gpr, reg + (I->nr_dests * width),
-                               reg + rctx->ncomps[I->src[0].value] - 1);
-         }
+         unsigned trail = rctx->ncomps[I->src[0].value] - (I->nr_dests * width);
+         BITSET_CLEAR_COUNT(used_regs_gpr, reg + (I->nr_dests * width), trail);
 
          agx_set_sources(rctx, I);
          agx_set_dests(rctx, I);
@@ -1186,8 +1181,7 @@ agx_ra_assign_local(struct ra_ctx *rctx)
              rctx->bound[i] * sizeof(*block->reg_to_ssa_out[i]));
    }
 
-   int i;
-   BITSET_FOREACH_SET(i, block->live_out, rctx->shader->alloc) {
+   U_SPARSE_BITSET_FOREACH_SET(&block->live_out, i) {
       block->reg_to_ssa_out[rctx->classes[i]][rctx->ssa_to_reg[i]] = i;
    }
 
@@ -1310,6 +1304,11 @@ lower_exports(agx_context *ctx)
          .src = I->src[0],
       };
 
+      /* The export itself is now trivial, reflect that for correct last-use
+       * tracking later.
+       */
+      I->src[0] = agx_register_like(I->imm, I->src[0]);
+
       /* We cannot use fewer registers than we export */
       ctx->max_reg =
          MAX2(ctx->max_reg, I->imm + agx_size_align_16(I->src[0].size));
@@ -1331,7 +1330,7 @@ agx_ra(agx_context *ctx)
    /* Compute shaders need to have their entire workgroup together, so our
     * register usage is bounded by the workgroup size.
     */
-   if (gl_shader_stage_is_compute(ctx->stage)) {
+   if (mesa_shader_stage_is_compute(ctx->stage)) {
       unsigned threads_per_workgroup;
 
       /* If we don't know the workgroup size, worst case it. TODO: Optimize
@@ -1388,16 +1387,41 @@ agx_ra(agx_context *ctx)
     * bound register assignment.
     */
    agx_compute_liveness(ctx);
-   unsigned effective_demand = agx_calc_register_demand(ctx);
+   unsigned effective_demand = agx_calc_register_demand(ctx, false);
    bool spilling = (effective_demand > max_possible_regs);
+   bool remat = false;
 
-   if (spilling) {
-      assert(ctx->key->has_scratch && "internal shaders are unspillable");
-      agx_spill(ctx, max_possible_regs);
+   /* If we need multiple waves, see if we can rematerialize constants to save
+    * waves. If we only have a single wave regardless, this is pointless.
+    */
+   if (effective_demand > agx_round_registers(1) && !spilling) {
+      unsigned effective_demand_remat = agx_calc_register_demand(ctx, true);
+
+      /* Worst-case assume we need 6 16-bit registers for constants, for a
+       * four-source cmpsel where 3 sources are 32-bit constants. Rounded to
+       * ensure live-range splitting works.
+       */
+      if ((effective_demand_remat + 6) < effective_demand) {
+         unsigned l = agx_round_registers(
+            align(agx_round_registers(effective_demand_remat + 6), 16));
+
+         /* Only rematerialize if it actually lets us save a wave */
+         if (l < agx_round_registers(effective_demand)) {
+            remat = true;
+            max_possible_regs = l;
+         }
+      }
+   }
+
+   if (spilling || remat) {
+      assert((remat || ctx->key->has_scratch) &&
+             "internal shaders are unspillable");
+
+      agx_spill(ctx, max_possible_regs, remat);
 
       /* After spilling, recalculate liveness and demand */
       agx_compute_liveness(ctx);
-      effective_demand = agx_calc_register_demand(ctx);
+      effective_demand = agx_calc_register_demand(ctx, false);
 
       /* The resulting program can now be assigned registers */
       assert(effective_demand <= max_possible_regs && "spiller post-condition");
@@ -1425,7 +1449,7 @@ agx_ra(agx_context *ctx)
    enum ra_class *classes = calloc(ctx->alloc, sizeof(enum ra_class));
    agx_instr **src_to_collect_phi = calloc(ctx->alloc, sizeof(agx_instr *));
    enum agx_size *sizes = calloc(ctx->alloc, sizeof(enum agx_size));
-   BITSET_WORD *visited = calloc(BITSET_WORDS(ctx->alloc), sizeof(BITSET_WORD));
+   BITSET_WORD *visited = BITSET_CALLOC(ctx->alloc);
    unsigned max_ncomps = 1;
 
    agx_foreach_instr_global(ctx, I) {
@@ -1459,6 +1483,7 @@ agx_ra(agx_context *ctx)
     */
    unsigned reg_file_alignment = MAX2(max_ncomps, 8);
    assert(util_is_power_of_two_nonzero(reg_file_alignment));
+   assert(reg_file_alignment <= 16 && "max size");
 
    unsigned demand = ALIGN_POT(effective_demand, reg_file_alignment);
    assert(demand <= max_possible_regs && "Invariant");

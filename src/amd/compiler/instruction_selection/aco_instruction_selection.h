@@ -7,15 +7,52 @@
 #ifndef ACO_INSTRUCTION_SELECTION_H
 #define ACO_INSTRUCTION_SELECTION_H
 
+#include "aco_builder.h"
 #include "aco_ir.h"
 
 #include "nir.h"
+#include "nir_range_analysis.h"
 
 #include <array>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
 namespace aco {
+
+struct parameter_info {
+   bool discardable;
+   bool needs_explicit_preservation;
+   bool is_reg;
+   union {
+      Definition def;
+      unsigned scratch_offset;
+   };
+};
+
+struct param_assignment_hints {
+   param_assignment_hints() { BITSET_ZERO(registers_to_avoid); }
+
+   std::vector<std::optional<parameter_info>> param_affinities;
+   std::optional<parameter_info> stack_pointer_affinity;
+   BITSET_DECLARE(registers_to_avoid, 512);
+};
+
+struct call_info {
+   nir_call_instr* nir_instr;
+   Instruction* aco_instr;
+   std::vector<parameter_info> return_info;
+   unsigned scratch_param_size;
+};
+
+struct callee_info {
+   std::vector<parameter_info> param_infos;
+   parameter_info return_address;
+   parameter_info stack_ptr;
+   unsigned reg_param_count = 0;
+   unsigned reg_discardable_param_count = 0;
+   unsigned scratch_param_size = 0;
+};
 
 enum aco_color_output_type {
    ACO_TYPE_ANY32,
@@ -112,11 +149,10 @@ struct isel_context {
 
    /* NIR range analysis. */
    struct hash_table* range_ht;
-   nir_unsigned_upper_bound_config ub_config;
+   struct hash_table* numlsb_ht;
+   nir_fp_analysis_state fp_class_ht;
 
    Temp arg_temps[AC_MAX_ARGS];
-   Operand workgroup_id[3];
-   Temp ttmp8;
 
    /* tessellation information */
    bool any_tcs_inputs_via_lds = false;
@@ -134,6 +170,13 @@ struct isel_context {
    uint32_t wqm_instruction_idx;
 
    BITSET_DECLARE(output_args, AC_MAX_ARGS);
+
+   /* Function information */
+   ABI callee_abi;
+   struct callee_info callee_info;
+   std::vector<call_info> call_infos;
+   Temp next_divergent_pc;
+   Temp next_pc;
 };
 
 inline Temp
@@ -178,6 +221,18 @@ should_declare_array(ac_image_dim dim)
           dim == ac_image_2darraymsaa;
 }
 
+template <typename T>
+inline void
+init_disable_wqm(Builder& bld, T& instr, bool disable_wqm)
+{
+   if (disable_wqm) {
+      instr_exact_mask(&instr) = Operand();
+      instr_wqm_mask(&instr) = Operand();
+      instr.disable_wqm = true;
+      bld.program->needs_exact = true;
+   }
+}
+
 /* aco_isel_setup.cpp */
 void init_context(isel_context* ctx, nir_shader* shader);
 void cleanup_context(isel_context* ctx);
@@ -206,7 +261,7 @@ void end_empty_exec_skip(isel_context* ctx);
 
 /* aco_isel_helpers.cpp */
 void append_logical_start(Block* b);
-void append_logical_end(Block* b);
+void append_logical_end(isel_context* ctx, bool append_reload_preserved = true);
 Temp get_ssa_temp_tex(struct isel_context* ctx, nir_def* def, bool is_16bit);
 Temp bool_to_vector_condition(isel_context* ctx, Temp val, Temp dst = Temp(0, s2));
 Temp bool_to_scalar_condition(isel_context* ctx, Temp val, Temp dst = Temp(0, s1));
@@ -228,7 +283,8 @@ void emit_interp_mov_instr(isel_context* ctx, unsigned idx, unsigned component, 
                            Temp dst, Temp prim_mask, bool high_16bits);
 std::vector<Temp> emit_pack_v1(isel_context* ctx, const std::vector<Temp>& unpacked);
 MIMG_instruction* emit_mimg(Builder& bld, aco_opcode op, std::vector<Temp> dsts, Temp rsrc,
-                            Operand samp, std::vector<Temp> coords, Operand vdata = Operand(v1));
+                            Operand samp, std::vector<Temp> coords, bool disable_wqm,
+                            Operand vdata = Operand(v1));
 Operand emit_tfe_init(Builder& bld, Temp dst);
 struct aco_export_mrt {
    Operand out[4];
@@ -240,8 +296,23 @@ void create_fs_dual_src_export_gfx11(isel_context* ctx, const struct aco_export_
                                      const struct aco_export_mrt* mrt1);
 Temp lanecount_to_mask(isel_context* ctx, Temp count, unsigned bit_offset);
 void build_end_with_regs(isel_context* ctx, std::vector<Operand>& regs);
-Instruction* add_startpgm(struct isel_context* ctx);
+Instruction* add_startpgm(struct isel_context* ctx, bool is_callee = false);
 void finish_program(isel_context* ctx);
+
+ABI nir_abi_to_aco(unsigned nir_abi_mask);
+
+param_assignment_hints get_ahit_isec_param_hints(const struct callee_info& traversal_info);
+
+struct callee_info get_callee_info(amd_gfx_level gfx_level, unsigned wave_size, const ABI& abi,
+                                   unsigned param_count, const nir_parameter* parameters,
+                                   Program* program, RegisterDemand reg_limit,
+                                   const param_assignment_hints& param_hints = {});
+void load_scratch_param(isel_context* ctx, Builder& bld, const parameter_info& param,
+                        Temp stack_ptr, unsigned scratch_param_size, Temp dst);
+void store_scratch_param(isel_context* ctx, Builder& bld, const parameter_info& param,
+                         Temp stack_ptr, unsigned scratch_param_size, Temp data);
+
+void emit_reload_preserved(isel_context* ctx);
 
 #define isel_err(...) _isel_err(ctx, __FILE__, __LINE__, __VA_ARGS__)
 

@@ -489,9 +489,9 @@ static struct r600_resource *r600_new_query_buffer(struct r600_common_screen *rs
 	 * being written by the gpu, hence staging is probably a good
 	 * usage pattern.
 	 */
-	struct r600_resource *buf = (struct r600_resource*)
-		pipe_buffer_create(&rscreen->b, 0,
-				   PIPE_USAGE_STAGING, buf_size);
+	struct r600_resource *buf =
+		r600_as_resource(pipe_buffer_create(&rscreen->b, 0,
+						 PIPE_USAGE_STAGING, buf_size));
 	if (!buf)
 		return NULL;
 
@@ -1579,8 +1579,8 @@ static void r600_restore_qbo_state(struct r600_common_context *rctx,
 				   struct r600_qbo_state *st)
 {
 	rctx->b.bind_compute_state(&rctx->b, st->saved_compute);
-	rctx->b.set_constant_buffer(&rctx->b, PIPE_SHADER_COMPUTE, 0, true, &st->saved_const0);
-	rctx->b.set_shader_buffers(&rctx->b, PIPE_SHADER_COMPUTE, 0, 3, st->saved_ssbo, ~0);
+	rctx->b.set_constant_buffer(&rctx->b, MESA_SHADER_COMPUTE, 0, &st->saved_const0);
+	rctx->b.set_shader_buffers(&rctx->b, MESA_SHADER_COMPUTE, 0, 3, st->saved_ssbo, ~0);
 	for (unsigned i = 0; i < 3; ++i)
 		pipe_resource_reference(&st->saved_ssbo[i].buffer, NULL);
 }
@@ -1712,9 +1712,9 @@ static void r600_query_hw_get_result_resource(struct r600_common_context *rctx,
 		} else
 			consts.buffer_offset = 0;
 
-		rctx->b.set_constant_buffer(&rctx->b, PIPE_SHADER_COMPUTE, 0, false, &constant_buffer);
+		rctx->b.set_constant_buffer(&rctx->b, MESA_SHADER_COMPUTE, 0, &constant_buffer);
 
-		rctx->b.set_shader_buffers(&rctx->b, PIPE_SHADER_COMPUTE, 0, 3, ssbo, ~0);
+		rctx->b.set_shader_buffers(&rctx->b, MESA_SHADER_COMPUTE, 0, 3, ssbo, ~0);
 
 		if ((flags & PIPE_QUERY_WAIT) && qbuf == &query->buffer) {
 			uint64_t va;
@@ -1874,9 +1874,8 @@ void r600_query_fix_enabled_rb_mask(struct r600_common_screen *rscreen)
 	/* otherwise backup path for older kernels */
 
 	/* create buffer for event data */
-	buffer = (struct r600_resource*)
-		pipe_buffer_create(ctx->b.screen, 0,
-				   PIPE_USAGE_STAGING, max_rbs * 16);
+	buffer = r600_as_resource(pipe_buffer_create(ctx->b.screen, 0,
+						  PIPE_USAGE_STAGING, max_rbs * 16));
 	if (!buffer)
 		return;
 

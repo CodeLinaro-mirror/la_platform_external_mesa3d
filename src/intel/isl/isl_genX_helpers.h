@@ -81,6 +81,13 @@ isl_encode_valign(uint8_t valign)
 UNUSED static struct isl_extent3d
 isl_get_image_alignment(const struct isl_surf *surf)
 {
+   if (surf->levels == 1 &&
+       surf->logical_level0_px.depth == 1 &&
+       surf->logical_level0_px.array_len == 1) {
+      /* This alignment value is unused for single slice surfaces. */
+      return isl_extent3d(GFX_VERx10 >= 125 ? 128 : 4, 4, 1);
+   }
+
    if (GFX_VERx10 >= 125) {
       if (isl_tiling_is_64(surf->tiling)) {
          /* The hardware ignores the alignment values. Anyway, the surface's
@@ -204,6 +211,10 @@ isl_get_qpitch(const struct isl_surf *surf)
 UNUSED static uint8_t
 isl_get_render_compression_format(enum isl_format format)
 {
+   /* The spec gives no CMFs to NPOT RGB formats. Remap them to RGBA. */
+   if (isl_format_get_layout(format)->bpb % 3 == 0)
+      format = isl_format_rgb_to_rgba(format);
+
    /* Bspec 63919 (r60413):
     *
     *   Table "[Enumeration] UNIFIED_COMPRESSION_FORMAT"
@@ -241,6 +252,10 @@ isl_get_render_compression_format(enum isl_format format)
    case ISL_FORMAT_B8G8R8A8_UNORM_SRGB:
    case ISL_FORMAT_B8G8R8A8_UNORM:
    case ISL_FORMAT_B8G8R8X8_UNORM:
+   case ISL_FORMAT_YCRCB_NORMAL:
+   case ISL_FORMAT_YCRCB_SWAPUVY:
+   case ISL_FORMAT_YCRCB_SWAPUV:
+   case ISL_FORMAT_YCRCB_SWAPY:
       return CMF_R8_G8_B8_A8;
    case ISL_FORMAT_R10G10B10A2_UNORM:
    case ISL_FORMAT_R10G10B10A2_UNORM_SRGB:

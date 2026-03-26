@@ -329,10 +329,10 @@ ptn_xpd(nir_builder *b, nir_def **src)
 static void
 ptn_kil(nir_builder *b, nir_def **src)
 {
-   /* flt must be exact, because NaN shouldn't discard. (apps rely on this) */
-   b->exact = true;
+   /* Apps rely on NaN not discarding. */
+   b->fp_math_ctrl = nir_fp_preserve_nan | nir_fp_preserve_inf;
    nir_def *cmp = nir_bany(b, nir_flt_imm(b, src[0], 0.0));
-   b->exact = false;
+   b->fp_math_ctrl = nir_fp_fast_math;
 
    nir_discard_if(b, cmp);
 }
@@ -784,6 +784,13 @@ setup_registers_and_variables(struct ptn_compile *c)
        * the shader.
        */
       c->output_regs[i] = nir_decl_reg(b, 4, 32, 0);
+
+      /* Initialize output registers with default value vec4(0, 0, 0, 1) */
+      if (c->ctx->Const.VertexProgramDefaultOut &&
+          c->prog->info.stage == MESA_SHADER_VERTEX &&
+          i != VARYING_SLOT_FOGC && i <= VARYING_SLOT_TEX7) {
+         nir_store_reg(b, nir_imm_vec4(b, 0, 0, 0, 1), c->output_regs[i]);
+      }
    }
 
    /* Create temporary registers. */
@@ -807,7 +814,7 @@ prog_to_nir(const struct gl_context *ctx, const struct gl_program *prog)
       ctx->screen->nir_options[prog->info.stage];
    struct ptn_compile *c;
    struct nir_shader *s;
-   gl_shader_stage stage = prog->info.stage;
+   mesa_shader_stage stage = prog->info.stage;
 
    c = rzalloc(NULL, struct ptn_compile);
    if (!c)
@@ -819,6 +826,8 @@ prog_to_nir(const struct gl_context *ctx, const struct gl_program *prog)
 
    /* Copy the shader_info from the gl_program */
    c->build.shader->info = prog->info;
+   c->build.shader->info.max_subgroup_size = 128;
+   c->build.shader->info.min_subgroup_size = 1;
 
    s = c->build.shader;
 
@@ -858,12 +867,15 @@ prog_to_nir(const struct gl_context *ctx, const struct gl_program *prog)
 
    /* ARB_vp: */
    if (prog->arb.IsPositionInvariant) {
-      NIR_PASS(_, s, st_nir_lower_position_invariant, prog->Parameters);
+      NIR_PASS(_, s, st_nir_lower_position_invariant, prog->Parameters,
+               ctx->Const.PackedDriverUniformStorage);
    }
 
    /* Add OPTION ARB_fog_exp code */
-   if (prog->arb.Fog)
-      NIR_PASS(_, s, st_nir_lower_fog, prog->arb.Fog, prog->Parameters);
+   if (prog->arb.Fog) {
+      NIR_PASS(_, s, st_nir_lower_fog, prog->arb.Fog, prog->Parameters,
+               ctx->Const.PackedDriverUniformStorage);
+   }
 
 fail:
    if (c->error) {

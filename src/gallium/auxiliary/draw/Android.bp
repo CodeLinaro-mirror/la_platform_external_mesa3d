@@ -1,0 +1,518 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "draw_context_c_impl",
+    srcs: [
+        "draw_context.c",
+    ],
+}
+
+filegroup {
+    name: "draw_fs_c_impl",
+    srcs: [
+        "draw_fs.c",
+    ],
+}
+
+filegroup {
+    name: "draw_gs_c_impl",
+    srcs: [
+        "draw_gs.c",
+    ],
+}
+
+filegroup {
+    name: "draw_llvm_c_impl",
+    srcs: [
+        "draw_llvm.c",
+    ],
+}
+
+filegroup {
+    name: "draw_mesh_c_impl",
+    srcs: [
+        "draw_mesh.c",
+    ],
+}
+
+filegroup {
+    name: "draw_mesh_prim_c_impl",
+    srcs: [
+        "draw_mesh_prim.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_aaline_c_impl",
+    srcs: [
+        "draw_pipe_aaline.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_aapoint_c_impl",
+    srcs: [
+        "draw_pipe_aapoint.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_c_impl",
+    srcs: [
+        "draw_pipe.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_clip_c_impl",
+    srcs: [
+        "draw_pipe_clip.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_cull_c_impl",
+    srcs: [
+        "draw_pipe_cull.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_flatshade_c_impl",
+    srcs: [
+        "draw_pipe_flatshade.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_offset_c_impl",
+    srcs: [
+        "draw_pipe_offset.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_pstipple_c_impl",
+    srcs: [
+        "draw_pipe_pstipple.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_stipple_c_impl",
+    srcs: [
+        "draw_pipe_stipple.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_twoside_c_impl",
+    srcs: [
+        "draw_pipe_twoside.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_unfilled_c_impl",
+    srcs: [
+        "draw_pipe_unfilled.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_user_cull_c_impl",
+    srcs: [
+        "draw_pipe_user_cull.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_util_c_impl",
+    srcs: [
+        "draw_pipe_util.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_validate_c_impl",
+    srcs: [
+        "draw_pipe_validate.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_vbuf_c_impl",
+    srcs: [
+        "draw_pipe_vbuf.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_wide_line_c_impl",
+    srcs: [
+        "draw_pipe_wide_line.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pipe_wide_point_c_impl",
+    srcs: [
+        "draw_pipe_wide_point.c",
+    ],
+}
+
+filegroup {
+    name: "draw_prim_assembler_c_impl",
+    srcs: [
+        "draw_prim_assembler.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pt_c_impl",
+    srcs: [
+        "draw_pt.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pt_emit_c_impl",
+    srcs: [
+        "draw_pt_emit.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pt_fetch_c_impl",
+    srcs: [
+        "draw_pt_fetch.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pt_fetch_shade_emit_c_impl",
+    srcs: [
+        "draw_pt_fetch_shade_emit.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pt_fetch_shade_pipeline_c_impl",
+    srcs: [
+        "draw_pt_fetch_shade_pipeline.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pt_fetch_shade_pipeline_llvm_c_impl",
+    srcs: [
+        "draw_pt_fetch_shade_pipeline_llvm.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pt_mesh_pipeline_c_impl",
+    srcs: [
+        "draw_pt_mesh_pipeline.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pt_post_vs_c_impl",
+    srcs: [
+        "draw_pt_post_vs.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pt_so_emit_c_impl",
+    srcs: [
+        "draw_pt_so_emit.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pt_util_c_impl",
+    srcs: [
+        "draw_pt_util.c",
+    ],
+}
+
+filegroup {
+    name: "draw_pt_vsplit_c_impl",
+    srcs: [
+        "draw_pt_vsplit.c",
+    ],
+}
+
+filegroup {
+    name: "draw_tess_c_impl",
+    srcs: [
+        "draw_tess.c",
+    ],
+}
+
+filegroup {
+    name: "draw_vertex_c_impl",
+    srcs: [
+        "draw_vertex.c",
+    ],
+}
+
+filegroup {
+    name: "draw_vs_c_impl",
+    srcs: [
+        "draw_vs.c",
+    ],
+}
+
+filegroup {
+    name: "draw_vs_exec_c_impl",
+    srcs: [
+        "draw_vs_exec.c",
+    ],
+}
+
+filegroup {
+    name: "draw_vs_llvm_c_impl",
+    srcs: [
+        "draw_vs_llvm.c",
+    ],
+}
+
+filegroup {
+    name: "draw_vs_variant_c_impl",
+    srcs: [
+        "draw_vs_variant.c",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_cliptest_tmp_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_context_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_decompose_tmp_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_fs_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_gs_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_gs_tmp_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_llvm_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_mesh_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_mesh_prim_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_mesh_prim_tmp_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_pipe_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_prim_assembler_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_prim_assembler_tmp_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_private_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_pt_decompose_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_pt_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_pt_vsplit_tmp_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_so_emit_tmp_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_split_tmp_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_tess_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_vbuf_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_vertex_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_vertex_header_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "draw_vs_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}

@@ -175,7 +175,6 @@ dump_vgprs_to_mem(isel_context* ctx, Builder& bld, Operand rsrc)
       {
          emit_loop_break(ctx);
       }
-      begin_uniform_if_else(ctx, &loop_break);
       end_uniform_if(ctx, &loop_break);
    }
    end_loop(ctx, &lc);
@@ -273,7 +272,6 @@ dump_lds_to_mem(isel_context* ctx, Builder& bld, Operand rsrc)
          {
             emit_loop_break(ctx);
          }
-         begin_uniform_if_else(ctx, &loop_break);
          end_uniform_if(ctx, &loop_break);
       }
       end_loop(ctx, &lc);
@@ -297,8 +295,7 @@ select_trap_handler_shader(Program* program, ac_shader_config* config,
 
    assert(options->gfx_level >= GFX8 && options->gfx_level <= GFX12);
 
-   init_program(program, compute_cs, info, options->gfx_level, options->family, options->wgp_mode,
-                config);
+   init_program(program, compute_cs, info, options, config);
 
    isel_context ctx = {};
    ctx.program = program;
@@ -499,7 +496,7 @@ select_trap_handler_shader(Program* program, ac_shader_config* config,
 
    program->config->float_mode = program->blocks[0].fp_mode.val;
 
-   append_logical_end(ctx.block);
+   append_logical_end(&ctx);
    ctx.block->kind |= block_kind_uniform;
    bld.sopp(aco_opcode::s_endpgm);
 

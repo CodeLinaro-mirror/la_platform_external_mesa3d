@@ -29,7 +29,7 @@ INSTALL=$(realpath -s "$PWD"/install)
 # Modifiying here directly LD_LIBRARY_PATH may cause problems when
 # using a command wrapper. Hence, we will just set it when running the
 # command.
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}:$INSTALL/lib/:/vkd3d-proton-tests/lib/"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}:$INSTALL/lib/"
 
 
 # Set the Vulkan driver to use.
@@ -102,7 +102,7 @@ printf "%s\n" "Running vkd3d-proton testsuite..."
 LOGFILE="$RESULTS_DIR/vkd3d-proton-log.txt"
 TEST_LOGS="/test-logs"
 pushd /vkd3d-proton-tests
-tests/test-runner.sh ./d3d12 --jobs "${FDO_CI_CONCURRENT:-4}" --output-dir "$TEST_LOGS" | tee "$LOGFILE" || true
+tests/test-runner.sh tests/d3d12 --jobs "${FDO_CI_CONCURRENT:-4}" --output-dir "$TEST_LOGS" | tee "$LOGFILE" || true
 popd
 
 printf '\n\n'
@@ -167,7 +167,7 @@ for expected_fail_line in "${expected_fail_lines[@]}"; do
   printf '%s,%s\n' "$test_name" "$test_status"
 done >> "$RESULTSFILE"
 
-mapfile -t unexpected_results < <(comm -23 "$RESULTSFILE" "$EXPECTATIONFILE")
+mapfile -t unexpected_results < <(comm -23 <(sort "$RESULTSFILE") <(sort "$EXPECTATIONFILE"))
 if [ ${#unexpected_results[@]} -gt 0 ]; then
   printf >&2 '\nUnexpected results:\n'
   printf >&2 '  %s\n' "${unexpected_results[@]}"

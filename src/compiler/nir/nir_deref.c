@@ -129,8 +129,7 @@ nir_deref_instr_has_indirect(nir_deref_instr *instr)
       if (instr->deref_type == nir_deref_type_cast)
          return true;
 
-      if ((instr->deref_type == nir_deref_type_array ||
-           instr->deref_type == nir_deref_type_ptr_as_array) &&
+      if (nir_deref_instr_is_arr(instr) &&
           !nir_src_is_const(instr->arr.index))
          return true;
 
@@ -792,52 +791,18 @@ rematerialize_deref_in_block(nir_deref_instr *deref,
       return deref;
 
    nir_builder *b = &state->builder;
-   nir_deref_instr *new_deref =
-      nir_deref_instr_create(b->shader, deref->deref_type);
-   new_deref->modes = deref->modes;
-   new_deref->type = deref->type;
+   nir_instr *new_instr = nir_instr_clone(b->shader, &deref->instr);
+   nir_deref_instr *new_deref = nir_instr_as_deref(new_instr);
 
-   if (deref->deref_type == nir_deref_type_var) {
-      new_deref->var = deref->var;
-   } else {
+   if (deref->deref_type != nir_deref_type_var) {
       nir_deref_instr *parent = nir_src_as_deref(deref->parent);
       if (parent) {
          parent = rematerialize_deref_in_block(parent, state);
          new_deref->parent = nir_src_for_ssa(&parent->def);
-      } else {
-         new_deref->parent = nir_src_for_ssa(deref->parent.ssa);
       }
    }
 
-   switch (deref->deref_type) {
-   case nir_deref_type_var:
-   case nir_deref_type_array_wildcard:
-      /* Nothing more to do */
-      break;
-
-   case nir_deref_type_cast:
-      new_deref->cast.ptr_stride = deref->cast.ptr_stride;
-      new_deref->cast.align_mul = deref->cast.align_mul;
-      new_deref->cast.align_offset = deref->cast.align_offset;
-      break;
-
-   case nir_deref_type_array:
-   case nir_deref_type_ptr_as_array:
-      assert(!nir_src_as_deref(deref->arr.index));
-      new_deref->arr.index = nir_src_for_ssa(deref->arr.index.ssa);
-      break;
-
-   case nir_deref_type_struct:
-      new_deref->strct.index = deref->strct.index;
-      break;
-
-   default:
-      UNREACHABLE("Invalid deref instruction type");
-   }
-
-   nir_def_init(&new_deref->instr, &new_deref->def,
-                deref->def.num_components, deref->def.bit_size);
-   nir_builder_instr_insert(b, &new_deref->instr);
+   nir_builder_instr_insert(b, new_instr);
 
    return new_deref;
 }
@@ -963,11 +928,10 @@ opt_alu_of_cast(nir_alu_instr *alu)
    bool progress = false;
 
    for (unsigned i = 0; i < nir_op_infos[alu->op].num_inputs; i++) {
-      nir_instr *src_instr = alu->src[i].src.ssa->parent_instr;
-      if (src_instr->type != nir_instr_type_deref)
+      if (!nir_src_is_deref(alu->src[i].src))
          continue;
 
-      nir_deref_instr *src_deref = nir_instr_as_deref(src_instr);
+      nir_deref_instr *src_deref = nir_src_as_deref(alu->src[i].src);
       if (src_deref->deref_type != nir_deref_type_cast)
          continue;
 
@@ -1565,4 +1529,50 @@ nir_lower_constant_to_temp(nir_shader *nir)
 
    nir_fixup_deref_modes(nir);
    nir_lower_global_vars_to_local(nir);
+}
+
+
+static bool
+update_image_format_intrin(nir_builder *b,
+                           nir_intrinsic_instr *intrin,
+                           void *state)
+{
+   switch (intrin->intrinsic) {
+#define CASE(op) case nir_intrinsic_image_deref_##op
+   CASE(load):
+   CASE(sparse_load):
+   CASE(store):
+   CASE(atomic):
+   CASE(atomic_swap):
+   CASE(format):
+   CASE(levels):
+   CASE(order):
+   CASE(size):
+   CASE(samples):
+   CASE(samples_identical):
+   CASE(texel_address):
+   CASE(load_raw_intel):
+   CASE(store_raw_intel):
+   CASE(descriptor_amd):
+   CASE(fragment_mask_load_amd):
+   CASE(store_block_agx): {
+      nir_deref_instr *deref = nir_src_as_deref(intrin->src[0]);
+      nir_variable *var = nir_deref_instr_get_variable(deref);
+      if (var == NULL)
+         return false;
+      nir_intrinsic_set_format(intrin, var->data.image.format);
+      return true;
+   }
+#undef CASE
+
+   default:
+      return false;
+   }
+}
+
+bool
+nir_update_image_intrinsic_from_var(nir_shader *nir)
+{
+   return nir_shader_intrinsics_pass(nir, update_image_format_intrin,
+                                     nir_metadata_all, NULL);
 }

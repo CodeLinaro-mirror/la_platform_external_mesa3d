@@ -46,9 +46,9 @@ static nir_def *
 load_speculatable(nir_builder *b, unsigned num_components, unsigned bit_size,
                   nir_def *addr, unsigned align)
 {
-   return nir_build_load_global_constant(b, num_components, bit_size, addr,
-                                         .align_mul = align,
-                                         .access = ACCESS_CAN_SPECULATE);
+   return nir_load_global_constant(b, num_components, bit_size, addr,
+                                   .align_mul = align,
+                                   .access = ACCESS_CAN_SPECULATE);
 }
 
 static nir_def *
@@ -95,7 +95,7 @@ load_dynamic_buffer_start(nir_builder *b, uint32_t set,
          break;
       }
 
-      dynamic_buffer_start_imm += ctx->set_layouts[s]->dynamic_buffer_count;
+      dynamic_buffer_start_imm += ctx->set_layouts[s]->vk.dynamic_descriptor_count;
    }
 
    if (dynamic_buffer_start_imm >= 0) {
@@ -383,15 +383,20 @@ translate_pipeline_stat_bit(enum pipe_statistics_query_index pipe)
       return VK_QUERY_PIPELINE_STATISTIC_TASK_SHADER_INVOCATIONS_BIT_EXT;
    case PIPE_STAT_QUERY_MS_INVOCATIONS:
       return VK_QUERY_PIPELINE_STATISTIC_MESH_SHADER_INVOCATIONS_BIT_EXT;
+   default:
+      UNREACHABLE("invalid statistic");
    }
-
-   UNREACHABLE("invalid statistic");
 }
+
+struct lower_uvs_args {
+   mesa_shader_stage sw_stage;
+   unsigned nr_vbos;
+};
 
 static bool
 lower_uvs_index(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
 {
-   unsigned *nr_vbos = data;
+   const struct lower_uvs_args *args = data;
 
    switch (intrin->intrinsic) {
    case nir_intrinsic_load_uvs_index_agx: {
@@ -419,14 +424,24 @@ lower_uvs_index(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
    case nir_intrinsic_load_geometry_param_buffer_poly:
       return lower_sysval_to_root_table(b, intrin, draw.geometry_params);
 
-   case nir_intrinsic_load_vs_output_buffer_poly:
-      return lower_sysval_to_root_table(b, intrin, draw.vertex_output_buffer);
-
    case nir_intrinsic_load_vs_outputs_poly:
       return lower_sysval_to_root_table(b, intrin, draw.vertex_outputs);
 
    case nir_intrinsic_load_tess_param_buffer_poly:
       return lower_sysval_to_root_table(b, intrin, draw.tess_params);
+
+   case nir_intrinsic_load_vertex_param_buffer_poly:
+      if (args->sw_stage == MESA_SHADER_VERTEX) {
+         b->cursor = nir_instr_remove(&intrin->instr);
+
+         unsigned base = AGX_ABI_VUNI_VERTEX_PARAMS(args->nr_vbos);
+         nir_def *val = nir_load_preamble(b, 1, 64, .base = base);
+         nir_def_rewrite_uses(&intrin->def, val);
+
+         return true;
+      } else {
+         return lower_sysval_to_root_table(b, intrin, draw.vertex_params);
+      }
 
    case nir_intrinsic_load_rasterization_stream:
       return lower_sysval_to_root_table(b, intrin, draw.rasterization_stream);
@@ -454,22 +469,17 @@ lower_uvs_index(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
    case nir_intrinsic_load_base_vertex:
    case nir_intrinsic_load_first_vertex:
    case nir_intrinsic_load_base_instance:
-   case nir_intrinsic_load_draw_id:
-   case nir_intrinsic_load_input_assembly_buffer_poly: {
+   case nir_intrinsic_load_draw_id: {
       b->cursor = nir_instr_remove(&intrin->instr);
 
-      unsigned base = AGX_ABI_VUNI_FIRST_VERTEX(*nr_vbos);
+      unsigned base = AGX_ABI_VUNI_FIRST_VERTEX(args->nr_vbos);
       unsigned size = 32;
 
       if (intrin->intrinsic == nir_intrinsic_load_base_instance) {
-         base = AGX_ABI_VUNI_BASE_INSTANCE(*nr_vbos);
+         base = AGX_ABI_VUNI_BASE_INSTANCE(args->nr_vbos);
       } else if (intrin->intrinsic == nir_intrinsic_load_draw_id) {
-         base = AGX_ABI_VUNI_DRAW_ID(*nr_vbos);
+         base = AGX_ABI_VUNI_DRAW_ID(args->nr_vbos);
          size = 16;
-      } else if (intrin->intrinsic ==
-                 nir_intrinsic_load_input_assembly_buffer_poly) {
-         base = AGX_ABI_VUNI_INPUT_ASSEMBLY(*nr_vbos);
-         size = 64;
       }
 
       nir_def *val = nir_load_preamble(b, 1, size, .base = base);
@@ -478,7 +488,7 @@ lower_uvs_index(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
       return true;
    }
 
-   case nir_intrinsic_load_stat_query_address_agx: {
+   case nir_intrinsic_load_stat_query_address_poly: {
       b->cursor = nir_instr_remove(&intrin->instr);
 
       unsigned off1 = hk_root_descriptor_offset(draw.pipeline_stats);
@@ -529,10 +539,14 @@ lower_uvs_index(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
 }
 
 bool
-hk_lower_uvs_index(nir_shader *s, unsigned nr_vbos)
+hk_lower_uvs_index(nir_shader *s, mesa_shader_stage sw_stage, unsigned nr_vbos)
 {
+   struct lower_uvs_args args = {
+      .sw_stage = sw_stage,
+      .nr_vbos = nr_vbos,
+   };
    return nir_shader_intrinsics_pass(s, lower_uvs_index,
-                                     nir_metadata_control_flow, &nr_vbos);
+                                     nir_metadata_control_flow, &args);
 }
 
 static bool

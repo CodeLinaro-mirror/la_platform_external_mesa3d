@@ -224,6 +224,10 @@ etna_emit_tex(struct etna_compile *c, nir_tex_instr * tex, unsigned dst_swiz,
       inst.opcode = ISA_OPC_TXF;
       inst.src[2] = etna_immediate_int(0x1100);
       break;
+   case nir_texop_tg4:
+      inst.opcode = ISA_OPC_TG4;
+      inst.src[1] = etna_immediate_int(tex->component);
+      break;
    default:
       compile_error(c, "Unhandled NIR tex type: %d\n", tex->op);
    }
@@ -259,7 +263,7 @@ etna_emit_discard(struct etna_compile *c, struct etna_inst_src condition)
    }
 
    struct etna_inst inst = {
-      .opcode = ISA_OPC_TEXKILL,
+      .opcode = ISA_OPC_TEXKILL_UNARY,
       .cond = ISA_COND_NZ,
       .type = (c->info->halti < 2) ? ISA_TYPE_F32 : ISA_TYPE_U32,
       .src[0] = condition,

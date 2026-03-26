@@ -367,7 +367,7 @@ clc_lower_nonnormalized_samplers(nir_shader *nir,
                continue;
 
             nir_src *sampler_src = &tex->src[sampler_src_idx].src;
-            assert(sampler_src->ssa->parent_instr->type == nir_instr_type_deref);
+            assert(nir_def_is_deref(sampler_src->ssa));
             nir_variable *sampler = nir_deref_instr_get_variable(nir_def_as_deref(sampler_src->ssa));
 
             // If the sampler returns ints, we'll handle this in the int lowering pass
@@ -801,7 +801,6 @@ clc_spirv_to_dxil(struct clc_libclc *lib,
       clc_error(logger, "spirv_to_nir() failed");
       goto err_free_dxil;
    }
-   nir->info.workgroup_size_variable = true;
 
    NIR_PASS(_, nir, nir_lower_goto_ifs);
    NIR_PASS(_, nir, nir_opt_dead_cf);
@@ -820,7 +819,7 @@ clc_spirv_to_dxil(struct clc_libclc *lib,
       do
       {
          progress = false;
-         NIR_PASS(progress, nir, nir_copy_prop);
+         NIR_PASS(progress, nir, nir_opt_copy_prop);
          NIR_PASS(progress, nir, nir_opt_copy_prop_vars);
          NIR_PASS(progress, nir, nir_opt_deref);
          NIR_PASS(progress, nir, nir_opt_dce);
@@ -849,7 +848,7 @@ clc_spirv_to_dxil(struct clc_libclc *lib,
       do
       {
          progress = false;
-         NIR_PASS(progress, nir, nir_copy_prop);
+         NIR_PASS(progress, nir, nir_opt_copy_prop);
          NIR_PASS(progress, nir, nir_opt_copy_prop_vars);
          NIR_PASS(progress, nir, nir_opt_deref);
          NIR_PASS(progress, nir, nir_opt_dce);
@@ -953,7 +952,7 @@ clc_spirv_to_dxil(struct clc_libclc *lib,
       do {
          progress = false;
          NIR_PASS(progress, nir, nir_opt_memcpy);
-         NIR_PASS(progress, nir, nir_copy_prop);
+         NIR_PASS(progress, nir, nir_opt_copy_prop);
          NIR_PASS(progress, nir, nir_opt_copy_prop_vars);
          NIR_PASS(progress, nir, nir_opt_deref);
          NIR_PASS(progress, nir, nir_opt_dce);
@@ -1109,9 +1108,6 @@ clc_spirv_to_dxil(struct clc_libclc *lib,
    NIR_PASS(_, nir, nir_lower_explicit_io, nir_var_mem_ubo,
               nir_address_format_32bit_index_offset);
    NIR_PASS(_, nir, clc_nir_lower_system_values, work_properties_var);
-   const struct dxil_nir_lower_loads_stores_options loads_stores_options = {
-      .use_16bit_ssbo = false,
-   };
 
    /* Now that function-declared local vars have been sized, append args */
    for (unsigned i = 0; i < out_dxil->kernel->num_args; i++) {
@@ -1140,7 +1136,7 @@ clc_spirv_to_dxil(struct clc_libclc *lib,
       nir->info.shared_size += size;
    }
 
-   NIR_PASS(_, nir, dxil_nir_lower_loads_stores_to_dxil, &loads_stores_options);
+   NIR_PASS(_, nir, dxil_nir_scratch_and_shared_to_dxil);
    NIR_PASS(_, nir, dxil_nir_opt_alu_deref_srcs);
    NIR_PASS(_, nir, nir_lower_fp16_casts, nir_lower_fp16_all);
    NIR_PASS(_, nir, nir_lower_convert_alu_types, NULL);

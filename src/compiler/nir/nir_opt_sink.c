@@ -47,7 +47,7 @@ is_constant_like(nir_src *src)
       return true;
 
    /* Otherwise, look for constant-like intrinsics */
-   nir_instr *parent = src->ssa->parent_instr;
+   nir_instr *parent = nir_def_instr(src->ssa);
    if (parent->type != nir_instr_type_intrinsic)
       return false;
 
@@ -80,13 +80,19 @@ can_sink_instr(nir_instr *instr, nir_move_options options, bool *can_mov_out_of_
       if (nir_alu_instr_is_comparison(alu))
          return options & nir_move_comparisons;
 
+      if (!(options & nir_move_alu))
+         return false;
+
+      /* Optimize assume packs will be coalesced, and sink them to let us sink
+       * their sources too. This optimizes lower_mem_access_bit_size patterns.
+       */
+      if (alu->op == nir_op_pack_64_2x32_split)
+         return true;
+
       /* Assuming that constants do not contribute to register pressure, it is
        * beneficial to sink ALU instructions where all non constant sources
        * are the same and the source bit size is not larger than the destination.
        */
-      if (!(options & nir_move_alu))
-         return false;
-
       unsigned inputs = nir_op_infos[alu->op].num_inputs;
       int non_const = -1;
 
@@ -100,6 +106,17 @@ can_sink_instr(nir_instr *instr, nir_move_options options, bool *can_mov_out_of_
       }
 
       if (non_const >= 0) {
+         nir_instr *parent = nir_def_instr(alu->src[non_const].src.ssa);
+         if (parent->type == nir_instr_type_intrinsic) {
+            /* Don't sink alu that uses ballot(true), as that can be a local system value
+             * and moving the alu then requires a mov in the old location.
+             */
+            nir_intrinsic_instr *intrin = nir_instr_as_intrinsic(parent);
+            if (intrin->intrinsic == nir_intrinsic_ballot &&
+                nir_src_is_const(intrin->src[0]))
+               return false;
+         }
+
          unsigned src_bits = nir_ssa_alu_instr_src_components(alu, non_const) *
                              alu->src[non_const].src.ssa->bit_size;
          unsigned dest_bits = alu->def.num_components * alu->def.bit_size;
@@ -148,9 +165,10 @@ can_sink_instr(nir_instr *instr, nir_move_options options, bool *can_mov_out_of_
          return false;
 
       if (intrin->intrinsic == nir_intrinsic_load_global ||
+          intrin->intrinsic == nir_intrinsic_load_global_amd ||
           intrin->intrinsic == nir_intrinsic_load_ubo ||
-          intrin->intrinsic == nir_intrinsic_load_ssbo ||
-          intrin->intrinsic == nir_intrinsic_load_smem_amd) {
+          intrin->intrinsic == nir_intrinsic_load_ubo_uniform_block_intel ||
+          intrin->intrinsic == nir_intrinsic_load_ssbo) {
          if (intrin->def.divergent) {
             if (options & nir_move_only_convergent)
                return false;
@@ -196,14 +214,19 @@ can_sink_instr(nir_instr *instr, nir_move_options options, bool *can_mov_out_of_
       case nir_intrinsic_load_per_vertex_input:
       case nir_intrinsic_load_per_primitive_input:
       case nir_intrinsic_load_attribute_pan:
+      case nir_intrinsic_load_urb_vec4_intel:
+      case nir_intrinsic_load_urb_lsc_intel:
          *can_mov_out_of_loop = true;
          return options & nir_move_load_input;
 
       case nir_intrinsic_load_global:
-      case nir_intrinsic_load_smem_amd: /* = global + convergent */
+      case nir_intrinsic_load_global_amd: /* = global + convergent */
          return options & nir_move_load_global;
 
+      case nir_intrinsic_ldc_nv:
+      case nir_intrinsic_ldcx_nv:
       case nir_intrinsic_load_ubo:
+      case nir_intrinsic_load_ubo_uniform_block_intel:
       case nir_intrinsic_load_ubo_vec4:
       case nir_intrinsic_load_global_constant_offset:
       case nir_intrinsic_load_global_constant_bounded:
@@ -237,6 +260,9 @@ can_sink_instr(nir_instr *instr, nir_move_options options, bool *can_mov_out_of_
 
       case nir_intrinsic_inverse_ballot:
       case nir_intrinsic_is_subgroup_invocation_lt_amd:
+      case nir_intrinsic_load_urb_input_handle_intel:
+      case nir_intrinsic_load_urb_input_handle_indexed_intel:
+      case nir_intrinsic_load_urb_output_handle_intel:
          return options & nir_move_copies;
 
       case nir_intrinsic_load_constant_agx:
@@ -268,7 +294,7 @@ get_innermost_loop(nir_cf_node *node)
    for (; node != NULL; node = node->parent) {
       if (node->type == nir_cf_node_loop) {
          nir_loop *loop = nir_cf_node_as_loop(node);
-         if (nir_loop_first_block(loop)->predecessors->entries > 1)
+         if (nir_loop_first_block(loop)->predecessors.entries > 1)
             return loop;
       }
    }
@@ -309,7 +335,7 @@ adjust_block_for_loops(nir_block *use_block, nir_block *def_block,
 
       nir_cf_node *next = nir_cf_node_next(&cur_block->cf_node);
       if (next && next->type == nir_cf_node_loop &&
-          nir_block_cf_tree_next(cur_block)->predecessors->entries > 1) {
+          nir_block_cf_tree_next(cur_block)->predecessors.entries > 1) {
          nir_loop *following_loop = nir_cf_node_as_loop(next);
          if (loop_contains_block(following_loop, use_block)) {
             use_block = cur_block;
@@ -357,11 +383,12 @@ nir_opt_sink(nir_shader *shader, nir_move_options options)
    bool progress = false;
 
    nir_foreach_function_impl(impl, shader) {
-      nir_metadata_require(impl,
-                           nir_metadata_control_flow |
-                           (options & (nir_move_only_convergent |
-                                       nir_move_only_divergent) ?
-                               nir_metadata_divergence : 0));
+      nir_metadata required = nir_metadata_block_index |
+                              nir_metadata_dominance |
+                              nir_metadata_dominance_lca;
+      if (options & (nir_move_only_convergent | nir_move_only_divergent))
+         required |= nir_metadata_divergence;
+      nir_metadata_require(impl, required);
 
       nir_foreach_block_reverse(block, impl) {
          nir_foreach_instr_reverse_safe(instr, block) {

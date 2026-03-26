@@ -1,0 +1,148 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "prog_enums2names",
+    srcs: [
+        "enums2names.py",
+    ],
+}
+
+filegroup {
+    name: "tr_context_c_impl",
+    srcs: [
+        "tr_context.c",
+    ],
+}
+
+filegroup {
+    name: "tr_dump_c_impl",
+    srcs: [
+        "tr_dump.c",
+    ],
+}
+
+filegroup {
+    name: "tr_dump_state_c_impl",
+    srcs: [
+        "tr_dump_state.c",
+    ],
+}
+
+filegroup {
+    name: "tr_screen_c_impl",
+    srcs: [
+        "tr_screen.c",
+    ],
+}
+
+filegroup {
+    name: "tr_texture_c_impl",
+    srcs: [
+        "tr_texture.c",
+    ],
+}
+
+filegroup {
+    name: "tr_video_c_impl",
+    srcs: [
+        "tr_video.c",
+    ],
+}
+
+python_binary_host {
+    name: "enums2names_py_binary",
+    main: "enums2names.py",
+    srcs: [
+        ":prog_enums2names",
+    ],
+    libs: [
+        "mako",
+        "pyyaml",
+    ],
+}
+
+cc_library_headers {
+    name: "tr_context_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tr_dump_defines_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tr_dump_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tr_dump_state_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tr_public_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tr_screen_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tr_texture_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tr_video_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
