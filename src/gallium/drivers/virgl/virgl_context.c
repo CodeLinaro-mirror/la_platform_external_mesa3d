@@ -716,16 +716,21 @@ static void *virgl_shader_encoder(struct pipe_context *ctx,
          .non_compute_membar_needs_all_modes = true
       };
 
+      /* Take ownership of the NIR shader: clone it for our own use and free
+       * the original.  All modifications are applied to the clone so that
+       * the caller's copy is not mutated.
+       */
+      nir_shader *s = nir_shader_clone(NULL, shader->ir.nir);
+      ralloc_free((void *)shader->ir.nir);
+
       if (!(rs->caps.caps.v2.capability_bits_v2 & VIRGL_CAP_V2_TEXTURE_SHADOW_LOD) &&
           rs->caps.caps.v2.capability_bits & VIRGL_CAP_HOST_IS_GLES) {
          nir_lower_tex_options lower_tex_options = {
             .lower_offset_filter = lower_gles_arrayshadow_offset_filter,
          };
 
-         NIR_PASS_V(shader->ir.nir, nir_lower_tex, &lower_tex_options);
+         NIR_PASS_V(s, nir_lower_tex, &lower_tex_options);
       }
-
-      nir_shader *s = nir_shader_clone(NULL, shader->ir.nir);
 
       /* The host can't handle certain IO slots as separable, because we can't assign
        * more than 32 IO locations explicitly, and with varyings and patches we already
@@ -1489,8 +1494,8 @@ static void *virgl_create_compute_state(struct pipe_context *ctx,
          .unoptimized_ra = true,
          .lower_fabs = true
       };
-      nir_shader *s = nir_shader_clone(NULL, state->prog);
-      ntt_tokens = tokens = nir_to_tgsi_options(s, vctx->base.screen, &options); /* takes ownership */
+      ntt_tokens = tokens = nir_to_tgsi_options((nir_shader *)state->prog,
+                                                vctx->base.screen, &options); /* takes ownership */
    } else {
       tokens = state->prog;
    }
