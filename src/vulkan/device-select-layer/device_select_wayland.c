@@ -25,13 +25,13 @@
 #ifdef HAVE_BIND_WL_DISPLAY
 #include "wayland-drm-client-protocol.h"
 #endif
-#include "linux-dmabuf-unstable-v1-client-protocol.h"
-#include "device_select.h"
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
 #include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 #include <xf86drm.h>
+#include "device_select.h"
+#include "linux-dmabuf-unstable-v1-client-protocol.h"
 
 struct device_select_wayland_info {
 #ifdef HAVE_BIND_WL_DISPLAY
@@ -41,6 +41,7 @@ struct device_select_wayland_info {
 
    struct zwp_linux_dmabuf_v1 *wl_dmabuf;
    struct zwp_linux_dmabuf_feedback_v1 *wl_dmabuf_feedback;
+   struct wl_fixes *wl_fixes;
    drmDevicePtr dmabuf_dev_info;
 };
 
@@ -70,26 +71,24 @@ device_select_drm_handle_authenticated(void *data, struct wl_drm *drm)
    /* ignore this event */
 }
 
-
 static void
 device_select_drm_handle_capabilities(void *data, struct wl_drm *drm, uint32_t value)
 {
    /* ignore this event */
 }
 
-
 static const struct wl_drm_listener ds_drm_listener = {
    .device = device_select_drm_handle_device,
    .format = device_select_drm_handle_format,
    .authenticated = device_select_drm_handle_authenticated,
-   .capabilities = device_select_drm_handle_capabilities
+   .capabilities = device_select_drm_handle_capabilities,
 };
 #endif
 
 static void
-default_dmabuf_feedback_format_table(void *data,
-                                     struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1,
-                                     int32_t fd, uint32_t size)
+default_dmabuf_feedback_format_table(
+   void *data, struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, int32_t fd,
+   uint32_t size)
 {
 
    /* ignore this event */
@@ -144,8 +143,7 @@ default_dmabuf_feedback_tranche_done(void *data,
 }
 
 static void
-default_dmabuf_feedback_done(void *data,
-                             struct zwp_linux_dmabuf_feedback_v1 *dmabuf_feedback)
+default_dmabuf_feedback_done(void *data, struct zwp_linux_dmabuf_feedback_v1 *dmabuf_feedback)
 {
    /* ignore this event */
 }
@@ -172,25 +170,26 @@ device_select_registry_global(void *data, struct wl_registry *registry, uint32_t
    } else
 #endif
    if (strcmp(interface, zwp_linux_dmabuf_v1_interface.name) == 0 &&
-              version >= ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
-      info->wl_dmabuf =
-         wl_registry_bind(registry, name, &zwp_linux_dmabuf_v1_interface,
-                          ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION);
-      info->wl_dmabuf_feedback =
-         zwp_linux_dmabuf_v1_get_default_feedback(info->wl_dmabuf);
-      zwp_linux_dmabuf_feedback_v1_add_listener(info->wl_dmabuf_feedback,
-                                                &dmabuf_feedback_listener, data);
+       version >= ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
+      info->wl_dmabuf = wl_registry_bind(registry, name, &zwp_linux_dmabuf_v1_interface,
+                                         ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION);
+      info->wl_dmabuf_feedback = zwp_linux_dmabuf_v1_get_default_feedback(info->wl_dmabuf);
+      zwp_linux_dmabuf_feedback_v1_add_listener(info->wl_dmabuf_feedback, &dmabuf_feedback_listener,
+                                                data);
+#ifdef WL_FIXES_INTERFACE
+   } else if (strcmp(interface, wl_fixes_interface.name) == 0) {
+      info->wl_fixes = wl_registry_bind(registry, name, &wl_fixes_interface, 1);
+#endif
    }
 }
 
 static void
-device_select_registry_global_remove_cb(void *data, struct wl_registry *registry,
-                                        uint32_t name)
+device_select_registry_global_remove_cb(void *data, struct wl_registry *registry, uint32_t name)
 {
-
 }
 
-int device_select_find_wayland_pci_default(struct device_pci_info *devices, uint32_t device_count)
+int
+device_select_find_wayland_pci_default(struct device_pci_info *devices, uint32_t device_count)
 {
    struct wl_display *display;
    struct wl_registry *registry = NULL;
@@ -207,14 +206,14 @@ int device_select_find_wayland_pci_default(struct device_pci_info *devices, uint
       return -1;
    }
 
-   static const struct wl_registry_listener registry_listener =
-      { device_select_registry_global, device_select_registry_global_remove_cb };
+   static const struct wl_registry_listener registry_listener = {
+      device_select_registry_global, device_select_registry_global_remove_cb};
 
    wl_registry_add_listener(registry, &registry_listener, &info);
    wl_display_dispatch(display);
    wl_display_roundtrip(display);
 
-   drmDevicePtr target;
+   drmDevicePtr target = NULL;
    if (info.dmabuf_dev_info != NULL) {
       target = info.dmabuf_dev_info;
    }
@@ -223,7 +222,7 @@ int device_select_find_wayland_pci_default(struct device_pci_info *devices, uint
       target = info.drm_dev_info;
    }
 #endif
-   if (target != NULL) {
+   if (target == NULL) {
       goto done;
    }
 
@@ -245,7 +244,7 @@ int device_select_find_wayland_pci_default(struct device_pci_info *devices, uint
       }
    }
 
- done:
+done:
    if (info.dmabuf_dev_info != NULL)
       drmFreeDevice(&info.dmabuf_dev_info);
 #ifdef HAVE_BIND_WL_DISPLAY
@@ -260,6 +259,12 @@ int device_select_find_wayland_pci_default(struct device_pci_info *devices, uint
 #ifdef HAVE_BIND_WL_DISPLAY
    if (info.wl_drm)
       wl_drm_destroy(info.wl_drm);
+#endif
+#ifdef WL_FIXES_INTERFACE
+   if (info.wl_fixes) {
+      wl_fixes_destroy_registry(info.wl_fixes, registry);
+      wl_fixes_destroy(info.wl_fixes);
+   }
 #endif
 
    wl_registry_destroy(registry);

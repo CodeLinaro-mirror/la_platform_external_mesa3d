@@ -13,6 +13,7 @@ venus-lavapipe:
     CROSVM_MEMORY: 12288
     CROSVM_CPU: $FDO_CI_CONCURRENT
     FLAKES_CHANNEL: "#virgl-ci"
+    FDO_CI_CONCURRENT: 12  # We get OOMkills if we go too wide since VKCTS 1.4.4.0
   script: |
     export LD_LIBRARY_PATH="$CI_PROJECT_DIR/install/lib"
     export LIBGL_DRIVERS_PATH="$CI_PROJECT_DIR/install/lib/dri"
@@ -31,7 +32,7 @@ venus-lavapipe-full:
     - .test-android
     - .venus-lavapipe-manual-rules
   variables:
-    ANDROID_GPU_MODE: venus
+    CUTTLEFISH_GPU_MODE: venus
     GPU_VERSION: venus
     DEQP_SUITE: android-venus
     # TODO: define DEQP_FRACTION?
@@ -42,7 +43,7 @@ venus-lavapipe-full:
     - .venus-lavapipe-manual-rules
     - .test-angle
   variables:
-    ANDROID_GPU_MODE: venus_guest_angle
+    CUTTLEFISH_GPU_MODE: venus_guest_angle
     GPU_VERSION: venus
     DEQP_SUITE: android-venus-angle
     # TODO: define DEQP_FRACTION?
@@ -67,6 +68,8 @@ android-angle-venus-anv-cml-cts:
   variables:
     GPU_VERSION: android-angle-venus-anv
     HWCI_KERNEL_MODULES: "i915,vhost_vsock"
+    DEVICE_HANGING_TIMEOUT_SEC: 5400  # Android CTS might not print anything for minutes
+  timeout: 2h
 
 android-angle-venus-anv-tgl:
   extends:
@@ -77,7 +80,6 @@ android-angle-venus-anv-tgl:
     DEQP_SUITE: android-angle-venus-anv
     GPU_VERSION: android-angle-venus-anv
     HWCI_KERNEL_MODULES: "i915,vhost_vsock"
-    DEVICE_HANGING_TIMEOUT_SEC: 5400  # Workaround until network configuration is updated
   timeout: 1h 30m
 
 android-angle-venus-anv-adl:
@@ -88,6 +90,13 @@ android-angle-venus-anv-adl:
   variables:
     DEQP_SUITE: android-angle-venus-anv
     GPU_VERSION: android-angle-venus-anv
-    HWCI_KERNEL_MODULES: "i915,vhost_vsock"
-    LAVA_CMDLINE: null  # Override the default cmdline to use i915 instead of Xe
-    DEVICE_HANGING_TIMEOUT_SEC: 5400  # Workaround until network configuration is updated
+    HWCI_KERNEL_MODULES: "xe,vhost_vsock"
+
+android-angle-venus-tu-a618:
+  extends:
+    - .android-angle-venus-tu-test
+    - .lava-sc7180-trogdor-wormdingler-rev1-boe:arm64  # TODO: move to .lava-sc7180-trogdor-kingoftown:arm64 once its network config is fixed
+    - .venus-tu-manual-rules
+  variables:
+    DEQP_SUITE: android-angle-venus-tu
+    GPU_VERSION: android-angle-venus-tu

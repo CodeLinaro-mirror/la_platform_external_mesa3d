@@ -164,7 +164,7 @@ static void
 rebind_sampler_views(struct v3d_context *v3d,
                      struct v3d_resource *rsc)
 {
-        for (int st = 0; st < PIPE_SHADER_TYPES; st++) {
+        for (int st = 0; st < MESA_SHADER_STAGES; st++) {
                 struct v3d_texture_stateobj *tex = v3d->tex + st;
 
                 for (unsigned i = 0; i < tex->num_textures; i++) {
@@ -200,6 +200,15 @@ v3d_map_usage_prep(struct pipe_context *pctx,
         MESA_TRACE_FUNC();
 
         if (usage & PIPE_MAP_DISCARD_WHOLE_RESOURCE) {
+                /* Flush any pending write jobs before replacing the BO.
+                 * The RCL reads rsc->bo at job submit time, so if we
+                 * replace the BO first, a later flush of the pending
+                 * job would resolve the new BO instead of the old one,
+                 * corrupting the new data with a stale store.
+                 */
+                v3d_flush_jobs_writing_resource(v3d, prsc,
+                                                V3D_FLUSH_ALWAYS,
+                                                false);
                 if (v3d_resource_bo_alloc(rsc)) {
                         /* If it might be bound as one of our vertex buffers
                          * or UBOs, make sure we re-emit vertex buffer state
@@ -573,8 +582,8 @@ v3d_get_dimension_mpad(uint32_t dimension, uint32_t level, uint32_t block_dimens
 }
 
 static void
-v3d_setup_slices(struct v3d_resource *rsc, uint32_t winsys_stride,
-                 bool uif_top)
+v3d_setup_slices(struct v3d_screen *screen, struct v3d_resource *rsc,
+                 uint32_t winsys_stride, bool uif_top)
 {
         struct pipe_resource *prsc = &rsc->base;
         uint32_t width = prsc->width0;
@@ -695,6 +704,20 @@ v3d_setup_slices(struct v3d_resource *rsc, uint32_t winsys_stride,
                         slice->stride = winsys_stride;
                 else
                         slice->stride = level_width * rsc->cpp;
+
+#if USE_V3D_SIMULATOR
+                /* Ensure stride alignment matches the one required by the GPU
+                 * that drives the display.
+                 */
+                if (slice->tiling == V3D_TILING_RASTER &&
+                    prsc->target == PIPE_TEXTURE_2D &&
+                    uif_top && !msaa) {
+                       slice->stride =
+                               align(slice->stride,
+                                     v3d_simulator_get_raster_stride_align(screen->fd));
+                }
+#endif
+
                 slice->padded_height = level_height;
                 slice->size = level_height * slice->stride;
 
@@ -842,7 +865,7 @@ v3d_resource_create_with_modifiers(struct pipe_screen *pscreen,
 
         rsc->internal_format = prsc->format;
 
-        v3d_setup_slices(rsc, 0, tmpl->bind & PIPE_BIND_SHARED);
+        v3d_setup_slices(screen, rsc, 0, tmpl->bind & PIPE_BIND_SHARED);
 
         if (screen->ro && (tmpl->bind & PIPE_BIND_SCANOUT)) {
                 assert(!rsc->tiled);
@@ -958,7 +981,7 @@ v3d_resource_from_handle(struct pipe_screen *pscreen,
 
         rsc->internal_format = prsc->format;
 
-        v3d_setup_slices(rsc, whandle->stride, true);
+        v3d_setup_slices(screen, rsc, whandle->stride, true);
         v3d_debug_resource_layout(rsc, "import");
 
         if (whandle->offset != 0) {

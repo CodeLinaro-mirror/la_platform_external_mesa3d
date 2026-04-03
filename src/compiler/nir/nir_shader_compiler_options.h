@@ -77,12 +77,19 @@ typedef enum {
    nir_divergence_uniform_load_tears = (1 << 7),
    /* If used, this allows phis for divergent merges with undef and a uniform source to be considered uniform */
    nir_divergence_ignore_undef_if_phi_srcs = (1 << 8),
+
    /* Whether to compute vertex divergence (meaning between vertices
     * of the same primitive) instead of subgroup invocation divergence
     * (between invocations of the same subgroup). For example, patch input
     * loads are always convergent, while subgroup intrinsics are divergent.
     */
    nir_divergence_vertex = (1 << 11),
+
+   /* Whether to compute divergence of subgroup operations as if multiple
+    * subgroups ran in lock-step (for example subgroup operations normally
+    * convergent are divergent).
+    */
+   nir_divergence_across_subgroups = (1 << 12),
 } nir_divergence_options;
 
 /** An instruction filtering callback
@@ -193,6 +200,28 @@ typedef enum {
     */
    nir_io_radv_intrinsic_component_workaround = BITFIELD_BIT(10),
 
+   /**
+    * nir_recompute_io_bases will assign VARYING_SLOT_COL0-1 such that
+    * their bases are after all other inputs.
+    */
+   nir_io_assign_color_input_bases_after_all_other_inputs = BITFIELD_BIT(11),
+
+   /**
+    * Whether nir_lower_io should use FRAG_RESULT_DUAL_SRC_BLEND instead of
+    * nir_io_semantics::dual_source_blend_index.
+    *
+    * This has the advantage that it behaves like a normal output and its
+    * presence is reflected in shader_info::outputs_written instead of
+    * shader_info::fs::color_is_dual_source.
+    */
+   nir_io_use_frag_result_dual_src_blend = BITFIELD_BIT(12),
+
+   /**
+    * Whether the implementation can compact 16-bit values in the higher
+    * 32-bits of a varying.
+    */
+   nir_io_compact_to_higher_16 = BITFIELD_BIT(13),
+
    /* Options affecting the GLSL compiler or Gallium are below. */
 
    /**
@@ -200,15 +229,6 @@ typedef enum {
     * This is only affects GLSL compilation and Gallium.
     */
    nir_io_has_intrinsics = BITFIELD_BIT(16),
-
-   /**
-    * Whether clip and cull distance arrays should be separate. If this is not
-    * set, cull distances will be moved into VARYING_SLOT_CLIP_DISTn after clip
-    * distances, and shader_info::clip_distance_array_size will be the index
-    * of the first cull distance. nir_lower_clip_cull_distance_array_vars does
-    * that.
-    */
-   nir_io_separate_clip_cull_distance_arrays = BITFIELD_BIT(17),
 } nir_io_options;
 
 typedef enum {
@@ -270,9 +290,6 @@ typedef struct nir_shader_compiler_options {
 
    /* lower {slt,sge,seq,sne} to {flt,fge,feq,fneu} + b2f: */
    bool lower_scmp;
-
-   /* lower b/fall_equalN/b/fany_nequalN (ex:fany_nequal4 to sne+fdot4+fsat) */
-   bool lower_vector_cmp;
 
    /** enable rules to avoid bit ops */
    bool lower_bitops;
@@ -479,6 +496,19 @@ typedef struct nir_shader_compiler_options {
     */
    bool lower_bfloat16_conversions;
 
+   /**
+    * Set if f2u_sat (or f2i_sat) is supported for converting from 16-, 32-,
+    * or 64-bit float types to 8-, 16-, or 32-bit integer types (with small
+    * exceptions).
+    *
+    * Due to the prevalence of drivers using \c nir_split_conversion for
+    * conversions from 64-bit float to 8-bit integer, these flags will not
+    * enable generation of f2u_sat from 64-bit float types to 8-bit integer
+    * types.
+    */
+   bool has_f2u_sat;
+   bool has_f2i_sat;
+
    bool vectorize_tess_levels;
    bool lower_to_scalar;
    nir_instr_filter_cb lower_to_scalar_filter;
@@ -545,6 +575,9 @@ typedef struct nir_shader_compiler_options {
     */
    bool has_mul24_relaxed;
 
+   /** Backend supports umul_16x16. */
+   bool has_umul_16x16;
+
    /** Backend supports 32-bit imad */
    bool has_imad32;
 
@@ -575,6 +608,9 @@ typedef struct nir_shader_compiler_options {
 
    /** Backend supports pack_32_4x8 or pack_32_4x8_split. */
    bool has_pack_32_4x8;
+
+   /** Backend supports nir_load_pixel_coord */
+   bool has_pixel_coord;
 
    /** Backend supports nir_load_texture_scale and prefers it over txs for nir
     * lowerings. */
@@ -613,6 +649,11 @@ typedef struct nir_shader_compiler_options {
     */
    bool has_fmulz_no_denorms;
 
+   /** Backend supports fcanonicalize, if not set fcanonicalize will be lowered
+    * to fmul(a, 1.0)
+    */
+   bool has_fcanonicalize;
+
    /** Backend supports 32bit ufind_msb_rev and ifind_msb_rev. */
    bool has_find_msb_rev;
 
@@ -646,6 +687,15 @@ typedef struct nir_shader_compiler_options {
    /** Backend supports load_global_bounded intrinsics. */
    bool has_load_global_bounded;
 
+   /** Backend supports f2i32_rtne opcode. */
+   bool has_f2i32_rtne;
+
+   /** Backend supports atomic isub. */
+   bool has_atomic_isub;
+
+   /** Backend supports atomic load/store. */
+   bool has_atomic_load_store;
+
    /**
     * Is this the Intel vec4 backend?
     *
@@ -661,6 +711,11 @@ typedef struct nir_shader_compiler_options {
     * have immediates, so two to three instructions may eventually be needed.
     */
    bool avoid_ternary_with_two_constants;
+
+   /* Avoid using fabs on sources to ternary operations
+    * r600 can't use source modifiers for these
+    */
+   bool avoid_ternary_with_fabs;
 
    /** Whether 8-bit ALU is supported. */
    bool support_8bit_alu;
@@ -712,6 +767,17 @@ typedef struct nir_shader_compiler_options {
    uint8_t support_indirect_inputs;
    uint8_t support_indirect_outputs;
 
+   /**
+    * If set, the maximum MSAA sample count supported -- can hint loop unrolling
+    * to optimistically unroll a loop doing txf_ms per sample.
+    */
+   uint8_t max_samples;
+
+   /**
+    * Lower fmulz to `min(abs(a), abs(b)) == 0.0 ? 0.0 : a * b`.
+    */
+   bool lower_fmulz_with_abs_min;
+
    /** store the variable offset into the instrinsic range_base instead
     *  of adding it to the image index.
     */
@@ -745,15 +811,14 @@ typedef struct nir_shader_compiler_options {
     */
    bool discard_is_demote;
 
-   /**
-    * Whether the new-style derivative intrinsics are supported. If false,
-    * legacy ALU derivative ops will be emitted. This transitional option will
-    * be removed once all drivers are converted to derivative intrinsics.
-    */
-   bool has_ddx_intrinsics;
-
    /** Whether derivative intrinsics must be scalarized. */
    bool scalarize_ddx;
+
+   /**
+    * Whether unspecified derivative intrinsics are always coarse.
+    * If this is false, they might be either coarse or fine.
+    */
+   bool coarse_ddx;
 
    /**
     * Assign a range of driver locations to per-view outputs, with unique
@@ -791,6 +856,12 @@ typedef struct nir_shader_compiler_options {
     *  Used by nir_lower_io_passes.
     */
    void (*lower_mediump_io)(struct nir_shader *nir);
+
+   /**
+    * If driver wishes to control which @convert_alu_types to lower, it
+    * can implement this callback.
+    */
+   bool (*lower_convert_alu_types)(nir_intrinsic_instr *convert_alu_types);
 
    /**
     * Return the maximum cost of an expression that's written to a shader
@@ -832,6 +903,23 @@ typedef struct nir_shader_compiler_options {
     * the next shader according to default_varying_estimate_instr_cost.
     */
    unsigned max_varying_expression_cost;
+
+   /**
+    * Used by nir_lower_explicit_io to determine the maximum offset_shift to
+    * use when lowering the deref address of the given intrinsic.
+    */
+   unsigned (*max_offset_shift)(nir_intrinsic_instr *, const void *);
+
+   /**
+    * Passed to the callbacks that accept a data pointer.
+    */
+   const void *cb_data;
+
+   /** Maximum amount of invocations per workgroup. */
+   unsigned max_workgroup_invocations;
+
+   /** Maximum compute shader / kernel dispatchable work size. */
+   unsigned max_workgroup_count[3];
 } nir_shader_compiler_options;
 
 #ifdef __cplusplus

@@ -1,0 +1,185 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+cc_library_shared {
+    name: "cutils",
+    vendor: true,
+    host_supported: true,
+    cpp_std: "c++17",
+    defaults: [
+        "aosp_mesa3d_cpp_project_args",
+    ],
+    header_libs: select((arch(), os()), {
+        ("x86_64", "linux_glibc"): [
+            "inc_include",
+        ],
+        ("x86_64", "linux_musl"): [
+            "inc_include",
+        ],
+        ("arm64", "linux_musl"): [
+            "inc_include",
+        ],
+        (default, default): [],
+    }),
+    srcs: select((arch(), os()), {
+        ("x86_64", "linux_glibc"): [
+            "cutils_stub.cpp",
+        ],
+        ("x86_64", "linux_musl"): [
+            "cutils_stub.cpp",
+        ],
+        ("arm64", "linux_musl"): [
+            "cutils_stub.cpp",
+        ],
+        (default, default): [],
+    }),
+}
+
+cc_library_shared {
+    name: "hardware",
+    vendor: true,
+    host_supported: true,
+    cpp_std: "c++17",
+    defaults: [
+        "aosp_mesa3d_cpp_project_args",
+    ],
+    header_libs: select((arch(), os()), {
+        ("x86_64", "linux_glibc"): [
+            "inc_include",
+        ],
+        ("x86_64", "linux_musl"): [
+            "inc_include",
+        ],
+        ("arm64", "linux_musl"): [
+            "inc_include",
+        ],
+        (default, default): [],
+    }),
+    srcs: select((arch(), os()), {
+        ("x86_64", "linux_glibc"): [
+            "hardware_stub.cpp",
+        ],
+        ("x86_64", "linux_musl"): [
+            "hardware_stub.cpp",
+        ],
+        ("arm64", "linux_musl"): [
+            "hardware_stub.cpp",
+        ],
+        (default, default): [],
+    }),
+}
+
+cc_library_shared {
+    name: "log",
+    vendor: true,
+    host_supported: true,
+    cpp_std: "c++17",
+    defaults: [
+        "aosp_mesa3d_cpp_project_args",
+    ],
+    header_libs: select((arch(), os()), {
+        ("x86_64", "linux_glibc"): [
+            "inc_include",
+        ],
+        ("x86_64", "linux_musl"): [
+            "inc_include",
+        ],
+        ("arm64", "linux_musl"): [
+            "inc_include",
+        ],
+        (default, default): [],
+    }),
+    srcs: select((arch(), os()), {
+        ("x86_64", "linux_glibc"): [
+            "log_stub.cpp",
+        ],
+        ("x86_64", "linux_musl"): [
+            "log_stub.cpp",
+        ],
+        ("arm64", "linux_musl"): [
+            "log_stub.cpp",
+        ],
+        (default, default): [],
+    }),
+}
+
+cc_library_shared {
+    name: "nativewindow",
+    vendor: true,
+    host_supported: true,
+    cpp_std: "c++17",
+    defaults: [
+        "aosp_mesa3d_cpp_project_args",
+    ],
+    header_libs: select((arch(), os()), {
+        ("x86_64", "linux_glibc"): [
+            "inc_include",
+        ],
+        ("x86_64", "linux_musl"): [
+            "inc_include",
+        ],
+        ("arm64", "linux_musl"): [
+            "inc_include",
+        ],
+        (default, default): [],
+    }),
+    srcs: select((arch(), os()), {
+        ("x86_64", "linux_glibc"): [
+            "nativewindow_stub.cpp",
+        ],
+        ("x86_64", "linux_musl"): [
+            "nativewindow_stub.cpp",
+        ],
+        ("arm64", "linux_musl"): [
+            "nativewindow_stub.cpp",
+        ],
+        (default, default): [],
+    }),
+}
+
+cc_library_shared {
+    name: "sync",
+    vendor: true,
+    host_supported: true,
+    cpp_std: "c++17",
+    defaults: [
+        "aosp_mesa3d_cpp_project_args",
+    ],
+    header_libs: select((arch(), os()), {
+        ("x86_64", "linux_glibc"): [
+            "inc_include",
+        ],
+        ("x86_64", "linux_musl"): [
+            "inc_include",
+        ],
+        ("arm64", "linux_musl"): [
+            "inc_include",
+        ],
+        (default, default): [],
+    }),
+    srcs: select((arch(), os()), {
+        ("x86_64", "linux_glibc"): [
+            "sync_stub.cpp",
+        ],
+        ("x86_64", "linux_musl"): [
+            "sync_stub.cpp",
+        ],
+        ("arm64", "linux_musl"): [
+            "sync_stub.cpp",
+        ],
+        (default, default): [],
+    }),
+}

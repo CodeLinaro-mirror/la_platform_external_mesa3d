@@ -43,7 +43,7 @@ typedef struct {
    struct blob *blob;
 
    /* maps pointer to index */
-   struct hash_table *remap_table;
+   struct hash_table remap_table;
 
    /* the next index to assign to a NIR in-memory object */
    uint32_t next_idx;
@@ -90,7 +90,7 @@ typedef struct {
    const struct glsl_type *last_interface_type;
    struct nir_variable_data last_var_data;
 
-   struct hash_table *strings;
+   struct hash_table strings;
 } read_ctx;
 
 static void
@@ -98,13 +98,13 @@ write_add_object(write_ctx *ctx, const void *obj)
 {
    uint32_t index = ctx->next_idx++;
    assert(index != MAX_OBJECT_IDS);
-   _mesa_hash_table_insert(ctx->remap_table, obj, (void *)(uintptr_t)index);
+   _mesa_hash_table_insert(&ctx->remap_table, obj, (void *)(uintptr_t)index);
 }
 
 static uint32_t
 write_lookup_object(write_ctx *ctx, const void *obj)
 {
-   struct hash_entry *entry = _mesa_hash_table_search(ctx->remap_table, obj);
+   struct hash_entry *entry = _mesa_hash_table_search(&ctx->remap_table, obj);
    assert(entry);
    return (uint32_t)(uintptr_t)entry->data;
 }
@@ -187,18 +187,23 @@ write_constant(write_ctx *ctx, const nir_constant *c)
 }
 
 static nir_constant *
-read_constant(read_ctx *ctx, nir_variable *nvar)
+read_constant(read_ctx *ctx, void *mem_ctx)
 {
-   nir_constant *c = ralloc(nvar, nir_constant);
+   nir_constant *c = ralloc(mem_ctx, nir_constant);
 
    static const nir_const_value zero_vals[ARRAY_SIZE(c->values)] = { 0 };
    blob_copy_bytes(ctx->blob, (uint8_t *)c->values, sizeof(c->values));
    c->is_null_constant = memcmp(c->values, zero_vals, sizeof(c->values)) == 0;
    c->num_elements = blob_read_uint32(ctx->blob);
-   c->elements = ralloc_array(nvar, nir_constant *, c->num_elements);
-   for (unsigned i = 0; i < c->num_elements; i++) {
-      c->elements[i] = read_constant(ctx, nvar);
-      c->is_null_constant &= c->elements[i]->is_null_constant;
+
+   if (c->num_elements) {
+      c->elements = ralloc_array(c, nir_constant *, c->num_elements);
+      for (unsigned i = 0; i < c->num_elements; i++) {
+         c->elements[i] = read_constant(ctx, c);
+         c->is_null_constant &= c->elements[i]->is_null_constant;
+      }
+   } else {
+      c->elements = NULL;
    }
 
    return c;
@@ -337,7 +342,7 @@ write_variable(write_ctx *ctx, const nir_variable *var)
 static nir_variable *
 read_variable(read_ctx *ctx)
 {
-   nir_variable *var = rzalloc(ctx->nir, nir_variable);
+   nir_variable *var = nir_variable_create_zeroed(ctx->nir);
    read_add_object(ctx, var);
 
    union packed_var flags;
@@ -361,7 +366,7 @@ read_variable(read_ctx *ctx)
 
    if (flags.u.has_name) {
       const char *name = blob_read_string(ctx->blob);
-      var->name = ralloc_strdup(var, name);
+      nir_variable_set_name(ctx->nir, var, name);
    } else {
       var->name = NULL;
    }
@@ -385,7 +390,7 @@ read_variable(read_ctx *ctx)
 
    var->num_state_slots = flags.u.num_state_slots;
    if (var->num_state_slots != 0) {
-      var->state_slots = ralloc_array(var, nir_state_slot,
+      var->state_slots = ralloc_array(ctx->nir, nir_state_slot,
                                       var->num_state_slots);
       for (unsigned i = 0; i < var->num_state_slots; i++) {
          blob_copy_bytes(ctx->blob, &var->state_slots[i],
@@ -393,7 +398,7 @@ read_variable(read_ctx *ctx)
       }
    }
    if (flags.u.has_constant_initializer)
-      var->constant_initializer = read_constant(ctx, var);
+      var->constant_initializer = read_constant(ctx, ctx->nir);
    else
       var->constant_initializer = NULL;
 
@@ -404,7 +409,7 @@ read_variable(read_ctx *ctx)
 
    var->num_members = flags.u.num_members;
    if (var->num_members > 0) {
-      var->members = ralloc_array(var, struct nir_variable_data,
+      var->members = ralloc_array(ctx->nir, struct nir_variable_data,
                                   var->num_members);
       blob_copy_bytes(ctx->blob, (uint8_t *)var->members,
                       var->num_members * sizeof(*var->members));
@@ -524,7 +529,7 @@ union packed_instr {
    } any;
    struct {
       unsigned instr_type : 4;
-      unsigned exact : 1;
+      unsigned pad : 1;
       unsigned no_signed_wrap : 1;
       unsigned no_unsigned_wrap : 1;
       /* Swizzles for 2 srcs */
@@ -714,7 +719,6 @@ write_alu(write_ctx *ctx, const nir_alu_instr *alu)
    header.u32 = 0;
 
    header.alu.instr_type = alu->instr.type;
-   header.alu.exact = alu->exact;
    header.alu.no_signed_wrap = alu->no_signed_wrap;
    header.alu.no_unsigned_wrap = alu->no_unsigned_wrap;
    header.alu.op = alu->op;
@@ -728,7 +732,8 @@ write_alu(write_ctx *ctx, const nir_alu_instr *alu)
    }
 
    write_def(ctx, &alu->def, header, alu->instr.type);
-   blob_write_uint32(ctx->blob, alu->fp_fast_math);
+   if (nir_op_infos[alu->op].valid_fp_math_ctrl)
+      blob_write_uint32(ctx->blob, alu->fp_math_ctrl);
 
    if (header.alu.packed_src_ssa_16bit) {
       for (unsigned i = 0; i < num_srcs; i++) {
@@ -746,9 +751,12 @@ write_alu(write_ctx *ctx, const nir_alu_instr *alu)
 
          if (packed) {
             src.alu.swizzle_x = alu->src[i].swizzle[0];
-            src.alu.swizzle_y = alu->src[i].swizzle[1];
-            src.alu.swizzle_z = alu->src[i].swizzle[2];
-            src.alu.swizzle_w = alu->src[i].swizzle[3];
+            if (src_channels >= 2)
+               src.alu.swizzle_y = alu->src[i].swizzle[1];
+            if (src_channels >= 3)
+               src.alu.swizzle_z = alu->src[i].swizzle[2];
+            if (src_channels >= 4)
+               src.alu.swizzle_w = alu->src[i].swizzle[3];
          }
 
          write_src_full(ctx, &alu->src[i].src, src);
@@ -775,12 +783,12 @@ read_alu(read_ctx *ctx, union packed_instr header)
    unsigned num_srcs = nir_op_infos[header.alu.op].num_inputs;
    nir_alu_instr *alu = nir_alu_instr_create(ctx->nir, header.alu.op);
 
-   alu->exact = header.alu.exact;
    alu->no_signed_wrap = header.alu.no_signed_wrap;
    alu->no_unsigned_wrap = header.alu.no_unsigned_wrap;
 
    read_def(ctx, &alu->def, &alu->instr, header);
-   alu->fp_fast_math = blob_read_uint32(ctx->blob);
+   if (nir_op_infos[alu->op].valid_fp_math_ctrl)
+      alu->fp_math_ctrl = blob_read_uint32(ctx->blob);
 
    if (header.alu.packed_src_ssa_16bit) {
       for (unsigned i = 0; i < num_srcs; i++) {
@@ -805,9 +813,12 @@ read_alu(read_ctx *ctx, union packed_instr header)
 
          if (packed) {
             alu->src[i].swizzle[0] = src.alu.swizzle_x;
-            alu->src[i].swizzle[1] = src.alu.swizzle_y;
-            alu->src[i].swizzle[2] = src.alu.swizzle_z;
-            alu->src[i].swizzle[3] = src.alu.swizzle_w;
+            if (src_channels >= 2)
+               alu->src[i].swizzle[1] = src.alu.swizzle_y;
+            if (src_channels >= 3)
+               alu->src[i].swizzle[2] = src.alu.swizzle_z;
+            if (src_channels >= 4)
+               alu->src[i].swizzle[3] = src.alu.swizzle_w;
          } else {
             /* Load swizzles for vec8 and vec16. */
             for (unsigned o = 0; o < src_channels; o += 8) {
@@ -904,8 +915,7 @@ write_deref(write_ctx *ctx, const nir_deref_instr *deref)
          header.deref_var.object_idx = var_idx;
    }
 
-   if (deref->deref_type == nir_deref_type_array ||
-       deref->deref_type == nir_deref_type_ptr_as_array) {
+   if (nir_deref_instr_is_arr(deref)) {
       header.deref.packed_src_ssa_16bit = are_object_ids_16bit(ctx);
 
       header.deref.in_bounds = deref->arr.in_bounds;
@@ -1043,7 +1053,7 @@ write_intrinsic(write_ctx *ctx, const nir_intrinsic_instr *intrin)
    /* 10 bits for nir_intrinsic_op */
    STATIC_ASSERT(nir_num_intrinsics <= 1024);
    unsigned num_srcs = nir_intrinsic_infos[intrin->intrinsic].num_srcs;
-   unsigned num_indices = nir_intrinsic_infos[intrin->intrinsic].num_indices;
+   unsigned num_index_slots = nir_intrinsic_infos[intrin->intrinsic].num_index_slots;
    assert(intrin->intrinsic < 1024);
 
    union packed_instr header;
@@ -1053,19 +1063,19 @@ write_intrinsic(write_ctx *ctx, const nir_intrinsic_instr *intrin)
    header.intrinsic.intrinsic = intrin->intrinsic;
 
    /* Analyze constant indices to decide how to encode them. */
-   if (num_indices) {
+   if (num_index_slots) {
       unsigned max_bits = 0;
-      for (unsigned i = 0; i < num_indices; i++) {
+      for (unsigned i = 0; i < num_index_slots; i++) {
          unsigned max = util_last_bit(intrin->const_index[i]);
          max_bits = MAX2(max_bits, max);
       }
 
-      if (max_bits * num_indices <= 8) {
+      if (max_bits * num_index_slots <= 8) {
          header.intrinsic.const_indices_encoding = const_indices_all_combined;
 
          /* Pack all const indices into 8 bits. */
-         unsigned bit_size = 8 / num_indices;
-         for (unsigned i = 0; i < num_indices; i++) {
+         unsigned bit_size = 8 / num_index_slots;
+         for (unsigned i = 0; i < num_index_slots; i++) {
             header.intrinsic.packed_const_indices |=
                intrin->const_index[i] << (i * bit_size);
          }
@@ -1085,18 +1095,18 @@ write_intrinsic(write_ctx *ctx, const nir_intrinsic_instr *intrin)
    for (unsigned i = 0; i < num_srcs; i++)
       write_src(ctx, &intrin->src[i]);
 
-   if (num_indices) {
+   if (num_index_slots) {
       switch (header.intrinsic.const_indices_encoding) {
       case const_indices_8bit:
-         for (unsigned i = 0; i < num_indices; i++)
+         for (unsigned i = 0; i < num_index_slots; i++)
             blob_write_uint8(ctx->blob, intrin->const_index[i]);
          break;
       case const_indices_16bit:
-         for (unsigned i = 0; i < num_indices; i++)
+         for (unsigned i = 0; i < num_index_slots; i++)
             blob_write_uint16(ctx->blob, intrin->const_index[i]);
          break;
       case const_indices_32bit:
-         for (unsigned i = 0; i < num_indices; i++)
+         for (unsigned i = 0; i < num_index_slots; i++)
             blob_write_uint32(ctx->blob, intrin->const_index[i]);
          break;
       }
@@ -1110,7 +1120,7 @@ read_intrinsic(read_ctx *ctx, union packed_instr header)
    nir_intrinsic_instr *intrin = nir_intrinsic_instr_create(ctx->nir, op);
 
    unsigned num_srcs = nir_intrinsic_infos[op].num_srcs;
-   unsigned num_indices = nir_intrinsic_infos[op].num_indices;
+   unsigned num_index_slots = nir_intrinsic_infos[op].num_index_slots;
 
    if (nir_intrinsic_infos[op].has_dest)
       read_def(ctx, &intrin->def, &intrin->instr, header);
@@ -1133,12 +1143,12 @@ read_intrinsic(read_ctx *ctx, union packed_instr header)
       }
    }
 
-   if (num_indices) {
+   if (num_index_slots) {
       switch (header.intrinsic.const_indices_encoding) {
       case const_indices_all_combined: {
-         unsigned bit_size = 8 / num_indices;
+         unsigned bit_size = 8 / num_index_slots;
          unsigned bit_mask = u_bit_consecutive(0, bit_size);
-         for (unsigned i = 0; i < num_indices; i++) {
+         for (unsigned i = 0; i < num_index_slots; i++) {
             intrin->const_index[i] =
                (header.intrinsic.packed_const_indices >> (i * bit_size)) &
                bit_mask;
@@ -1146,15 +1156,15 @@ read_intrinsic(read_ctx *ctx, union packed_instr header)
          break;
       }
       case const_indices_8bit:
-         for (unsigned i = 0; i < num_indices; i++)
+         for (unsigned i = 0; i < num_index_slots; i++)
             intrin->const_index[i] = blob_read_uint8(ctx->blob);
          break;
       case const_indices_16bit:
-         for (unsigned i = 0; i < num_indices; i++)
+         for (unsigned i = 0; i < num_index_slots; i++)
             intrin->const_index[i] = blob_read_uint16(ctx->blob);
          break;
       case const_indices_32bit:
-         for (unsigned i = 0; i < num_indices; i++)
+         for (unsigned i = 0; i < num_index_slots; i++)
             intrin->const_index[i] = blob_read_uint32(ctx->blob);
          break;
       }
@@ -1483,7 +1493,7 @@ write_phi(write_ctx *ctx, const nir_phi_instr *phi)
          .src = src->src.ssa,
          .block = src->pred,
       };
-      util_dynarray_append(&ctx->phi_fixups, write_phi_fixup, fixup);
+      util_dynarray_append(&ctx->phi_fixups, fixup);
    }
 }
 
@@ -1601,6 +1611,36 @@ read_call(read_ctx *ctx)
    return call;
 }
 
+static void
+write_cmat_call(write_ctx *ctx, const nir_cmat_call_instr *call)
+{
+   blob_write_uint32(ctx->blob, write_lookup_object(ctx, call->callee));
+
+   blob_write_uint32(ctx->blob, call->op);
+
+   for (unsigned i = 0; i < call->num_params; i++)
+      write_src(ctx, &call->params[i]);
+
+   for (unsigned i = 0; i < NIR_CMAT_CALL_MAX_CONST_INDEX; i++)
+      blob_write_uint32(ctx->blob, call->const_index[i]);
+}
+
+static nir_cmat_call_instr *
+read_cmat_call(read_ctx *ctx)
+{
+   nir_function *callee = read_object(ctx);
+   nir_cmat_call_op op = blob_read_uint32(ctx->blob);
+   nir_cmat_call_instr *call = nir_cmat_call_instr_create(ctx->nir, op, callee);
+
+   for (unsigned i = 0; i < call->num_params; i++)
+      read_src(ctx, &call->params[i]);
+
+   for (unsigned i = 0; i < NIR_CMAT_CALL_MAX_CONST_INDEX; i++)
+      call->const_index[i] = blob_read_uint32(ctx->blob);
+
+   return call;
+}
+
 enum nir_serialize_debug_info_flags {
    NIR_SERIALIZE_FILENAME = 1 << 0,
    NIR_SERIALIZE_VARIABLE_NAME = 1 << 1,
@@ -1646,24 +1686,24 @@ read_debug_info(read_ctx *ctx, nir_instr_debug_info *debug_info)
    if (flags & NIR_SERIALIZE_FILENAME) {
       const char *filename = blob_read_string(ctx->blob);
 
-      struct hash_entry *entry = _mesa_hash_table_search(ctx->strings, filename);
+      struct hash_entry *entry = _mesa_hash_table_search(&ctx->strings, filename);
       if (entry) {
          debug_info->filename = entry->data;
       } else {
          debug_info->filename = ralloc_strdup(ctx->nir, filename);
-         _mesa_hash_table_insert(ctx->strings, filename, debug_info->filename);
+         _mesa_hash_table_insert(&ctx->strings, filename, debug_info->filename);
       }
    }
 
    if (flags & NIR_SERIALIZE_VARIABLE_NAME) {
       const char *variable_name = blob_read_string(ctx->blob);
 
-      struct hash_entry *entry = _mesa_hash_table_search(ctx->strings, variable_name);
+      struct hash_entry *entry = _mesa_hash_table_search(&ctx->strings, variable_name);
       if (entry) {
          debug_info->variable_name = entry->data;
       } else {
          debug_info->variable_name = ralloc_strdup(ctx->nir, variable_name);
-         _mesa_hash_table_insert(ctx->strings, variable_name, debug_info->variable_name);
+         _mesa_hash_table_insert(&ctx->strings, variable_name, debug_info->variable_name);
       }
    }
 }
@@ -1706,8 +1746,10 @@ write_instr(write_ctx *ctx, const nir_instr *instr)
       blob_write_uint32(ctx->blob, instr->type);
       write_call(ctx, nir_instr_as_call(instr));
       break;
-   case nir_instr_type_parallel_copy:
-      UNREACHABLE("Cannot write parallel copies");
+   case nir_instr_type_cmat_call:
+      blob_write_uint32(ctx->blob, instr->type);
+      write_cmat_call(ctx, nir_instr_as_cmat_call(instr));
+      break;
    default:
       UNREACHABLE("bad instr type");
    }
@@ -1760,8 +1802,9 @@ read_instr(read_ctx *ctx, nir_block *block)
    case nir_instr_type_call:
       instr = &read_call(ctx)->instr;
       break;
-   case nir_instr_type_parallel_copy:
-      UNREACHABLE("Cannot read parallel copies");
+   case nir_instr_type_cmat_call:
+      instr = &read_cmat_call(ctx)->instr;
+      break;
    default:
       UNREACHABLE("bad instr type");
    }
@@ -1982,6 +2025,8 @@ write_function(write_ctx *ctx, const nir_function *fxn)
       flags |= 0x80;
    if (fxn->workgroup_size[0] || fxn->workgroup_size[1] || fxn->workgroup_size[2])
       flags |= 0x100;
+   if (fxn->cmat_call)
+      flags |= 0x200;
    blob_write_uint32(ctx->blob, flags);
    if (fxn->name && !ctx->strip)
       blob_write_string(ctx->blob, fxn->name);
@@ -2084,6 +2129,7 @@ read_function(read_ctx *ctx)
    fxn->dont_inline = flags & 0x20;
    fxn->is_subroutine = flags & 0x40;
    fxn->is_tmp_globals_wrapper = flags & 0x80;
+   fxn->cmat_call = flags & 0x200;
    return fxn;
 }
 
@@ -2123,11 +2169,11 @@ void
 nir_serialize_function(struct blob *blob, const nir_function *fxn)
 {
    write_ctx ctx = { 0 };
-   ctx.remap_table = _mesa_pointer_hash_table_create(NULL);
+   _mesa_pointer_hash_table_init(&ctx.remap_table, NULL);
    ctx.blob = blob;
    ctx.nir = fxn->shader;
    ctx.strip = true;
-   util_dynarray_init(&ctx.phi_fixups, NULL);
+   ctx.phi_fixups = UTIL_DYNARRAY_INIT;
 
    size_t idx_size_offset = blob_reserve_uint32(blob);
 
@@ -2136,31 +2182,26 @@ nir_serialize_function(struct blob *blob, const nir_function *fxn)
 
    blob_overwrite_uint32(blob, idx_size_offset, ctx.next_idx);
 
-   _mesa_hash_table_destroy(ctx.remap_table, NULL);
+   _mesa_hash_table_fini(&ctx.remap_table, NULL);
    util_dynarray_fini(&ctx.phi_fixups);
 }
 
-/**
- * Serialize NIR into a binary blob.
- *
- * \param strip  Don't serialize information only useful for debugging,
- *               such as variable names, making cache hits from similar
- *               shaders more likely.
- */
-void
-nir_serialize(struct blob *blob, const nir_shader *nir, bool strip)
+static void
+serialize_internal(struct blob *blob, const nir_shader *nir, bool strip, bool serialize_info)
 {
    write_ctx ctx = { 0 };
-   ctx.remap_table = _mesa_pointer_hash_table_create(NULL);
+   _mesa_pointer_hash_table_init(&ctx.remap_table, NULL);
    ctx.blob = blob;
    ctx.nir = nir;
    ctx.strip = strip;
    ctx.debug_info = nir->has_debug_info && !strip;
-   util_dynarray_init(&ctx.phi_fixups, NULL);
+   ctx.phi_fixups = UTIL_DYNARRAY_INIT;
 
    size_t idx_size_offset = blob_reserve_uint32(blob);
 
    struct shader_info info = nir->info;
+   if (!serialize_info)
+      memset(&info, 0, sizeof(info));
 
    enum nir_serialize_shader_flags flags = 0;
    if (!strip && info.name)
@@ -2205,8 +2246,21 @@ nir_serialize(struct blob *blob, const nir_shader *nir, bool strip)
 
    blob_overwrite_uint32(blob, idx_size_offset, ctx.next_idx);
 
-   _mesa_hash_table_destroy(ctx.remap_table, NULL);
+   _mesa_hash_table_fini(&ctx.remap_table, NULL);
    util_dynarray_fini(&ctx.phi_fixups);
+}
+
+/**
+ * Serialize NIR into a binary blob.
+ *
+ * \param strip  Don't serialize information only useful for debugging,
+ *               such as variable names, making cache hits from similar
+ *               shaders more likely.
+ */
+void
+nir_serialize(struct blob *blob, const nir_shader *nir, bool strip)
+{
+   serialize_internal(blob, nir, strip, true);
 }
 
 nir_shader *
@@ -2227,11 +2281,11 @@ nir_deserialize(void *mem_ctx,
    struct shader_info info;
    blob_copy_bytes(blob, (uint8_t *)&info, sizeof(info));
 
-   ctx.nir = nir_shader_create(mem_ctx, info.stage, options, NULL);
+   ctx.nir = nir_shader_create(mem_ctx, info.stage, options);
 
    ctx.nir->has_debug_info = !!(flags & NIR_SERIALIZE_DEBUG_INFO);
    if (ctx.nir->has_debug_info)
-      ctx.strings = _mesa_hash_table_create(NULL, _mesa_hash_string, _mesa_key_string_equal);
+      _mesa_hash_table_init(&ctx.strings, NULL, _mesa_hash_string, _mesa_key_string_equal);
 
    info.name = name ? ralloc_strdup(ctx.nir, name) : NULL;
    info.label = label ? ralloc_strdup(ctx.nir, label) : NULL;
@@ -2271,7 +2325,7 @@ nir_deserialize(void *mem_ctx,
    }
 
    free(ctx.idx_table);
-   _mesa_hash_table_destroy(ctx.strings, NULL);
+   _mesa_hash_table_fini(&ctx.strings, NULL);
 
    nir_validate_shader(ctx.nir, "after deserialize");
 
@@ -2289,7 +2343,7 @@ nir_deserialize_function(void *mem_ctx,
    ctx.idx_table_len = blob_read_uint32(blob);
    ctx.idx_table = calloc(ctx.idx_table_len, sizeof(uintptr_t));
 
-   ctx.nir = nir_shader_create(mem_ctx, 0 /* stage */, options, NULL);
+   ctx.nir = nir_shader_create(mem_ctx, 0 /* stage */, options);
 
    nir_function *fxn = read_function(&ctx);
    nir_function_set_impl(fxn, read_function_impl(&ctx));
@@ -2324,3 +2378,37 @@ nir_shader_serialize_deserialize(nir_shader *shader)
    nir_shader_replace(shader, copy);
    ralloc_free(dead_ctx);
 }
+
+#ifndef NDEBUG
+struct blob
+nir_validate_progress_setup(nir_shader *shader)
+{
+   if (!NIR_DEBUG(PROGRESS_VALIDATION))
+      return (struct blob){0};
+
+   struct blob blob_before;
+   blob_init(&blob_before);
+   serialize_internal(&blob_before, shader, false, false);
+   return blob_before;
+}
+
+void
+nir_validate_progress_finish(nir_shader *shader, struct blob *setup_blob, bool progress, const char *when)
+{
+   if (!NIR_DEBUG(PROGRESS_VALIDATION))
+      return;
+
+   if (!progress) {
+      struct blob blob_after;
+      blob_init(&blob_after);
+      serialize_internal(&blob_after, shader, false, false);
+      if (setup_blob->size != blob_after.size ||
+          memcmp(setup_blob->data, blob_after.data, setup_blob->size)) {
+         fprintf(stderr, "NIR changed but no progress reported %s\n", when);
+         abort();
+      }
+      blob_finish(&blob_after);
+   }
+   blob_finish(setup_blob);
+}
+#endif

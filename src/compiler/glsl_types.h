@@ -288,6 +288,13 @@ enum {
    GLSL_PRECISION_LOW
 };
 
+enum {
+   GLSL_PIXEL_LOCAL_STORAGE_NONE = 0,
+   GLSL_PIXEL_LOCAL_STORAGE_IN,
+   GLSL_PIXEL_LOCAL_STORAGE_OUT,
+   GLSL_PIXEL_LOCAL_STORAGE_INOUT
+};
+
 enum glsl_cmat_use {
    GLSL_CMAT_USE_NONE = 0,
    GLSL_CMAT_USE_A,
@@ -467,6 +474,11 @@ struct glsl_struct_field {
          unsigned precision:2;
 
          /**
+          * Pixel local storage qualifier
+          */
+         unsigned pixel_local_storage:2;
+
+         /**
           * Memory qualifiers, applicable to buffer variables defined in shader
           * storage buffer objects (SSBOs)
           */
@@ -484,6 +496,12 @@ struct glsl_struct_field {
          unsigned explicit_xfb_buffer:1;
 
          unsigned implicit_sized_array:1;
+
+         /**
+          * For interface blocks, 1 if this variable is a per-primitive input or output
+          * (as in ir_variable::patch). 0 otherwise.
+          */
+         unsigned per_primitive:1;
       };
       unsigned flags;
    };
@@ -656,6 +674,14 @@ static inline bool
 glsl_type_is_e5m2(const glsl_type *t)
 {
    return t->base_type == GLSL_TYPE_FLOAT_E5M2;
+}
+
+static inline bool
+glsl_type_is_nonnative_float(const glsl_type *t)
+{
+   return t->base_type == GLSL_TYPE_BFLOAT16 ||
+          t->base_type == GLSL_TYPE_FLOAT_E4M3FN ||
+          t->base_type == GLSL_TYPE_FLOAT_E5M2;
 }
 
 static inline bool

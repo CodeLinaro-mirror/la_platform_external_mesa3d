@@ -1105,18 +1105,16 @@ svga_texture_create(struct pipe_screen *screen,
    /* Initialize the backing resource cache */
    tex->backed_handle = NULL;
 
-   svgascreen->hud.total_resource_bytes += tex->size;
-   svgascreen->hud.num_resources++;
+   p_atomic_add(&svgascreen->hud.total_resource_bytes, tex->size);
+   p_atomic_inc(&svgascreen->hud.num_resources);
 
    SVGA_STATS_TIME_POP(svgascreen->sws);
 
    return &tex->b;
 
 fail:
-   if (tex->dirty)
-      FREE(tex->dirty);
-   if (tex->defined)
-      FREE(tex->defined);
+   FREE(tex->dirty);
+   FREE(tex->defined);
    FREE(tex);
 fail_notex:
    SVGA_STATS_TIME_POP(svgascreen->sws);
@@ -1197,7 +1195,7 @@ svga_texture_from_handle(struct pipe_screen *screen,
 
    tex->imported = true;
 
-   ss->hud.num_resources++;
+   p_atomic_inc(&ss->hud.num_resources);
 
    return &tex->b;
 
@@ -1459,7 +1457,7 @@ svga_texture_transfer_map_upload(struct svga_context *svga,
     * upload buffer manager code will try to allocate a new buffer
     * with the new buffer size.
     */
-   u_upload_alloc(svga->tex_upload, 0, upload_size, 16,
+   u_upload_alloc_ref(svga->tex_upload, 0, upload_size, 16,
                   &offset, &tex_buffer, &tex_map);
 
    if (!tex_map) {

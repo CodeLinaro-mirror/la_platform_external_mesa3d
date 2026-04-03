@@ -6,6 +6,7 @@ use crate::legalize::{
     src_is_reg, src_is_upred_reg, swap_srcs_if_not_reg, LegalizeBuildHelpers,
     LegalizeBuilder,
 };
+use crate::sm70::ShaderModel70;
 use bitview::*;
 
 use rustc_hash::FxHashMap;
@@ -149,13 +150,13 @@ impl SM70Encoder<'_> {
         self.set_pred_src_file(range, not_bit, src, RegFile::UPred);
     }
 
-    fn set_rev_upred_src(
+    fn set_rev_pred_src_file(
         &mut self,
         range: Range<usize>,
         not_bit: usize,
         src: &Src,
+        file: RegFile,
     ) {
-        let file = RegFile::UPred;
         let (not, reg) = match src.src_ref {
             SrcRef::True => (false, self.true_reg(file)),
             SrcRef::False => (true, self.true_reg(file)),
@@ -174,6 +175,24 @@ impl SM70Encoder<'_> {
         self.set_field(range, 7 - reg.base_idx());
 
         self.set_bit(not_bit, not ^ src_mod_is_bnot(src.src_mod));
+    }
+
+    fn set_rev_pred_src(
+        &mut self,
+        range: Range<usize>,
+        not_bit: usize,
+        src: &Src,
+    ) {
+        self.set_rev_pred_src_file(range, not_bit, src, RegFile::Pred)
+    }
+
+    fn set_rev_upred_src(
+        &mut self,
+        range: Range<usize>,
+        not_bit: usize,
+        src: &Src,
+    ) {
+        self.set_rev_pred_src_file(range, not_bit, src, RegFile::UPred)
     }
 
     fn set_src_cb(&mut self, range: Range<usize>, cx_bit: usize, cb: &CBufRef) {
@@ -310,7 +329,7 @@ fn src_mod_is_bnot(src_mod: SrcMod) -> bool {
 fn dst_is_bar(dst: &Dst) -> bool {
     match dst {
         Dst::None => false,
-        Dst::SSA(ssa) => ssa.file().unwrap() == RegFile::Bar,
+        Dst::SSA(ssa) => ssa.file() == RegFile::Bar,
         Dst::Reg(reg) => reg.file() == RegFile::Bar,
     }
 }
@@ -372,6 +391,17 @@ impl ALUSrc {
                 ALUSrc::CBuf(alu_ref)
             }
             _ => panic!("Invalid ALU source"),
+        }
+    }
+}
+
+impl OffsetStride {
+    fn encode_sm75(&self) -> u8 {
+        match self {
+            Self::X1 => 0,
+            Self::X4 => 1,
+            Self::X8 => 2,
+            Self::X16 => 3,
         }
     }
 }
@@ -653,46 +683,6 @@ fn op_gpr(op: &impl DstsAsSlice) -> RegFile {
         RegFile::UGPR
     } else {
         RegFile::GPR
-    }
-}
-
-/// Helper to legalize extended or external instructions
-///
-/// These are instructions which reach out external units such as load/store
-/// and texture ops.  They typically can't take anything but GPRs and are the
-/// only types of instructions that support vectors.  They also can never be
-/// uniform so we always evict uniform sources.
-///
-fn legalize_ext_instr(op: &mut impl SrcsAsSlice, b: &mut LegalizeBuilder) {
-    let src_types = op.src_types();
-    for (i, src) in op.srcs_as_mut_slice().iter_mut().enumerate() {
-        match src_types[i] {
-            SrcType::SSA | SrcType::GPR => match &mut src.src_ref {
-                SrcRef::Zero | SrcRef::True | SrcRef::False => {
-                    assert!(src_types[i] != SrcType::SSA);
-                }
-                SrcRef::SSA(ssa) => {
-                    b.copy_ssa_ref_if_uniform(ssa);
-                }
-                _ => panic!("Unsupported source reference"),
-            },
-            SrcType::ALU
-            | SrcType::F16
-            | SrcType::F16v2
-            | SrcType::F32
-            | SrcType::F64
-            | SrcType::I32
-            | SrcType::B32 => {
-                panic!("ALU srcs must be legalized explicitly");
-            }
-            SrcType::Pred => {
-                panic!("Predicates must be legalized explicitly");
-            }
-            SrcType::Carry => {
-                panic!("Carry is invalid on Volta+");
-            }
-            SrcType::Bar => (),
-        }
     }
 }
 
@@ -1923,13 +1913,16 @@ impl SM70Op for OpF2F {
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
         assert!(!self.integer_rnd);
+
+        // The swizzle is handled by the .high bit below.
+        let src = self.src.clone().without_swizzle();
         if self.src_type.bits() <= 32 && self.dst_type.bits() <= 32 {
-            e.encode_alu(0x104, Some(&self.dst), None, Some(&self.src), None)
+            e.encode_alu(0x104, Some(&self.dst), None, Some(&src), None)
         } else {
-            e.encode_alu(0x110, Some(&self.dst), None, Some(&self.src), None)
+            e.encode_alu(0x110, Some(&self.dst), None, Some(&src), None)
         };
 
-        if self.high {
+        if self.is_high() {
             e.set_field(60..62, 1_u8); // .H1
         }
 
@@ -2135,6 +2128,35 @@ impl SM70Op for OpSel {
 
             e.set_pred_src(87..90, 90, &self.cond);
         }
+    }
+}
+
+impl SM70Op for OpSgxt {
+    fn legalize(&mut self, b: &mut LegalizeBuilder) {
+        let gpr = op_gpr(self);
+        b.copy_alu_src_if_not_reg(&mut self.a, gpr, SrcType::ALU);
+    }
+
+    fn encode(&self, e: &mut SM70Encoder<'_>) {
+        if self.is_uniform() {
+            e.encode_ualu(
+                0x09a,
+                Some(&self.dst),
+                Some(&self.a),
+                Some(&self.bits),
+                None,
+            );
+        } else {
+            e.encode_alu(
+                0x01a,
+                Some(&self.dst),
+                Some(&self.a),
+                Some(&self.bits),
+                None,
+            );
+        }
+        e.set_bit(73, self.signed);
+        e.set_bit(75, false); // .W (wrap vs clamp)
     }
 }
 
@@ -2907,7 +2929,8 @@ impl SM70Encoder<'_> {
 
 impl SM70Op for OpSuLd {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.handle);
+        b.copy_src_if_uniform(&mut self.coord);
 
         // suld.constant doesn't exist on Volta or Turing but it's always safe
         // to silently degrade to suld.weak
@@ -2944,7 +2967,9 @@ impl SM70Op for OpSuLd {
 
 impl SM70Op for OpSuSt {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.handle);
+        b.copy_src_if_uniform(&mut self.coord);
+        b.copy_src_if_uniform(&mut self.data);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
@@ -2974,7 +2999,9 @@ impl SM70Op for OpSuSt {
 
 impl SM70Op for OpSuAtom {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.handle);
+        b.copy_src_if_uniform(&mut self.coord);
+        b.copy_src_if_uniform(&mut self.data);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
@@ -3009,17 +3036,26 @@ impl SM70Op for OpSuAtom {
 
 impl SM70Op for OpLd {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.addr);
+        b.copy_src_if_uniform(&mut self.pred);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
         match self.access.space {
             MemSpace::Global(_) => {
                 e.set_opcode(0x381);
+                assert_eq!(self.stride, OffsetStride::X1);
+                if e.sm >= 73 {
+                    e.set_rev_pred_src(64..67, 67, &self.pred);
+                } else {
+                    assert!(self.pred.is_true());
+                }
                 e.set_pred_dst(81..84, &Dst::None);
                 e.set_mem_access(&self.access);
             }
             MemSpace::Local => {
+                assert!(self.pred.is_true());
+                assert_eq!(self.stride, OffsetStride::X1);
                 e.set_opcode(0x983);
                 e.set_field(84..87, 1_u8);
 
@@ -3032,6 +3068,7 @@ impl SM70Op for OpLd {
             }
             MemSpace::Shared => {
                 e.set_opcode(0x984);
+                assert!(self.pred.is_true());
 
                 e.set_mem_type(73..76, self.access.mem_type);
                 assert!(self.access.order == MemOrder::Strong(MemScope::CTA));
@@ -3040,6 +3077,8 @@ impl SM70Op for OpLd {
                         == MemEvictionPriority::Normal
                 );
 
+                assert!(e.sm >= 75 || self.stride == OffsetStride::X1);
+                e.set_field(78..80, self.stride.encode_sm75());
                 e.set_bit(87, false); // !.ZD - Returns a predicate?
             }
         }
@@ -3142,17 +3181,20 @@ impl SM70Op for OpLdc {
 
 impl SM70Op for OpSt {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.addr);
+        b.copy_src_if_uniform(&mut self.data);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
         match self.access.space {
             MemSpace::Global(_) => {
                 e.set_opcode(0x386);
+                assert_eq!(self.stride, OffsetStride::X1);
                 e.set_mem_access(&self.access);
             }
             MemSpace::Local => {
                 e.set_opcode(0x387);
+                assert_eq!(self.stride, OffsetStride::X1);
                 e.set_field(84..87, 1_u8);
 
                 e.set_mem_type(73..76, self.access.mem_type);
@@ -3171,6 +3213,9 @@ impl SM70Op for OpSt {
                     self.access.eviction_priority
                         == MemEvictionPriority::Normal
                 );
+
+                assert!(e.sm >= 75 || self.stride == OffsetStride::X1);
+                e.set_field(78..80, self.stride.encode_sm75());
             }
         }
 
@@ -3245,7 +3290,9 @@ impl SM70Encoder<'_> {
 
 impl SM70Op for OpAtom {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.addr);
+        b.copy_src_if_uniform(&mut self.cmpr);
+        b.copy_src_if_uniform(&mut self.data);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
@@ -3289,6 +3336,7 @@ impl SM70Op for OpAtom {
 
                 e.set_mem_order(&self.mem_order);
                 e.set_eviction_priority(&self.mem_eviction_priority);
+                assert_eq!(self.addr_stride, OffsetStride::X1);
             }
             MemSpace::Local => panic!("Atomics do not support local"),
             MemSpace::Shared => {
@@ -3314,6 +3362,9 @@ impl SM70Op for OpAtom {
                     e.set_atom_op(87..91, self.atom_op);
                 }
 
+                assert!(e.sm >= 75 || self.addr_stride == OffsetStride::X1);
+                e.set_field(78..80, self.addr_stride.encode_sm75());
+
                 assert!(self.mem_order == MemOrder::Strong(MemScope::CTA));
                 assert!(
                     self.mem_eviction_priority == MemEvictionPriority::Normal
@@ -3330,7 +3381,7 @@ impl SM70Op for OpAtom {
 
 impl SM70Op for OpAL2P {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.offset);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
@@ -3347,7 +3398,8 @@ impl SM70Op for OpAL2P {
 
 impl SM70Op for OpALd {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.vtx);
+        b.copy_src_if_uniform(&mut self.offset);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
@@ -3367,7 +3419,9 @@ impl SM70Op for OpALd {
 
 impl SM70Op for OpASt {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.data);
+        b.copy_src_if_uniform(&mut self.vtx);
+        b.copy_src_if_uniform(&mut self.offset);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
@@ -3386,7 +3440,7 @@ impl SM70Op for OpASt {
 
 impl SM70Op for OpIpa {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.offset);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
@@ -3426,9 +3480,7 @@ impl SM70Op for OpIpa {
 }
 
 impl SM70Op for OpLdTram {
-    fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
-    }
+    fn legalize(&mut self, _: &mut LegalizeBuilder) {}
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
         e.set_opcode(0x3ad);
@@ -3447,7 +3499,7 @@ impl SM70Op for OpLdTram {
 
 impl SM70Op for OpCCtl {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.addr);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
@@ -3609,13 +3661,24 @@ impl SM70Op for OpBra {
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
-        e.set_opcode(0x947);
+        if self.cond.is_upred_reg() {
+            assert!(e.sm >= 80);
+            e.set_opcode(0x547);
+            e.set_upred_src(24..27, 27, &self.cond);
+            e.set_bit(32, true); // .U
+            e.set_field(87..90, 0x7_u8);
+            e.set_bit(91, true);
+        } else {
+            e.set_opcode(0x947);
+            e.set_bit(32, false); // .U
+            e.set_pred_src(87..90, 90, &self.cond);
+        }
+
         if e.sm >= 100 {
             e.set_rel_offset2(16..24, 34..82, &self.target);
         } else {
             e.set_rel_offset(34..82, &self.target);
         }
-        e.set_field(87..90, 0x7_u8); // TODO: Pred?
     }
 }
 
@@ -3688,14 +3751,76 @@ impl SM70Op for OpCS2R {
 }
 
 impl SM70Op for OpIsberd {
-    fn legalize(&mut self, _b: &mut LegalizeBuilder) {
-        // Nothing to do
+    fn legalize(&mut self, b: &mut LegalizeBuilder) {
+        b.copy_src_if_uniform(&mut self.offset);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
+        // The immediate offset is only supported on SM86+
+        assert!(e.sm >= 86 || self.imm_offset == 0);
+
         e.set_opcode(0x923);
         e.set_dst(&self.dst);
-        e.set_reg_src(24..32, &self.idx);
+        e.set_reg_src(24..32, &self.offset);
+        e.set_field(40..56, self.imm_offset);
+        e.set_field(
+            74..76,
+            match self.mem_type {
+                MemType::U8 => 0_u8,
+                MemType::U16 => 1_u8,
+                MemType::B32 => 2_u8,
+                _ => panic!("Invalid ISBERD mem type"),
+            },
+        );
+        e.set_field(
+            76..78,
+            match self.access_type {
+                IsbeAccessType::Map => 0_u8,
+                IsbeAccessType::Patch => 1_u8,
+                IsbeAccessType::Primitive => 2_u8,
+                IsbeAccessType::Attribute => 3_u8,
+            },
+        );
+        e.set_bit(78, self.skew);
+        e.set_bit(79, self.output);
+    }
+}
+
+impl SM70Op for OpIsbewr {
+    fn legalize(&mut self, b: &mut LegalizeBuilder) {
+        b.copy_src_if_uniform(&mut self.offset);
+        b.copy_src_if_uniform(&mut self.data);
+    }
+
+    fn encode(&self, e: &mut SM70Encoder<'_>) {
+        assert!(e.sm >= 75);
+
+        // The immediate offset is only supported on SM86+
+        assert!(e.sm >= 86 || self.imm_offset == 0);
+
+        e.set_opcode(0x927);
+        e.set_reg_src(24..32, &self.offset);
+        e.set_reg_src(32..40, &self.data);
+        e.set_field(40..56, self.imm_offset);
+        e.set_field(
+            74..76,
+            match self.mem_type {
+                MemType::U8 => 0_u8,
+                MemType::U16 => 1_u8,
+                MemType::B32 => 2_u8,
+                _ => panic!("Invalid ISBEWR mem type"),
+            },
+        );
+        e.set_field(
+            76..78,
+            match self.access_type {
+                IsbeAccessType::Map => 0_u8,
+                IsbeAccessType::Attribute => 3_u8,
+                _ => panic!("Invalid ISBEWR access type"),
+            },
+        );
+        e.set_bit(78, self.skew);
+        e.set_bit(79, self.output);
     }
 }
 
@@ -3834,7 +3959,7 @@ impl SM70Op for OpVote {
 
 impl SM70Op for OpMatch {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.src);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
@@ -3861,7 +3986,9 @@ impl SM70Op for OpMatch {
 
 impl SM70Op for OpImma {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.srcs[0]);
+        b.copy_src_if_uniform(&mut self.srcs[1]);
+        b.copy_src_if_uniform(&mut self.srcs[2]);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
@@ -3916,7 +4043,9 @@ impl SM70Op for OpImma {
 
 impl SM70Op for OpHmma {
     fn legalize(&mut self, b: &mut LegalizeBuilder) {
-        legalize_ext_instr(self, b);
+        b.copy_src_if_uniform(&mut self.srcs[0]);
+        b.copy_src_if_uniform(&mut self.srcs[1]);
+        b.copy_src_if_uniform(&mut self.srcs[2]);
     }
 
     fn encode(&self, e: &mut SM70Encoder<'_>) {
@@ -3957,118 +4086,173 @@ impl SM70Op for OpHmma {
     }
 }
 
-macro_rules! as_sm70_op_match {
-    ($op: expr) => {
+impl SM70Op for OpLdsm {
+    fn legalize(&mut self, b: &mut LegalizeBuilder) {
+        b.copy_src_if_uniform(&mut self.addr);
+    }
+
+    fn encode(&self, e: &mut SM70Encoder<'_>) {
+        assert!(e.sm >= 75);
+
+        e.set_opcode(0x83b);
+        e.set_dst(&self.dst);
+        e.set_reg_src(24..32, &self.addr);
+        e.set_field(40..64, self.offset);
+        e.set_field(
+            72..74,
+            match self.mat_count {
+                1 => 0u8,
+                2 => 1u8,
+                4 => 2u8,
+                _ => panic!("Invalid LDSM mat count"),
+            },
+        );
+        e.set_field(
+            78..80,
+            match self.mat_size {
+                LdsmSize::M8N8 => 0u8,
+                LdsmSize::MT8N8 => 1u8,
+                // Those do value expansion and are weird, we'll probably never use them.
+                // LdsmSize::M8N16 => 2,
+                // LdsmSize::M8N32 => 3,
+            },
+        );
+    }
+}
+
+impl SM70Op for OpMovm {
+    fn legalize(&mut self, b: &mut LegalizeBuilder) {
+        b.copy_src_if_uniform(&mut self.src);
+    }
+
+    fn encode(&self, e: &mut SM70Encoder<'_>) {
+        assert!(e.sm >= 75);
+
+        e.set_opcode(0x23a);
+        e.set_dst(&self.dst);
+        e.set_reg_src(24..32, &self.src);
+        // TODO: 1: M832, 2: M864
+        e.set_field(78..80, 0); // MT88
+    }
+}
+
+macro_rules! sm70_op_match {
+    ($op: expr, |$x: ident| $y: expr) => {
         match $op {
-            Op::FAdd(op) => op,
-            Op::FFma(op) => op,
-            Op::FMnMx(op) => op,
-            Op::FMul(op) => op,
-            Op::FSet(op) => op,
-            Op::FSetP(op) => op,
-            Op::FSwzAdd(op) => op,
-            Op::DAdd(op) => op,
-            Op::DFma(op) => op,
-            Op::DMul(op) => op,
-            Op::DSetP(op) => op,
-            Op::HAdd2(op) => op,
-            Op::HFma2(op) => op,
-            Op::HMul2(op) => op,
-            Op::HSet2(op) => op,
-            Op::HSetP2(op) => op,
-            Op::HMnMx2(op) => op,
-            Op::MuFu(op) => op,
-            Op::BMsk(op) => op,
-            Op::BRev(op) => op,
-            Op::Flo(op) => op,
-            Op::IAbs(op) => op,
-            Op::IAdd3(op) => op,
-            Op::IAdd3X(op) => op,
-            Op::IDp4(op) => op,
-            Op::IMad(op) => op,
-            Op::IMad64(op) => op,
-            Op::IMnMx(op) => op,
-            Op::ISetP(op) => op,
-            Op::Lea(op) => op,
-            Op::LeaX(op) => op,
-            Op::Lop3(op) => op,
-            Op::PopC(op) => op,
-            Op::Shf(op) => op,
-            Op::F2F(op) => op,
-            Op::F2FP(op) => op,
-            Op::F2I(op) => op,
-            Op::I2F(op) => op,
-            Op::FRnd(op) => op,
-            Op::Mov(op) => op,
-            Op::Prmt(op) => op,
-            Op::Sel(op) => op,
-            Op::Shfl(op) => op,
-            Op::PLop3(op) => op,
-            Op::R2UR(op) => op,
-            Op::Redux(op) => op,
-            Op::Tex(op) => op,
-            Op::Tld(op) => op,
-            Op::Tld4(op) => op,
-            Op::Tmml(op) => op,
-            Op::Txd(op) => op,
-            Op::Txq(op) => op,
-            Op::SuLd(op) => op,
-            Op::SuSt(op) => op,
-            Op::SuAtom(op) => op,
-            Op::Ld(op) => op,
-            Op::Ldc(op) => op,
-            Op::St(op) => op,
-            Op::Atom(op) => op,
-            Op::AL2P(op) => op,
-            Op::ALd(op) => op,
-            Op::ASt(op) => op,
-            Op::Ipa(op) => op,
-            Op::LdTram(op) => op,
-            Op::CCtl(op) => op,
-            Op::MemBar(op) => op,
-            Op::BClear(op) => op,
-            Op::BMov(op) => op,
-            Op::Break(op) => op,
-            Op::BSSy(op) => op,
-            Op::BSync(op) => op,
-            Op::Bra(op) => op,
-            Op::Exit(op) => op,
-            Op::WarpSync(op) => op,
-            Op::Bar(op) => op,
-            Op::CS2R(op) => op,
-            Op::Isberd(op) => op,
-            Op::Kill(op) => op,
-            Op::Nop(op) => op,
-            Op::PixLd(op) => op,
-            Op::S2R(op) => op,
-            Op::Out(op) => op,
-            Op::OutFinal(op) => op,
-            Op::Vote(op) => op,
-            Op::Match(op) => op,
-            Op::Hmma(op) => op,
-            Op::Imma(op) => op,
+            Op::FAdd($x) => $y,
+            Op::FFma($x) => $y,
+            Op::FMnMx($x) => $y,
+            Op::FMul($x) => $y,
+            Op::FSet($x) => $y,
+            Op::FSetP($x) => $y,
+            Op::FSwzAdd($x) => $y,
+            Op::DAdd($x) => $y,
+            Op::DFma($x) => $y,
+            Op::DMul($x) => $y,
+            Op::DSetP($x) => $y,
+            Op::HAdd2($x) => $y,
+            Op::HFma2($x) => $y,
+            Op::HMul2($x) => $y,
+            Op::HSet2($x) => $y,
+            Op::HSetP2($x) => $y,
+            Op::HMnMx2($x) => $y,
+            Op::MuFu($x) => $y,
+            Op::BMsk($x) => $y,
+            Op::BRev($x) => $y,
+            Op::Flo($x) => $y,
+            Op::IAbs($x) => $y,
+            Op::IAdd3($x) => $y,
+            Op::IAdd3X($x) => $y,
+            Op::IDp4($x) => $y,
+            Op::IMad($x) => $y,
+            Op::IMad64($x) => $y,
+            Op::IMnMx($x) => $y,
+            Op::ISetP($x) => $y,
+            Op::Lea($x) => $y,
+            Op::LeaX($x) => $y,
+            Op::Lop3($x) => $y,
+            Op::PopC($x) => $y,
+            Op::Shf($x) => $y,
+            Op::F2F($x) => $y,
+            Op::F2FP($x) => $y,
+            Op::F2I($x) => $y,
+            Op::I2F($x) => $y,
+            Op::FRnd($x) => $y,
+            Op::Mov($x) => $y,
+            Op::Movm($x) => $y,
+            Op::Prmt($x) => $y,
+            Op::Sel($x) => $y,
+            Op::Sgxt($x) => $y,
+            Op::Shfl($x) => $y,
+            Op::PLop3($x) => $y,
+            Op::R2UR($x) => $y,
+            Op::Redux($x) => $y,
+            Op::Tex($x) => $y,
+            Op::Tld($x) => $y,
+            Op::Tld4($x) => $y,
+            Op::Tmml($x) => $y,
+            Op::Txd($x) => $y,
+            Op::Txq($x) => $y,
+            Op::SuLd($x) => $y,
+            Op::SuSt($x) => $y,
+            Op::SuAtom($x) => $y,
+            Op::Ld($x) => $y,
+            Op::Ldc($x) => $y,
+            Op::St($x) => $y,
+            Op::Atom($x) => $y,
+            Op::AL2P($x) => $y,
+            Op::ALd($x) => $y,
+            Op::ASt($x) => $y,
+            Op::Ipa($x) => $y,
+            Op::LdTram($x) => $y,
+            Op::CCtl($x) => $y,
+            Op::MemBar($x) => $y,
+            Op::BClear($x) => $y,
+            Op::BMov($x) => $y,
+            Op::Break($x) => $y,
+            Op::BSSy($x) => $y,
+            Op::BSync($x) => $y,
+            Op::Bra($x) => $y,
+            Op::Exit($x) => $y,
+            Op::WarpSync($x) => $y,
+            Op::Bar($x) => $y,
+            Op::CS2R($x) => $y,
+            Op::Isberd($x) => $y,
+            Op::Isbewr($x) => $y,
+            Op::Kill($x) => $y,
+            Op::Nop($x) => $y,
+            Op::PixLd($x) => $y,
+            Op::S2R($x) => $y,
+            Op::Out($x) => $y,
+            Op::OutFinal($x) => $y,
+            Op::Vote($x) => $y,
+            Op::Match($x) => $y,
+            Op::Hmma($x) => $y,
+            Op::Imma($x) => $y,
+            Op::Ldsm($x) => $y,
             _ => panic!("Unsupported op: {}", $op),
         }
     };
 }
 
-fn as_sm70_op(op: &Op) -> &dyn SM70Op {
-    as_sm70_op_match!(op)
-}
-
-fn as_sm70_op_mut(op: &mut Op) -> &mut dyn SM70Op {
-    as_sm70_op_match!(op)
+impl SM70Op for Op {
+    fn legalize(&mut self, b: &mut LegalizeBuilder) {
+        sm70_op_match!(self, |op| op.legalize(b));
+    }
+    fn encode(&self, e: &mut SM70Encoder<'_>) {
+        sm70_op_match!(self, |op| op.encode(e));
+    }
 }
 
 pub fn legalize_sm70_op(
-    _sm: &dyn ShaderModel,
+    _sm: &ShaderModel70,
     b: &mut LegalizeBuilder,
     op: &mut Op,
 ) {
-    as_sm70_op_mut(op).legalize(b);
+    op.legalize(b);
 }
 
-pub fn encode_sm70_shader(sm: &dyn ShaderModel, s: &Shader<'_>) -> Vec<u32> {
+pub fn encode_sm70_shader(sm: &ShaderModel70, s: &Shader<'_>) -> Vec<u32> {
     assert!(s.functions.len() == 1);
     let func = &s.functions[0];
 
@@ -4095,7 +4279,7 @@ pub fn encode_sm70_shader(sm: &dyn ShaderModel, s: &Shader<'_>) -> Vec<u32> {
                 labels: &labels,
                 inst: [0_u32; 4],
             };
-            as_sm70_op(&instr.op).encode(&mut e);
+            instr.op.encode(&mut e);
             e.set_pred(&instr.pred);
             e.set_instr_deps(&instr.deps);
             encoded.extend_from_slice(&e.inst[..]);

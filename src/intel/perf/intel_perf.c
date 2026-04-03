@@ -45,6 +45,7 @@
 
 #include "dev/intel_debug.h"
 #include "dev/intel_device_info.h"
+#include "dev/virtio/intel_virtio.h"
 
 #include "perf/i915/intel_perf.h"
 #include "perf/xe/intel_perf.h"
@@ -325,6 +326,9 @@ compute_topology_builtins(struct intel_perf_config *perf)
    perf->sys_vars.n_l3_banks = devinfo->l3_banks;
    perf->sys_vars.n_l3_nodes = devinfo->l3_banks / 4;
    perf->sys_vars.n_sq_idis =  devinfo->num_slices;
+   perf->sys_vars.n_depth_pipes = devinfo->num_depth_pipes;
+   perf->sys_vars.n_geom_pipes = devinfo->num_geom_pipes;
+   perf->sys_vars.n_color_pipes = devinfo->num_color_pipes;
 
    perf->sys_vars.n_eu_slice0123 = 0;
    for (int s = 0; s < MIN2(4, devinfo->max_slices); s++) {
@@ -688,13 +692,15 @@ oa_metrics_available(struct intel_perf_config *perf, int fd,
    perf_register_oa_queries_t oa_register = get_register_queries_function(devinfo);
    bool oa_metrics_available = false;
 
+   /* TODO: Support performance metrics */
+   if (devinfo->is_virtio)
+      return false;
+
    perf->devinfo = devinfo;
 
    /* Consider an invalid as supported. */
-   if (fd == -1) {
-      perf->features_supported = INTEL_PERF_FEATURE_QUERY_PERF;
+   if (fd == -1)
       return true;
-   }
 
    perf->enable_all_metrics = debug_get_bool_option("INTEL_EXTENDED_METRICS", false);
 
@@ -770,19 +776,17 @@ load_oa_metrics(struct intel_perf_config *perf, int fd,
       perf->fallback_raw_oa_metric = perf->queries[perf->n_queries - 1].oa_metrics_set_id;
 }
 
-struct intel_perf_registers *
-intel_perf_load_configuration(struct intel_perf_config *perf_cfg, int fd, const char *guid)
+uint64_t
+intel_perf_get_configuration_id(struct intel_perf_config *perf_cfg, const char *guid)
 {
-   if (!(perf_cfg->features_supported & INTEL_PERF_FEATURE_QUERY_PERF))
-      return NULL;
+   char path[512];
+   uint64_t val;
 
-   switch (perf_cfg->devinfo->kmd_type) {
-   case INTEL_KMD_TYPE_I915:
-      return i915_perf_load_configurations(perf_cfg, fd, guid);
-   default:
-      UNREACHABLE("missing");
-      return NULL;
-   }
+   snprintf(path, sizeof(path), "metrics/%s/id", guid);
+   if (read_sysfs_drm_device_file_uint64(perf_cfg, path, &val))
+      return val;
+
+   return 0;
 }
 
 uint64_t
@@ -812,10 +816,10 @@ intel_perf_store_configuration(struct intel_perf_config *perf_cfg, int fd,
                         config->n_b_counter_regs);
    }
 
-   uint8_t hash[20];
+   uint8_t hash[SHA1_DIGEST_LENGTH];
    _mesa_sha1_final(&sha1_ctx, hash);
 
-   char formatted_hash[41];
+   char formatted_hash[SHA1_DIGEST_STRING_LENGTH];
    _mesa_sha1_format(formatted_hash, hash);
 
    char generated_guid[37];

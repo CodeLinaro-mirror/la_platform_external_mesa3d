@@ -127,7 +127,7 @@ __vk_log_impl(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 
    char *message_idname = ralloc_asprintf(NULL, "%s:%d", file, line);
 
-#if MESA_DEBUG
+#if MESA_VK_LOG
    switch (severity) {
    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
       mesa_logd("%s: %s", message_idname, message);
@@ -259,8 +259,8 @@ __vk_log_impl(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
        * decreasing order of importance, we're forwarding the first
        * one.
        */
-      vk_debug_report(instance, flags, object_count ? objects[0] : NULL, 0,
-                      0, message_idname, message);
+      vk_debug_report(&instance->debug_report, flags, object_count ? objects[0] : NULL,
+                      0, 0, message_idname, message);
    }
 
    ralloc_free(message);

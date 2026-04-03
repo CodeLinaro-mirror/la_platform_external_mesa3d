@@ -1,41 +1,26 @@
 /*
  * Copyright (C) 2022 Collabora, Ltd.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 
+#include "genxml/gen_macros.h"
+
 #include "pan_earlyzs.h"
-#include "panfrost/util/pan_ir.h"
+#include "panfrost/compiler/pan_compiler.h"
+
 
 /*
  * Return an "early" mode. If it is known that the depth/stencil tests always
  * pass (so the shader is always executed), weak early is usually faster than
  * force early.
  */
-static enum pan_earlyzs
+static enum mali_pixel_kill
 best_early_mode(bool zs_always_passes, bool force_early)
 {
    if (zs_always_passes && !force_early)
-      return PAN_EARLYZS_WEAK_EARLY;
+      return MALI_PIXEL_KILL_WEAK_EARLY;
    else
-      return PAN_EARLYZS_FORCE_EARLY;
+      return MALI_PIXEL_KILL_FORCE_EARLY;
 }
 
 /*
@@ -121,9 +106,9 @@ analyze(const struct pan_shader_info *s, bool writes_zs_or_oq,
    /* Collect results */
    return (struct pan_earlyzs_state){
       .update = late_update
-                   ? PAN_EARLYZS_FORCE_LATE
+                   ? MALI_PIXEL_KILL_FORCE_LATE
                    : best_early_mode(zs_always_passes, force_early_update),
-      .kill = late_kill ? PAN_EARLYZS_FORCE_LATE
+      .kill = late_kill ? MALI_PIXEL_KILL_FORCE_LATE
                         : best_early_mode(zs_always_passes, force_early_kill),
       .shader_readonly_zs = optimize_shader_read_only_zs,
    };

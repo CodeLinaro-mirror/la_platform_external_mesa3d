@@ -247,10 +247,10 @@ static inline unsigned
 nv50_context_shader_stage(unsigned pipe)
 {
    switch (pipe) {
-   case PIPE_SHADER_VERTEX: return NV50_SHADER_STAGE_VERTEX;
-   case PIPE_SHADER_FRAGMENT: return NV50_SHADER_STAGE_FRAGMENT;
-   case PIPE_SHADER_GEOMETRY: return NV50_SHADER_STAGE_GEOMETRY;
-   case PIPE_SHADER_COMPUTE: return NV50_SHADER_STAGE_COMPUTE;
+   case MESA_SHADER_VERTEX: return NV50_SHADER_STAGE_VERTEX;
+   case MESA_SHADER_FRAGMENT: return NV50_SHADER_STAGE_FRAGMENT;
+   case MESA_SHADER_GEOMETRY: return NV50_SHADER_STAGE_GEOMETRY;
+   case MESA_SHADER_COMPUTE: return NV50_SHADER_STAGE_COMPUTE;
    default:
       assert(!"invalid/unhandled shader type");
       return 0;
@@ -312,6 +312,7 @@ bool nv50_state_validate_3d(struct nv50_context *, uint32_t);
 
 /* nv50_surface.c */
 extern void nv50_clear(struct pipe_context *, unsigned buffers,
+                       uint32_t color_clear_mask, uint8_t stencil_clear_mask,
                        const struct pipe_scissor_state *scissor_state,
                        const union pipe_color_union *color,
                        double depth, unsigned stencil);

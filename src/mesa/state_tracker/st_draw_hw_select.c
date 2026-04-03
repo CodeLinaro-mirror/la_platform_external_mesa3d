@@ -647,13 +647,15 @@ hw_select_create_gs(struct st_context *st, union state_key state)
       UNREACHABLE("unexpected primitive");
    }
 
-   nir_lower_returns(nir);
+   NIR_PASS(_, nir, nir_lower_returns);
+   NIR_PASS(_, nir, nir_opt_intrinsics);
 
    return st_nir_finish_builtin_shader(st, nir);
 }
 
 bool
-st_draw_hw_select_prepare_common(struct gl_context *ctx)
+st_draw_hw_select_prepare_common(struct gl_context *ctx,
+                                 struct pipe_resource **releasebuf)
 {
    struct st_context *st = st_context(ctx);
    if (ctx->GeometryProgram._Current ||
@@ -691,14 +693,14 @@ st_draw_hw_select_prepare_common(struct gl_context *ctx)
    cb.buffer_size = sizeof(consts) - (MAX_CLIP_PLANES - num_planes) * 4 * sizeof(float);
 
    struct pipe_context *pipe = st->pipe;
-   pipe->set_constant_buffer(pipe, PIPE_SHADER_GEOMETRY, 0, false, &cb);
+   pipe_upload_constant_buffer0(pipe, MESA_SHADER_GEOMETRY, &cb, releasebuf);
 
    struct pipe_shader_buffer buffer;
    memset(&buffer, 0, sizeof(buffer));
    buffer.buffer = ctx->Select.Result->buffer;
    buffer.buffer_size = MAX_NAME_STACK_RESULT_NUM * 3 * sizeof(int);
 
-   pipe->set_shader_buffers(pipe, PIPE_SHADER_GEOMETRY, 0, 1, &buffer, 0x1);
+   pipe->set_shader_buffers(st->pipe, MESA_SHADER_GEOMETRY, 0, 1, &buffer, 0x1);
 
    return true;
 }

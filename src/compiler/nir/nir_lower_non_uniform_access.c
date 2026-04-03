@@ -177,7 +177,7 @@ add_non_uniform_instr(struct nu_state *state, struct nu_handle *handles,
       key.instr_index = instr->index;
 
    for (uint32_t i = 0; i < handle_count; i++)
-      key.handle_indixes[i] = handles[i].handle->parent_instr->index;
+      key.handle_indixes[i] = nir_def_instr(handles[i].handle)->index;
 
    struct hash_entry *entry = _mesa_hash_table_search(state->accesses, &key);
    if (!entry) {
@@ -200,17 +200,40 @@ add_non_uniform_instr(struct nu_state *state, struct nu_handle *handles,
    for (uint32_t i = 0; i < handle_count; i++)
       src.srcs[i] = srcs[i];
 
-   util_dynarray_append(&data->srcs, struct nu_handle_src, src);
+   util_dynarray_append(&data->srcs, src);
 }
 
 static bool
 lower_non_uniform_tex_access(struct nu_state *state, nir_tex_instr *tex,
                              const nir_lower_non_uniform_access_options *opts)
 {
-   if (!(tex->texture_non_uniform && (opts->types & nir_lower_non_uniform_texture_access)) &&
-       !(tex->sampler_non_uniform && (opts->types & nir_lower_non_uniform_texture_access)) &&
-       !(tex->offset_non_uniform  && (opts->types & nir_lower_non_uniform_texture_offset_access)))
-      return false;
+   enum nir_lower_non_uniform_access_type base_access_type;
+
+   switch (tex->op) {
+   case nir_texop_txs:
+   case nir_texop_query_levels:
+   case nir_texop_texture_samples:
+   case nir_texop_descriptor_amd:
+      if (!(tex->texture_non_uniform && (opts->types & nir_lower_non_uniform_texture_query)))
+         return false;
+      base_access_type = nir_lower_non_uniform_texture_query;
+      break;
+
+   case nir_texop_lod_bias:
+   case nir_texop_sampler_descriptor_amd:
+      if (!(tex->sampler_non_uniform && (opts->types & nir_lower_non_uniform_texture_query)))
+         return false;
+      base_access_type = nir_lower_non_uniform_texture_query;
+      break;
+
+   default:
+      if (!(tex->texture_non_uniform && (opts->types & nir_lower_non_uniform_texture_access)) &&
+          !(tex->sampler_non_uniform && (opts->types & nir_lower_non_uniform_texture_access)) &&
+          !(tex->offset_non_uniform  && (opts->types & nir_lower_non_uniform_texture_offset_access)))
+         return false;
+      base_access_type = nir_lower_non_uniform_texture_access;
+      break;
+   }
 
    /* We can have at most one texture and one sampler handle */
    unsigned num_handles = 0;
@@ -221,9 +244,10 @@ lower_non_uniform_tex_access(struct nu_state *state, nir_tex_instr *tex,
       case nir_tex_src_texture_offset:
       case nir_tex_src_texture_handle:
       case nir_tex_src_texture_deref:
+      case nir_tex_src_texture_2_deref:
          if (!tex->texture_non_uniform)
             continue;
-         if (!(opts->types & nir_lower_non_uniform_texture_access))
+         if (!(opts->types & base_access_type))
             continue;
          if (opts->tex_src_callback && !opts->tex_src_callback(tex, i, opts->callback_data))
             continue;
@@ -232,9 +256,10 @@ lower_non_uniform_tex_access(struct nu_state *state, nir_tex_instr *tex,
       case nir_tex_src_sampler_offset:
       case nir_tex_src_sampler_handle:
       case nir_tex_src_sampler_deref:
+      case nir_tex_src_sampler_2_deref:
          if (!tex->sampler_non_uniform)
             continue;
-         if (!(opts->types & nir_lower_non_uniform_texture_access))
+         if (!(opts->types & base_access_type))
             continue;
          if (opts->tex_src_callback && !opts->tex_src_callback(tex, i, opts->callback_data))
             continue;
@@ -272,7 +297,7 @@ lower_non_uniform_tex_access(struct nu_state *state, nir_tex_instr *tex,
    tex->offset_non_uniform = false;
 
    add_non_uniform_instr(state, handles, srcs, num_handles, true,
-                         nir_lower_non_uniform_texture_access);
+                         base_access_type);
 
    return true;
 }
@@ -332,6 +357,7 @@ nir_lower_non_uniform_access_impl(nir_function_impl *impl,
          case nir_instr_type_tex: {
             nir_tex_instr *tex = nir_instr_as_tex(instr);
             if ((options->types & (nir_lower_non_uniform_texture_access |
+                                   nir_lower_non_uniform_texture_query |
                                    nir_lower_non_uniform_texture_offset_access)) &&
                 lower_non_uniform_tex_access(&state, tex, options))
                progress = true;
@@ -382,9 +408,6 @@ nir_lower_non_uniform_access_impl(nir_function_impl *impl,
             case nir_intrinsic_image_store:
             case nir_intrinsic_image_atomic:
             case nir_intrinsic_image_atomic_swap:
-            case nir_intrinsic_image_levels:
-            case nir_intrinsic_image_size:
-            case nir_intrinsic_image_samples:
             case nir_intrinsic_image_samples_identical:
             case nir_intrinsic_image_fragment_mask_load_amd:
             case nir_intrinsic_bindless_image_load:
@@ -392,9 +415,6 @@ nir_lower_non_uniform_access_impl(nir_function_impl *impl,
             case nir_intrinsic_bindless_image_store:
             case nir_intrinsic_bindless_image_atomic:
             case nir_intrinsic_bindless_image_atomic_swap:
-            case nir_intrinsic_bindless_image_levels:
-            case nir_intrinsic_bindless_image_size:
-            case nir_intrinsic_bindless_image_samples:
             case nir_intrinsic_bindless_image_samples_identical:
             case nir_intrinsic_bindless_image_fragment_mask_load_amd:
             case nir_intrinsic_image_deref_load:
@@ -402,9 +422,6 @@ nir_lower_non_uniform_access_impl(nir_function_impl *impl,
             case nir_intrinsic_image_deref_store:
             case nir_intrinsic_image_deref_atomic:
             case nir_intrinsic_image_deref_atomic_swap:
-            case nir_intrinsic_image_deref_levels:
-            case nir_intrinsic_image_deref_size:
-            case nir_intrinsic_image_deref_samples:
             case nir_intrinsic_image_deref_samples_identical:
             case nir_intrinsic_image_deref_fragment_mask_load_amd:
                if ((options->types & nir_lower_non_uniform_image_access) &&
@@ -412,8 +429,22 @@ nir_lower_non_uniform_access_impl(nir_function_impl *impl,
                   progress = true;
                break;
 
-            case nir_intrinsic_load_readonly_output_pan:
-            case nir_intrinsic_load_converted_output_pan:
+            case nir_intrinsic_image_levels:
+            case nir_intrinsic_image_size:
+            case nir_intrinsic_image_samples:
+            case nir_intrinsic_bindless_image_levels:
+            case nir_intrinsic_bindless_image_size:
+            case nir_intrinsic_bindless_image_samples:
+            case nir_intrinsic_image_deref_levels:
+            case nir_intrinsic_image_deref_size:
+            case nir_intrinsic_image_deref_samples:
+               if ((options->types & nir_lower_non_uniform_image_query) &&
+                   lower_non_uniform_access_intrin(&state, intrin, 0, nir_lower_non_uniform_image_query))
+                  progress = true;
+               break;
+
+            case nir_intrinsic_load_tile_pan:
+            case nir_intrinsic_load_tile_res_pan:
                /* render target can be nonuniform, but not conversion descriptor */
                if ((options->types & nir_lower_non_uniform_image_access) &&
                    lower_non_uniform_access_intrin(&state, intrin, 2, nir_lower_non_uniform_image_access))
@@ -428,6 +459,7 @@ nir_lower_non_uniform_access_impl(nir_function_impl *impl,
          }
 
          case nir_instr_type_call:
+         case nir_instr_type_cmat_call:
             handle_barrier(&state, true);
             break;
 
@@ -463,7 +495,7 @@ nir_lower_non_uniform_access_impl(nir_function_impl *impl,
             all_equal_first = nir_iand(&b, all_equal_first, equal_first);
       }
 
-      nir_push_if(&b, all_equal_first);
+      nir_push_if(&b, all_equal_first)->control = nir_selection_control_divergent_always_taken;
 
       util_dynarray_foreach(&data.srcs, struct nu_handle_src, src) {
          for (uint32_t i = 0; i < key->handle_count; i++)

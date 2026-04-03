@@ -59,12 +59,13 @@
 #ifdef HAVE_X11_PLATFORM
 #include "X11/Xlibint.h"
 #include "x11_dri3.h"
+#include "x11_display.h"
 #endif
 
 #include "GL/mesa_glinterop.h"
 #include "pipe-loader/pipe_loader.h"
 #include "loader/loader.h"
-#include "mapi/glapi/glapi.h"
+#include "mesa/glapi/glapi/glapi.h"
 #include "pipe/p_screen.h"
 #include "util/bitscan.h"
 #include "util/driconf.h"
@@ -76,7 +77,6 @@
 #include "util/u_vector.h"
 #include "egl_dri2.h"
 #include "egldefines.h"
-#include "mapi/glapi/glapi.h"
 #include "dispatch.h"
 
 #define NUM_ATTRIBS 16
@@ -84,6 +84,8 @@
 static const enum pipe_format dri2_pbuffer_visuals[] = {
    PIPE_FORMAT_R16G16B16A16_FLOAT,
    PIPE_FORMAT_R16G16B16X16_FLOAT,
+   PIPE_FORMAT_R16G16B16A16_UNORM,
+   PIPE_FORMAT_R16G16B16X16_UNORM,
    PIPE_FORMAT_B10G10R10A2_UNORM,
    PIPE_FORMAT_B10G10R10X2_UNORM,
    PIPE_FORMAT_BGRA8888_UNORM,
@@ -482,6 +484,7 @@ dri2_add_pbuffer_configs_for_visuals(_EGLDisplay *disp)
 
    for (unsigned i = 0; dri2_dpy->driver_configs[i] != NULL; i++) {
       struct dri2_egl_config *dri2_conf;
+      EGLint config_group = 0;
       struct gl_config *gl_config =
          (struct gl_config *) dri2_dpy->driver_configs[i];
       int idx = dri2_pbuffer_visual_index(gl_config->color_format);
@@ -489,8 +492,20 @@ dri2_add_pbuffer_configs_for_visuals(_EGLDisplay *disp)
       if (idx == -1)
          continue;
 
+      /* Put the 16 bpc rgb[a] unorm formats into a lower priority EGL config
+       * group 1, so they don't get preferably chosen by eglChooseConfig().
+       */
+      if (util_format_is_unorm16(util_format_description(gl_config->color_format)))
+         config_group = 1;
+
+      const EGLint attr_list[] = {
+         EGL_CONFIG_SELECT_GROUP_EXT,
+         config_group,
+         EGL_NONE,
+      };
+
       dri2_conf = dri2_add_config(disp, dri2_dpy->driver_configs[i],
-                                  EGL_PBUFFER_BIT, NULL);
+                                  EGL_PBUFFER_BIT, attr_list);
       if (dri2_conf)
          format_count[idx]++;
    }
@@ -542,8 +557,9 @@ dri2_detect_swrast_kopper(_EGLDisplay *disp)
 {
    struct dri2_egl_display *dri2_dpy = dri2_egl_display(disp);
 
+   /* Kopper won't work on Android without extra platform level support. */
    dri2_dpy->kopper = dri2_dpy->driver_name && !strcmp(dri2_dpy->driver_name, "zink") &&
-                      !debug_get_bool_option("LIBGL_KOPPER_DISABLE", false);
+                      !debug_get_bool_option("LIBGL_KOPPER_DISABLE", false) && disp->Platform != _EGL_PLATFORM_ANDROID;
    dri2_dpy->swrast = (disp->Options.ForceSoftware && !dri2_dpy->kopper && strcmp(dri2_dpy->driver_name, "vmwgfx")) ||
                       !dri2_dpy->driver_name || strstr(dri2_dpy->driver_name, "swrast");
    dri2_dpy->swrast_not_kms = dri2_dpy->swrast && (!dri2_dpy->driver_name || strcmp(dri2_dpy->driver_name, "kms_swrast"));
@@ -574,6 +590,11 @@ dri2_query_device_info(const void* driver_device_identifier,
                        struct egl_device_info *device_info)
 {
    const char* drm_device_name = (const char*)driver_device_identifier;
+
+   /* We have information cached already. */
+   if (device_info->vendor_name)
+      return true;
+
    return dri_get_drm_device_info(
       drm_device_name, device_info->device_uuid, device_info->driver_uuid,
       &device_info->vendor_name, &device_info->renderer_name, &device_info->driver_name);
@@ -1236,9 +1257,25 @@ dri2_create_context(_EGLDisplay *disp, _EGLConfig *conf,
                                   &num_attribs))
       goto cleanup;
 
+   bool thread_safe = true;
+
+#ifdef HAVE_X11_PLATFORM
+   if (disp->Platform == _EGL_PLATFORM_X11) {
+      if (disp->PlatformDisplay != EGL_DEFAULT_DISPLAY) {
+         thread_safe = x11_xlib_display_is_thread_safe(disp->PlatformDisplay);
+      } else {
+         Display *display = XOpenDisplay(NULL);
+         if (display) {
+            thread_safe = x11_xlib_display_is_thread_safe(display);
+            XCloseDisplay(display);
+         }
+      }
+   }
+#endif
+
    dri2_ctx->dri_context = driCreateContextAttribs(
       dri2_dpy->dri_screen_render_gpu, api, dri_config, shared, num_attribs / 2,
-      ctx_attribs, &error, dri2_ctx);
+      ctx_attribs, &error, dri2_ctx, thread_safe);
    dri2_create_context_attribs_error(error);
 
    if (!dri2_ctx->dri_context)
@@ -2194,6 +2231,8 @@ dri2_num_fourcc_format_planes(EGLint format)
    case DRM_FORMAT_NV21:
    case DRM_FORMAT_NV16:
    case DRM_FORMAT_NV61:
+   case DRM_FORMAT_NV24:
+   case DRM_FORMAT_NV42:
    case DRM_FORMAT_NV15:
    case DRM_FORMAT_NV20:
    case DRM_FORMAT_NV30:
@@ -2523,41 +2562,49 @@ dri2_export_dma_buf_image_mesa(_EGLDisplay *disp, _EGLImage *img, int *fds,
 {
    struct dri2_egl_display *dri2_dpy = dri2_egl_display_lock(disp);
    struct dri2_egl_image *dri2_img = dri2_egl_image(img);
-   EGLint nplanes;
 
    if (!dri2_can_export_dma_buf_image(disp, img)) {
       mtx_unlock(&dri2_dpy->lock);
       return EGL_FALSE;
    }
 
-   /* EGL_MESA_image_dma_buf_export spec says:
-    *    "If the number of fds is less than the number of planes, then
-    *    subsequent fd slots should contain -1."
+   int nplanes;
+   /* Query nplanes so that we know how big the given array is. */
+   dri2_query_image(dri2_img->dri_image, __DRI_IMAGE_ATTRIB_NUM_PLANES, &nplanes);
+
+   /* For driver which does not implement disjoint query, still uses
+    * single fd to match previous behavior.
     */
-   if (fds) {
-      /* Query nplanes so that we know how big the given array is. */
-      dri2_query_image(dri2_img->dri_image,
-                                  __DRI_IMAGE_ATTRIB_NUM_PLANES, &nplanes);
-      memset(fds, -1, nplanes * sizeof(int));
+   int is_disjoint = false;
+   if (nplanes > 1) {
+      dri2_query_image(dri2_img->dri_image, __DRI_IMAGE_ATTRIB_DISJOINT_PLANES,
+                       &is_disjoint);
    }
 
-   /* rework later to provide multiple fds/strides/offsets */
-   if (fds)
-      dri2_query_image(dri2_img->dri_image, __DRI_IMAGE_ATTRIB_FD,
-                                  fds);
+   for (int i = 0; i < nplanes; i++) {
+      struct dri_image *image = dri2_img->dri_image;
+      if (i)
+         image = dri2_from_planar(image, i, NULL);
 
-   if (strides)
-      dri2_query_image(dri2_img->dri_image,
-                                  __DRI_IMAGE_ATTRIB_STRIDE, strides);
+      if (fds) {
+         /* EGL_MESA_image_dma_buf_export spec says:
+          *    "If the number of fds is less than the number of planes, then
+          *    subsequent fd slots should contain -1."
+          */
+         if (i == 0 || is_disjoint)
+            dri2_query_image(image, __DRI_IMAGE_ATTRIB_FD, &fds[i]);
+         else
+            fds[i] = -1;
+      }
 
-   if (offsets) {
-      int img_offset;
-      bool ret = dri2_query_image(
-         dri2_img->dri_image, __DRI_IMAGE_ATTRIB_OFFSET, &img_offset);
-      if (ret)
-         offsets[0] = img_offset;
-      else
-         offsets[0] = 0;
+      if (strides && !dri2_query_image(image, __DRI_IMAGE_ATTRIB_STRIDE, &strides[i]))
+         strides[i] = 0;
+
+      if (offsets && !dri2_query_image(image, __DRI_IMAGE_ATTRIB_OFFSET, &offsets[i]))
+         offsets[i] = 0;
+
+      if (i)
+         dri2_destroy_image(image);
    }
 
    mtx_unlock(&dri2_dpy->lock);

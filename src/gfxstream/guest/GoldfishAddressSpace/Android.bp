@@ -1,36 +1,75 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
 package {
     // See: http://go/android-license-faq
     default_applicable_licenses: ["external_mesa3d_license"],
 }
 
 cc_library_static {
-    name: "mesa_goldfish_address_space",
+    name: "goldfish_address_space",
+    vendor: true,
+    c_std: "c11",
+    cpp_std: "c++17",
+    host_supported: true,
     defaults: [
-        "mesa_gfxstream_guest_cc_defaults",
-        "mesa_platform_virtgpu_defaults",
-        "mesa_common_defaults",
+        "_trial_msvc",
+        "aosp_mesa3d_c_link_args",
+        "aosp_mesa3d_c_project_args",
+        "aosp_mesa3d_cpp_link_args",
+        "aosp_mesa3d_cpp_project_args",
+        "gfxstream_guest_args",
+        "vulkan_wsi_list",
+    ],
+    header_libs: [
+        "inc_aemu",
+        "inc_goldfish_address_space",
+        "inc_guest_iostream",
+        "inc_include",
+        "inc_platform_virtgpu",
+        "inc_src",
     ],
     srcs: [
         "AddressSpaceStream.cpp",
-        "goldfish_address_space.cpp",
         "VirtioGpuAddressSpaceStream.cpp",
-        "GoldfishAddressSpaceStream.cpp",
-    ],
-    header_libs: [
-        "mesa_gfxstream_guest_iostream",
-        "mesa_common_headers",
-        "mesa_gfxstream_aemu_headers",
-    ],
+    ] + select(os(), {
+        "android": [
+            "GoldfishAddressSpaceStream.cpp",
+            "goldfish_address_space.cpp",
+        ],
+        default: [],
+    }),
+    static_libs: [
+        "blake3",
+        "gfxstream_vulkan_mapper",
+        "libvirtgpu_kumquat_ffi",
+        "mesa_util",
+        "mesa_util_c11",
+        "mesa_util_simd",
+        "platform_virtgpu",
+        "platform_virtgpu_drm",
+        "platform_virtgpu_kumquat",
+        "vulkan_util",
+    ] + select(arch(), {
+        "x86_64": [
+            "mesa_util_clflush",
+            "mesa_util_clflushopt",
+        ],
+        "x86": [
+            "mesa_util_clflush",
+            "mesa_util_clflushopt",
+        ],
+        default: [],
+    }),
     shared_libs: [
         "libdrm",
-        "liblog",
-    ],
-    static_libs: [
-        "mesa_util",
-        "libringbuffer",
-        "mesa_gfxstream_aemu",
-    ],
-    export_include_dirs: [
-        "include",
     ],
 }

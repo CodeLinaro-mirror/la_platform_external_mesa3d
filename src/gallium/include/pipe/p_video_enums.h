@@ -36,8 +36,7 @@ enum pipe_video_format
 {
    PIPE_VIDEO_FORMAT_UNKNOWN = 0,
    PIPE_VIDEO_FORMAT_MPEG12,   /**< MPEG1, MPEG2 */
-   PIPE_VIDEO_FORMAT_MPEG4,    /**< DIVX, XVID */
-   PIPE_VIDEO_FORMAT_VC1,      /**< WMV */
+   PIPE_VIDEO_FORMAT_VC1 = 3,  /**< WMV */
    PIPE_VIDEO_FORMAT_MPEG4_AVC,/**< H.264 */
    PIPE_VIDEO_FORMAT_HEVC,     /**< H.265 */
    PIPE_VIDEO_FORMAT_JPEG,     /**< JPEG */
@@ -51,8 +50,6 @@ enum pipe_video_profile
    PIPE_VIDEO_PROFILE_MPEG1,
    PIPE_VIDEO_PROFILE_MPEG2_SIMPLE,
    PIPE_VIDEO_PROFILE_MPEG2_MAIN,
-   PIPE_VIDEO_PROFILE_MPEG4_SIMPLE,
-   PIPE_VIDEO_PROFILE_MPEG4_ADVANCED_SIMPLE,
    PIPE_VIDEO_PROFILE_VC1_SIMPLE,
    PIPE_VIDEO_PROFILE_VC1_MAIN,
    PIPE_VIDEO_PROFILE_VC1_ADVANCED,
@@ -88,9 +85,7 @@ enum pipe_video_cap
    PIPE_VIDEO_CAP_MAX_WIDTH = 2,
    PIPE_VIDEO_CAP_MAX_HEIGHT = 3,
    PIPE_VIDEO_CAP_PREFERRED_FORMAT = 4,
-   PIPE_VIDEO_CAP_PREFERS_INTERLACED = 5,
    PIPE_VIDEO_CAP_SUPPORTS_PROGRESSIVE = 6,
-   PIPE_VIDEO_CAP_SUPPORTS_INTERLACED = 7,
    PIPE_VIDEO_CAP_MAX_LEVEL = 8,
    PIPE_VIDEO_CAP_STACKED_FRAMES = 9,
    PIPE_VIDEO_CAP_MAX_MACROBLOCKS = 10,
@@ -168,11 +163,6 @@ enum pipe_video_cap
     * HEVC range extension support pipe_h265_enc_cap_range_extension_flags
     */
    PIPE_VIDEO_CAP_ENC_HEVC_RANGE_EXTENSION_FLAGS_SUPPORT = 52,
-   /*
-    * Video Post Processing support HDR content
-    */
-   PIPE_VIDEO_CAP_VPP_SUPPORT_HDR_INPUT = 53,
-   PIPE_VIDEO_CAP_VPP_SUPPORT_HDR_OUTPUT = 54,
    /*
     * Video encode max long term references supported
     */
@@ -255,6 +245,23 @@ enum pipe_video_cap
     * data layout
     */
    PIPE_VIDEO_CAP_ENC_GPU_STATS_PSNR = 67,
+   /*
+    * Support for the gallium driver to enable spatial adaptive quantization
+    * based on the rate control param spatial_adaptive_quantization_strength
+    *
+    * The returned value is pipe_enc_cap_spatial_adaptive_quantization
+    */
+   PIPE_VIDEO_CAP_ENC_SPATIAL_ADAPTIVE_QUANTIZATION = 68,
+   /*
+    * Support for readable reconstructed picture from DPB current picture
+    *
+    * Indicates whether dpb_curr_pic (index in dpb array from
+    * pipe_h264_enc_picture_desc, pipe_h265_enc_picture_desc, or
+    * pipe_av1_enc_picture_desc) is readable or uses an opaque
+    * non-readable memory layout. When true, the reconstructed
+    * picture can be read directly.
+    */
+   PIPE_VIDEO_CAP_ENC_READABLE_RECONSTRUCTED_PICTURE = 69,
 };
 
 enum pipe_video_h264_enc_dbk_filter_mode_flags
@@ -333,17 +340,6 @@ enum pipe_video_vpp_blend_mode
 {
    PIPE_VIDEO_VPP_BLEND_MODE_NONE = 0x0,
    PIPE_VIDEO_VPP_BLEND_MODE_GLOBAL_ALPHA = 0x1,
-};
-
-/* To be used for VPP state*/
-enum pipe_video_vpp_color_standard_type
-{
-   PIPE_VIDEO_VPP_COLOR_STANDARD_TYPE_NONE = 0x0,
-   PIPE_VIDEO_VPP_COLOR_STANDARD_TYPE_BT601 = 0x1,
-   PIPE_VIDEO_VPP_COLOR_STANDARD_TYPE_BT709 = 0x2,
-   PIPE_VIDEO_VPP_COLOR_STANDARD_TYPE_BT2020 = 0xC,
-   PIPE_VIDEO_VPP_COLOR_STANDARD_TYPE_EXPLICIT = 0xD,
-   PIPE_VIDEO_VPP_COLOR_STANDARD_TYPE_COUNT,
 };
 
 /* To be used for VPP state*/
@@ -476,6 +472,8 @@ enum pipe_video_cap_slice_structure
    *  for all slices except for the last one, which must be equal or smaller
    *  to the previous slices. */
    PIPE_VIDEO_CAP_SLICE_STRUCTURE_EQUAL_MULTI_ROWS = 0x00000020,
+   /* Driver supports PIPE_VIDEO_SLICE_MODE_AUTO. */
+   PIPE_VIDEO_CAP_SLICE_STRUCTURE_AUTO = 0x00000040,
 };
 
 enum pipe_video_enc_intra_refresh_mode

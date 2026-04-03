@@ -4,26 +4,7 @@
  * Copyright (C) 2018 Alyssa Rosenzweig
  * Copyright (C) 2019 Collabora, Ltd.
  * Copyright (C) 2012 Rob Clark <robclark@freedesktop.org>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
+ * SPDX-License-Identifier: MIT
  */
 
 #include "draw/draw_context.h"
@@ -38,7 +19,6 @@
 #include "util/u_screen.h"
 #include "util/u_video.h"
 #include "util/xmlconfig.h"
-#include "util/perf/cpu_trace.h"
 
 #include <fcntl.h>
 
@@ -53,8 +33,9 @@
 #include "pan_public.h"
 #include "pan_resource.h"
 #include "pan_screen.h"
-#include "pan_shader.h"
+#include "pan_compiler.h"
 #include "pan_util.h"
+#include "pan_trace.h"
 
 #include "pan_context.h"
 
@@ -136,6 +117,8 @@ pipe_to_pan_bind_flags(uint32_t pipe_bind_flags)
       pan_bind_flags |= PAN_BIND_VERTEX_BUFFER;
    if (pipe_bind_flags & PIPE_BIND_SAMPLER_VIEW)
       pan_bind_flags |= PAN_BIND_SAMPLER_VIEW;
+   if (pipe_bind_flags & PIPE_BIND_SHADER_IMAGE)
+      pan_bind_flags |= PAN_BIND_STORAGE_IMAGE;
 
    return pan_bind_flags;
 }
@@ -143,9 +126,11 @@ pipe_to_pan_bind_flags(uint32_t pipe_bind_flags)
 static unsigned
 get_max_msaa(struct panfrost_device *dev, enum pipe_format format)
 {
-   unsigned max_tib_size = pan_get_max_tib_size(dev->arch, dev->model);
+   unsigned max_tib_size = pan_query_tib_size(dev->model);
    unsigned max_cbuf_atts = pan_get_max_cbufs(dev->arch, max_tib_size);
-   unsigned format_size = util_format_get_blocksize(format);
+
+   unsigned format_size =
+      pan_format_tib_size(format, dev->blendable_formats[format].internal);
 
    unsigned max_msaa = pan_get_max_msaa(dev->arch, max_tib_size,
                                         max_cbuf_atts, format_size);
@@ -257,54 +242,129 @@ panfrost_lower_yuv_format(struct panfrost_device *dev,
    assert(util_format_is_yuv(format));
 
    switch (format) {
-#define SINGLE_RES(__in, __out)                                                \
-   case PIPE_FORMAT_##__in:                                                    \
-      if (dev->formats[PIPE_FORMAT_##__out].bind & PAN_BIND_SAMPLER_VIEW) {    \
+#define TRY_LOWERING(...)                                                      \
+   do {                                                                        \
+      const enum pipe_format out_fmts__[] = {__VA_ARGS__};                     \
+      bool supported__ = true;                                                 \
+      for (unsigned r__ = 0; r__ < ARRAY_SIZE(out_fmts__); r__++) {            \
+         supported__ &=                                                        \
+            !!(dev->formats[out_fmts__[r__]].bind & PAN_BIND_SAMPLER_VIEW);    \
+      }                                                                        \
+      if (supported__) {                                                       \
          return (struct panfrost_yuv_format_lowering){                         \
-            .nres = 1,                                                         \
-            .res_formats[0] = PIPE_FORMAT_##__out,                             \
+            .nres = ARRAY_SIZE(out_fmts__),                                    \
+            .res_formats = {__VA_ARGS__},                                      \
          };                                                                    \
       }                                                                        \
+   } while (0)
+
+   case PIPE_FORMAT_AYUV:
+      TRY_LOWERING(PIPE_FORMAT_RGBA8888_UNORM);
+      break;
+   case PIPE_FORMAT_XYUV:
+      TRY_LOWERING(PIPE_FORMAT_RGBX8888_UNORM);
+      break;
+   case PIPE_FORMAT_Y410:
+      TRY_LOWERING(PIPE_FORMAT_R10G10B10A2_UNORM);
+      break;
+   case PIPE_FORMAT_Y412:
+   case PIPE_FORMAT_Y416:
+      TRY_LOWERING(PIPE_FORMAT_R16G16B16A16_UNORM);
+      break;
+   case PIPE_FORMAT_YUYV:
+      TRY_LOWERING(PIPE_FORMAT_R8G8_R8B8_UNORM);
+      TRY_LOWERING(PIPE_FORMAT_RG88_UNORM, PIPE_FORMAT_BGRA8888_UNORM);
+      break;
+   case PIPE_FORMAT_UYVY:
+      TRY_LOWERING(PIPE_FORMAT_G8R8_B8R8_UNORM);
+      TRY_LOWERING(PIPE_FORMAT_RG88_UNORM, PIPE_FORMAT_RGBA8888_UNORM);
+      break;
+   case PIPE_FORMAT_YVYU:
+      TRY_LOWERING(PIPE_FORMAT_R8B8_R8G8_UNORM);
+      TRY_LOWERING(PIPE_FORMAT_RG88_UNORM, PIPE_FORMAT_BGRA8888_UNORM);
+      break;
+   case PIPE_FORMAT_VYUY:
+      TRY_LOWERING(PIPE_FORMAT_B8R8_G8R8_UNORM);
+      TRY_LOWERING(PIPE_FORMAT_RG88_UNORM, PIPE_FORMAT_RGBA8888_UNORM);
+      break;
+   case PIPE_FORMAT_NV12:
+      TRY_LOWERING(PIPE_FORMAT_R8_G8B8_420_UNORM);
+      TRY_LOWERING(PIPE_FORMAT_R8_UNORM, PIPE_FORMAT_RG88_UNORM);
+      break;
+   case PIPE_FORMAT_NV21:
+      TRY_LOWERING(PIPE_FORMAT_R8_B8G8_420_UNORM);
+      TRY_LOWERING(PIPE_FORMAT_R8_UNORM, PIPE_FORMAT_RG88_UNORM);
+      break;
+   case PIPE_FORMAT_NV16:
+      TRY_LOWERING(PIPE_FORMAT_R8_G8B8_422_UNORM);
+      TRY_LOWERING(PIPE_FORMAT_R8_UNORM, PIPE_FORMAT_RG88_UNORM);
+      break;
+   case PIPE_FORMAT_NV61:
+      TRY_LOWERING(PIPE_FORMAT_R8_UNORM, PIPE_FORMAT_RG88_UNORM);
+      break;
+   case PIPE_FORMAT_NV24:
+      TRY_LOWERING(PIPE_FORMAT_R8_UNORM, PIPE_FORMAT_RG88_UNORM);
+      break;
+   case PIPE_FORMAT_NV42:
+      TRY_LOWERING(PIPE_FORMAT_R8_UNORM, PIPE_FORMAT_RG88_UNORM);
+      break;
+   case PIPE_FORMAT_NV15:
+      TRY_LOWERING(PIPE_FORMAT_R10_G10B10_420_UNORM);
+      break;
+   case PIPE_FORMAT_NV20:
+      TRY_LOWERING(PIPE_FORMAT_R10_G10B10_422_UNORM);
+      break;
+   case PIPE_FORMAT_IYUV:
+      TRY_LOWERING(PIPE_FORMAT_R8_G8_B8_420_UNORM);
+      TRY_LOWERING(PIPE_FORMAT_R8_UNORM, PIPE_FORMAT_R8_UNORM, PIPE_FORMAT_R8_UNORM);
+      break;
+   case PIPE_FORMAT_YV12:
+      TRY_LOWERING(PIPE_FORMAT_R8_B8_G8_420_UNORM);
+      TRY_LOWERING(PIPE_FORMAT_R8_UNORM, PIPE_FORMAT_R8_UNORM, PIPE_FORMAT_R8_UNORM);
+      break;
+   case PIPE_FORMAT_Y8U8V8_420_UNORM_PACKED:
+      TRY_LOWERING(PIPE_FORMAT_R8G8B8_420_UNORM_PACKED);
+      break;
+   case PIPE_FORMAT_Y10U10V10_420_UNORM_PACKED:
+      TRY_LOWERING(PIPE_FORMAT_R10G10B10_420_UNORM_PACKED);
+      break;
+   case PIPE_FORMAT_Y210:
+      TRY_LOWERING(PIPE_FORMAT_X6R10X6G10_X6R10X6B10_422_UNORM);
+      TRY_LOWERING(PIPE_FORMAT_RG1616_UNORM, PIPE_FORMAT_R16G16B16A16_UNORM);
+      break;
+   case PIPE_FORMAT_Y212:
+   case PIPE_FORMAT_Y216:
+      TRY_LOWERING(PIPE_FORMAT_R16G16_R16B16_422_UNORM);
+      TRY_LOWERING(PIPE_FORMAT_RG1616_UNORM, PIPE_FORMAT_R16G16B16A16_UNORM);
+      break;
+   case PIPE_FORMAT_P010:
+   case PIPE_FORMAT_P012:
+   case PIPE_FORMAT_P016:
+   case PIPE_FORMAT_P030:
+      TRY_LOWERING(PIPE_FORMAT_R16_UNORM, PIPE_FORMAT_RG1616_UNORM);
       break;
 
-   SINGLE_RES(AYUV, RGBA8888_UNORM)
-   SINGLE_RES(XYUV, RGBX8888_UNORM)
-   SINGLE_RES(YUYV, R8G8_R8B8_UNORM)
-   SINGLE_RES(UYVY, G8R8_B8R8_UNORM)
-   SINGLE_RES(YVYU, R8B8_R8G8_UNORM)
-   SINGLE_RES(VYUY, B8R8_G8R8_UNORM)
-   SINGLE_RES(NV12, R8_G8B8_420_UNORM)
-   SINGLE_RES(NV21, R8_B8G8_420_UNORM)
-   SINGLE_RES(NV16, R8_G8B8_422_UNORM)
-   SINGLE_RES(NV15, R10_G10B10_420_UNORM)
-   SINGLE_RES(NV20, R10_G10B10_422_UNORM)
-   SINGLE_RES(IYUV, R8_G8_B8_420_UNORM)
-   SINGLE_RES(YV12, R8_B8_G8_420_UNORM)
-   SINGLE_RES(Y8U8V8_420_UNORM_PACKED, R8G8B8_420_UNORM_PACKED)
-   SINGLE_RES(Y10U10V10_420_UNORM_PACKED, R10G10B10_420_UNORM_PACKED)
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_420_UNORM:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_422_UNORM:
+   case PIPE_FORMAT_Y10X6_U10X6_V10X6_444_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_420_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_422_UNORM:
+   case PIPE_FORMAT_Y12X4_U12X4_V12X4_444_UNORM:
+   case PIPE_FORMAT_Y16_U16_V16_420_UNORM:
+   case PIPE_FORMAT_Y16_U16_V16_422_UNORM:
+   case PIPE_FORMAT_Y16_U16_V16_444_UNORM:
+      TRY_LOWERING(PIPE_FORMAT_R16_UNORM, PIPE_FORMAT_R16_UNORM,
+                   PIPE_FORMAT_R16_UNORM);
+      break;
 
-#undef SINGLE_RES
+#undef TRY_LOWERING
 
    default:
       break;
    }
 
-   struct panfrost_yuv_format_lowering lowering = {0};
-   unsigned nplanes =  util_format_get_num_planes(format);
-   for (unsigned i = 0; i < nplanes; i++) {
-      lowering.res_formats[lowering.nres++] =
-         util_format_get_plane_format(format, i);
-
-      /* If there's no YUV-as-RGB lowering available, the original YUV format
-       * will be returned, and only LINEAR will be allowed. */
-      if (i == 0 && lowering.res_formats[i] == format)
-         return lowering;
-
-      /* If plane0 got lowered, so should planeX. */
-      assert(lowering.res_formats[i] != format);
-   }
-
-   return lowering;
+   mesa_loge("%s is not supported\n", util_format_name(format));
+   return (struct panfrost_yuv_format_lowering){0};
 }
 
 /* We always support linear and tiled operations, both external and internal.
@@ -325,26 +385,15 @@ panfrost_walk_dmabuf_modifiers(struct pipe_screen *screen,
       yuv_lowering =
          panfrost_lower_yuv_format(dev, format);
 
+      /* If we get there, format support must have been validated beforehand,
+       * and the lowering can't return 0 resouces. Similarly, it can't be a YUV
+       * format either. */
+      assert(yuv_lowering.nres >= 1);
+      for (unsigned i = 0; i < yuv_lowering.nres; i++)
+         assert(!util_format_is_yuv(yuv_lowering.res_formats[i]));
+
       if (yuv_lowering.nres == 1)
          format = yuv_lowering.res_formats[0];
-   }
-
-   /* Query AFBC status */
-   bool afbc = dev->has_afbc;
-   bool ytr = afbc && !is_yuv;
-   bool tiled_afbc = pan_afbc_can_tile(dev->arch);
-   bool afrc = allow_afrc && dev->has_afrc;
-
-   if (is_yuv && yuv_lowering.nres > 1) {
-      for (unsigned i = 0; i < yuv_lowering.nres; i++) {
-         enum pipe_format plane_format = yuv_lowering.res_formats[i];
-
-         afbc &= pan_afbc_supports_format(dev->arch, plane_format);
-      }
-   } else {
-      afbc &= pan_afbc_supports_format(dev->arch, format);
-      ytr &= pan_afbc_can_ytr(format);
-      afrc &= !is_yuv && pan_afrc_supports_format(format);
    }
 
    PANFROST_EMULATED_MODIFIERS(emulated_mods);
@@ -352,60 +401,52 @@ panfrost_walk_dmabuf_modifiers(struct pipe_screen *screen,
    unsigned count = 0;
 
    for (unsigned i = 0; i < ARRAY_SIZE(native_mods); ++i) {
-      if (drm_is_afbc(native_mods[i])) {
-         if (!afbc)
-            continue;
+      uint64_t mod =  native_mods[i];
 
-         if ((native_mods[i] & AFBC_FORMAT_MOD_SPLIT)) {
-            unsigned nplanes = util_format_get_num_planes(format);
-            bool can_split = true;
+      /* We don't implement the WSI interface for
+       * DRM_FORMAT_MOD_ARM_INTERLEAVED_64K so let's just not advertise images
+       * using this modifier, which will take care of it being advertised for
+       * WSI. */
+      if (mod == DRM_FORMAT_MOD_ARM_INTERLEAVED_64K)
+         continue;
 
-            for (unsigned p = 0; p < nplanes; p++) {
-               if (is_yuv && yuv_lowering.nres > 1) {
-                  can_split &= pan_afbc_can_split(
-                     dev->arch, yuv_lowering.res_formats[p], native_mods[i], 0);
-               } else {
-                  can_split &=
-                     pan_afbc_can_split(dev->arch, format, native_mods[i], p);
-               }
-            }
+      if ((dev->debug & PAN_DBG_NO_AFBC) && drm_is_afbc(mod))
+         continue;
 
-            if (!can_split)
-               continue;
+      if (!allow_afrc && drm_is_afrc(mod))
+         continue;
+
+      /* Some single-plane subsampled YUV formats need to be lowered to two
+       * resources pointing to the same image. Such aliasing only works with
+       * linear images, so bail out early if that's the case and the modifier is
+       * not linear. */
+      if (yuv_lowering.nres > util_format_get_num_planes(format) &&
+          mod != DRM_FORMAT_MOD_LINEAR)
+         continue;
+
+      /* Defer the <modifier,format> test to the mod handler. */
+      bool supported;
+      if (is_yuv && yuv_lowering.nres > 1) {
+         supported = true;
+         for (unsigned r = 0; r < yuv_lowering.nres; r++) {
+            enum pipe_format res_format = yuv_lowering.res_formats[r];
+
+            supported &= pan_image_test_modifier_with_format(
+               &dev->kmod.dev->props, mod, res_format);
          }
-
-         if ((native_mods[i] & AFBC_FORMAT_MOD_YTR) && !ytr)
-            continue;
-
-         if ((native_mods[i] & AFBC_FORMAT_MOD_TILED) && !tiled_afbc)
-            continue;
+      } else {
+         supported = pan_image_test_modifier_with_format(&dev->kmod.dev->props,
+                                                         mod, format);
       }
 
-      if (drm_is_afrc(native_mods[i]) && !afrc)
+      if (!supported)
          continue;
 
-      if (drm_is_mtk_tiled(native_mods[i]) &&
-          !panfrost_format_supports_mtk_tiled(format))
-         continue;
-
-      /* If the format is still YUV after lowering, the SW emulation might
-       * involve plane aliasing which we can't do with U_TILED. */
-      if (util_format_is_yuv(format) &&
-          native_mods[i] == DRM_FORMAT_MOD_ARM_16X16_BLOCK_U_INTERLEAVED)
-         continue;
-
-      /* Some formats only work with AFBC. */
-      if ((native_mods[i] == DRM_FORMAT_MOD_LINEAR ||
-           native_mods[i] == DRM_FORMAT_MOD_ARM_16X16_BLOCK_U_INTERLEAVED) &&
-          !pan_u_tiled_or_linear_supports_format(format))
-         continue;
-
-      if (test_modifier != DRM_FORMAT_MOD_INVALID &&
-          test_modifier != native_mods[i])
+      if (test_modifier != DRM_FORMAT_MOD_INVALID && test_modifier != mod)
          continue;
 
       if (max > (int)count) {
-         modifiers[count] = native_mods[i];
+         modifiers[count] = mod;
 
          if (external_only)
             external_only[count] = is_yuv;
@@ -474,13 +515,26 @@ panfrost_is_dmabuf_modifier_supported(struct pipe_screen *screen,
    unsigned int uint_extern_only = 0;
    int count;
 
+   if (format_requires_afbc(format) && !drm_is_afbc(modifier))
+      return false;
+
    panfrost_walk_dmabuf_modifiers(screen, format, 1, &unused, &uint_extern_only,
                                   &count, modifier, true);
 
    if (external_only)
       *external_only = uint_extern_only ? true : false;
 
+
    return count > 0;
+}
+
+static unsigned int
+panfrost_get_dmabuf_modifier_planes(struct pipe_screen *pscreen, uint64_t modifier,
+                                    enum pipe_format format)
+{
+   unsigned int planes = util_format_get_num_planes(format);
+
+   return planes;
 }
 
 static void
@@ -489,14 +543,14 @@ panfrost_init_shader_caps(struct panfrost_screen *screen)
    struct panfrost_device *dev = &screen->dev;
    bool is_nofp16 = dev->debug & PAN_DBG_NOFP16;
 
-   for (unsigned i = 0; i <= PIPE_SHADER_COMPUTE; i++) {
+   for (unsigned i = 0; i <= MESA_SHADER_COMPUTE; i++) {
       struct pipe_shader_caps *caps =
          (struct pipe_shader_caps *)&screen->base.shader_caps[i];
 
       switch (i) {
-      case PIPE_SHADER_VERTEX:
-      case PIPE_SHADER_FRAGMENT:
-      case PIPE_SHADER_COMPUTE:
+      case MESA_SHADER_VERTEX:
+      case MESA_SHADER_FRAGMENT:
+      case MESA_SHADER_COMPUTE:
          break;
       default:
          continue;
@@ -506,7 +560,7 @@ panfrost_init_shader_caps(struct panfrost_screen *screen)
        * fragment shaders. Side effects in the geometry pipeline cause
        * trouble with IDVS and conflict with our transform feedback lowering.
        */
-      bool allow_side_effects = (i != PIPE_SHADER_VERTEX);
+      bool allow_side_effects = (i != MESA_SHADER_VERTEX);
 
       caps->max_instructions =
       caps->max_alu_instructions =
@@ -515,7 +569,7 @@ panfrost_init_shader_caps(struct panfrost_screen *screen)
       caps->max_control_flow_depth = 1024; /* arbitrary */
       /* Used as ABI on Midgard */
       caps->max_inputs = dev->arch >= 9 ? 32 : 16;
-      caps->max_outputs = i == PIPE_SHADER_FRAGMENT ? 8 : PIPE_MAX_ATTRIBS;
+      caps->max_outputs = i == MESA_SHADER_FRAGMENT ? 8 : PIPE_MAX_ATTRIBS;
       caps->max_temps = 256; /* arbitrary */
       caps->max_const_buffer0_size = 16 * 1024 * sizeof(float);
       STATIC_ASSERT(PAN_MAX_CONST_BUFFERS < 0x100);
@@ -619,13 +673,15 @@ panfrost_init_screen_caps(struct panfrost_screen *screen)
 
    u_init_pipe_screen_caps(&screen->base, 1);
 
+   caps->vendor_id = ARM_VENDOR_ID;
+
    struct panfrost_device *dev = &screen->dev;
 
    /* Our GL 3.x implementation is WIP */
    bool is_gl3 = dev->debug & PAN_DBG_GL3;
 
    unsigned max_tib_size =
-      pan_get_max_tib_size(dev->arch, dev->model);
+      pan_query_tib_size(dev->model);
 
    caps->npot_textures = true;
    caps->mixed_color_depth_bits = true;
@@ -663,9 +719,14 @@ panfrost_init_screen_caps(struct panfrost_screen *screen)
 
    /* Compile side is TODO for Midgard. */
    caps->shader_clock = dev->arch >= 6 &&
-      dev->kmod.props.gpu_can_query_timestamp;
+      dev->kmod.dev->props.gpu_can_query_timestamp;
    caps->shader_realtime_clock = dev->arch >= 6 &&
-      dev->kmod.props.gpu_can_query_timestamp;
+      dev->kmod.dev->props.gpu_can_query_timestamp &&
+      dev->kmod.dev->props.timestamp_device_coherent;
+
+   /* pixel_local_storage is initially for valhall and bifrost only */
+   caps->shader_pixel_local_storage_fast_size =
+      caps->shader_pixel_local_storage_size = (dev->arch >= 6) ? 16 : 0;
 
    caps->vs_instanceid = true;
    caps->texture_multisample = true;
@@ -689,8 +750,11 @@ panfrost_init_screen_caps(struct panfrost_screen *screen)
    caps->texture_half_float_linear = true;
    caps->shader_array_components = true;
    caps->texture_buffer_objects = true;
+   caps->buffer_sampler_view_rgba_only = true;
    caps->packed_uniforms = true;
    caps->image_load_formatted = true;
+   caps->image_store_formatted = true;
+   caps->image_atomic_inc_wrap = true;
    caps->cube_map_array = true;
    caps->compute = true;
    caps->int64 = true;
@@ -720,15 +784,15 @@ panfrost_init_screen_caps(struct panfrost_screen *screen)
    caps->texture_border_color_quirk = dev->arch == 7 || dev->arch >= 10 ?
       PIPE_QUIRK_TEXTURE_BORDER_COLOR_SWIZZLE_FREEDRENO : 0;
 
-   caps->max_texel_buffer_elements = PAN_MAX_TEXEL_BUFFER_ELEMENTS;
+   caps->max_texel_buffer_elements =
+      pan_get_max_texel_buffer_elements(dev->arch);
 
    /* Must be at least 64 for correct behaviour */
    caps->texture_buffer_offset_alignment = 64;
 
-   caps->query_time_elapsed =
-   caps->query_timestamp =
-      dev->kmod.props.gpu_can_query_timestamp &&
-      dev->kmod.props.timestamp_frequency != 0;
+   caps->query_time_elapsed = caps->query_timestamp =
+      dev->kmod.dev->props.gpu_can_query_timestamp &&
+      dev->kmod.dev->props.timestamp_frequency != 0;
 
    if (caps->query_timestamp)
       caps->timer_resolution = pan_gpu_time_to_ns(dev, 1);
@@ -839,13 +903,10 @@ panfrost_init_screen_caps(struct panfrost_screen *screen)
    caps->supported_prim_modes =
    caps->supported_prim_modes_with_restart = modes;
 
-   caps->image_store_formatted = true;
-
    caps->native_fence_fd = true;
 
-   caps->context_priority_mask =
-      from_kmod_group_allow_priority_flags(
-         dev->kmod.props.allowed_group_priorities_mask);
+   caps->context_priority_mask = from_kmod_group_allow_priority_flags(
+      dev->kmod.dev->props.allowed_group_priorities_mask);
 
    caps->astc_decode_mode = dev->arch >= 9 && (dev->compressed_formats & (1 << 30));
 
@@ -865,6 +926,14 @@ panfrost_init_screen_caps(struct panfrost_screen *screen)
    caps->max_texture_anisotropy = 16.0;
 
    caps->max_texture_lod_bias = 16.0; /* arbitrary */
+
+   caps->shader_atomic_int64 = dev->arch >= 9;
+
+   /* We hard-code this value as it is dictated by driver uAPI */
+   caps->max_label_length = 4096;
+
+   /* Avoid emulating non-perspective interpolation when not needed */
+   caps->prefer_persp = true;
 }
 
 static void
@@ -930,7 +999,7 @@ get_core_mask(const struct panfrost_device *dev,
               const struct pipe_screen_config *config,
               const char *option_name, uint64_t *mask)
 {
-   uint64_t present = dev->kmod.props.shader_present;
+   uint64_t present = dev->kmod.dev->props.shader_present;
    *mask = driQueryOptionu64(config->options, option_name) & present;
 
    if (!*mask) {
@@ -966,7 +1035,7 @@ panfrost_create_screen(int fd, const struct pipe_screen_config *config,
    screen->max_afbc_packing_ratio = debug_get_num_option(
       "PAN_MAX_AFBC_PACKING_RATIO", DEFAULT_MAX_AFBC_PACKING_RATIO);
 
-   util_cpu_trace_init();
+   pan_trace_init();
 
    if (panfrost_open_device(screen, fd, dev)) {
       ralloc_free(screen);
@@ -987,8 +1056,12 @@ panfrost_create_screen(int fd, const struct pipe_screen_config *config,
       return NULL;
    }
 
+   unsigned core_id_range;
+   unsigned core_count =
+      pan_query_core_count(&dev->kmod.dev->props, &core_id_range);
+
    snprintf(screen->renderer_string, sizeof(screen->renderer_string),
-            "%s (Panfrost)", dev->model->name);
+            "%s MC%u (Panfrost)", dev->model->name, core_count);
 
    screen->afbc_tiled = driQueryOptionb(config->options, "pan_afbc_tiled");
 
@@ -1055,7 +1128,8 @@ panfrost_create_screen(int fd, const struct pipe_screen_config *config,
    screen->base.query_compression_rates = panfrost_query_compression_rates;
    screen->base.query_compression_modifiers =
       panfrost_query_compression_modifiers;
-
+   screen->base.get_dmabuf_modifier_planes =
+      panfrost_get_dmabuf_modifier_planes;
    panfrost_resource_screen_init(&screen->base);
 
    panfrost_init_shader_caps(screen);
@@ -1073,7 +1147,8 @@ panfrost_create_screen(int fd, const struct pipe_screen_config *config,
    }
 
    for (unsigned i = 0; i <= MESA_SHADER_COMPUTE; i++)
-      screen->base.nir_options[i] = pan_shader_get_compiler_options(pan_screen(&screen->base)->dev.arch);
+      screen->base.nir_options[i] =
+         pan_get_nir_shader_compiler_options(dev->arch);
 
    switch (dev->arch) {
    case 4:

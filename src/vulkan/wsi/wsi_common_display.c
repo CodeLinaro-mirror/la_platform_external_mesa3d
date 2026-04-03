@@ -20,6 +20,35 @@
  * OF THIS SOFTWARE.
  */
 
+/*
+ * Colorimetry helper functions (color_xy_to_u16, nits_to_u16, nits_to_u16_dark),
+ * kindly taken from Weston:
+ * https://gitlab.freedesktop.org/wayland/weston/-/blob/main/libweston/backend-drm/kms-color.c
+ *
+ * Copyright 2021-2022 Collabora, Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the
+ * next paragraph) shall be included in all copies or substantial
+ * portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include "util/u_atomic.h"
 #include "util/macros.h"
 #include <stdlib.h>
@@ -46,6 +75,7 @@
 #include "util/hash_table.h"
 #include "util/list.h"
 #include "util/os_time.h"
+#include "util/u_overflow.h"
 #include "util/timespec.h"
 
 #include "vk_device.h"
@@ -59,6 +89,12 @@
 #include "wsi_common_private.h"
 #include "wsi_common_display.h"
 #include "wsi_common_queue.h"
+
+#ifdef HAVE_LIBDISPLAY_INFO
+#include "libdisplay-info/info.h"
+#include "libdisplay-info/edid.h"
+#include "libdisplay-info/cta.h"
+#endif
 
 #if 0
 #define wsi_display_debug(...) fprintf(stderr, __VA_ARGS__)
@@ -86,6 +122,8 @@ typedef struct wsi_display_mode {
 enum connector_property {
    CONN_CRTC_ID,
    DPMS,
+   HDR_OUTPUT_METADATA,
+   Colorspace,
    CONNECTOR_PROPERTY_MAX,
 };
 
@@ -112,6 +150,23 @@ enum plane_property {
    PLANE_PROPERTY_MAX,
 };
 
+enum colorspace_enum {
+   COLORSPACE_Default,
+   COLORSPACE_BT2020_RGB,
+   COLORSPACE_ENUM_MAX,
+};
+
+enum vrr_tristate {
+   VRR_TRISTATE_UNKNOWN,
+   VRR_TRISTATE_DISABLED,
+   VRR_TRISTATE_ENABLED,
+};
+
+typedef struct wsi_display_connector_metadata {
+   VkHdrMetadataEXT             hdr_metadata;
+   bool                         supports_st2084;
+} wsi_display_connector_metadata;
+
 typedef struct wsi_display_connector {
    struct list_head             list;
    struct wsi_display           *wsi;
@@ -121,6 +176,7 @@ typedef struct wsi_display_connector {
    char                         *name;
    bool                         connected;
    bool                         active;
+   bool                         imported;
    int                          refcount; /* swapchains using this connector */
    struct list_head             display_modes;
    wsi_display_mode             *current_mode;
@@ -128,9 +184,18 @@ typedef struct wsi_display_connector {
    uint32_t                     property[CONNECTOR_PROPERTY_MAX];
    uint32_t                     crtc_property[CRTC_PROPERTY_MAX];
    uint32_t                     plane_property[PLANE_PROPERTY_MAX];
+   uint32_t                     colorspace_enum[COLORSPACE_ENUM_MAX];
+   uint64_t                     color_outcome_serial;
 #ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
    xcb_randr_output_t           output;
 #endif
+   struct wsi_display_connector_metadata metadata;
+   uint32_t                     count_formats;
+   uint32_t                     *formats;
+   enum vrr_tristate            vrr_capable;
+   enum vrr_tristate            vrr_enabled;
+   uint64_t                     last_frame;
+   uint64_t                     last_nsec;
 } wsi_display_connector;
 
 struct wsi_display {
@@ -138,7 +203,15 @@ struct wsi_display {
 
    const VkAllocationCallbacks  *alloc;
 
+   /* fd currently in use for KHR_display, provided by vkAcquireDrmDisplayEXT()
+    * or vkAcquireXlibDisplayEXT().  When none is active, it's set to device_fd
+    * for connector enumeration.
+    */
    int                          fd;
+   /* fd that was passed to wsi_display_init_wsi */
+   int                          device_fd;
+   /* Refcount for DRM master on device_fd. */
+   uint32_t                     master_refcount;
 
    /* Used with syncobj imported from driver side. */
    int                          syncobj_fd;
@@ -151,42 +224,97 @@ struct wsi_display {
    pthread_t                    hotplug_thread;
 
    struct list_head             connectors; /* list of all discovered connectors */
+
+   /* A unique monotonically increasing value to associate with an individual
+    * colorimetry outcome on the output. This is used to avoid propagating
+    * dirty tracking flags across large numbers of objects.
+    */
+   uint64_t                     color_outcome_serial_counter;
 };
+
+static void
+wsi_display_parse_edid(struct wsi_display_connector *connector, drmModePropertyBlobRes *blob)
+{
+#ifdef HAVE_LIBDISPLAY_INFO
+   struct wsi_display_connector_metadata *metadata = &connector->metadata;
+   struct di_info *info = di_info_parse_edid(blob->data, blob->length);
+
+   if (!info) {
+      fprintf(stderr, "wsi_display_parse_edid: Failed to parse edid. Reason: %s\n", di_info_get_failure_msg(info));
+      return;
+   }
+
+   const struct di_edid *edid = di_info_get_edid(info);
+
+   const struct di_edid_chromaticity_coords *chroma = di_edid_get_chromaticity_coords(edid);
+   const struct di_cta_hdr_static_metadata_block *hdr_static_metadata = NULL;
+   const struct di_cta_colorimetry_block *colorimetry = NULL;
+
+   const struct di_edid_cta *cta = NULL;
+   const struct di_edid_ext * const *exts = di_edid_get_extensions(edid);
+   for (; *exts != NULL; exts++) {
+      if ((cta = di_edid_ext_get_cta(*exts)))
+         break;
+   }
+
+   if (cta) {
+      const struct di_cta_data_block * const * blocks = di_edid_cta_get_data_blocks(cta);
+      for (; *blocks != NULL; blocks++) {
+         if (!hdr_static_metadata && (hdr_static_metadata = di_cta_data_block_get_hdr_static_metadata(*blocks)))
+            continue;
+         if (!colorimetry && (colorimetry = di_cta_data_block_get_colorimetry(*blocks)))
+            continue;
+      }
+   }
+
+   if (chroma) {
+      metadata->hdr_metadata.displayPrimaryRed = (VkXYColorEXT){ chroma->red_x, chroma->red_y };
+      metadata->hdr_metadata.displayPrimaryGreen = (VkXYColorEXT){ chroma->green_x, chroma->green_y };
+      metadata->hdr_metadata.displayPrimaryBlue = (VkXYColorEXT){ chroma->blue_x, chroma->blue_y };
+      metadata->hdr_metadata.whitePoint = (VkXYColorEXT){ chroma->white_x, chroma->white_y };
+   }
+
+   if (hdr_static_metadata) {
+      metadata->hdr_metadata.maxFrameAverageLightLevel = hdr_static_metadata->desired_content_max_frame_avg_luminance;
+      metadata->hdr_metadata.minLuminance = hdr_static_metadata->desired_content_min_luminance;
+      metadata->hdr_metadata.maxLuminance = hdr_static_metadata->desired_content_max_luminance;
+      /* To be filled in by the app based on the scene, default to desired_content_max_luminance. */
+      metadata->hdr_metadata.maxContentLightLevel = hdr_static_metadata->desired_content_max_luminance;
+   }
+
+   metadata->supports_st2084 =
+      chroma &&
+      colorimetry && colorimetry->bt2020_rgb &&
+      hdr_static_metadata && hdr_static_metadata->eotfs && hdr_static_metadata->eotfs->pq;
+
+   di_info_destroy(info);
+#endif
+}
 
 /**
  * Creates the mapping from our property enums to the KMS property ID for that
  * property associated with the object.
  */
 static bool
-find_properties(struct wsi_display_connector *connector, int fd, uint32_t type)
+find_properties(struct wsi_display_connector *connector, uint32_t count_props, uint32_t *props, uint64_t *prop_values, int fd, uint32_t type)
 {
-   uint32_t *prop_id, prop_count, obj_id;
-   drmModeObjectProperties *props;
+   uint32_t *prop_id, prop_count;
 
    switch (type) {
    case DRM_MODE_OBJECT_CONNECTOR:
-      obj_id = connector->id;
       prop_id = connector->property;
       prop_count = ARRAY_SIZE(connector->property);
       break;
    case DRM_MODE_OBJECT_CRTC:
-      obj_id = connector->crtc_id;
       prop_id = connector->crtc_property;
       prop_count = ARRAY_SIZE(connector->crtc_property);
       break;
    case DRM_MODE_OBJECT_PLANE:
-      obj_id = connector->plane_id;
       prop_id = connector->plane_property;
       prop_count = ARRAY_SIZE(connector->plane_property);
       break;
    default:
       UNREACHABLE("unexpected drm object type");
-   }
-
-   props = drmModeObjectGetProperties(fd, obj_id, type);
-   if (!props) {
-      mesa_loge("Failed to drmModeObjectGetProperties(obj=%d, type=0x%08x)", obj_id, type);
-      return false;
    }
 
    memset(prop_id, 0, prop_count * sizeof(*prop_id));
@@ -198,22 +326,27 @@ find_properties(struct wsi_display_connector *connector, int fd, uint32_t type)
       prop_id[GAMMA_LUT] = -1;
       prop_id[DEGAMMA_LUT] = -1;
       prop_id[CTM] = -1;
+   } else if (type == DRM_MODE_OBJECT_CONNECTOR) {
+      prop_id[HDR_OUTPUT_METADATA] = -1;
+      prop_id[Colorspace] = -1;
    }
 
    /* Walk the list of properties seeing if their names match one of the
     * properties we care about controlling.
     */
-   for (int p = 0; p < props->count_props; p++) {
-      drmModePropertyPtr prop = drmModeGetProperty(fd, props->props[p]);
+   for (int p = 0; p < count_props; p++) {
+      drmModePropertyPtr prop = drmModeGetProperty(fd, props[p]);
       if (!prop)
          continue;
 
-#define PROPERTY(x) if (!strcmp(prop->name, #x)) prop_id[x] = props->props[p]
+#define PROPERTY(x) if (!strcmp(prop->name, #x)) prop_id[x] = props[p]
       switch (type) {
       case DRM_MODE_OBJECT_CONNECTOR:
          STATIC_ASSERT(CRTC_ID == (enum plane_property) CONN_CRTC_ID);
          PROPERTY(CRTC_ID);
          PROPERTY(DPMS);
+         PROPERTY(HDR_OUTPUT_METADATA);
+         PROPERTY(Colorspace);
          break;
       case DRM_MODE_OBJECT_CRTC:
          PROPERTY(MODE_ID);
@@ -236,10 +369,33 @@ find_properties(struct wsi_display_connector *connector, int fd, uint32_t type)
          break;
       }
 #undef PROPERTY
+
+      if (!strcmp(prop->name, "Colorspace")) {
+         assert(prop->flags & DRM_MODE_PROP_ENUM);
+#define COLORSPACE_ENUM(x) if (!strcmp(en->name, #x)) connector->colorspace_enum[COLORSPACE_##x] = en->value
+         for (int e = 0; e < prop->count_enums; e++) {
+            struct drm_mode_property_enum *en = &prop->enums[e];
+            COLORSPACE_ENUM(Default);
+            COLORSPACE_ENUM(BT2020_RGB);
+         }
+#undef COLORSPACE_ENUM
+      }
+
+      if (!strcmp(prop->name, "EDID")) {
+         drmModePropertyBlobRes *blob = drmModeGetPropertyBlob(fd, prop_values[p]);
+         if (blob) {
+            wsi_display_parse_edid(connector, blob);
+            drmModeFreePropertyBlob(blob);
+         }
+      }
+
+      if (!strcmp(prop->name, "vrr_capable"))
+         connector->vrr_capable = prop_values[p] != 0 ? VRR_TRISTATE_ENABLED : VRR_TRISTATE_DISABLED;
+      if (!strcmp(prop->name, "VRR_ENABLED"))
+         connector->vrr_enabled = prop_values[p] != 0 ? VRR_TRISTATE_ENABLED : VRR_TRISTATE_DISABLED;
+
       drmModeFreeProperty(prop);
    }
-
-   drmModeFreeObjectProperties(props);
 
    /* verify that all required properties were found */
    for (int i = 0; i < prop_count; i++) {
@@ -249,6 +405,43 @@ find_properties(struct wsi_display_connector *connector, int fd, uint32_t type)
       }
    }
    return true;
+}
+
+static bool
+find_object_properties(struct wsi_display_connector *connector, int fd, uint32_t type)
+{
+   drmModeObjectProperties *props;
+   uint32_t obj_id;
+   bool ret;
+
+   switch (type) {
+   case DRM_MODE_OBJECT_CONNECTOR:
+      obj_id = connector->id;
+      break;
+   case DRM_MODE_OBJECT_CRTC:
+      obj_id = connector->crtc_id;
+      break;
+   case DRM_MODE_OBJECT_PLANE:
+      obj_id = connector->plane_id;
+      break;
+   default:
+      UNREACHABLE("unexpected drm object type");
+   }
+
+   props = drmModeObjectGetProperties(fd, obj_id, type);
+   if (!props) {
+      mesa_loge("Failed to drmModeObjectGetProperties(obj=%d, type=0x%08x)", obj_id, type);
+      return false;
+   }
+   ret = find_properties(connector, props->count_props, props->props, props->prop_values, fd, type);
+   drmModeFreeObjectProperties(props);
+   return ret;
+}
+
+static bool
+find_connector_properties(struct wsi_display_connector *connector, drmModeConnectorPtr drm_connector, int fd)
+{
+   return find_properties(connector, drm_connector->count_props, drm_connector->props, drm_connector->prop_values, fd, DRM_MODE_OBJECT_CONNECTOR);
 }
 
 #define wsi_for_each_display_mode(_mode, _conn)                 \
@@ -262,34 +455,45 @@ find_properties(struct wsi_display_connector *connector, int fd, uint32_t type)
 enum wsi_image_state {
    WSI_IMAGE_IDLE,
    WSI_IMAGE_DRAWING,
+   WSI_IMAGE_WAITING,
+   WSI_IMAGE_QUEUED_AFTER_WAIT,
    WSI_IMAGE_QUEUED,
    WSI_IMAGE_FLIPPING,
    WSI_IMAGE_DISPLAYING
 };
 
 struct wsi_display_image {
-   struct wsi_image             base;
-   struct wsi_display_swapchain *chain;
-   enum wsi_image_state         state;
-   uint32_t                     fb_id;
-   uint32_t                     buffer[4];
-   uint64_t                     flip_sequence;
-   uint64_t                     present_id;
+   struct wsi_image                base;
+   struct wsi_display_swapchain    *chain;
+   enum wsi_image_state            state;
+   uint32_t                        fb_id;
+   uint32_t                        buffer[4];
+   uint64_t                        flip_sequence;
+   uint64_t                        present_id;
+   struct wsi_image_timing_request timing_request;
+   struct wsi_display_fence        *fence;
+   uint64_t                        minimum_ns;
 };
 
 struct wsi_display_swapchain {
-   struct wsi_swapchain         base;
-   struct wsi_display           *wsi;
-   VkIcdSurfaceDisplay          *surface;
-   uint64_t                     flip_sequence;
-   VkResult                     status;
+   struct wsi_swapchain            base;
+   struct wsi_display              *wsi;
+   VkIcdSurfaceDisplay             *surface;
+   uint64_t                        flip_sequence;
+   VkResult                        status;
 
-   mtx_t                        present_id_mutex;
-   struct u_cnd_monotonic       present_id_cond;
-   uint64_t                     present_id;
-   VkResult                     present_id_error;
+   mtx_t                           present_id_mutex;
+   struct u_cnd_monotonic          present_id_cond;
+   uint64_t                        present_id;
+   VkResult                        present_id_error;
 
-   struct wsi_display_image     images[0];
+   /* A unique ID for the color outcome of the swapchain. A serial of 0 means unset/default. */
+   uint64_t                        color_outcome_serial;
+   VkHdrMetadataEXT                hdr_metadata;
+
+   struct wsi_image_timing_request timing_request;
+
+   struct wsi_display_image        images[0];
 };
 
 struct wsi_display_fence {
@@ -300,6 +504,9 @@ struct wsi_display_fence {
    uint32_t                     syncobj; /* syncobj to signal on event */
    uint64_t                     sequence;
    bool                         device_event; /* fence is used for device events */
+   struct wsi_display_connector *connector;
+   /* Image to be flipped, if this fence is for an image in the WSI_IMAGE_WAITING state that will need to move to QUEUED. */
+   struct wsi_display_image     *image;
 };
 
 struct wsi_display_sync {
@@ -308,6 +515,9 @@ struct wsi_display_sync {
 };
 
 static uint64_t fence_sequence;
+
+static void
+_wsi_display_cleanup_state(struct wsi_display_swapchain *chain);
 
 ICD_DEFINE_NONDISP_HANDLE_CASTS(wsi_display_mode, VkDisplayModeKHR)
 ICD_DEFINE_NONDISP_HANDLE_CASTS(wsi_display_connector, VkDisplayKHR)
@@ -341,12 +551,12 @@ wsi_display_mode_refresh(struct wsi_display_mode *wsi)
 static uint64_t wsi_rel_to_abs_time(uint64_t rel_time)
 {
    uint64_t current_time = os_time_get_nano();
+   uint64_t abs;
 
-   /* check for overflow */
-   if (rel_time > UINT64_MAX - current_time)
+   if (util_add_overflow(uint64_t, current_time, rel_time, &abs))
       return UINT64_MAX;
 
-   return current_time + rel_time;
+   return abs;
 }
 
 static struct wsi_display_mode *
@@ -441,8 +651,8 @@ wsi_display_is_crtc_available(const struct wsi_display * const wsi,
 
 static struct wsi_display_connector *
 wsi_display_alloc_connector(struct wsi_display *wsi,
-                            int fd,
-                            uint32_t connector_id)
+                            uint32_t connector_id,
+                            bool imported)
 {
    struct wsi_display_connector *connector =
       vk_zalloc(wsi->alloc, sizeof (struct wsi_display_connector),
@@ -450,31 +660,26 @@ wsi_display_alloc_connector(struct wsi_display *wsi,
    if (!connector)
       return NULL;
 
-   /* We set this flag because this is the common entrypoint before we start
-    * using atomic capabilities -- it's a simple bool setting in the kernel to
-    * make the properties we start querying be available, and re-setting it is
-    * harmless.  Otherwise, we'd need to push it up to all the entrypoints that
-    * a drm FD comes thorugh.
-    */
-   drmSetClientCap(fd, DRM_CLIENT_CAP_ATOMIC, 1);
-
    connector->id = connector_id;
    connector->wsi = wsi;
    connector->active = false;
+   connector->imported = imported;
    /* XXX use EDID name */
    connector->name = "monitor";
    list_inithead(&connector->display_modes);
 
-   /* note: drmModeConnector has props pointer, the extra
-    * drmModeObjectGetProperties here could be avoided
-    */
-   if (!find_properties(connector, fd, DRM_MODE_OBJECT_CONNECTOR)) {
-      mesa_logd("Failed to find properties for connector");
-      vk_free(wsi->alloc, connector);
-      return NULL;
-   }
-
    return connector;
+}
+
+static void
+wsi_display_free_connector(struct wsi_display *wsi,
+                           struct wsi_display_connector *connector)
+{
+   wsi_for_each_display_mode(mode, connector) {
+      vk_free(wsi->alloc, mode);
+   }
+   vk_free(wsi->alloc, connector->formats);
+   vk_free(wsi->alloc, connector);
 }
 
 static struct wsi_display_connector *
@@ -488,6 +693,14 @@ wsi_display_get_connector(struct wsi_device *wsi_device,
    if (drm_fd < 0)
       return NULL;
 
+   /* We set this flag because this is the common entrypoint before we start
+    * using atomic capabilities -- it's a simple bool setting in the kernel to
+    * make the properties we start querying be available, and re-setting it is
+    * harmless.  Otherwise, we'd need to push it up to all the entrypoints that
+    * a drm FD comes thorugh.
+    */
+   drmSetClientCap(drm_fd, DRM_CLIENT_CAP_ATOMIC, 1);
+
    drmModeConnectorPtr drm_connector =
       drmModeGetConnector(drm_fd, connector_id);
 
@@ -498,12 +711,18 @@ wsi_display_get_connector(struct wsi_device *wsi_device,
       wsi_display_find_connector(wsi_device, connector_id);
 
    if (!connector) {
-      connector = wsi_display_alloc_connector(wsi, drm_fd, connector_id);
+      connector = wsi_display_alloc_connector(wsi, connector_id, drm_fd != wsi->fd);
       if (!connector) {
          drmModeFreeConnector(drm_connector);
          return NULL;
       }
       list_addtail(&connector->list, &wsi->connectors);
+   }
+
+   if (!find_connector_properties(connector, drm_connector, drm_fd)) {
+      mesa_logd("Failed to find properties for connector");
+      drmModeFreeConnector(drm_connector);
+      return NULL;
    }
 
    connector->connected = drm_connector->connection != DRM_MODE_DISCONNECTED;
@@ -1092,8 +1311,8 @@ wsi_display_surface_get_capabilities2(VkIcdSurfaceBase *icd_surface,
 
    struct wsi_surface_supported_counters *counters =
       vk_find_struct( caps->pNext, WSI_SURFACE_SUPPORTED_COUNTERS_MESA);
-   const VkSurfacePresentModeEXT *present_mode =
-      vk_find_struct_const(info_next, SURFACE_PRESENT_MODE_EXT);
+   const VkSurfacePresentModeKHR *present_mode =
+      vk_find_struct_const(info_next, SURFACE_PRESENT_MODE_KHR);
 
    if (counters) {
       result = wsi_display_surface_get_surface_counters(&counters->supported_surface_counters);
@@ -1107,9 +1326,9 @@ wsi_display_surface_get_capabilities2(VkIcdSurfaceBase *icd_surface,
          break;
       }
 
-      case VK_STRUCTURE_TYPE_SURFACE_PRESENT_SCALING_CAPABILITIES_EXT: {
+      case VK_STRUCTURE_TYPE_SURFACE_PRESENT_SCALING_CAPABILITIES_KHR: {
          /* Unsupported. */
-         VkSurfacePresentScalingCapabilitiesEXT *scaling = (void *)ext;
+         VkSurfacePresentScalingCapabilitiesKHR *scaling = (void *)ext;
          scaling->supportedPresentScaling = 0;
          scaling->supportedPresentGravityX = 0;
          scaling->supportedPresentGravityY = 0;
@@ -1118,9 +1337,9 @@ wsi_display_surface_get_capabilities2(VkIcdSurfaceBase *icd_surface,
          break;
       }
 
-      case VK_STRUCTURE_TYPE_SURFACE_PRESENT_MODE_COMPATIBILITY_EXT: {
+      case VK_STRUCTURE_TYPE_SURFACE_PRESENT_MODE_COMPATIBILITY_KHR: {
          /* We only support FIFO. */
-         VkSurfacePresentModeCompatibilityEXT *compat = (void *)ext;
+         VkSurfacePresentModeCompatibilityKHR *compat = (void *)ext;
          if (compat->pPresentModes) {
             if (compat->presentModeCount) {
                assert(present_mode);
@@ -1144,6 +1363,16 @@ wsi_display_surface_get_capabilities2(VkIcdSurfaceBase *icd_surface,
          VkSurfaceCapabilitiesPresentWait2KHR *pwait2 = (void *)ext;
 
          pwait2->presentWait2Supported = VK_TRUE;
+         break;
+      }
+
+      case VK_STRUCTURE_TYPE_PRESENT_TIMING_SURFACE_CAPABILITIES_EXT: {
+         VkPresentTimingSurfaceCapabilitiesEXT *wait = (void *)ext;
+
+         wait->presentStageQueries = VK_PRESENT_STAGE_IMAGE_FIRST_PIXEL_OUT_BIT_EXT;
+         wait->presentTimingSupported = VK_TRUE;
+         wait->presentAtAbsoluteTimeSupported = VK_TRUE;
+         wait->presentAtRelativeTimeSupported = VK_TRUE;
          break;
       }
 
@@ -1177,6 +1406,62 @@ static const struct wsi_display_surface_format
       },
       .drm_format = DRM_FORMAT_XRGB8888
    },
+   {
+      .surface_format = {
+         .format = VK_FORMAT_A2B10G10R10_UNORM_PACK32,
+         .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+      },
+      .drm_format = DRM_FORMAT_XBGR2101010
+   },
+   {
+      .surface_format = {
+         .format = VK_FORMAT_A2B10G10R10_UNORM_PACK32,
+         .colorSpace = VK_COLOR_SPACE_HDR10_ST2084_EXT,
+      },
+      .drm_format = DRM_FORMAT_XBGR2101010
+   },
+   {
+      .surface_format = {
+         .format = VK_FORMAT_A2R10G10B10_UNORM_PACK32,
+         .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+      },
+      .drm_format = DRM_FORMAT_XRGB2101010
+   },
+   {
+      .surface_format = {
+         .format = VK_FORMAT_A2R10G10B10_UNORM_PACK32,
+         .colorSpace = VK_COLOR_SPACE_HDR10_ST2084_EXT,
+      },
+      .drm_format = DRM_FORMAT_XRGB2101010
+   },
+   {
+      .surface_format = {
+         .format = VK_FORMAT_R16G16B16A16_UNORM,
+         .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+      },
+      .drm_format = DRM_FORMAT_XBGR16161616
+   },
+   {
+      .surface_format = {
+         .format = VK_FORMAT_R16G16B16A16_UNORM,
+         .colorSpace = VK_COLOR_SPACE_HDR10_ST2084_EXT,
+      },
+      .drm_format = DRM_FORMAT_XBGR16161616
+   },
+   {
+      .surface_format = {
+         .format = VK_FORMAT_R16G16B16A16_SFLOAT,
+         .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+      },
+      .drm_format = DRM_FORMAT_XBGR16161616F
+   },
+   {
+      .surface_format = {
+         .format = VK_FORMAT_R16G16B16A16_SFLOAT,
+         .colorSpace = VK_COLOR_SPACE_HDR10_ST2084_EXT,
+      },
+      .drm_format = DRM_FORMAT_XBGR16161616F
+   },
 };
 
 static void
@@ -1197,6 +1482,45 @@ get_sorted_vk_formats(struct wsi_device *wsi_device, VkSurfaceFormatKHR *sorted_
    }
 }
 
+static bool
+wsi_display_setup_crtc(wsi_display_connector *connector);
+
+static bool
+surface_format_supported(VkIcdSurfaceBase *icd_surface, VkSurfaceFormatKHR surface_format)
+{
+   VkIcdSurfaceDisplay *surface = (VkIcdSurfaceDisplay *) icd_surface;
+   wsi_display_mode *mode = wsi_display_mode_from_handle(surface->displayMode);
+   uint32_t i, drm_format = DRM_FORMAT_INVALID;
+
+   for (i = 0; i < ARRAY_SIZE(available_surface_formats); i++) {
+      if (surface_format.format == available_surface_formats[i].surface_format.format &&
+          surface_format.colorSpace == available_surface_formats[i].surface_format.colorSpace) {
+         drm_format = available_surface_formats[i].drm_format;
+         break;
+      }
+   }
+
+   assert(i != ARRAY_SIZE(available_surface_formats));
+
+   if (!wsi_display_setup_crtc(mode->connector))
+      return false;
+
+   for (i = 0; i < mode->connector->count_formats; i++) {
+      if (mode->connector->formats[i] == drm_format)
+         break;
+   }
+   if (i == mode->connector->count_formats)
+      return false;
+
+   if (surface_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+      return true;
+
+   if (surface_format.colorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT)
+      return mode->connector->metadata.supports_st2084;
+
+   return false;
+}
+
 static VkResult
 wsi_display_surface_get_formats(VkIcdSurfaceBase *icd_surface,
                                 struct wsi_device *wsi_device,
@@ -1210,8 +1534,10 @@ wsi_display_surface_get_formats(VkIcdSurfaceBase *icd_surface,
    get_sorted_vk_formats(wsi_device, sorted_formats);
 
    for (unsigned i = 0; i < ARRAY_SIZE(sorted_formats); i++) {
-      vk_outarray_append_typed(VkSurfaceFormatKHR, &out, f) {
-         *f = sorted_formats[i];
+      if (surface_format_supported(icd_surface, sorted_formats[i])) {
+         vk_outarray_append_typed(VkSurfaceFormatKHR, &out, f) {
+            *f = sorted_formats[i];
+         }
       }
    }
 
@@ -1232,9 +1558,11 @@ wsi_display_surface_get_formats2(VkIcdSurfaceBase *surface,
    get_sorted_vk_formats(wsi_device, sorted_formats);
 
    for (unsigned i = 0; i < ARRAY_SIZE(sorted_formats); i++) {
-      vk_outarray_append_typed(VkSurfaceFormat2KHR, &out, f) {
-         assert(f->sType == VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR);
-         f->surfaceFormat = sorted_formats[i];
+      if (surface_format_supported(surface, sorted_formats[i])) {
+         vk_outarray_append_typed(VkSurfaceFormat2KHR, &out, f) {
+            assert(f->sType == VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR);
+            f->surfaceFormat = sorted_formats[i];
+         }
       }
    }
 
@@ -1361,10 +1689,16 @@ wsi_get_modifiers_for_format(const struct wsi_display * const wsi,
       if (!(mod->formats & (1ull << (format_index - mod->offset))))
          continue;
 
-      modifiers = realloc(modifiers,
-                          (count_modifiers + 1) *
-                          sizeof(modifiers[0]));
-      assert(modifiers);
+      uint64_t *new_modifiers = realloc(modifiers,
+                                        (count_modifiers + 1) *
+                                        sizeof(modifiers[0]));
+      if (!new_modifiers) {
+         free(modifiers);
+         drmModeFreePropertyBlob(blob);
+         drmModeFreeObjectProperties(props);
+         return NULL;
+      }
+      modifiers = new_modifiers;
       modifiers[count_modifiers++] = mod->modifier;
    }
 
@@ -1407,6 +1741,8 @@ wsi_display_image_init(struct wsi_swapchain *drv_chain,
 
    image->chain = chain;
    image->state = WSI_IMAGE_IDLE;
+   image->fence = NULL;
+   image->minimum_ns = 0;
    image->fb_id = 0;
 
    uint64_t *fb_modifiers = NULL;
@@ -1458,12 +1794,56 @@ wsi_display_image_finish(struct wsi_swapchain *drv_chain,
    wsi_destroy_image(&chain->base, &image->base);
 }
 
+/** Re-acquires DRM master privileges for the device_fd as necessary.
+ *
+ * We have to refcount, because an oldSwapchain can be freed after a new
+ * swapchain is created.
+ */
+static int
+wsi_display_get_master(struct wsi_display *wsi)
+{
+   if (wsi->fd != wsi->device_fd)
+      return 0;
+
+   if (wsi->master_refcount++ == 0) {
+      int ret = drmSetMaster(wsi->fd);
+      if (ret != 0) {
+         wsi_display_debug("drm fd %d failed to re-set master: %s", wsi->fd, strerror(-errno));
+         wsi->master_refcount--;
+         return ret;
+      }
+      wsi_display_debug("drm fd %d got master", wsi->fd);
+   }
+
+   return 0;
+}
+
+static int
+wsi_display_drop_master(struct wsi_display *wsi)
+{
+   if (wsi->fd != wsi->device_fd)
+      return 0;
+
+   if (--wsi->master_refcount == 0) {
+      int ret = drmDropMaster(wsi->fd);
+      if (ret != 0) {
+         wsi_display_debug("drm fd %d failed to drop master: %s", wsi->fd, strerror(-errno));
+      }
+      wsi_display_debug("drm fd %d dropped master", wsi->fd);
+   }
+
+   return 0;
+}
+
 static VkResult
 wsi_display_swapchain_destroy(struct wsi_swapchain *drv_chain,
                               const VkAllocationCallbacks *allocator)
 {
    struct wsi_display_swapchain *chain =
       (struct wsi_display_swapchain *) drv_chain;
+   struct wsi_display *wsi = chain->wsi;
+
+   _wsi_display_cleanup_state(chain);
 
    for (uint32_t i = 0; i < chain->base.image_count; i++)
       wsi_display_image_finish(drv_chain, &chain->images[i]);
@@ -1477,6 +1857,8 @@ wsi_display_swapchain_destroy(struct wsi_swapchain *drv_chain,
       display_mode->connector->crtc_id = 0;
 
    wsi_swapchain_finish(&chain->base);
+
+   wsi_display_drop_master(wsi);
 
    vk_free(allocator, chain);
    return VK_SUCCESS;
@@ -1492,6 +1874,11 @@ wsi_display_get_wsi_image(struct wsi_swapchain *drv_chain,
    return &chain->images[image_index].base;
 }
 
+/**
+ * Marks the old image as idle after a pageflip event has indicated that we've
+ * flipped to the new image and are no longer scanning out from the previous
+ * image.
+ */
 static void
 wsi_display_idle_old_displaying(struct wsi_display_image *active_image)
 {
@@ -1511,6 +1898,16 @@ wsi_display_idle_old_displaying(struct wsi_display_image *active_image)
 static VkResult
 _wsi_display_queue_next(struct wsi_swapchain *drv_chain);
 
+static uint64_t
+widen_32_to_64(uint32_t narrow, uint64_t near)
+{
+   return near + (int32_t)(narrow - near);
+}
+
+/**
+ * Wakes up any vkWaitForPresentKHR() waiters on the last present to this
+ * image.
+ */
 static void
 wsi_display_present_complete(struct wsi_display_swapchain *swapchain,
                              struct wsi_display_image *image)
@@ -1535,6 +1932,17 @@ wsi_display_surface_error(struct wsi_display_swapchain *swapchain, VkResult resu
    mtx_unlock(&swapchain->present_id_mutex);
 }
 
+/**
+ * libdrm callback for when we get a DRM_EVENT_PAGE_FLIP in response to our
+ * atomic commit with DRM_MODE_PAGE_FLIP_EVENT.  That event can happen at any
+ * point after vblank, when the old image is no longer being scanned out and
+ * that commit is set up to be scanned out next.
+ *
+ * This means that we can queue up a new atomic commit, if there were presents
+ * that we hadn't submitted yet (the event queue is driven by
+ * wsi_display_wait_thread(), so that's what ends up submitting atomic commits
+ * most of the time).
+ **/
 static void
 wsi_display_page_flip_handler2(int fd,
                                unsigned int frame,
@@ -1546,53 +1954,64 @@ wsi_display_page_flip_handler2(int fd,
    struct wsi_display_image *image = data;
    struct wsi_display_swapchain *chain = image->chain;
 
+   VkIcdSurfaceDisplay *surface = chain->surface;
+   wsi_display_mode *display_mode =
+         wsi_display_mode_from_handle(surface->displayMode);
+   wsi_display_connector *connector = display_mode->connector;
+
+   uint64_t nsec = 1000000000ull * sec + 1000ull * usec;
+   /* If we're on VRR timing path, ensure we get a stable pace. */
+   nsec = MAX2(nsec, image->minimum_ns);
+
+   uint64_t frame64 = widen_32_to_64(frame, connector->last_frame);
+   connector->last_frame = frame64;
+   connector->last_nsec = nsec;
+
+   /* Never update the refresh rate estimate. It's static based on the mode.
+    * Update this before we signal present wait so that applications
+    * get lowest possible latency for present time. */
+   if (image->timing_request.serial) {
+      wsi_swapchain_present_timing_notify_completion(
+            &chain->base, image->timing_request.serial,
+            nsec, &image->base);
+   }
+
    wsi_display_debug("image %ld displayed at %d\n",
                      image - &(image->chain->images[0]), frame);
    image->state = WSI_IMAGE_DISPLAYING;
    wsi_display_present_complete(chain, image);
 
    wsi_display_idle_old_displaying(image);
+
+   /* Send the next queued atomic commit now that one has completed. */
    VkResult result = _wsi_display_queue_next(&(chain->base));
    if (result != VK_SUCCESS)
       chain->status = result;
 }
 
-static void wsi_display_fence_event_handler(struct wsi_display_fence *fence);
+static void wsi_display_fence_event_handler(struct wsi_display_fence *fence,
+                                            uint64_t nsec,
+                                            uint64_t frame);
 
-static void wsi_display_page_flip_handler(int fd,
-                                          unsigned int frame,
-                                          unsigned int sec,
-                                          unsigned int usec,
-                                          void *data)
-{
-   wsi_display_page_flip_handler2(fd, frame, sec, usec, 0, data);
-}
-
-static void wsi_display_vblank_handler(int fd, unsigned int frame,
-                                       unsigned int sec, unsigned int usec,
-                                       void *data)
-{
-   struct wsi_display_fence *fence = data;
-
-   wsi_display_fence_event_handler(fence);
-}
-
+/**
+ * libdrm callback for when we get a DRM_EVENT_CRTC_SEQUENCE in response to a
+ * drmCrtcQueueSequence(), indicating that the first pixel of a new frame is
+ * being scanned out.
+ **/
 static void wsi_display_sequence_handler(int fd, uint64_t frame,
                                          uint64_t nsec, uint64_t user_data)
 {
    struct wsi_display_fence *fence =
       (struct wsi_display_fence *) (uintptr_t) user_data;
 
-   wsi_display_fence_event_handler(fence);
+   wsi_display_fence_event_handler(fence, nsec, frame);
 }
 
 static drmEventContext event_context = {
    .version = DRM_EVENT_CONTEXT_VERSION,
-   .page_flip_handler = wsi_display_page_flip_handler,
-#if DRM_EVENT_CONTEXT_VERSION >= 3
+   .page_flip_handler = NULL,
    .page_flip_handler2 = wsi_display_page_flip_handler2,
-#endif
-   .vblank_handler = wsi_display_vblank_handler,
+   .vblank_handler = NULL,
    .sequence_handler = wsi_display_sequence_handler,
 };
 
@@ -1927,6 +2346,58 @@ wsi_display_select_plane(const struct wsi_display_connector *connector,
    return plane_id;
 }
 
+static bool
+wsi_display_setup_crtc(wsi_display_connector *connector)
+{
+   struct wsi_display *wsi = connector->wsi;
+   bool ret = false;
+
+   if (connector->crtc_id)
+      return true;
+
+   drmModeConnectorPtr drm_connector = drmModeGetConnector(wsi->fd, connector->id);
+
+   if (!drm_connector)
+      return false;
+
+   drmModeResPtr mode_res = drmModeGetResources(wsi->fd);
+   if (!mode_res)
+      return false;
+
+   connector->crtc_id = wsi_display_select_crtc(connector, mode_res, drm_connector);
+   if (!connector->crtc_id ||
+       !find_object_properties(connector, wsi->fd, DRM_MODE_OBJECT_CRTC))
+      goto bail;
+
+   /* Select the primary plane of that CRTC, and populate the
+    * format/modifier lists for that plane */
+   connector->plane_id = wsi_display_select_plane(connector, mode_res);
+   if (!connector->plane_id ||
+       !find_object_properties(connector, wsi->fd, DRM_MODE_OBJECT_PLANE))
+      goto bail;
+
+   drmModePlanePtr plane = drmModeGetPlane(wsi->fd, connector->plane_id);
+   if (!plane)
+      goto bail;
+
+   size_t size = sizeof(*plane->formats) * plane->count_formats;
+   connector->formats =
+      vk_zalloc(wsi->alloc, size, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+   if (connector->formats) {
+      memcpy(connector->formats, plane->formats, size);
+      connector->count_formats = plane->count_formats;
+   }
+
+   drmModeFreePlane(plane);
+
+   ret = true;
+
+bail:
+   drmModeFreeResources(mode_res);
+   drmModeFreeConnector(drm_connector);
+   return ret;
+}
+
 static VkResult
 wsi_display_setup_connector(wsi_display_connector *connector,
                             wsi_display_mode *display_mode)
@@ -1959,23 +2430,9 @@ wsi_display_setup_connector(wsi_display_connector *connector,
    }
 
    /* Pick a CRTC if we don't have one */
-   if (!connector->crtc_id) {
-      connector->crtc_id = wsi_display_select_crtc(connector, mode_res,
-                                                   drm_connector);
-      if (!connector->crtc_id ||
-          !find_properties(connector, wsi->fd, DRM_MODE_OBJECT_CRTC)) {
-         result = VK_ERROR_SURFACE_LOST_KHR;
-         goto bail_connector;
-      }
-
-      /* Select the primary plane of that CRTC, and populate the
-       * format/modifier lists for that plane */
-      connector->plane_id = wsi_display_select_plane(connector, mode_res);
-      if (!connector->plane_id ||
-          !find_properties(connector, wsi->fd, DRM_MODE_OBJECT_PLANE)) {
-         result = VK_ERROR_SURFACE_LOST_KHR;
-         goto bail_connector;
-      }
+   if (!wsi_display_setup_crtc(connector)) {
+      result = VK_ERROR_SURFACE_LOST_KHR;
+      goto bail_connector;
    }
 
    if (connector->current_mode != display_mode) {
@@ -2061,11 +2518,28 @@ wsi_display_fence_check_free(struct wsi_display_fence *fence)
       vk_free(fence->wsi->alloc, fence);
 }
 
-static void wsi_display_fence_event_handler(struct wsi_display_fence *fence)
+static void wsi_display_fence_event_handler(struct wsi_display_fence *fence,
+                                            uint64_t nsec, uint64_t frame)
 {
+   struct wsi_display_connector *connector = fence->connector;
+   struct wsi_display_image *image = fence->image;
+
    if (fence->syncobj) {
       (void) drmSyncobjSignal(fence->wsi->syncobj_fd, &fence->syncobj, 1);
       (void) drmSyncobjDestroy(fence->wsi->syncobj_fd, fence->syncobj);
+   }
+
+   if (connector) {
+      connector->last_nsec = nsec;
+      connector->last_frame = frame;
+   }
+
+   if (image && image->state == WSI_IMAGE_WAITING) {
+      /* We may need to do the final sleep on CPU to resolve VRR timings. */
+      image->state = WSI_IMAGE_QUEUED_AFTER_WAIT;
+      VkResult result = _wsi_display_queue_next(&image->chain->base);
+      if (result != VK_SUCCESS)
+         image->chain->status = result;
    }
 
    fence->event_received = true;
@@ -2244,6 +2718,105 @@ wsi_register_vblank_event(struct wsi_display_fence *fence,
    }
 }
 
+static inline uint16_t
+color_xy_to_u16(float v)
+{
+   assert(v >= 0.0f);
+   assert(v <= 1.0f);
+   /*
+    * CTA-861-G
+    * 6.9.1 Static Metadata Type 1
+    * chromaticity coordinate encoding
+    */
+   return (uint16_t)round(v * 50000.0);
+}
+
+static inline uint16_t
+nits_to_u16(float nits)
+{
+   assert(nits >= 0.0f);
+   assert(nits <= 65535.0f);
+   /*
+    * CTA-861-G
+    * 6.9.1 Static Metadata Type 1
+    * max display mastering luminance, max content light level,
+    * max frame-average light level
+    */
+   return (uint16_t)round(nits);
+}
+
+static inline uint16_t
+nits_to_u16_dark(float nits)
+{
+   assert(nits >= 0.0000f);
+   assert(nits <= 6.5535f);
+   /*
+    * CTA-861-G
+    * 6.9.1 Static Metadata Type 1
+    * min display mastering luminance
+    */
+   return (uint16_t)round(nits * 10000.0);
+}
+
+/* from CTA-861-G */
+#define HDMI_EOTF_SDR 0
+#define HDMI_EOTF_TRADITIONAL_HDR 1
+#define HDMI_EOTF_ST2084 2
+#define HDMI_EOTF_HLG 3
+
+static int
+_wsi_hdmi_metadata_eotf_from_vk_colorspace(VkColorSpaceKHR color_space)
+{
+   switch (color_space) {
+   default:
+   case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+      return HDMI_EOTF_SDR;
+   case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
+      return HDMI_EOTF_TRADITIONAL_HDR;
+   case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+      return HDMI_EOTF_ST2084;
+   case VK_COLOR_SPACE_HDR10_HLG_EXT:
+      return HDMI_EOTF_HLG;
+   }
+}
+
+static enum colorspace_enum
+vk_colorspace_to_drm_colorspace(VkColorSpaceKHR color_space)
+{
+   switch (color_space) {
+   default:
+   case VK_COLORSPACE_SRGB_NONLINEAR_KHR:
+      return COLORSPACE_Default;
+   case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+      return COLORSPACE_BT2020_RGB;
+   }
+}
+
+static void
+_wsi_display_convert_hdr_metadata(VkHdrMetadataEXT *pMetadata, uint8_t hdmi_eotf, struct hdr_output_metadata *drm_metadata)
+{
+   memset(drm_metadata, 0, sizeof(struct hdr_output_metadata));
+
+   drm_metadata->metadata_type = 0;
+   drm_metadata->hdmi_metadata_type1.eotf = hdmi_eotf;
+   drm_metadata->hdmi_metadata_type1.metadata_type = drm_metadata->metadata_type; /* duplicated */
+
+   if (drm_metadata->hdmi_metadata_type1.eotf == HDMI_EOTF_ST2084) {
+      drm_metadata->hdmi_metadata_type1.display_primaries[0].x = color_xy_to_u16(pMetadata->displayPrimaryRed.x);
+      drm_metadata->hdmi_metadata_type1.display_primaries[0].y = color_xy_to_u16(pMetadata->displayPrimaryRed.y);
+      drm_metadata->hdmi_metadata_type1.display_primaries[1].x = color_xy_to_u16(pMetadata->displayPrimaryGreen.x);
+      drm_metadata->hdmi_metadata_type1.display_primaries[1].y = color_xy_to_u16(pMetadata->displayPrimaryGreen.y);
+      drm_metadata->hdmi_metadata_type1.display_primaries[2].x = color_xy_to_u16(pMetadata->displayPrimaryBlue.x);
+      drm_metadata->hdmi_metadata_type1.display_primaries[2].y = color_xy_to_u16(pMetadata->displayPrimaryBlue.y);
+      drm_metadata->hdmi_metadata_type1.white_point.x = color_xy_to_u16(pMetadata->whitePoint.x);
+      drm_metadata->hdmi_metadata_type1.white_point.y = color_xy_to_u16(pMetadata->whitePoint.y);
+      drm_metadata->hdmi_metadata_type1.max_display_mastering_luminance = nits_to_u16(pMetadata->maxLuminance);
+      drm_metadata->hdmi_metadata_type1.min_display_mastering_luminance = nits_to_u16_dark(pMetadata->minLuminance);
+      drm_metadata->hdmi_metadata_type1.max_cll = nits_to_u16(pMetadata->maxContentLightLevel);
+      drm_metadata->hdmi_metadata_type1.max_fall = nits_to_u16(pMetadata->maxFrameAverageLightLevel);
+   }
+}
+
 static int
 drm_atomic_commit(wsi_display_connector *connector, struct wsi_display_image *image)
 {
@@ -2285,6 +2858,41 @@ drm_atomic_commit(wsi_display_connector *connector, struct wsi_display_image *im
       flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
    }
 
+   if (connector->color_outcome_serial != image->chain->color_outcome_serial) {
+      if (connector->property[HDR_OUTPUT_METADATA] != -1) {
+         const uint8_t hdmi_eotf =
+            _wsi_hdmi_metadata_eotf_from_vk_colorspace(image->chain->base.image_info.color_space);
+
+         blob_id = 0;
+
+         /* Only bother making a blob if we are HDR, otherwise set it to 0 (empty). */
+         if (hdmi_eotf != HDMI_EOTF_SDR) {
+            struct hdr_output_metadata drm_metadata;
+            _wsi_display_convert_hdr_metadata(&image->chain->hdr_metadata, hdmi_eotf, &drm_metadata);
+
+            if (drmModeCreatePropertyBlob(image->chain->wsi->fd, &drm_metadata,
+                                          sizeof(drm_metadata), &blob_id) != 0)
+               return -1;
+         }
+
+         drmModeAtomicAddProperty(req, connector->id, connector->property[HDR_OUTPUT_METADATA], blob_id);
+      }
+
+      if (connector->property[Colorspace] != -1) {
+         const enum colorspace_enum drm_colorspace =
+            vk_colorspace_to_drm_colorspace(image->chain->base.image_info.color_space);
+         drmModeAtomicAddProperty(req, connector->id, connector->property[Colorspace],
+                                  connector->colorspace_enum[drm_colorspace]);
+      }
+
+      /* At least some drivers need a modeset for HDR or Colorspace change, e.g., amdgpu
+       * at least for Colorspace change or HDR en-/disable.
+       */
+      flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
+
+      connector->color_outcome_serial = image->chain->color_outcome_serial;
+   }
+
    const uint32_t *prop = connector->plane_property;
    drmModeAtomicAddProperty(req, plane_id, prop[FB_ID], image->fb_id);
    drmModeAtomicAddProperty(req, plane_id, prop[CRTC_ID], crtc_id);
@@ -2305,6 +2913,30 @@ out:
    drmModeAtomicFree(req);
 
    return ret;
+}
+
+static void
+_wsi_display_cleanup_state(struct wsi_display_swapchain *chain)
+{
+   VkIcdSurfaceDisplay *surface = chain->surface;
+   wsi_display_mode *display_mode =
+      wsi_display_mode_from_handle(surface->displayMode);
+   wsi_display_connector *connector = display_mode->connector;
+
+   /* Reset our color outcome to defaults, and update the state.
+    * We need to clean up after our mess, for any other compositors,
+    * etc that come after us that may not be aware of properties
+    * we have set.
+    * We can do this by just setting ourselves back to sRGB and therefore
+    * SDR and updating like normal.
+    * We only need to do this if we have a color outcome serial that isn't
+    * 0, the default.
+    */
+   if (chain->color_outcome_serial) {
+      chain->color_outcome_serial = 0;
+      chain->base.image_info.color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+      drm_atomic_commit(connector, &chain->images[0]);
+   }
 }
 
 /*
@@ -2342,9 +2974,11 @@ _wsi_display_queue_next(struct wsi_swapchain *drv_chain)
 
          switch (tmp_image->state) {
          case WSI_IMAGE_FLIPPING:
-            /* already flipping, don't send another to the kernel yet */
+         case WSI_IMAGE_WAITING:
+            /* already flipping or waiting for a flip, don't send another to the kernel yet */
             return VK_SUCCESS;
          case WSI_IMAGE_QUEUED:
+         case WSI_IMAGE_QUEUED_AFTER_WAIT:
             /* find the oldest queued */
             if (!image || tmp_image->flip_sequence < image->flip_sequence)
                image = tmp_image;
@@ -2357,6 +2991,95 @@ _wsi_display_queue_next(struct wsi_swapchain *drv_chain)
       if (!image)
          return VK_SUCCESS;
 
+      if (image->fence) {
+         image->fence->image = NULL;
+         wsi_display_fence_destroy(image->fence);
+         image->fence = NULL;
+      }
+
+      unsigned num_cycles_to_skip = 0;
+      int64_t target_relative_ns = 0;
+      bool skip_timing = false;
+      bool nearest_cycle =
+            (image->timing_request.flags & VK_PRESENT_TIMING_INFO_PRESENT_AT_NEAREST_REFRESH_CYCLE_BIT_EXT) != 0;
+
+      if (image->timing_request.time != 0) {
+         /* Ensure we have some kind of timebase to work from. */
+         if (!connector->last_frame)
+            drmCrtcGetSequence(wsi->fd, connector->crtc_id, &connector->last_frame, &connector->last_nsec);
+
+         if (!connector->last_frame || chain->base.present_timing.refresh_duration == 0) {
+            /* Something has gone very wrong. Just ignore present timing for safety. */
+            skip_timing = true;
+            wsi_display_debug("Cannot get a stable timebase, last frame = %"PRIu64", refresh_duration = %"PRIu64".\n",
+                              connector->last_frame, chain->base.present_timing.refresh_duration);
+         }
+      }
+
+      if (!skip_timing && image->state == WSI_IMAGE_QUEUED && image->timing_request.time != 0) {
+         target_relative_ns = (int64_t)image->timing_request.time;
+
+         /* We need to estimate number of refresh cycles to wait for. */
+         if (!(image->timing_request.flags & VK_PRESENT_TIMING_INFO_PRESENT_AT_RELATIVE_TIME_BIT_EXT)) {
+            target_relative_ns -= (int64_t)connector->last_nsec;
+         }
+
+         if (nearest_cycle) {
+            /* No need to lock, we never update refresh_duration dynamically. */
+            target_relative_ns -= (int64_t)chain->base.present_timing.refresh_duration / 2;
+         } else {
+            /* If application is computing an exact value that lands exactly on the refresh cycle,
+             * pull back the estimate a little bit since DRM precision is 1us. */
+            target_relative_ns -= 1000;
+         }
+      }
+
+      target_relative_ns = MAX2(target_relative_ns, 0);
+      if (target_relative_ns && chain->base.present_timing.refresh_duration)
+         num_cycles_to_skip = target_relative_ns / chain->base.present_timing.refresh_duration;
+
+      /* CRTC cycles is not reliable on VRR. We cannot use that as a time base. */
+      bool is_vrr = connector->vrr_enabled == VRR_TRISTATE_ENABLED &&
+                    connector->vrr_capable == VRR_TRISTATE_ENABLED;
+
+      if (num_cycles_to_skip) {
+         if (!is_vrr) {
+            /* On FRR, we can rely on vblank events to guide time progression. */
+            VkDisplayKHR display = wsi_display_connector_to_handle(connector);
+            image->fence = wsi_display_fence_alloc(wsi, -1);
+
+            if (image->fence) {
+               image->fence->connector = connector;
+               image->fence->image = image;
+
+               uint64_t frame_queued;
+               uint64_t target_frame = connector->last_frame + num_cycles_to_skip;
+               VkResult result = wsi_register_vblank_event(image->fence, chain->base.wsi, display,
+                                                           0, target_frame, &frame_queued);
+
+               if (result == VK_SUCCESS && frame_queued <= target_frame) {
+                  /* Wait until the vblank fence signals and the event handler will attempt to requeue us. */
+                  image->state = WSI_IMAGE_WAITING;
+                  return VK_SUCCESS;
+               }
+            }
+         } else {
+            /* On a VRR display, applications can request frame times which are fractional,
+             * and there is no good way to target absolute time with atomic commits it seems ... */
+            int64_t target_ns = target_relative_ns + (int64_t)connector->last_nsec;
+            image->minimum_ns = target_ns;
+
+            /* Account for some minimum delay in submitting a page flip until it's processed and sleep jitter.
+             * We will compensate for the difference if there is any, so that we don't report completion
+             * times in the past. */
+            target_ns -= 1 * 1000 * 1000;
+
+            os_time_nanosleep_until(target_ns);
+         }
+      }
+
+      image->state = WSI_IMAGE_QUEUED;
+
       int ret = drm_atomic_commit(connector, image);
       if (ret == 0) {
          image->state = WSI_IMAGE_FLIPPING;
@@ -2367,16 +3090,61 @@ _wsi_display_queue_next(struct wsi_swapchain *drv_chain)
       if (ret != -EACCES) {
          connector->active = false;
          image->state = WSI_IMAGE_IDLE;
+         wsi_display_debug("drm_atomic_commit error: %s\n", strerror(-ret));
          wsi_display_surface_error(chain, VK_ERROR_SURFACE_LOST_KHR);
          return VK_ERROR_SURFACE_LOST_KHR;
+      }
+
+      if (!drmIsMaster(wsi->fd)) {
+         wsi_display_debug("drm_atomic_commit without DRM master\n");
+         wsi_display_surface_error(chain, VK_ERROR_SURFACE_LOST_KHR);
       }
 
       /* Some other VT is currently active. Sit here waiting for
        * our VT to become active again by polling once a second
        */
+      wsi_display_debug("waiting for VT\n");
       usleep(1000 * 1000);
       connector->active = false;
    }
+}
+
+static void
+wsi_display_set_timing_request(struct wsi_swapchain *drv_chain,
+                               const struct wsi_image_timing_request *request)
+{
+   struct wsi_display_swapchain *chain =
+         (struct wsi_display_swapchain *) drv_chain;
+   chain->timing_request = *request;
+}
+
+static uint64_t
+wsi_display_poll_refresh_duration(struct wsi_swapchain *drv_chain, uint64_t *interval)
+{
+   struct wsi_display_swapchain *chain =
+         (struct wsi_display_swapchain *)drv_chain;
+   VkIcdSurfaceDisplay *surface = chain->surface;
+   wsi_display_mode *display_mode =
+         wsi_display_mode_from_handle(surface->displayMode);
+   double refresh = wsi_display_mode_refresh(display_mode);
+   wsi_display_connector *connector = display_mode->connector;
+
+   uint64_t refresh_ns = (uint64_t)(floor(1.0 / refresh * 1e9 + 0.5));
+
+   /* Assume FRR by default. */
+   *interval = refresh_ns;
+
+   /* If VRR is not enabled on the target CRTC, we should honor that.
+    * There is no mechanism to clearly request that VRR is desired,
+    * so we must assume that user might force us into FRR mode. */
+   if (connector->vrr_capable == VRR_TRISTATE_ENABLED) {
+      if (connector->vrr_enabled == VRR_TRISTATE_UNKNOWN)
+         *interval = 0; /* Somehow we don't know if the connector is VRR or FRR. Report unknown. */
+      else if (connector->vrr_enabled == VRR_TRISTATE_ENABLED)
+         *interval = UINT64_MAX;
+   }
+
+   return refresh_ns;
 }
 
 static VkResult
@@ -2396,16 +3164,19 @@ wsi_display_queue_present(struct wsi_swapchain *drv_chain,
       return chain->status;
 
    image->present_id = present_id;
+   image->timing_request = chain->timing_request;
 
    assert(image->state == WSI_IMAGE_DRAWING);
    wsi_display_debug("present %d\n", image_index);
 
    mtx_lock(&wsi->wait_mutex);
 
-   /* Make sure that the page flip handler is processed in finite time if using present wait. */
-   if (present_id)
+   /* Make sure that the page flip handler is processed in finite time if using present wait
+    * or presentation time. */
+   if (present_id || chain->timing_request.serial)
       wsi_display_start_wait_thread(wsi);
 
+   memset(&chain->timing_request, 0, sizeof(chain->timing_request));
    image->flip_sequence = ++chain->flip_sequence;
    image->state = WSI_IMAGE_QUEUED;
 
@@ -2463,6 +3234,16 @@ wsi_display_wait_for_present(struct wsi_swapchain *wsi_chain,
    return result;
 }
 
+static void
+wsi_display_set_hdr_metadata(struct wsi_swapchain *wsi_chain,
+                             const VkHdrMetadataEXT* pMetadata)
+{
+   struct wsi_display_swapchain *chain = (struct wsi_display_swapchain *)wsi_chain;
+
+   chain->color_outcome_serial = p_atomic_inc_return(&chain->wsi->color_outcome_serial_counter);
+   chain->hdr_metadata = *pMetadata;
+}
+
 static VkResult
 wsi_display_surface_create_swapchain(
    VkIcdSurfaceBase *icd_surface,
@@ -2477,6 +3258,7 @@ wsi_display_surface_create_swapchain(
    VkIcdSurfaceDisplay *surface = (VkIcdSurfaceDisplay *) icd_surface;
    wsi_display_mode *display_mode =
       wsi_display_mode_from_handle(surface->displayMode);
+   VkResult result = VK_SUCCESS;
 
    assert(create_info->sType == VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR);
 
@@ -2510,21 +3292,20 @@ wsi_display_surface_create_swapchain(
 
    int ret = mtx_init(&chain->present_id_mutex, mtx_plain);
    if (ret != thrd_success) {
-      vk_free(allocator, chain);
-      return VK_ERROR_OUT_OF_HOST_MEMORY;
+      result = VK_ERROR_OUT_OF_HOST_MEMORY;
+      goto fail_free;
    }
 
    ret = u_cnd_monotonic_init(&chain->present_id_cond);
    if (ret != thrd_success) {
-      mtx_destroy(&chain->present_id_mutex);
-      vk_free(allocator, chain);
-      return VK_ERROR_OUT_OF_HOST_MEMORY;
+      result = VK_ERROR_OUT_OF_HOST_MEMORY;
+      goto fail_mtx_destroy;
    }
 
-   VkResult result =
+   result =
       wsi_display_setup_connector(display_mode->connector, display_mode);
    if (result != VK_SUCCESS)
-      return result;
+      goto fail_cond_destroy;
 
    uint32_t num_modifiers = 0;
    const uint64_t *modifiers = NULL;
@@ -2539,31 +3320,46 @@ wsi_display_surface_create_swapchain(
       image_params.num_modifiers = &num_modifiers;
    }
 
+   /* Set master, so that we can do modesets when we're using wsi->device_fd
+    * that had previously had master dropped.
+    */
+   ret = wsi_display_get_master(wsi);
+   if (ret != 0) {
+      wsi_display_debug("Failed to get DRM master: %s", strerror(ret));
+      result = VK_ERROR_DEVICE_LOST;
+      goto fail_cond_destroy;
+   }
+
    result = wsi_swapchain_init(wsi_device, &chain->base, device,
                                create_info, &image_params.base,
                                allocator);
    free((void *)modifiers);
-   if (result != VK_SUCCESS) {
-      u_cnd_monotonic_destroy(&chain->present_id_cond);
-      mtx_destroy(&chain->present_id_mutex);
-      vk_free(allocator, chain);
-      return result;
-   }
+   if (result != VK_SUCCESS)
+      goto fail_drop_master;
 
    chain->base.destroy = wsi_display_swapchain_destroy;
    chain->base.get_wsi_image = wsi_display_get_wsi_image;
    chain->base.acquire_next_image = wsi_display_acquire_next_image;
    chain->base.release_images = wsi_display_release_images;
    chain->base.queue_present = wsi_display_queue_present;
+   chain->base.set_timing_request = wsi_display_set_timing_request;
+   chain->base.poll_early_refresh = wsi_display_poll_refresh_duration;
+   chain->base.present_timing.time_domain = VK_TIME_DOMAIN_CLOCK_MONOTONIC_KHR;
    chain->base.wait_for_present = wsi_display_wait_for_present;
    chain->base.wait_for_present2 = wsi_display_wait_for_present;
+   chain->base.set_hdr_metadata = wsi_display_set_hdr_metadata;
    chain->base.present_mode = wsi_swapchain_get_present_mode(wsi_device, create_info);
    chain->base.image_count = num_images;
+   chain->color_outcome_serial = 0;
 
    chain->wsi = wsi;
    chain->status = VK_SUCCESS;
 
    chain->surface = surface;
+
+   /* Default HDR metadata when the HDR10/ST2084 colorspace is used
+    * to the metadata provided by the EDID. */
+   chain->hdr_metadata = display_mode->connector->metadata.hdr_metadata;
 
    p_atomic_inc(&display_mode->connector->refcount);
 
@@ -2578,19 +3374,34 @@ wsi_display_surface_create_swapchain(
             wsi_display_image_finish(&chain->base,
                                      &chain->images[image]);
          }
-         u_cnd_monotonic_destroy(&chain->present_id_cond);
-         mtx_destroy(&chain->present_id_mutex);
-         wsi_swapchain_finish(&chain->base);
-         vk_free(allocator, chain);
-         goto fail_init_images;
+         goto fail_swapchain_fini;
       }
    }
+
+   /* For a non-default colorspace, make sure that proper setup also works if
+    * a client app does not explicitly call vkSetHdrMetadataEXT(), but only
+    * selects a HDR colorspace. We assign the EDID provided metadata here, so
+    * the 1st atomic commit will assign colorspace and HDR metadata props to
+    * the connector to enable HDR or Wide color gamut modes.
+    */
+   if (create_info->imageColorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+      wsi_display_set_hdr_metadata(&chain->base, &chain->hdr_metadata);
 
    *swapchain_out = &chain->base;
 
    return VK_SUCCESS;
 
-fail_init_images:
+fail_swapchain_fini:
+   wsi_swapchain_finish(&chain->base);
+fail_drop_master:
+   if (wsi->fd == wsi->device_fd)
+      wsi_display_drop_master(wsi);
+fail_cond_destroy:
+   u_cnd_monotonic_destroy(&chain->present_id_cond);
+fail_mtx_destroy:
+   mtx_destroy(&chain->present_id_mutex);
+fail_free:
+   vk_free(allocator, chain);
    return result;
 }
 
@@ -2717,10 +3528,29 @@ wsi_display_init_wsi(struct wsi_device *wsi_device,
    if (wsi->fd != -1 && !local_drmIsMaster(wsi->fd))
       wsi->fd = -1;
 
+   /* wsi->fd will get modified as part of vkAcquireDRMDisplayEXT() and
+    * vkReleaseDisplay(), but we need to keep it around for the
+    * device-equivalence check in vkAcquireDRMDisplayEXT.
+    */
+   wsi->device_fd = wsi->fd;
+
    wsi->syncobj_fd = wsi->fd;
 
-   if (wsi->fd >= 0)
+   if (wsi->fd >= 0) {
       drmSetClientCap(wsi->fd, DRM_CLIENT_CAP_ATOMIC, 1);
+      /* Drop master, so that others (vkAcquireDRMDisplayEXT, KMS-native
+       * compositors after a VT switch) can get master when they open.
+       */
+      int ret = drmDropMaster(wsi->fd);
+      if (ret != 0) {
+         /* Leave a debug note, but ignore it -- if you ask for KHR_display, and
+          * are the second client (not master), but can later acquire a master
+          * fd by whatever means (systemd-logind, whatever), that should be
+          * allowed.
+          */
+         wsi_display_debug("wsi_display_init_wsi: drm fd %d failed to drop master", wsi->fd);
+      }
+   }
 
    wsi->alloc = alloc;
 
@@ -2774,12 +3604,8 @@ wsi_display_finish_wsi(struct wsi_device *wsi_device,
       (struct wsi_display *) wsi_device->wsi[VK_ICD_WSI_PLATFORM_DISPLAY];
 
    if (wsi) {
-      wsi_for_each_connector(connector, wsi) {
-         wsi_for_each_display_mode(mode, connector) {
-            vk_free(wsi->alloc, mode);
-         }
-         vk_free(wsi->alloc, connector);
-      }
+      wsi_for_each_connector(connector, wsi)
+         wsi_display_free_connector(wsi, connector);
 
       wsi_display_stop_wait_thread(wsi);
 
@@ -2811,15 +3637,25 @@ wsi_ReleaseDisplayEXT(VkPhysicalDevice physicalDevice,
    if (wsi->fd >= 0) {
       wsi_display_stop_wait_thread(wsi);
 
-      close(wsi->fd);
-      wsi->fd = -1;
+      /* Only close if we have an active drmFd passed in from an Acquire. */
+      if (wsi->fd != wsi->device_fd)
+         close(wsi->fd);
+      wsi->fd = wsi->device_fd;
    }
 
-   wsi_display_connector_from_handle(display)->active = false;
+   struct wsi_display_connector *connector =
+      wsi_display_connector_from_handle(display);
+
+   connector->active = false;
 
 #ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
-   wsi_display_connector_from_handle(display)->output = None;
+   connector->output = None;
 #endif
+
+   if (connector->imported) {
+      list_del(&connector->list);
+      wsi_display_free_connector(wsi, connector);
+   }
 
    return VK_SUCCESS;
 }
@@ -2827,8 +3663,8 @@ wsi_ReleaseDisplayEXT(VkPhysicalDevice physicalDevice,
 #ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
 
 static struct wsi_display_connector *
-wsi_display_find_output(struct wsi_device *wsi_device,
-                        xcb_randr_output_t output)
+wsi_display_find_randr_output(struct wsi_device *wsi_device,
+                              xcb_randr_output_t output)
 {
    struct wsi_display *wsi =
       (struct wsi_display *) wsi_device->wsi[VK_ICD_WSI_PLATFORM_DISPLAY];
@@ -2847,9 +3683,9 @@ wsi_display_find_output(struct wsi_device *wsi_device,
  */
 
 static uint32_t
-wsi_display_output_to_connector_id(xcb_connection_t *connection,
-                                   xcb_atom_t *connector_id_atom_p,
-                                   xcb_randr_output_t output)
+wsi_display_randr_output_to_connector_id(xcb_connection_t *connection,
+                                         xcb_atom_t *connector_id_atom_p,
+                                         xcb_randr_output_t output)
 {
    uint32_t connector_id = 0;
    xcb_atom_t connector_id_atom = *connector_id_atom_p;
@@ -2926,8 +3762,8 @@ wsi_display_check_randr_version(xcb_connection_t *connection)
  */
 
 static xcb_randr_output_t
-wsi_display_connector_id_to_output(xcb_connection_t *connection,
-                                   uint32_t connector_id)
+wsi_display_randr_connector_id_to_output(xcb_connection_t *connection,
+                                         uint32_t connector_id)
 {
    if (!wsi_display_check_randr_version(connection))
       return 0;
@@ -2955,8 +3791,8 @@ wsi_display_connector_id_to_output(xcb_connection_t *connection,
       int o;
 
       for (o = 0; o < gsr_r->num_outputs; o++) {
-         if (wsi_display_output_to_connector_id(connection,
-                                                &connector_id_atom, ro[o])
+         if (wsi_display_randr_output_to_connector_id(connection,
+                                                      &connector_id_atom, ro[o])
              == connector_id)
          {
             output = ro[o];
@@ -2972,8 +3808,8 @@ wsi_display_connector_id_to_output(xcb_connection_t *connection,
  * Given a RandR output, find out which screen it's associated with
  */
 static xcb_window_t
-wsi_display_output_to_root(xcb_connection_t *connection,
-                           xcb_randr_output_t output)
+wsi_display_randr_output_to_root(xcb_connection_t *connection,
+                                 xcb_randr_output_t output)
 {
    if (!wsi_display_check_randr_version(connection))
       return 0;
@@ -2986,15 +3822,15 @@ wsi_display_output_to_root(xcb_connection_t *connection,
         root == 0 && iter.rem;
         xcb_screen_next(&iter))
    {
-      xcb_randr_get_screen_resources_cookie_t gsr_c =
-         xcb_randr_get_screen_resources(connection, iter.data->root);
-      xcb_randr_get_screen_resources_reply_t *gsr_r =
-         xcb_randr_get_screen_resources_reply(connection, gsr_c, NULL);
+      xcb_randr_get_screen_resources_current_cookie_t gsr_c =
+         xcb_randr_get_screen_resources_current(connection, iter.data->root);
+      xcb_randr_get_screen_resources_current_reply_t *gsr_r =
+         xcb_randr_get_screen_resources_current_reply(connection, gsr_c, NULL);
 
       if (!gsr_r)
          return 0;
 
-      xcb_randr_output_t *ro = xcb_randr_get_screen_resources_outputs(gsr_r);
+      xcb_randr_output_t *ro = xcb_randr_get_screen_resources_current_outputs(gsr_r);
 
       for (int o = 0; o < gsr_r->num_outputs; o++) {
          if (ro[o] == output) {
@@ -3079,21 +3915,21 @@ wsi_display_register_x_mode(struct wsi_device *wsi_device,
 }
 
 static struct wsi_display_connector *
-wsi_display_get_output(struct wsi_device *wsi_device,
-                       xcb_connection_t *connection,
-                       xcb_randr_output_t output)
+wsi_display_get_randr_output(struct wsi_device *wsi_device,
+                             xcb_connection_t *connection,
+                             xcb_randr_output_t output)
 {
    struct wsi_display *wsi =
       (struct wsi_display *) wsi_device->wsi[VK_ICD_WSI_PLATFORM_DISPLAY];
    struct wsi_display_connector *connector;
    uint32_t connector_id;
 
-   xcb_window_t root = wsi_display_output_to_root(connection, output);
+   xcb_window_t root = wsi_display_randr_output_to_root(connection, output);
    if (!root)
       return NULL;
 
    /* See if we already have a connector for this output */
-   connector = wsi_display_find_output(wsi_device, output);
+   connector = wsi_display_find_randr_output(wsi_device, output);
 
    if (!connector) {
       xcb_atom_t connector_id_atom = 0;
@@ -3101,9 +3937,9 @@ wsi_display_get_output(struct wsi_device *wsi_device,
       /*
        * Go get the kernel connector ID for this X output
        */
-      connector_id = wsi_display_output_to_connector_id(connection,
-                                                        &connector_id_atom,
-                                                        output);
+      connector_id = wsi_display_randr_output_to_connector_id(connection,
+                                                              &connector_id_atom,
+                                                              output);
 
       /* Any X server with lease support will have this atom */
       if (!connector_id) {
@@ -3114,7 +3950,7 @@ wsi_display_get_output(struct wsi_device *wsi_device,
       connector = wsi_display_find_connector(wsi_device, connector_id);
 
       if (connector == NULL) {
-         connector = wsi_display_alloc_connector(wsi, wsi->fd, connector_id);
+         connector = wsi_display_alloc_connector(wsi, connector_id, false);
          if (!connector) {
             return NULL;
          }
@@ -3123,12 +3959,12 @@ wsi_display_get_output(struct wsi_device *wsi_device,
       connector->output = output;
    }
 
-   xcb_randr_get_screen_resources_cookie_t src =
-      xcb_randr_get_screen_resources(connection, root);
+   xcb_randr_get_screen_resources_current_cookie_t src =
+      xcb_randr_get_screen_resources_current(connection, root);
    xcb_randr_get_output_info_cookie_t oic =
       xcb_randr_get_output_info(connection, output, XCB_CURRENT_TIME);
-   xcb_randr_get_screen_resources_reply_t *srr =
-      xcb_randr_get_screen_resources_reply(connection, src, NULL);
+   xcb_randr_get_screen_resources_current_reply_t *srr =
+      xcb_randr_get_screen_resources_current_reply(connection, src, NULL);
    xcb_randr_get_output_info_reply_t *oir =
       xcb_randr_get_output_info_reply(connection, oic, NULL);
 
@@ -3143,7 +3979,7 @@ wsi_display_get_output(struct wsi_device *wsi_device,
       xcb_randr_mode_t *x_modes = xcb_randr_get_output_info_modes(oir);
       for (int m = 0; m < oir->num_modes; m++) {
          xcb_randr_mode_info_iterator_t i =
-            xcb_randr_get_screen_resources_modes_iterator(srr);
+            xcb_randr_get_screen_resources_current_modes_iterator(srr);
          while (i.rem) {
             xcb_randr_mode_info_t *mi = i.data;
             if (mi->id == x_modes[m]) {
@@ -3167,9 +4003,9 @@ wsi_display_get_output(struct wsi_device *wsi_device,
 }
 
 static xcb_randr_crtc_t
-wsi_display_find_crtc_for_output(xcb_connection_t *connection,
-                                 xcb_window_t root,
-                                 xcb_randr_output_t output)
+wsi_display_find_crtc_for_randr_output(xcb_connection_t *connection,
+                                       xcb_window_t root,
+                                       xcb_randr_output_t output)
 {
    xcb_randr_get_screen_resources_cookie_t gsr_c =
       xcb_randr_get_screen_resources(connection, root);
@@ -3234,26 +4070,28 @@ wsi_AcquireXlibDisplayEXT(VkPhysicalDevice physicalDevice,
       wsi_display_connector_from_handle(display);
    xcb_window_t root;
 
-   /* XXX no support for multiple leases yet */
-   if (wsi->fd >= 0)
+   /* XXX no support for tracking the FD used for a particular VkDisplayKHR, so
+    * make sure that we don't have an existing Acquire active.
+    */
+   if (wsi->fd >= 0 && wsi->fd != wsi->device_fd)
       return VK_ERROR_INITIALIZATION_FAILED;
 
    if (!connector->output) {
-      connector->output = wsi_display_connector_id_to_output(connection,
-                                                             connector->id);
+      connector->output = wsi_display_randr_connector_id_to_output(connection,
+                                                                   connector->id);
 
       /* Check and see if we found the output */
       if (!connector->output)
          return VK_ERROR_INITIALIZATION_FAILED;
    }
 
-   root = wsi_display_output_to_root(connection, connector->output);
+   root = wsi_display_randr_output_to_root(connection, connector->output);
    if (!root)
       return VK_ERROR_INITIALIZATION_FAILED;
 
-   xcb_randr_crtc_t crtc = wsi_display_find_crtc_for_output(connection,
-                                                            root,
-                                                            connector->output);
+   xcb_randr_crtc_t crtc = wsi_display_find_crtc_for_randr_output(connection,
+                                                                  root,
+                                                                  connector->output);
 
    if (!crtc)
       return VK_ERROR_INITIALIZATION_FAILED;
@@ -3278,6 +4116,7 @@ wsi_AcquireXlibDisplayEXT(VkPhysicalDevice physicalDevice,
    if (fd < 0)
       return VK_ERROR_INITIALIZATION_FAILED;
 
+   drmSetClientCap(fd, DRM_CLIENT_CAP_ATOMIC, 1);
    wsi->fd = fd;
 #endif
 
@@ -3294,8 +4133,8 @@ wsi_GetRandROutputDisplayEXT(VkPhysicalDevice physicalDevice,
    struct wsi_device *wsi_device = pdevice->wsi_device;
    xcb_connection_t *connection = XGetXCBConnection(dpy);
    struct wsi_display_connector *connector =
-      wsi_display_get_output(wsi_device, connection,
-                             (xcb_randr_output_t) rrOutput);
+      wsi_display_get_randr_output(wsi_device, connection,
+                                   (xcb_randr_output_t) rrOutput);
 
    if (connector)
       *pDisplay = wsi_display_connector_to_handle(connector);
@@ -3553,9 +4392,39 @@ wsi_AcquireDrmDisplayEXT(VkPhysicalDevice physicalDevice,
    struct wsi_display *wsi =
       (struct wsi_display *) wsi_device->wsi[VK_ICD_WSI_PLATFORM_DISPLAY];
 
-   /* XXX no support for mulitple leases yet */
-   if (wsi->fd >= 0 || !local_drmIsMaster(drmFd))
+   /* "The provided drmFd must correspond to the one owned by the
+    *  physicalDevice.  If not, the error code VK_ERROR_UNKNOWN must be returned.
+    *  The DRM FD must have DRM mast⁠er permissions.  If any error is encountered
+    *  during the acquisition of the display, the call must return the error code
+    *  VK_ERROR_INITIALIZATION_FAILED."
+    *
+    * Since the wsi->fd will only be set to a master fd, we just check if they
+    * provided an fd that matches the device's, and treat the "DRM fd must have
+    * DRM master permissions" as referring to the physicalDevice's.
+    */
+   if (wsi->fd >= 0) {
+      struct stat in_stat = {0}, wsi_stat = {0};
+      if (fstat(drmFd, &in_stat) != 0 ||
+          fstat(wsi->device_fd, &wsi_stat) != 0 ||
+          in_stat.st_dev != wsi_stat.st_dev ||
+          in_stat.st_rdev != wsi_stat.st_rdev) {
+         wsi_display_debug("vkAcquireDRMDisplayEXT(rdev=%d/%d) vs wsi->fd rdev=%d/%d\n",
+            major(in_stat.st_dev), minor(in_stat.st_dev),
+            major(wsi_stat.st_rdev), minor(wsi_stat.st_rdev));
+         return VK_ERROR_UNKNOWN;
+      }
+
+      /* XXX no support for tracking the FD used for a particular VkDisplayKHR, so
+       * make sure that we don't have an existing Acquire active.
+       */
+      if (wsi->fd != wsi->device_fd)
+         return VK_ERROR_INITIALIZATION_FAILED;
+   }
+
+   if (!local_drmIsMaster(drmFd)) {
+      wsi_display_debug("vkAcquireDRMDisplayEXT(drmFd=%d not master)\n", drmFd);
       return VK_ERROR_INITIALIZATION_FAILED;
+   }
 
    struct wsi_display_connector *connector =
          wsi_display_connector_from_handle(display);
@@ -3568,6 +4437,7 @@ wsi_AcquireDrmDisplayEXT(VkPhysicalDevice physicalDevice,
 
    drmModeFreeConnector(drm_connector);
 
+   drmSetClientCap(drmFd, DRM_CLIENT_CAP_ATOMIC, 1);
    wsi->fd = drmFd;
    return VK_SUCCESS;
 }

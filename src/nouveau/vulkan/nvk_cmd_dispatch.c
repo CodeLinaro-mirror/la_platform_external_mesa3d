@@ -25,6 +25,7 @@
 #include "nv_push_clc3c0.h"
 #include "nv_push_clc597.h"
 #include "nv_push_clc6c0.h"
+#include "nv_push_clc7c0.h"
 #include "nv_push_clc86f.h"
 
 VkResult
@@ -149,6 +150,9 @@ nvk_flush_compute_state(struct nvk_cmd_buffer *cmd,
                                        0, 3, base_workgroup);
    nvk_descriptor_state_set_root_array(cmd, desc, cs.group_count,
                                        0, 3, global_size);
+
+   if (NAK_CAN_PRINTF)
+      nvk_cmd_buffer_flush_printf_buffer(cmd, desc);
 }
 
 static VkResult
@@ -163,6 +167,7 @@ nvk_cmd_upload_qmd(struct nvk_cmd_buffer *cmd,
    struct nvk_device *dev = nvk_cmd_buffer_device(cmd);
    const struct nvk_physical_device *pdev = nvk_device_physical(dev);
    const uint32_t min_cbuf_alignment = nvk_min_cbuf_alignment(&pdev->info);
+   const uint32_t qmd_size_B = nak_qmd_size_B(&pdev->info);
    VkResult result;
 
    /* pre Pascal the constant buffer sizes need to be 0x100 aligned. As we
@@ -186,7 +191,6 @@ nvk_cmd_upload_qmd(struct nvk_cmd_buffer *cmd,
       struct nak_qmd_info qmd_info = {
          .addr = shader->hdr_addr,
          .smem_size = shader->info.cs.smem_size,
-         .smem_max = NVK_MAX_SHARED_SIZE,
          .global_size = {
             global_size[0],
             global_size[1],
@@ -223,16 +227,17 @@ nvk_cmd_upload_qmd(struct nvk_cmd_buffer *cmd,
          }
       }
 
-      uint32_t qmd[64];
-      nak_fill_qmd(&pdev->info, &shader->info, &qmd_info, qmd, sizeof(qmd));
+      uint32_t qmd[NAK_MAX_QMD_DWORDS];
+      assert(qmd_size_B <= sizeof(qmd));
+      nak_fill_qmd(&pdev->info, &shader->info, &qmd_info, qmd, qmd_size_B);
 
       void *qmd_map;
-      result = nvk_cmd_buffer_alloc_qmd(cmd, sizeof(qmd), 0x100,
+      result = nvk_cmd_buffer_alloc_qmd(cmd, qmd_size_B, 0x100,
                                         &qmd_addr, &qmd_map);
       if (unlikely(result != VK_SUCCESS))
          return result;
 
-      memcpy(qmd_map, qmd, sizeof(qmd));
+      memcpy(qmd_map, qmd, qmd_size_B);
    }
 
    *qmd_addr_out = qmd_addr;
@@ -314,7 +319,10 @@ nvk_CmdDispatchBase(VkCommandBuffer commandBuffer,
 
    struct nv_push *p = nvk_cmd_buffer_push(cmd, 7);
 
-   P_1INC(p, NV9097, CALL_MME_MACRO(NVK_MME_ADD_CS_INVOCATIONS));
+   if (nvk_cmd_buffer_compute_cls(cmd) >= AMPERE_COMPUTE_B)
+      P_1INC(p, NVC7C0, CALL_MME_MACRO(NVK_MME_ADD_CS_INVOCATIONS));
+   else
+      P_1INC(p, NV9097, CALL_MME_MACRO(NVK_MME_ADD_CS_INVOCATIONS));
    P_INLINE_DATA(p, cs_invocations >> 32);
    P_INLINE_DATA(p, cs_invocations);
 
@@ -351,6 +359,11 @@ nvk_cmd_dispatch_shader(struct nvk_cmd_buffer *cmd,
    };
    assert(push_size <= sizeof(root.push));
    memcpy(root.push, push_data, push_size);
+
+   if (NAK_CAN_PRINTF) {
+      struct nvkmd_mem *bo = (struct nvkmd_mem *)dev->printf.bo;
+      root.printf_buffer_addr = bo->va->addr;
+   }
 
    uint64_t qmd_addr;
    VkResult result = nvk_cmd_upload_qmd(cmd, shader, NULL, &root,
@@ -561,7 +574,10 @@ nvk_CmdDispatchIndirect(VkCommandBuffer commandBuffer,
       p = nvk_cmd_buffer_push(cmd, 14);
       if (nvk_cmd_buffer_compute_cls(cmd) < BLACKWELL_COMPUTE_A)
          P_IMMD(p, NVC597, SET_MME_DATA_FIFO_CONFIG, FIFO_SIZE_SIZE_4KB);
-      P_1INC(p, NV9097, CALL_MME_MACRO(NVK_MME_DISPATCH_INDIRECT));
+      if (nvk_cmd_buffer_compute_cls(cmd) >= AMPERE_COMPUTE_B)
+         P_1INC(p, NVC7C0, CALL_MME_MACRO(NVK_MME_DISPATCH_INDIRECT));
+      else
+         P_1INC(p, NV9097, CALL_MME_MACRO(NVK_MME_DISPATCH_INDIRECT));
       P_INLINE_DATA(p, dispatch_addr >> 32);
       P_INLINE_DATA(p, dispatch_addr);
       P_INLINE_DATA(p, root_desc_addr >> 32);

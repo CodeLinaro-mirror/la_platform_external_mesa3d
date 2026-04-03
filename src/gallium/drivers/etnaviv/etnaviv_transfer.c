@@ -29,6 +29,7 @@
 #include "etnaviv_context.h"
 #include "etnaviv_debug.h"
 #include "etnaviv_etc2.h"
+#include "etnaviv_format.h"
 #include "etnaviv_rs.h"
 #include "etnaviv_screen.h"
 
@@ -224,19 +225,31 @@ etna_texture_unmap(struct pipe_context *pctx, struct pipe_transfer *ptrans)
          /* We have a temporary resource due to either tile status or
           * tiling format. Write back the updated buffer contents.
           */
+         ctx->in_transfer_blit = true;
          etna_copy_resource_box(pctx, ptrans->resource, trans->rsc,
                                 ptrans->level, 0, &ptrans->box);
+         ctx->in_transfer_blit = false;
       } else if (trans->staging) {
          /* map buffer object */
          if (rsc->layout == ETNA_LAYOUT_TILED) {
             for (unsigned z = 0; z < ptrans->box.depth; z++) {
-               etna_texture_tile(
-                  trans->mapped + (ptrans->box.z + z) * res_level->layer_stride,
-                  trans->staging + z * ptrans->layer_stride,
-                  ptrans->box.x, ptrans->box.y,
-                  res_level->stride, ptrans->box.width, ptrans->box.height,
-                  ptrans->stride, util_format_get_blocksize(rsc->base.format));
+               if (format_is_128bit(rsc->base.format)) {
+                  etna_texture_tile_rgba32f(
+                     trans->mapped + (ptrans->box.z + z) * res_level->layer_stride,
+                     trans->staging + z * ptrans->layer_stride,
+                     ptrans->box.x, ptrans->box.y,
+                     res_level->stride, ptrans->box.width, ptrans->box.height,
+                     ptrans->stride, (res_level->size * res_level->depth) / 2);
+
+               } else {
+                  etna_texture_tile(
+                     trans->mapped + (ptrans->box.z + z) * res_level->layer_stride,
+                     trans->staging + z * ptrans->layer_stride,
+                     ptrans->box.x, ptrans->box.y,
+                     res_level->stride, ptrans->box.width, ptrans->box.height,
+                     ptrans->stride, util_format_get_blocksize(rsc->base.format));
             }
+         }
          } else if (rsc->layout == ETNA_LAYOUT_LINEAR) {
             util_copy_box(trans->mapped, rsc->base.format, res_level->stride,
                           res_level->layer_stride, ptrans->box.x,
@@ -333,7 +346,8 @@ etna_texture_map(struct pipe_context *pctx, struct pipe_resource *prsc,
       rsc = etna_resource(rsc->render);
    }
 
-   if (rsc->texture && !etna_resource_newer(rsc, etna_resource(rsc->texture))) {
+   if (rsc->texture && !etna_resource_newer(rsc, etna_resource(rsc->texture)) &&
+       !translate_pe_format_rb_swap(prsc->format)) {
       /* We have a texture resource which is the same age or newer than the
        * render resource. Use the texture resource, which avoids bouncing
        * pixels between the two resources, and we can de-tile it in s/w. */
@@ -377,8 +391,11 @@ etna_texture_map(struct pipe_context *pctx, struct pipe_resource *prsc,
          etna_align_box_for_rs(ctx->screen, rsc, &ptrans->box);
       }
 
-      if ((usage & PIPE_MAP_READ) || !(usage & ETNA_PIPE_MAP_DISCARD_LEVEL))
+      if ((usage & PIPE_MAP_READ) || !(usage & ETNA_PIPE_MAP_DISCARD_LEVEL)) {
+         ctx->in_transfer_blit = true;
          etna_copy_resource_box(pctx, trans->rsc, &rsc->base, 0, level, &ptrans->box);
+         ctx->in_transfer_blit = false;
+      }
 
       /* Switch to using the temporary resource instead */
       rsc = etna_resource(trans->rsc);
@@ -465,11 +482,20 @@ etna_texture_map(struct pipe_context *pctx, struct pipe_resource *prsc,
       if (usage & PIPE_MAP_READ) {
          if (rsc->layout == ETNA_LAYOUT_TILED) {
             for (unsigned z = 0; z < ptrans->box.depth; z++) {
-               etna_texture_untile(trans->staging + z * ptrans->layer_stride,
-                                   trans->mapped + (ptrans->box.z + z) * res_level->layer_stride,
-                                   ptrans->box.x, ptrans->box.y, res_level->stride,
-                                   ptrans->box.width, ptrans->box.height, ptrans->stride,
-                                   util_format_get_blocksize(rsc->base.format));
+               if (format_is_128bit(rsc->base.format)) {
+                  etna_texture_untile_rgba32f(trans->staging + z * ptrans->layer_stride,
+                                    trans->mapped + (ptrans->box.z + z) * res_level->layer_stride,
+                                    ptrans->box.x, ptrans->box.y, res_level->stride,
+                                    ptrans->box.width, ptrans->box.height, ptrans->stride,
+                                    (res_level->size * res_level->depth) / 2);
+
+               } else {
+                  etna_texture_untile(trans->staging + z * ptrans->layer_stride,
+                                    trans->mapped + (ptrans->box.z + z) * res_level->layer_stride,
+                                    ptrans->box.x, ptrans->box.y, res_level->stride,
+                                    ptrans->box.width, ptrans->box.height, ptrans->stride,
+                                    util_format_get_blocksize(rsc->base.format));
+               }
             }
          } else if (rsc->layout == ETNA_LAYOUT_LINEAR) {
             util_copy_box(trans->staging, rsc->base.format, ptrans->stride,

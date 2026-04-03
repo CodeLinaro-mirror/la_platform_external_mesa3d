@@ -54,6 +54,12 @@ echo
 
 section_switch init_stage2 "Pre-testing hardware setup"
 
+job_time=$(get_job_seconds)
+uptime=$(cut -d ' ' -f1 /proc/uptime)
+echo "$(get_current_minsec) after job start == $uptime sec after kernel boot time"
+printf -v uptime_rounded "%.0f" "$uptime"
+echo "Kernel boot occurred $((job_time-uptime_rounded)) seconds after job start"
+
 set -ex
 
 # Set up any devices required by the jobs
@@ -107,9 +113,6 @@ export PATH=/usr/local/bin:$PATH
 
 # Store Mesa's disk cache under /tmp, rather than sending it out over NFS.
 export XDG_CACHE_HOME=/tmp
-
-# Make sure Python can find all our imports
-export PYTHONPATH=$(python3 -c "import sys;print(\":\".join(sys.path))")
 
 # If we need to specify a driver, it means several drivers could pick up this gpu;
 # ensure that the other driver can't accidentally be used
@@ -166,6 +169,11 @@ fi
 ARCH=$(uname -m)
 export VK_DRIVER_FILES="/install/share/vulkan/icd.d/${VK_DRIVER}_icd.$ARCH.json"
 
+if [ -n "$HWCI_START_WESTON" ] && [ -n "$HWCI_START_XORG" ]; then
+  echo "Please drop HWCI_START_XORG and instead use Weston XWayland for testing."
+  exit 1
+fi
+
 # If we want Xorg to be running for the test, then we start it up before the
 # HWCI_TEST_SCRIPT because we need to use xinit to start X (otherwise
 # without using -displayfd you can race with Xorg's startup), but xinit will eat
@@ -187,21 +195,8 @@ if [ -n "$HWCI_START_XORG" ]; then
 fi
 
 if [ -n "$HWCI_START_WESTON" ]; then
-  WESTON_X11_SOCK="/tmp/.X11-unix/X0"
-  if [ -n "$HWCI_START_XORG" ]; then
-    echo "Please consider dropping HWCI_START_XORG and instead using Weston XWayland for testing."
-    WESTON_X11_SOCK="/tmp/.X11-unix/X1"
-  fi
-  export WAYLAND_DISPLAY=wayland-0
-
-  # Display server is Weston Xwayland when HWCI_START_XORG is not set or Xorg when it's
-  export DISPLAY=:0
-  mkdir -p /tmp/.X11-unix
-
-  env weston --config="/install/common/weston.ini" -Swayland-0 --use-gl &
+  . /install/common/weston.sh --renderer=gl
   BACKGROUND_PIDS="$! $BACKGROUND_PIDS"
-
-  while [ ! -S "$WESTON_X11_SOCK" ]; do sleep 1; done
 fi
 
 set +x

@@ -328,7 +328,7 @@ pack_texture(struct hk_image_view *view, unsigned view_plane,
       cfg.srgb_2_channel = cfg.srgb && util_format_colormask(desc) == 0x3;
 
       if (layout->compressed) {
-         cfg.compressed_1 = true;
+         cfg.compressed = true;
          cfg.extended = true;
       }
 
@@ -482,7 +482,7 @@ pack_pbe(struct hk_device *dev, struct hk_image_view *view, unsigned view_plane,
       }
 
       if (layout->compressed && usage != HK_DESC_USAGE_EMRT) {
-         cfg.compressed_1 = true;
+         cfg.compressed = true;
          cfg.extended = true;
 
          cfg.acceleration_buffer = base_addr + layout->metadata_offset_B +
@@ -520,13 +520,12 @@ pack_pbe(struct hk_device *dev, struct hk_image_view *view, unsigned view_plane,
 
 static VkResult
 hk_image_view_init(struct hk_device *dev, struct hk_image_view *view,
-                   bool driver_internal,
                    const VkImageViewCreateInfo *pCreateInfo)
 {
    VK_FROM_HANDLE(hk_image, image, pCreateInfo->image);
    memset(view, 0, sizeof(*view));
 
-   vk_image_view_init(&dev->vk, &view->vk, driver_internal, pCreateInfo);
+   vk_image_view_init(&dev->vk, &view->vk, pCreateInfo);
 
    /* First, figure out which image planes we need. For depth/stencil, we only
     * have one aspect viewed at a time.
@@ -598,10 +597,7 @@ hk_CreateImageView(VkDevice _device, const VkImageViewCreateInfo *pCreateInfo,
    if (!view)
       return vk_error(dev, VK_ERROR_OUT_OF_HOST_MEMORY);
 
-   result = hk_image_view_init(
-      dev, view,
-      pCreateInfo->flags & VK_IMAGE_VIEW_CREATE_DRIVER_INTERNAL_BIT_MESA,
-      pCreateInfo);
+   result = hk_image_view_init(dev, view, pCreateInfo);
    if (result != VK_SUCCESS) {
       hk_DestroyImageView(_device, hk_image_view_to_handle(view), pAllocator);
       return result;

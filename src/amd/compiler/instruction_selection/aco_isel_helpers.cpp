@@ -8,8 +8,11 @@
 #include "aco_builder.h"
 #include "aco_instruction_selection.h"
 #include "aco_ir.h"
+#include "aco_nir_call_attribs.h"
 
 #include "util/memstream.h"
+
+#include <optional>
 
 namespace aco {
 
@@ -38,9 +41,14 @@ append_logical_start(Block* b)
 }
 
 void
-append_logical_end(Block* b)
+append_logical_end(isel_context* ctx, bool append_reload_preserved)
 {
-   Builder(NULL, b).pseudo(aco_opcode::p_logical_end);
+   Builder bld(ctx->program, ctx->block);
+
+   if (append_reload_preserved && ctx->program->is_callee && ctx->block->loop_nest_depth == 0)
+      emit_reload_preserved(ctx);
+
+   bld.pseudo(aco_opcode::p_logical_end);
 }
 
 Temp
@@ -109,42 +117,55 @@ emit_extract_vector(isel_context* ctx, Temp src, uint32_t idx, RegClass dst_rc)
    }
 
    assert(src.bytes() > (idx * dst_rc.bytes()));
-   Builder bld(ctx->program, ctx->block);
+
    auto it = ctx->allocated_vec.find(src.id());
-   if (it != ctx->allocated_vec.end() && dst_rc.bytes() == it->second[idx].regClass().bytes()) {
-      if (it->second[idx].regClass() == dst_rc) {
-         return it->second[idx];
-      } else {
-         assert(!dst_rc.is_subdword());
-         assert(dst_rc.type() == RegType::vgpr && it->second[idx].type() == RegType::sgpr);
-         return bld.copy(bld.def(dst_rc), it->second[idx]);
+   if (it != ctx->allocated_vec.end()) {
+      unsigned new_byte_offset = (idx * dst_rc.bytes()) % it->second[0].bytes();
+
+      if ((it->second[0].bytes() - new_byte_offset) >= dst_rc.bytes() &&
+          new_byte_offset % dst_rc.bytes() == 0) {
+         src = it->second[idx * dst_rc.bytes() / it->second[0].bytes()];
+         idx = new_byte_offset / dst_rc.bytes();
+         assert(src.id()); /* allocated_vec can contain undefs, but they must not be used. */
+         return emit_extract_vector(ctx, src, idx, dst_rc);
       }
    }
+
+   Builder bld(ctx->program, ctx->block);
 
    if (dst_rc.is_subdword())
       src = as_vgpr(ctx, src);
 
    if (src.bytes() == dst_rc.bytes()) {
       assert(idx == 0);
+      assert(dst_rc.type() == RegType::vgpr && src.type() == RegType::sgpr);
       return bld.copy(bld.def(dst_rc), src);
    } else {
-      Temp dst = bld.tmp(dst_rc);
-      bld.pseudo(aco_opcode::p_extract_vector, Definition(dst), src, Operand::c32(idx));
-      return dst;
+      return bld.pseudo(aco_opcode::p_extract_vector, bld.def(dst_rc), src, Operand::c32(idx));
    }
 }
 
 void
 emit_split_vector(isel_context* ctx, Temp vec_src, unsigned num_components)
 {
+   if (vec_src.size() == 1 && vec_src.type() == RegType::sgpr)
+      return;
+   unsigned comp_bytes = vec_src.bytes() / num_components;
+   assert(vec_src.bytes() % num_components == 0 && util_is_power_of_two_nonzero(comp_bytes));
    if (num_components == 1)
       return;
    if (ctx->allocated_vec.find(vec_src.id()) != ctx->allocated_vec.end())
       return;
-   if (num_components > vec_src.size() && vec_src.type() == RegType::sgpr) {
-      /* sub-dword split: should still help get_alu_src() */
-      emit_split_vector(ctx, vec_src, vec_src.size());
-      return;
+   if (comp_bytes < 4 && num_components > 2) {
+      /* sub-dword split: split into dwords/words first */
+      unsigned split_size = vec_src.size() == 1 ? 2 : 4;
+      if (vec_src.bytes() % split_size == 0) {
+         emit_split_vector(ctx, vec_src, vec_src.bytes() / split_size);
+         auto it = ctx->allocated_vec.find(vec_src.id());
+         for (unsigned i = 0; i < vec_src.bytes() / split_size; i++)
+            emit_split_vector(ctx, it->second[i], split_size / comp_bytes);
+         return;
+      }
    }
    RegClass rc = RegClass::get(vec_src.type(), vec_src.bytes() / num_components);
    aco_ptr<Instruction> split{
@@ -366,9 +387,9 @@ emit_interp_instr_gfx11(isel_context* ctx, unsigned idx, unsigned component, Tem
    Builder bld(ctx->program, ctx->block);
 
    if (ctx->cf_info.in_divergent_cf || ctx->cf_info.had_divergent_discard) {
-      bld.pseudo(aco_opcode::p_interp_gfx11, Definition(dst), Operand(v1.as_linear()),
-                 Operand::c32(idx), Operand::c32(component), Operand::c32(high_16bits), coord1,
-                 coord2, bld.m0(prim_mask));
+      bld.pseudo(aco_opcode::p_interp_gfx11, Definition(dst), Operand(lv1), Operand::c32(idx),
+                 Operand::c32(component), Operand::c32(high_16bits), coord1, coord2,
+                 bld.m0(prim_mask));
       return;
    }
 
@@ -442,9 +463,8 @@ emit_interp_mov_instr(isel_context* ctx, unsigned idx, unsigned component, unsig
    if (ctx->options->gfx_level >= GFX11) {
       uint16_t dpp_ctrl = dpp_quad_perm(vertex_id, vertex_id, vertex_id, vertex_id);
       if (ctx->cf_info.in_divergent_cf || ctx->cf_info.had_divergent_discard) {
-         bld.pseudo(aco_opcode::p_interp_gfx11, Definition(tmp), Operand(v1.as_linear()),
-                    Operand::c32(idx), Operand::c32(component), Operand::c32(dpp_ctrl),
-                    bld.m0(prim_mask));
+         bld.pseudo(aco_opcode::p_interp_gfx11, Definition(tmp), Operand(lv1), Operand::c32(idx),
+                    Operand::c32(component), Operand::c32(dpp_ctrl), bld.m0(prim_mask));
       } else {
          Temp p =
             bld.ldsdir(aco_opcode::lds_param_load, bld.def(v1), bld.m0(prim_mask), idx, component);
@@ -498,7 +518,7 @@ emit_pack_v1(isel_context* ctx, const std::vector<Temp>& unpacked)
 
 MIMG_instruction*
 emit_mimg(Builder& bld, aco_opcode op, std::vector<Temp> dsts, Temp rsrc, Operand samp,
-          std::vector<Temp> coords, Operand vdata)
+          std::vector<Temp> coords, bool disable_wqm, Operand vdata)
 {
    bool is_vsample = !samp.isUndefined() || op == aco_opcode::image_msaa_load;
 
@@ -541,7 +561,8 @@ emit_mimg(Builder& bld, aco_opcode op, std::vector<Temp> dsts, Temp rsrc, Operan
       coords.resize(nsa_size + 1);
    }
 
-   aco_ptr<Instruction> mimg{create_instruction(op, Format::MIMG, 3 + coords.size(), dsts.size())};
+   aco_ptr<Instruction> mimg{
+      create_instruction(op, Format::MIMG, 3 + coords.size() + disable_wqm * 2, dsts.size())};
    for (unsigned i = 0; i < dsts.size(); ++i)
       mimg->definitions[i] = Definition(dsts[i]);
    mimg->operands[0] = Operand(rsrc);
@@ -549,6 +570,8 @@ emit_mimg(Builder& bld, aco_opcode op, std::vector<Temp> dsts, Temp rsrc, Operan
    mimg->operands[2] = vdata;
    for (unsigned i = 0; i < coords.size(); i++)
       mimg->operands[3 + i] = Operand(coords[i]);
+
+   init_disable_wqm(bld, mimg->mimg(), disable_wqm);
    mimg->mimg().strict_wqm = strict_wqm;
 
    return &bld.insert(std::move(mimg))->mimg();
@@ -581,11 +604,14 @@ create_fs_dual_src_export_gfx11(isel_context* ctx, const struct aco_export_mrt* 
    Builder bld(ctx->program, ctx->block);
 
    aco_ptr<Instruction> exp{
-      create_instruction(aco_opcode::p_dual_src_export_gfx11, Format::PSEUDO, 8, 6)};
+      create_instruction(aco_opcode::p_dual_src_export_gfx11, Format::PSEUDO, 10, 6)};
    for (unsigned i = 0; i < 4; i++) {
-      exp->operands[i] = mrt0 ? mrt0->out[i] : Operand(v1);
-      exp->operands[i + 4] = mrt1 ? mrt1->out[i] : Operand(v1);
+      exp->operands[i] = mrt0->out[i];
+      exp->operands[i + 4] = mrt1->out[i];
    }
+
+   instr_exact_mask(exp.get()) = Operand();
+   instr_wqm_mask(exp.get()) = Operand();
 
    RegClass type = RegClass(RegType::vgpr, util_bitcount(mrt0->enabled_channels));
    exp->definitions[0] = bld.def(type); /* mrt0 */
@@ -656,8 +682,10 @@ build_end_with_regs(isel_context* ctx, std::vector<Operand>& regs)
 }
 
 Instruction*
-add_startpgm(struct isel_context* ctx)
+add_startpgm(struct isel_context* ctx, bool is_callee)
 {
+   ctx->program->scratch_arg_size += ctx->callee_info.scratch_param_size * ctx->program->wave_size;
+
    unsigned def_count = 0;
    for (unsigned i = 0; i < ctx->args->arg_count; i++) {
       if (ctx->args->args[i].skip)
@@ -669,8 +697,14 @@ add_startpgm(struct isel_context* ctx)
          def_count++;
    }
 
-   if (ctx->stage.hw == AC_HW_COMPUTE_SHADER && ctx->program->gfx_level >= GFX12)
-      def_count += 3;
+   if (is_callee) {
+      /* We do not support shader args in callees. */
+      assert(def_count == 0);
+      def_count += ctx->callee_info.reg_param_count;
+      /* Add system parameters separately - they aren't counted by reg_param_count */
+      assert(ctx->callee_info.stack_ptr.is_reg && ctx->callee_info.return_address.is_reg);
+      def_count += 2;
+   }
 
    Instruction* startpgm = create_instruction(aco_opcode::p_startpgm, Format::PSEUDO, 0, def_count);
    ctx->block->instructions.emplace_back(startpgm);
@@ -704,33 +738,17 @@ add_startpgm(struct isel_context* ctx)
       }
    }
 
-   if (ctx->program->gfx_level >= GFX12 && ctx->stage.hw == AC_HW_COMPUTE_SHADER) {
-      Temp idx = ctx->program->allocateTmp(s1);
-      Temp idy = ctx->program->allocateTmp(s1);
-      ctx->ttmp8 = ctx->program->allocateTmp(s1);
-      startpgm->definitions[def_count - 3] = Definition(idx);
-      startpgm->definitions[def_count - 3].setPrecolored(PhysReg(108 + 9 /*ttmp9*/));
-      startpgm->definitions[def_count - 2] = Definition(ctx->ttmp8);
-      startpgm->definitions[def_count - 2].setPrecolored(PhysReg(108 + 8 /*ttmp8*/));
-      startpgm->definitions[def_count - 1] = Definition(idy);
-      startpgm->definitions[def_count - 1].setPrecolored(PhysReg(108 + 7 /*ttmp7*/));
-      ctx->workgroup_id[0] = Operand(idx);
-      if (ctx->args->workgroup_ids[2].used) {
-         Builder bld(ctx->program, ctx->block);
-         ctx->workgroup_id[1] =
-            bld.pseudo(aco_opcode::p_extract, bld.def(s1), bld.def(s1, scc), idy, Operand::zero(),
-                       Operand::c32(16u), Operand::zero());
-         ctx->workgroup_id[2] =
-            bld.pseudo(aco_opcode::p_extract, bld.def(s1), bld.def(s1, scc), idy, Operand::c32(1u),
-                       Operand::c32(16u), Operand::zero());
-      } else {
-         ctx->workgroup_id[1] = Operand(idy);
-         ctx->workgroup_id[2] = Operand::zero();
+   if (is_callee) {
+      unsigned def_idx = 0;
+      ctx->program->stack_ptr = ctx->callee_info.stack_ptr.def.getTemp();
+      startpgm->definitions[def_idx++] = ctx->callee_info.stack_ptr.def;
+      startpgm->definitions[def_idx++] = ctx->callee_info.return_address.def;
+
+      for (auto& info : ctx->callee_info.param_infos) {
+         if (!info.is_reg)
+            continue;
+         startpgm->definitions[def_idx++] = info.def;
       }
-   } else if (ctx->stage.hw == AC_HW_COMPUTE_SHADER) {
-      const struct ac_arg* ids = ctx->args->workgroup_ids;
-      for (unsigned i = 0; i < 3; i++)
-         ctx->workgroup_id[i] = ids[i].used ? Operand(get_arg(ctx, ids[i])) : Operand::zero();
    }
 
    /* epilog has no scratch */
@@ -792,7 +810,7 @@ finish_program(isel_context* ctx)
       while (it != instrs->end()) {
          aco_ptr<Instruction>& instr = *it;
          /* End WQM before: */
-         if (instr->isVMEM() || instr->isFlatLike() || instr->isDS() || instr->isEXP() ||
+         if (instr->isDS() || instr->isEXP() ||
              instr->opcode == aco_opcode::p_dual_src_export_gfx11 ||
              instr->opcode == aco_opcode::p_jump_to_epilog ||
              instr->opcode == aco_opcode::p_logical_start)
@@ -812,6 +830,407 @@ finish_program(isel_context* ctx)
       bld.reset(instrs, it);
       bld.pseudo(aco_opcode::p_end_wqm);
    }
+}
+
+ABI
+nir_abi_to_aco(unsigned function_attributes)
+{
+   switch (function_attributes & ACO_NIR_FUNCTION_ATTRIB_ABI_MASK) {
+   case ACO_NIR_CALL_ABI_RT_RECURSIVE: return rtRaygenABI;
+   case ACO_NIR_CALL_ABI_TRAVERSAL: return rtTraversalABI;
+   case ACO_NIR_CALL_ABI_AHIT_ISEC: return rtAnyHitABI;
+   default: UNREACHABLE("invalid abi");
+   }
+}
+
+struct param_assignment_info {
+   uint16_t required_alignment;
+   uint16_t provided_alignment;
+   RegClass rc;
+   parameter_info* dst_info;
+   const parameter_info* affinity;
+   bool is_return_param;
+   /* If true, this parameter shouldn't count toward the callee info's reg_param_count because it
+    * receives special handling (e.g. the call return address being a definition instead of an
+    * operand).
+    */
+   bool is_system_param;
+   /* This parameter must reside in a register. Used for stack pointers as well as s_swappc
+    * operands.
+    */
+   bool force_reg;
+};
+
+std::optional<PhysReg>
+find_reg(BITSET_WORD* regs, RegClass rc, const BITSET_WORD* avoid)
+{
+   uint16_t start = 0;
+   uint16_t size = 128;
+   if (rc.type() == RegType::vgpr) {
+      start = 256;
+      size = 256;
+   }
+
+   uint16_t contiguous_size = 0;
+   for (uint16_t i = 0; i < size; ++i) {
+      if (!BITSET_TEST(regs, start + i) || (avoid && BITSET_TEST(avoid, start + i))) {
+         contiguous_size = 0;
+         continue;
+      }
+      if (++contiguous_size >= rc.size())
+         return PhysReg{(unsigned)(start + i - contiguous_size + 1)};
+   }
+   return {};
+}
+
+void
+param_hint_avoid(param_assignment_hints& hints, const parameter_info& param_info)
+{
+   if (!param_info.is_reg)
+      return;
+   BITSET_SET_COUNT(hints.registers_to_avoid, param_info.def.physReg(), param_info.def.size());
+}
+
+void
+param_hint_map(param_assignment_hints& hints, const struct callee_info& traversal_info,
+               unsigned dst_param_idx, unsigned src_param_idx)
+{
+   auto& param_info = traversal_info.param_infos[src_param_idx + ACO_NIR_CALL_SYSTEM_ARG_COUNT];
+   if (!param_info.is_reg)
+      return;
+   hints.param_affinities[dst_param_idx + ACO_NIR_CALL_SYSTEM_ARG_COUNT] = param_info;
+}
+
+param_assignment_hints
+get_ahit_isec_param_hints(const struct callee_info& traversal_info)
+{
+   param_assignment_hints hints;
+   hints.stack_pointer_affinity = traversal_info.stack_ptr;
+   hints.param_affinities.resize(AHIT_ISEC_ARG_HIT_ATTRIB_PAYLOAD_BASE, {});
+
+   for (auto& info : traversal_info.param_infos)
+      param_hint_avoid(hints, info);
+   param_hint_avoid(hints, traversal_info.stack_ptr);
+
+   param_hint_map(hints, traversal_info, RT_ARG_LAUNCH_ID, RT_ARG_LAUNCH_ID);
+   param_hint_map(hints, traversal_info, RT_ARG_LAUNCH_SIZE, RT_ARG_LAUNCH_SIZE);
+   param_hint_map(hints, traversal_info, RT_ARG_DESCRIPTORS, RT_ARG_DESCRIPTORS);
+   param_hint_map(hints, traversal_info, RT_ARG_DYNAMIC_DESCRIPTORS, RT_ARG_DYNAMIC_DESCRIPTORS);
+   param_hint_map(hints, traversal_info, RT_ARG_PUSH_CONSTANTS, RT_ARG_PUSH_CONSTANTS);
+   param_hint_map(hints, traversal_info, RT_ARG_SBT_DESCRIPTORS, RT_ARG_SBT_DESCRIPTORS);
+   param_hint_map(hints, traversal_info, AHIT_ISEC_ARG_SHADER_RECORD_PTR,
+                  TRAVERSAL_ARG_SHADER_RECORD_PTR);
+   param_hint_map(hints, traversal_info, AHIT_ISEC_ARG_CULL_MASK_AND_FLAGS,
+                  TRAVERSAL_ARG_CULL_MASK_AND_FLAGS);
+   param_hint_map(hints, traversal_info, AHIT_ISEC_ARG_RAY_ORIGIN, TRAVERSAL_ARG_RAY_ORIGIN);
+   param_hint_map(hints, traversal_info, AHIT_ISEC_ARG_RAY_TMIN, TRAVERSAL_ARG_RAY_TMIN);
+   param_hint_map(hints, traversal_info, AHIT_ISEC_ARG_RAY_DIRECTION, TRAVERSAL_ARG_RAY_DIRECTION);
+   param_hint_map(hints, traversal_info, AHIT_ISEC_ARG_CANDIDATE_RAY_TMAX, TRAVERSAL_ARG_RAY_TMAX);
+   param_hint_map(hints, traversal_info, AHIT_ISEC_ARG_PRIMITIVE_ADDR,
+                  TRAVERSAL_ARG_PRIMITIVE_ADDR);
+   param_hint_map(hints, traversal_info, AHIT_ISEC_ARG_PRIMITIVE_ID, TRAVERSAL_ARG_PRIMITIVE_ID);
+   param_hint_map(hints, traversal_info, AHIT_ISEC_ARG_INSTANCE_ADDR, TRAVERSAL_ARG_INSTANCE_ADDR);
+   param_hint_map(hints, traversal_info, AHIT_ISEC_ARG_GEOMETRY_ID_AND_FLAGS,
+                  TRAVERSAL_ARG_GEOMETRY_ID_AND_FLAGS);
+
+   return hints;
+}
+
+void
+find_param_regs(Program* program, const ABI& abi, callee_info& info,
+                std::vector<struct param_assignment_info>& params,
+                const BITSET_DECLARE(regs_to_avoid, 512), RegisterDemand reg_limit)
+{
+   unsigned scratch_param_bytes = 0;
+   RegisterDemand param_demand = RegisterDemand();
+
+   BITSET_DECLARE(preserved_regs, 512);
+   BITSET_DECLARE(clobbered_regs, 512);
+   abi.preservedRegisters(preserved_regs, reg_limit);
+   BITSET_COPY(clobbered_regs, preserved_regs);
+   BITSET_NOT(clobbered_regs);
+   bool has_preserved_regs = !BITSET_IS_EMPTY(preserved_regs);
+
+   std::stable_sort(params.begin(), params.end(),
+                    [](const param_assignment_info& first, const param_assignment_info& second)
+                    {
+                       /* Assign parameters with larger alignments first so we can use parameters
+                        * with smaller alignments as padding
+                        */
+                       return first.provided_alignment > second.provided_alignment;
+                    });
+   std::stable_sort(params.begin(), params.end(),
+                    [](const param_assignment_info& first, const param_assignment_info& second)
+                    {
+                       /* Move parameters forced into registers to the very front so we assign
+                        * them first.
+                        */
+                       return first.force_reg && !second.force_reg;
+                    });
+   for (size_t i = 1; i < params.size(); ++i) {
+      assert(!params[i].force_reg || params[i - 1].force_reg);
+   }
+   /* Reverse parameters and start from the end, to make erasing elements cheap */
+   std::reverse(params.begin(), params.end());
+
+   while (!params.empty()) {
+      RegClass rc = params.back().rc;
+      bool discardable = params.back().dst_info->discardable || params.back().is_return_param;
+
+      BITSET_WORD* regs;
+      if (has_preserved_regs && !discardable)
+         regs = preserved_regs;
+      else
+         regs = clobbered_regs;
+
+      std::optional<PhysReg> next_reg;
+
+      if (params.back().affinity) {
+         bool use_affinity = true;
+         if (params.back().affinity->is_reg) {
+            const Definition& def = params.back().affinity->def;
+            for (auto reg = def.physReg(); reg < def.physReg().advance(def.bytes());
+                 reg = reg.advance(4)) {
+               if (!BITSET_TEST(regs, reg)) {
+                  use_affinity = false;
+                  break;
+               }
+            }
+            if (use_affinity)
+               next_reg = def.physReg();
+         } else {
+            /* TODO: scratch parameters could benefit from affinities as well */
+            use_affinity = false;
+         }
+      }
+
+      if (!next_reg)
+         next_reg = find_reg(regs, rc, regs_to_avoid);
+      if (!next_reg)
+         next_reg = find_reg(regs, rc, NULL);
+
+      /* Force parameter into scratch if it exceeds the ABI's maximum parameter demand */
+      if (abi.max_param_demand != RegisterDemand() &&
+          (param_demand + Temp(0, rc)).exceeds(abi.max_param_demand))
+         next_reg = {};
+
+      if (next_reg && next_reg->reg() % params.back().required_alignment) {
+         /* We found a register, but it's not aligned properly. Check if we can add some padding
+          * (and ideally stuff a different parameter in there).
+          */
+         uint16_t required_padding =
+            params.back().required_alignment - (next_reg->reg() % params.back().required_alignment);
+         uint16_t aligned_size = rc.size() + required_padding;
+         for (unsigned i = 0; i < aligned_size; ++i) {
+            /* The added padding exceeds the size of the register range. Just bail out at this
+             * point.
+             * TODO: we could probably try finding a new register, but then we'd need to reevaluate
+             * alignment etc...
+             */
+            if (!BITSET_TEST(regs, next_reg->advance(i * 4).reg())) {
+               next_reg = {};
+               break;
+            }
+         }
+
+         /* Try finding a small parameter to put inside the padding space */
+         for (auto it2 = std::next(params.rbegin()); next_reg && it2 != params.rend(); ++it2) {
+            if (it2->rc.type() != params.back().rc.type() ||
+                it2->dst_info->discardable != discardable)
+               continue;
+            if (it2->rc.size() > required_padding || (it2->required_alignment % next_reg->reg()))
+               continue;
+
+            param_demand += Temp(0, it2->rc);
+
+            it2->dst_info->needs_explicit_preservation = regs == clobbered_regs;
+            it2->dst_info->def.setPrecolored(*next_reg);
+            for (unsigned i = 0; i < it2->rc.size(); ++i)
+               BITSET_CLEAR(regs, next_reg->reg() + i);
+            if (!it2->is_system_param) {
+               ++info.reg_param_count;
+               if (discardable)
+                  ++info.reg_discardable_param_count;
+            }
+            params.erase(std::prev(it2.base()));
+            break;
+         }
+         if (next_reg)
+            next_reg = next_reg->advance(required_padding * 4);
+      }
+      if (next_reg) {
+         params.back().dst_info->needs_explicit_preservation = regs == clobbered_regs;
+         param_demand += Temp(0, params.back().rc);
+         params.back().dst_info->def.setPrecolored(*next_reg);
+         BITSET_CLEAR_COUNT(regs, next_reg->reg(), params.back().rc.size());
+         if (!params.back().is_system_param) {
+            ++info.reg_param_count;
+            if (discardable)
+               ++info.reg_discardable_param_count;
+         }
+      } else {
+         assert(!params.back().force_reg);
+         params.back().dst_info->is_reg = false;
+         params.back().dst_info->scratch_offset = scratch_param_bytes;
+         scratch_param_bytes += rc.size() * 4;
+      }
+      params.pop_back();
+   }
+
+   info.scratch_param_size = scratch_param_bytes;
+   if (program)
+      program->callee_param_demand = param_demand;
+}
+
+struct callee_info
+get_callee_info(amd_gfx_level gfx_level, unsigned wave_size, const ABI& abi, unsigned param_count,
+                const nir_parameter* parameters, Program* program, RegisterDemand reg_limit,
+                const param_assignment_hints& param_hints)
+{
+   struct callee_info info = {};
+   info.param_infos.reserve(param_count);
+
+   std::vector<param_assignment_info> assignment_infos;
+   assignment_infos.reserve(param_count + 2);
+
+   Temp return_addr = program ? program->allocateTmp(s2) : Temp();
+   Definition return_def = Definition(return_addr);
+   info.return_address = {};
+   info.return_address.discardable = false;
+   info.return_address.is_reg = true;
+   info.return_address.def = return_def;
+
+   param_assignment_info return_def_info = {};
+   return_def_info.required_alignment = 2;
+   return_def_info.provided_alignment = 2;
+   return_def_info.rc = s2;
+   return_def_info.dst_info = &info.return_address;
+   return_def_info.is_return_param = true;
+   return_def_info.is_system_param = true;
+   return_def_info.force_reg = true;
+   assignment_infos.push_back(return_def_info);
+
+   if (gfx_level >= GFX9) {
+      Temp stack_ptr = program ? program->allocateTmp(s1) : Temp();
+      Definition stack_def = Definition(stack_ptr);
+      info.stack_ptr = {};
+      info.stack_ptr.discardable = false;
+      info.stack_ptr.is_reg = true;
+      info.stack_ptr.def = stack_def;
+
+      param_assignment_info stack_ptr_info = {};
+      stack_ptr_info.required_alignment = 1;
+      stack_ptr_info.provided_alignment = 1;
+      stack_ptr_info.rc = s1;
+      stack_ptr_info.dst_info = &info.stack_ptr;
+      stack_ptr_info.is_return_param = false;
+      stack_ptr_info.is_system_param = true;
+      stack_ptr_info.force_reg = true;
+      if (param_hints.stack_pointer_affinity)
+         stack_ptr_info.affinity = &(*param_hints.stack_pointer_affinity);
+
+      assignment_infos.push_back(stack_ptr_info);
+   } else {
+      Temp scratch_rsrc = program ? program->allocateTmp(s4) : Temp();
+      Definition rsrc_def = Definition(scratch_rsrc);
+      info.stack_ptr = {};
+      info.stack_ptr.discardable = false;
+      info.stack_ptr.is_reg = true;
+      info.stack_ptr.def = rsrc_def;
+
+      param_assignment_info rsrc_info = {};
+      rsrc_info.required_alignment = 4;
+      rsrc_info.provided_alignment = 4;
+      rsrc_info.rc = s4;
+      rsrc_info.dst_info = &info.stack_ptr;
+      rsrc_info.is_return_param = false;
+      rsrc_info.is_system_param = true;
+      rsrc_info.force_reg = true;
+      if (param_hints.stack_pointer_affinity)
+         rsrc_info.affinity = &(*param_hints.stack_pointer_affinity);
+
+      assignment_infos.push_back(rsrc_info);
+   }
+
+   size_t info_base = assignment_infos.size();
+
+   for (unsigned i = 0; i < param_count; ++i) {
+      RegType type = parameters[i].is_uniform ? RegType::sgpr : RegType::vgpr;
+      unsigned byte_size = align(parameters[i].bit_size, 32) / 8 * parameters[i].num_components;
+      if (parameters[i].bit_size == 1) {
+         type = RegType::sgpr;
+         byte_size = wave_size / 8;
+      }
+      RegClass rc = RegClass(type, byte_size / 4);
+
+      Temp dst = program ? program->allocateTmp(rc) : Temp(0, rc);
+      Definition def = Definition(dst);
+
+      parameter_info param_info = {};
+      param_info.discardable =
+         !!(parameters[i].driver_attributes & ACO_NIR_PARAM_ATTRIB_DISCARDABLE);
+      param_info.is_reg = true;
+      param_info.def = def;
+      info.param_infos.push_back(param_info);
+
+      uint16_t required_alignment = 1;
+      uint16_t provided_alignment = 1;
+
+      if (rc.type() == RegType::sgpr) {
+         if (rc.size() > 2)
+            required_alignment = 4;
+         else if (rc.size() > 1)
+            required_alignment = 2;
+      }
+      if (rc.size() % 4 == 0)
+         provided_alignment = 4;
+      else if (rc.size() % 2 == 0)
+         provided_alignment = 2;
+
+      param_assignment_info assignment_info = {};
+      assignment_info.required_alignment = required_alignment;
+      assignment_info.provided_alignment = provided_alignment;
+      assignment_info.rc = rc;
+      assignment_info.is_return_param = parameters[i].is_return;
+      /* Force the first two parameters (callee addresses) into registers - they're assumed to be
+       * accessible through a temp.
+       */
+      assignment_info.force_reg = i <= 1;
+      if (param_hints.param_affinities.size() > i && param_hints.param_affinities[i])
+         assignment_info.affinity = &*param_hints.param_affinities[i];
+      assignment_infos.push_back(assignment_info);
+   }
+
+   for (unsigned i = 0; i < param_count; ++i)
+      assignment_infos[info_base + i].dst_info = &info.param_infos[i];
+
+   find_param_regs(program, abi, info, assignment_infos, param_hints.registers_to_avoid, reg_limit);
+
+   /* The call target parameters are special - they are marked as discardable to allow us
+    * to overwrite the parameter values within each callee for the divergent dispatch logic.
+    * However, we still need to explicitly write back the new values to the ABI-assigned registers
+    * when jumping to the next divergent callee/returning. Therefore, mark them as needing explicit
+    * preservation.
+    */
+   info.param_infos[ACO_NIR_CALL_SYSTEM_ARG_DIVERGENT_PC].needs_explicit_preservation = true;
+   info.param_infos[ACO_NIR_CALL_SYSTEM_ARG_UNIFORM_PC].needs_explicit_preservation = true;
+
+   /* Explicitly preserve the stack pointer. spill_preserved() can ensure correctness on its own,
+    * but it only can spill the initial stack pointer value to a linear VGPR, the inactive lanes of
+    * which would in turn need to be spilled to scratch. Explicitly preserving the stack pointer's
+    * value is more efficient.
+    */
+   info.stack_ptr.needs_explicit_preservation = true;
+
+   return info;
+}
+
+void
+emit_reload_preserved(isel_context* ctx)
+{
+   Builder bld(ctx->program, ctx->block);
+   bld.pseudo(aco_opcode::p_reload_preserved, bld.def(bld.lm), Operand(),
+              Operand(ctx->program->stack_ptr));
 }
 
 } // namespace aco

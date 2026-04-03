@@ -1578,7 +1578,7 @@ Converter::visit(nir_cf_node *node)
 bool
 Converter::visit(nir_block *block)
 {
-   if (!block->predecessors->entries && exec_list_is_empty(&block->instr_list))
+   if (!block->predecessors.entries && exec_list_is_empty(&block->instr_list))
       return true;
 
    BasicBlock *bb = convert(block);
@@ -2802,14 +2802,6 @@ Converter::visit(nir_alu_instr *insn)
       mkOp3(OP_INSBF, TYPE_U32, newDefs[0], tmpH, mkImm(0x1010), tmpL);
       break;
    }
-   case nir_op_unpack_half_2x16_split_x:
-   case nir_op_unpack_half_2x16_split_y: {
-      LValues &newDefs = convert(&insn->def);
-      Instruction *cvt = mkCvt(OP_CVT, TYPE_F32, newDefs[0], TYPE_F16, getSrc(&insn->src[0]));
-      if (op == nir_op_unpack_half_2x16_split_y)
-         cvt->subOp = 1;
-      break;
-   }
    case nir_op_unpack_64_2x32: {
       LValues &newDefs = convert(&insn->def);
       mkOp1(OP_SPLIT, dType, newDefs[0], getSrc(&insn->src[0]))->setDef(1, newDefs[1]);
@@ -3003,7 +2995,7 @@ Converter::visit(nir_alu_instr *insn)
 
    if (!oldPos) {
       oldPos = this->bb->getEntry();
-      oldPos->precise = insn->exact;
+      oldPos->precise = nir_alu_instr_is_exact(insn);
    }
 
    if (unlikely(!oldPos))
@@ -3011,7 +3003,7 @@ Converter::visit(nir_alu_instr *insn)
 
    while (oldPos->next) {
       oldPos = oldPos->next;
-      oldPos->precise = insn->exact;
+      oldPos->precise = nir_alu_instr_is_exact(insn);
    }
 
    return true;
@@ -3373,13 +3365,13 @@ Converter::runOptLoop()
    bool progress;
    do {
       progress = false;
-      NIR_PASS(progress, nir, nir_copy_prop);
+      NIR_PASS(progress, nir, nir_opt_copy_prop);
       NIR_PASS(progress, nir, nir_opt_remove_phis);
       NIR_PASS(progress, nir, nir_opt_loop);
       NIR_PASS(progress, nir, nir_opt_cse);
       NIR_PASS(progress, nir, nir_opt_algebraic);
       NIR_PASS(progress, nir, nir_opt_constant_folding);
-      NIR_PASS(progress, nir, nir_copy_prop);
+      NIR_PASS(progress, nir, nir_opt_copy_prop);
       NIR_PASS(progress, nir, nir_opt_dce);
       NIR_PASS(progress, nir, nir_opt_dead_cf);
       NIR_PASS(progress, nir, nir_lower_64bit_phis);
@@ -3418,7 +3410,7 @@ Converter::run()
 
       if (lowered) {
          nir_function_impl *impl = nir_shader_get_entrypoint(nir);
-         NIR_PASS(_, nir, nir_lower_io_vars_to_temporaries, impl, true, false);
+         NIR_PASS(_, nir, nir_lower_io_vars_to_temporaries, impl, nir_var_shader_out);
          NIR_PASS(_, nir, nir_lower_global_vars_to_local);
          NIR_PASS(_, nir, nv50_nir_lower_load_user_clip_plane, info);
       } else {
@@ -3503,6 +3495,7 @@ Converter::run()
       NIR_PASS(_, nir, nv_nir_move_stores_to_end);
 
    NIR_PASS(_, nir, nir_opt_algebraic_late);
+   NIR_PASS(_, nir, nir_opt_dce);
 
    NIR_PASS(_, nir, nir_lower_bool_to_int32);
    NIR_PASS(_, nir, nir_lower_bit_size, Converter::lowerBitSizeCB, this);
@@ -3588,7 +3581,6 @@ nvir_nir_shader_compiler_options(int chipset, uint8_t shader_type)
    op.lower_fneg = false;
    op.lower_ineg = false;
    op.lower_scmp = true; // TODO: not implemented yet
-   op.lower_vector_cmp = false;
    op.lower_bitops = false;
    op.lower_isign = (chipset >= NVISA_GV100_CHIPSET);
    op.lower_fsign = (chipset >= NVISA_GV100_CHIPSET);
@@ -3635,13 +3627,13 @@ nvir_nir_shader_compiler_options(int chipset, uint8_t shader_type)
    op.intel_vec4 = false;
    op.lower_uniforms_to_ubo = true;
    op.force_indirect_unrolling = (nir_variable_mode) (
-      ((shader_type == PIPE_SHADER_FRAGMENT) ? nir_var_shader_out : 0) |
+      ((shader_type == MESA_SHADER_FRAGMENT) ? nir_var_shader_out : 0) |
       /* HW doesn't support indirect addressing of fragment program inputs
        * on Volta.  The binary driver generates a function to handle every
        * possible indirection, and indirectly calls the function to handle
        * this instead.
        */
-      ((chipset >= NVISA_GV100_CHIPSET && shader_type == PIPE_SHADER_FRAGMENT) ? nir_var_shader_in : 0)
+      ((chipset >= NVISA_GV100_CHIPSET && shader_type == MESA_SHADER_FRAGMENT) ? nir_var_shader_in : 0)
    );
    op.force_indirect_unrolling_sampler = (chipset < NVISA_GF100_CHIPSET);
    op.max_unroll_iterations = 32;
@@ -3672,7 +3664,6 @@ nvir_nir_shader_compiler_options(int chipset, uint8_t shader_type)
       ((chipset >= NVISA_GV100_CHIPSET) ? nir_lower_ddiv : 0)
    );
    op.discard_is_demote = true;
-   op.has_ddx_intrinsics = true;
    op.scalarize_ddx = true;
    op.support_indirect_inputs = (uint8_t)BITFIELD_MASK(MESA_SHADER_GEOMETRY + 1);
    op.support_indirect_outputs = (uint8_t)BITFIELD_MASK(MESA_SHADER_GEOMETRY + 1);
@@ -3689,27 +3680,27 @@ nvir_nir_shader_compiler_options(int chipset, uint8_t shader_type)
 }
 
 static const nir_shader_compiler_options g80_nir_shader_compiler_options =
-nvir_nir_shader_compiler_options(NVISA_G80_CHIPSET, PIPE_SHADER_TYPES);
+nvir_nir_shader_compiler_options(NVISA_G80_CHIPSET, MESA_SHADER_STAGES);
 static const nir_shader_compiler_options g80_fs_nir_shader_compiler_options =
-nvir_nir_shader_compiler_options(NVISA_G80_CHIPSET, PIPE_SHADER_FRAGMENT);
+nvir_nir_shader_compiler_options(NVISA_G80_CHIPSET, MESA_SHADER_FRAGMENT);
 static const nir_shader_compiler_options gf100_nir_shader_compiler_options =
-nvir_nir_shader_compiler_options(NVISA_GF100_CHIPSET, PIPE_SHADER_TYPES);
+nvir_nir_shader_compiler_options(NVISA_GF100_CHIPSET, MESA_SHADER_STAGES);
 static const nir_shader_compiler_options gf100_fs_nir_shader_compiler_options =
-nvir_nir_shader_compiler_options(NVISA_GF100_CHIPSET, PIPE_SHADER_FRAGMENT);
+nvir_nir_shader_compiler_options(NVISA_GF100_CHIPSET, MESA_SHADER_FRAGMENT);
 static const nir_shader_compiler_options gm107_nir_shader_compiler_options =
-nvir_nir_shader_compiler_options(NVISA_GM107_CHIPSET, PIPE_SHADER_TYPES);
+nvir_nir_shader_compiler_options(NVISA_GM107_CHIPSET, MESA_SHADER_STAGES);
 static const nir_shader_compiler_options gm107_fs_nir_shader_compiler_options =
-nvir_nir_shader_compiler_options(NVISA_GM107_CHIPSET, PIPE_SHADER_FRAGMENT);
+nvir_nir_shader_compiler_options(NVISA_GM107_CHIPSET, MESA_SHADER_FRAGMENT);
 static const nir_shader_compiler_options gv100_nir_shader_compiler_options =
-nvir_nir_shader_compiler_options(NVISA_GV100_CHIPSET, PIPE_SHADER_TYPES);
+nvir_nir_shader_compiler_options(NVISA_GV100_CHIPSET, MESA_SHADER_STAGES);
 static const nir_shader_compiler_options gv100_fs_nir_shader_compiler_options =
-nvir_nir_shader_compiler_options(NVISA_GV100_CHIPSET, PIPE_SHADER_FRAGMENT);
+nvir_nir_shader_compiler_options(NVISA_GV100_CHIPSET, MESA_SHADER_FRAGMENT);
 
 const nir_shader_compiler_options *
 nv50_ir_nir_shader_compiler_options(int chipset,  uint8_t shader_type)
 {
    if (chipset >= NVISA_GV100_CHIPSET) {
-      if (shader_type == PIPE_SHADER_FRAGMENT) {
+      if (shader_type == MESA_SHADER_FRAGMENT) {
          return &gv100_fs_nir_shader_compiler_options;
       } else {
          return &gv100_nir_shader_compiler_options;
@@ -3717,7 +3708,7 @@ nv50_ir_nir_shader_compiler_options(int chipset,  uint8_t shader_type)
    }
 
    if (chipset >= NVISA_GM107_CHIPSET) {
-      if (shader_type == PIPE_SHADER_FRAGMENT) {
+      if (shader_type == MESA_SHADER_FRAGMENT) {
          return &gm107_fs_nir_shader_compiler_options;
       } else {
          return &gm107_nir_shader_compiler_options;
@@ -3725,14 +3716,14 @@ nv50_ir_nir_shader_compiler_options(int chipset,  uint8_t shader_type)
    }
 
    if (chipset >= NVISA_GF100_CHIPSET) {
-      if (shader_type == PIPE_SHADER_FRAGMENT) {
+      if (shader_type == MESA_SHADER_FRAGMENT) {
          return &gf100_fs_nir_shader_compiler_options;
       } else {
          return &gf100_nir_shader_compiler_options;
       }
    }
 
-   if (shader_type == PIPE_SHADER_FRAGMENT) {
+   if (shader_type == MESA_SHADER_FRAGMENT) {
       return &g80_fs_nir_shader_compiler_options;
    } else {
       return &g80_nir_shader_compiler_options;

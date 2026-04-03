@@ -203,14 +203,16 @@ vk_instance_init(struct vk_instance *instance,
       return vk_error(instance, VK_ERROR_INITIALIZATION_FAILED);
    }
 
-   instance->trace_mode = parse_debug_string(getenv("MESA_VK_TRACE"), trace_options);
+   instance->trace_mode = parse_debug_string(os_get_option("MESA_VK_TRACE"), trace_options);
    instance->trace_per_submit = debug_get_bool_option("MESA_VK_TRACE_PER_SUBMIT", false);
    if (!instance->trace_per_submit) {
       instance->trace_frame = (uint32_t)debug_get_num_option("MESA_VK_TRACE_FRAME", 0xFFFFFFFF);
-      instance->trace_trigger_file = secure_getenv("MESA_VK_TRACE_TRIGGER");
+      instance->trace_trigger_file = os_get_option_secure("MESA_VK_TRACE_TRIGGER");
    }
 
+#if HAVE_RENDERDOC_INTEGRATION
    simple_mtx_init(&instance->renderdoc_mtx, mtx_plain);
+#endif
 
 #if !VK_LITE_RUNTIME_INSTANCE
    glsl_type_singleton_init_or_ref();
@@ -238,7 +240,9 @@ vk_instance_finish(struct vk_instance *instance)
    glsl_type_singleton_decref();
 #endif
 
+#if HAVE_RENDERDOC_INTEGRATION
    simple_mtx_destroy(&instance->renderdoc_mtx);
+#endif
 
    if (unlikely(!list_is_empty(&instance->debug_utils.callbacks))) {
       list_for_each_entry_safe(struct vk_debug_utils_messenger, messenger,
@@ -403,7 +407,7 @@ void
 vk_instance_add_driver_trace_modes(struct vk_instance *instance,
                                    const struct debug_control *modes)
 {
-   instance->trace_mode |= parse_debug_string(getenv("MESA_VK_TRACE"), modes);
+   instance->trace_mode |= parse_debug_string(os_get_option("MESA_VK_TRACE"), modes);
 }
 
 static VkResult
@@ -555,16 +559,6 @@ vk_common_EnumeratePhysicalDeviceGroups(VkInstance _instance, uint32_t *pGroupCo
    return vk_outarray_status(&out);
 }
 
-/* For Windows, PUBLIC is default-defined to __declspec(dllexport) to automatically export the
- * public entrypoints from a DLL. However, this declspec needs to match between declaration and
- * definition, and this attribute is not present on the prototypes specified in vk_icd.h. Instead,
- * we'll use a .def file to manually export these entrypoints on Windows.
- */
-#ifdef _WIN32
-#undef PUBLIC
-#define PUBLIC
-#endif
-
 /* With version 4+ of the loader interface the ICD should expose
  * vk_icdGetPhysicalDeviceProcAddr()
  */
@@ -657,7 +651,7 @@ vk_icdNegotiateLoaderICDInterfaceVersion(uint32_t *pSupportedVersion)
 void
 vk_instance_start_renderdoc_capture(struct vk_instance *instance)
 {
-#ifndef _WIN32
+#if HAVE_RENDERDOC_INTEGRATION
    simple_mtx_lock(&instance->renderdoc_mtx);
 
    if (!instance->renderdoc_api) {
@@ -679,6 +673,7 @@ vk_instance_start_renderdoc_capture(struct vk_instance *instance)
 void
 vk_instance_end_renderdoc_capture(struct vk_instance *instance)
 {
+#if HAVE_RENDERDOC_INTEGRATION
    if (!instance->renderdoc_api)
       return;
 
@@ -688,4 +683,5 @@ vk_instance_end_renderdoc_capture(struct vk_instance *instance)
       instance->renderdoc_api->EndFrameCapture(NULL, NULL);
 
    simple_mtx_unlock(&instance->renderdoc_mtx);
+#endif
 }

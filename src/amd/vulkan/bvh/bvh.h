@@ -34,6 +34,7 @@
 #else
 #include <vulkan/vulkan.h>
 typedef uint16_t float16_t;
+typedef struct radv_aabb16 radv_aabb16;
 #endif
 
 struct radv_accel_struct_serialization_header {
@@ -112,9 +113,18 @@ struct radv_bvh_instance_node {
    mat3x4 otw_matrix;
 };
 
+struct radv_aabb16 {
+   float16_t min_x;
+   float16_t min_y;
+   float16_t min_z;
+   float16_t max_x;
+   float16_t max_y;
+   float16_t max_z;
+};
+
 struct radv_bvh_box16_node {
    uint32_t children[4];
-   float16_t coords[4][2][3];
+   radv_aabb16 coords[4];
 };
 
 struct radv_bvh_box32_node {
@@ -159,7 +169,7 @@ typedef struct radv_gfx12_box_child radv_gfx12_box_child;
 struct radv_gfx12_box_node {
    uint32_t internal_base_id;
    uint32_t primitive_base_id;
-   uint32_t unused;
+   uint32_t parent_id;
    vec3 origin;
    uint32_t child_count_exponents;
    uint32_t obb_matrix_index;
@@ -169,7 +179,7 @@ struct radv_gfx12_box_node {
 struct radv_gfx12_instance_node {
    mat3x4 wto_matrix;
    uint64_t pointer_flags_bvh_addr;
-   uint32_t unused;
+   uint32_t parent_id;
    uint32_t cull_mask_user_data;
    vec3 origin;
    uint32_t child_count_exponents;
@@ -193,6 +203,15 @@ struct radv_gfx12_instance_node_user_data {
 
 struct radv_gfx12_primitive_node {
    uint32_t dwords[32];
+};
+
+#define RADV_TRIANGLE_ENCODE_TASK_TRIANGLE_COUNT 16
+#define RADV_TRIANGLE_ENCODE_TASK_INVOCATION_COUNT 8
+
+struct radv_triangle_encode_task {
+   uint32_t parent_offset;
+   /* The pair index is stored in the 4 high bits and the node index is stored in the low bits. */
+   uint32_t pair_index_node_index[RADV_TRIANGLE_ENCODE_TASK_TRIANGLE_COUNT];
 };
 
 #endif /* BVH_H */

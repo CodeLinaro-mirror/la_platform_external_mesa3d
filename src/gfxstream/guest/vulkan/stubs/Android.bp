@@ -1,0 +1,47 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+cc_library_headers {
+    name: "inc_gfxstream_vk_stubs",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_static {
+    name: "gfxstream_vk_stubs",
+    vendor: true,
+    cpp_std: "c++17",
+    host_supported: true,
+    defaults: [
+        "_trial_msvc",
+        "aosp_mesa3d_cpp_link_args",
+        "aosp_mesa3d_cpp_project_args",
+        "gfxstream_guest_args",
+        "vulkan_wsi_list",
+    ],
+    header_libs: [
+        "inc_connection_manager",
+        "inc_guest_iostream",
+        "inc_platform_virtgpu",
+        "inc_src",
+    ],
+    srcs: [
+        "GfxStreamRenderControl.cpp",
+    ],
+}

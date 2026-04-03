@@ -1,7 +1,6 @@
 /*
  * Copyright © 2024 Collabora Ltd.
  * Copyright © 2024 Arm Ltd.
- *
  * SPDX-License-Identifier: MIT
  */
 #include "drm-uapi/panthor_drm.h"
@@ -300,7 +299,8 @@ generate_tiler_oom_handler(struct panvk_device *dev,
    }
 
    assert(cs_is_valid(&b));
-   cs_finish(&b);
+   cs_end(&b);
+   cs_builder_fini(&b);
    *dump_region_size = handler.dump_size;
 
    return handler.length * sizeof(uint64_t);
@@ -310,11 +310,10 @@ generate_tiler_oom_handler(struct panvk_device *dev,
 VkResult
 panvk_per_arch(init_tiler_oom)(struct panvk_device *device)
 {
-   struct panvk_instance *instance =
-      to_panvk_instance(device->vk.physical->instance);
-   bool tracing_enabled = instance->debug_flags & PANVK_DEBUG_TRACE;
+   const bool tracing_enabled = PANVK_DEBUG(TRACE);
    VkResult result = panvk_priv_bo_create(
-      device, TILER_OOM_HANDLER_MAX_SIZE * 2 * MAX_RTS, 0,
+      device, TILER_OOM_HANDLER_MAX_SIZE * 2 * MAX_RTS,
+      panvk_device_adjust_bo_flags(device, PAN_KMOD_BO_FLAG_WB_MMAP),
       VK_SYSTEM_ALLOCATION_SCOPE_DEVICE, &device->tiler_oom.handlers_bo);
    if (result != VK_SUCCESS)
       return result;
@@ -338,6 +337,7 @@ panvk_per_arch(init_tiler_oom)(struct panvk_device *device)
             generate_tiler_oom_handler(device, handler_mem, zs_ext, rt_count,
                                        tracing_enabled, &dump_region_size);
 
+
          /* All handlers must have the same length */
          assert(idx == 0 || handler_length == device->tiler_oom.handler_stride);
          device->tiler_oom.handler_stride = handler_length;
@@ -346,6 +346,9 @@ panvk_per_arch(init_tiler_oom)(struct panvk_device *device)
                  dump_region_size);
       }
    }
+
+   panvk_priv_bo_flush(device->tiler_oom.handlers_bo, 0,
+                       pan_kmod_bo_size(device->tiler_oom.handlers_bo->bo));
 
    return result;
 }

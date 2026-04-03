@@ -61,7 +61,6 @@
 #include "common/freedreno_common.h"
 #include "perfcntrs/freedreno_perfcntr.h"
 
-#include <vulkan/vk_android_native_buffer.h>
 #include <vulkan/vk_icd.h>
 #include <vulkan/vulkan.h>
 
@@ -92,7 +91,9 @@
 #define MAX_DYNAMIC_STORAGE_BUFFERS 8
 #define MAX_DYNAMIC_BUFFERS_SIZE                                             \
    (MAX_DYNAMIC_UNIFORM_BUFFERS + 2 * MAX_DYNAMIC_STORAGE_BUFFERS) *         \
-   A6XX_TEX_CONST_DWORDS
+   FDL6_TEX_CONST_DWORDS
+
+#define TU_MAX_VIS_STREAMS 4
 
 /* With dynamic rendering, input attachment indices are shifted by 1 and
  * attachment 0 is used for input attachments without an InputAttachmentIndex
@@ -105,6 +106,7 @@
 
 #define TU_MAX_DRM_DEVICES 8
 #define MAX_VIEWS 16
+#define MAX_HW_SCALED_VIEWS 6
 #define MAX_BIND_POINTS 2 /* compute + graphics */
 /* match the latest Qualcomm driver which is also a hw limit on later gens */
 #define MAX_STORAGE_BUFFER_RANGE (1u << 27)
@@ -122,7 +124,6 @@
 #define MAX_INLINE_UBO_RANGE 256
 #define MAX_INLINE_UBOS 4
 
-#define A6XX_TEX_CONST_DWORDS 16
 #define A6XX_TEX_SAMP_DWORDS 4
 
 /* We sample the fragment density map on the CPU, so technically the
@@ -147,6 +148,41 @@
  * Choose 8 as a compromise between the two.
  */
 #define TU_FDM_OFFSET_GRANULARITY 8
+
+enum tu_predicate_bit {
+   TU_PREDICATE_LOAD_STORE = 0,
+   TU_PREDICATE_PERFCNTRS = 1,
+   TU_PREDICATE_CB_ENABLED = 2,
+   TU_PREDICATE_VTX_STATS_RUNNING = 3,
+   TU_PREDICATE_VTX_STATS_NOT_RUNNING = 4,
+   TU_PREDICATE_FIRST_TILE = 5,
+   TU_PREDICATE_FAST_STORE = 6,
+   TU_PREDICATE_NO_FAST_STORE = 7,
+};
+
+/* Onchip timestamp register layout. */
+enum tu_onchip_addr {
+   /* Registers 0-7 are defined by firmware to be shared between BR/BV.
+    */
+
+   /* See tu7_emit_concurrent_binning */
+   TU_ONCHIP_CB_BR_TIMESTAMP,
+   TU_ONCHIP_CB_BV_TIMESTAMP,
+   TU_ONCHIP_CB_BV_DETERMINATION_FINISHED_TIMESTAMP,
+   TU_ONCHIP_CB_BV_DISABLED_TIMESTAMP,
+   TU_ONCHIP_BARRIER,
+   TU_ONCHIP_CB_RESLIST_OVERFLOW,
+
+   /* Registers 8-15 are defined by firmware to be split between BR and BV.
+    * Each has their own copy.
+    */
+};
+
+struct tu_rect2d_float {
+   float x_start, y_start;
+   float x_end, y_end;
+};
+
 
 #define TU_GENX(FUNC_NAME) FD_GENX(FUNC_NAME)
 
@@ -183,5 +219,14 @@ struct tu_suballoc_bo;
 struct tu_suballocator;
 struct tu_subpass;
 struct tu_u_trace_submission_data;
+
+/* Helper for iterating over layers of an attachment that handles both
+ * multiview and layered rendering cases.
+ */
+#define for_each_layer(layer, layer_mask, layers) \
+   for (uint32_t layer = 0; \
+        layer < ((layer_mask) ? (util_logbase2(layer_mask) + 1) : (layers)); \
+        layer++) \
+      if (!(layer_mask) || ((layer_mask) & BIT(layer)))
 
 #endif /* TU_COMMON_H */

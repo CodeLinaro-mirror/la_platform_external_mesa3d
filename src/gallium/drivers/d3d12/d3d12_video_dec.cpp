@@ -41,6 +41,7 @@
 #endif
 #include "d3d12_video_buffer.h"
 #include "d3d12_residency.h"
+#include "d3d12_interop_public.h"
 
 #include "vl/vl_video_buffer.h"
 #include "util/format/u_format.h"
@@ -127,8 +128,19 @@ d3d12_video_create_decoder(struct pipe_context *context, const struct pipe_video
                                                             &pD3D12Dec->m_decodeFormatInfo,
                                                             sizeof(pD3D12Dec->m_decodeFormatInfo));
    if (FAILED(hr)) {
-      debug_printf("CheckFeatureSupport failed with HR %x\n", hr);
+      debug_printf("CheckFeatureSupport failed with HR %x\n", (unsigned)hr);
       goto failed;
+   }
+
+   if (pD3D12Ctx->priority_manager)
+   {
+      // Register queue with priority manager
+      if (pD3D12Ctx->priority_manager->register_work_queue(pD3D12Ctx->priority_manager, pD3D12Dec->m_spDecodeCommandQueue.Get()) != 0)
+      {
+         debug_printf("[d3d12_video_decoder] d3d12_video_create_decoder - Failure on "
+                      "pipe_priority_manager::register_work_queue\n");
+         goto failed;
+      }
    }
 
    return &pD3D12Dec->base;
@@ -181,6 +193,16 @@ d3d12_video_decoder_destroy(struct pipe_video_codec *codec)
 
    // No need for m_pD3D12Screen as it is not managed by d3d12_video_decoder
 
+   struct d3d12_context* ctx = d3d12_context(pD3D12Dec->base.context);
+   if (ctx->priority_manager)
+   {
+      if (ctx->priority_manager->unregister_work_queue(ctx->priority_manager, pD3D12Dec->m_spDecodeCommandQueue.Get()) != 0)
+      {
+         debug_printf("D3D12: Failed to unregister command queue with frontend priority manager\n");
+         assert(false);
+      }
+   }
+
    // Call dtor to make ComPtr work
    delete pD3D12Dec;
 }
@@ -212,7 +234,7 @@ d3d12_video_decoder_begin_frame(struct pipe_video_codec *codec,
    HRESULT hr = pD3D12Dec->m_spDecodeCommandList->Reset(
       pD3D12Dec->m_inflightResourcesPool[d3d12_video_decoder_pool_current_index(pD3D12Dec)].m_spCommandAllocator.Get());
    if (FAILED(hr)) {
-      debug_printf("[d3d12_video_decoder] resetting ID3D12GraphicsCommandList failed with HR %x\n", hr);
+      debug_printf("[d3d12_video_decoder] resetting ID3D12GraphicsCommandList failed with HR %x\n", (unsigned)hr);
       assert(false);
    }
 
@@ -772,7 +794,7 @@ d3d12_video_decoder_flush(struct pipe_video_codec *codec)
          debug_printf("[d3d12_video_decoder] d3d12_video_decoder_flush"
                       " - D3D12Device was removed BEFORE commandlist "
                       "execution with HR %x.\n",
-                      hr);
+                      (unsigned)hr);
          goto flush_fail;
       }
 
@@ -784,7 +806,7 @@ d3d12_video_decoder_flush(struct pipe_video_codec *codec)
 
       hr = pD3D12Dec->m_spDecodeCommandList->Close();
       if (FAILED(hr)) {
-         debug_printf("[d3d12_video_decoder] d3d12_video_decoder_flush - Can't close command list with HR %x\n", hr);
+         debug_printf("[d3d12_video_decoder] d3d12_video_decoder_flush - Can't close command list with HR %x\n", (unsigned)hr);
          goto flush_fail;
       }
 
@@ -801,7 +823,7 @@ d3d12_video_decoder_flush(struct pipe_video_codec *codec)
          debug_printf("[d3d12_video_decoder] d3d12_video_decoder_flush"
                       " - D3D12Device was removed AFTER commandlist "
                       "execution with HR %x, but wasn't before.\n",
-                      hr);
+                      (unsigned)hr);
          goto flush_fail;
       }
 
@@ -824,12 +846,15 @@ d3d12_video_decoder_create_command_objects(const struct d3d12_screen *pD3D12Scre
    assert(pD3D12Dec->m_spD3D12VideoDevice);
 
    D3D12_COMMAND_QUEUE_DESC commandQueueDesc = { D3D12_COMMAND_LIST_TYPE_VIDEO_DECODE };
+   if (pD3D12Screen->supports_dynamic_queue_priority)
+      commandQueueDesc.Flags |= D3D12_COMMAND_QUEUE_FLAG_ALLOW_DYNAMIC_PRIORITY;
+
    HRESULT hr = pD3D12Screen->dev->CreateCommandQueue(&commandQueueDesc,
                                                       IID_PPV_ARGS(pD3D12Dec->m_spDecodeCommandQueue.GetAddressOf()));
    if (FAILED(hr)) {
       debug_printf("[d3d12_video_decoder] d3d12_video_decoder_create_command_objects - Call to CreateCommandQueue "
                    "failed with HR %x\n",
-                   hr);
+                   (unsigned)hr);
       return false;
    }
 
@@ -837,7 +862,7 @@ d3d12_video_decoder_create_command_objects(const struct d3d12_screen *pD3D12Scre
    if (FAILED(hr)) {
       debug_printf(
          "[d3d12_video_decoder] d3d12_video_decoder_create_command_objects - Call to CreateFence failed with HR %x\n",
-         hr);
+         (unsigned)hr);
       return false;
    }
 
@@ -849,7 +874,7 @@ d3d12_video_decoder_create_command_objects(const struct d3d12_screen *pD3D12Scre
       if (FAILED(hr)) {
          debug_printf("[d3d12_video_decoder] d3d12_video_decoder_create_command_objects - Call to "
                       "CreateCommandAllocator failed with HR %x\n",
-                      hr);
+                      (unsigned)hr);
          return false;
       }
 
@@ -872,7 +897,7 @@ d3d12_video_decoder_create_command_objects(const struct d3d12_screen *pD3D12Scre
    if (FAILED(hr)) {
       debug_printf("[d3d12_video_decoder] d3d12_video_decoder_create_command_objects - Call to CreateCommandList "
                    "failed with HR %x\n",
-                   hr);
+                   (unsigned)hr);
       return false;
    }
 
@@ -908,7 +933,7 @@ d3d12_video_decoder_check_caps_and_create_decoder(const struct d3d12_screen *pD3
    if (FAILED(hr)) {
       debug_printf("[d3d12_video_decoder] d3d12_video_decoder_check_caps_and_create_decoder - CheckFeatureSupport "
                    "failed with HR %x\n",
-                   hr);
+                   (unsigned)hr);
       return false;
    }
 
@@ -942,7 +967,7 @@ d3d12_video_decoder_check_caps_and_create_decoder(const struct d3d12_screen *pD3
    if (FAILED(hr)) {
       debug_printf("[d3d12_video_decoder] d3d12_video_decoder_check_caps_and_create_decoder - CreateVideoDecoder "
                    "failed with HR %x\n",
-                   hr);
+                   (unsigned)hr);
       return false;
    }
 
@@ -988,7 +1013,7 @@ d3d12_video_decoder_create_staging_bitstream_buffer(const struct d3d12_screen *p
    if (FAILED(hr)) {
       debug_printf("[d3d12_video_decoder] d3d12_video_decoder_create_staging_bitstream_buffer - "
                    "CreateCommittedResource failed with HR %x\n",
-                   hr);
+                   (unsigned)hr);
       return false;
    }
 
@@ -1029,7 +1054,7 @@ d3d12_video_decoder_prepare_for_decode_frame(struct d3d12_video_decoder *pD3D12D
    if (pD3D12Dec->m_spDPBManager->is_pipe_buffer_underlying_output_decode_allocation()) {
       assert(d3d12_resource_resource(vidBuffer->texture) == *ppOutTexture2D);
       // Make it permanently resident for video use
-      d3d12_promote_to_permanent_residency(pD3D12Dec->m_pD3D12Screen, vidBuffer->texture);
+      d3d12_promote_to_permanent_residency(pD3D12Dec->m_pD3D12Screen, &vidBuffer->texture, 1);
    }
 
    // Get the reference only texture for the current frame to be decoded (if applicable)
@@ -1151,7 +1176,7 @@ d3d12_video_decoder_reconfigure_dpb(struct d3d12_video_decoder *pD3D12Dec,
       if (FAILED(hr)) {
          debug_printf(
             "[d3d12_video_decoder] d3d12_video_decoder_reconfigure_dpb - CreateVideoDecoder failed with HR %x\n",
-            hr);
+            (unsigned)hr);
          return false;
       }
       // Update state after CreateVideoDecoder succeeds only.
@@ -1203,7 +1228,7 @@ d3d12_video_decoder_reconfigure_dpb(struct d3d12_video_decoder *pD3D12Dec,
       if (FAILED(hr)) {
          debug_printf(
             "[d3d12_video_decoder] d3d12_video_decoder_reconfigure_dpb - CreateVideoDecoderHeap failed with HR %x\n",
-            hr);
+            (unsigned)hr);
          return false;
       }
       // Update pD3D12Dec after CreateVideoDecoderHeap succeeds only.
@@ -1655,7 +1680,7 @@ d3d12_video_decoder_sync_completion(struct pipe_video_codec *codec,
 
    hr = pool_entry.m_spCommandAllocator->Reset();
    if (FAILED(hr)) {
-      debug_printf("failed with %x.\n", hr);
+      debug_printf("failed with %x.\n", (unsigned)hr);
       goto sync_with_token_fail;
    }
 
@@ -1665,7 +1690,7 @@ d3d12_video_decoder_sync_completion(struct pipe_video_codec *codec,
       debug_printf("[d3d12_video_decoder] d3d12_video_decoder_sync_completion"
                    " - D3D12Device was removed AFTER d3d12_video_decoder_ensure_fence_finished "
                    "execution with HR %x, but wasn't before.\n",
-                   hr);
+                   (unsigned)hr);
       goto sync_with_token_fail;
    }
 

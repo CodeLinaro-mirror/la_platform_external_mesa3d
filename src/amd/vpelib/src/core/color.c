@@ -1,4 +1,4 @@
-/* Copyright 2022 Advanced Micro Devices, Inc.
+/* Copyright 2022-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -34,6 +34,7 @@
 #include "3dlut_builder.h"
 #include "shaper_builder.h"
 #include "geometric_scaling.h"
+#include "conversion.h"
 
 static void color_check_input_cm_update(struct vpe_priv *vpe_priv, struct stream_ctx *stream_ctx,
     const struct vpe_color_space *vcs, const struct vpe_color_adjust *adjustments,
@@ -177,14 +178,15 @@ static enum vpe_status vpe_allocate_cm_memory(
         }
 
         if (!stream_ctx->gamut_remap) {
-            stream_ctx->gamut_remap = vpe_zalloc(sizeof(struct colorspace_transform));
+            stream_ctx->gamut_remap =
+                (struct colorspace_transform *)vpe_zalloc(sizeof(struct colorspace_transform));
             if (!stream_ctx->gamut_remap) {
                 vpe_log("err: out of memory for gamut_remap!");
                 return VPE_STATUS_NO_MEMORY;
             }
         }
         if (!stream_ctx->blend_tf) {
-            stream_ctx->blend_tf = vpe_zalloc(sizeof(struct transfer_func));
+            stream_ctx->blend_tf = (struct transfer_func *)vpe_zalloc(sizeof(struct transfer_func));
             if (!stream_ctx->blend_tf) {
                 vpe_log("err: out of memory for blend tf!");
                 return VPE_STATUS_NO_MEMORY;
@@ -272,6 +274,18 @@ static bool color_update_input_cs(struct vpe_priv *vpe_priv, enum color_space in
     }
 
     return true;
+}
+
+static bool can_bypass_degamma(const struct stream_ctx *stream_ctx)
+{
+    if (vpe_is_fp16(stream_ctx->stream.surface_info.format))
+        return true;
+    if ((stream_ctx->stream.tm_params.UID != 0) || (stream_ctx->stream.tm_params.enable_3dlut))
+        return true;
+    if (stream_ctx->geometric_scaling)
+        return true;
+
+    return false;
 }
 
 bool vpe_use_csc_adjust(const struct vpe_color_adjust *adjustments)
@@ -650,9 +664,7 @@ enum vpe_status vpe_color_update_color_space_and_tf(
             if (stream_ctx->dirty_bits.transfer_function) {
                 vpe_color_update_degamma_tf(vpe_priv, stream_ctx->tf,
                     vpe_priv->stream_ctx->tf_scaling_factor, y_scale, vpe_fixpt_zero,
-                    is_3dlut_enable || geometric_scaling ||
-                        vpe_is_fp16(stream_ctx->stream.surface_info.format),
-                    stream_ctx->input_tf);
+                    can_bypass_degamma(stream_ctx), stream_ctx->input_tf);
             }
 
             if (stream_ctx->dirty_bits.color_space || output_ctx->dirty_bits.color_space) {
@@ -691,15 +703,15 @@ enum vpe_status vpe_color_update_color_space_and_tf(
     return status;
 }
 
-enum vpe_status vpe_color_tm_update_hdr_mult(uint16_t shaper_in_exp_max, uint32_t peak_white,
-    struct fixed31_32 *hdr_multiplier, bool enable3dlut, bool is_fp16)
+enum vpe_status vpe_color_tm_update_hdr_mult(
+    uint32_t peak_white, struct fixed31_32 *hdr_multiplier, bool enable3dlut, bool is_g10)
 {
     if (enable3dlut) {
         struct fixed31_32 shaper_in_gain;
         struct fixed31_32 pq_norm_gain;
 
-        shaper_in_gain = vpe_fixpt_from_int((long long)1 << shaper_in_exp_max);
-        if (is_fp16) {
+        shaper_in_gain = vpe_fixpt_from_int((long long)1 << SHAPER_EXP_MAX_IN);
+        if (is_g10) {
             *hdr_multiplier = vpe_fixpt_div_int(shaper_in_gain, CCCS_NORM);
         } else {
             // HDRMULT = 2^shaper_in_exp_max*(1/PQ(x))
@@ -766,6 +778,25 @@ enum vpe_status vpe_color_update_shaper(const struct vpe_priv *vpe_priv, uint16_
     return ret;
 }
 
+enum vpe_status vpe_calculate_shaper(struct vpe_priv *vpe_priv, struct stream_ctx *stream_ctx)
+{
+    struct vpe_color_space   cs;
+    enum color_space         out_lut_cs;
+    enum color_transfer_func lut_in_tf;
+    bool                     enable_3dlut =
+        stream_ctx->stream.tm_params.UID != 0 || stream_ctx->stream.tm_params.enable_3dlut;
+
+    // Build the shaper color space based on tone mapping parameters and output surface.
+    vpe_color_build_shaper_cs(&stream_ctx->stream.tm_params, &vpe_priv->output_ctx.surface, &cs);
+
+    // Extract the color space and transfer function from the shaper color space.
+    vpe_color_get_color_space_and_tf(&cs, &out_lut_cs, &lut_in_tf);
+
+    // Update the shaper transfer function for the current stream.
+    return vpe_color_update_shaper(
+        vpe_priv, SHAPER_EXP_MAX_IN, stream_ctx, lut_in_tf, enable_3dlut);
+}
+
 enum vpe_status vpe_color_update_movable_cm(
     struct vpe_priv *vpe_priv, const struct vpe_build_param *param)
 {
@@ -779,17 +810,16 @@ enum vpe_status vpe_color_update_movable_cm(
         stream_ctx = &vpe_priv->stream_ctx[stream_idx];
 
         bool enable_3dlut = stream_ctx->stream.tm_params.UID != 0 || stream_ctx->stream.tm_params.enable_3dlut;
+        uint32_t shaper_norm_factor;
 
         if (stream_ctx->uid_3dlut != stream_ctx->stream.tm_params.UID) {
 
-            uint32_t                 shaper_norm_factor;
             struct vpe_color_space   tm_out_cs;
-            struct vpe_color_space   cs;
             enum color_space         out_lut_cs;
-            enum color_transfer_func tf, lut_in_tf;
-
+            enum color_transfer_func tf;
             if (!stream_ctx->in_shaper_func) {
-                stream_ctx->in_shaper_func = vpe_zalloc(sizeof(struct transfer_func));
+                stream_ctx->in_shaper_func =
+                    (struct transfer_func *)vpe_zalloc(sizeof(struct transfer_func));
                 if (!stream_ctx->in_shaper_func) {
                     vpe_log("err: out of memory for shaper tf!");
                     ret = VPE_STATUS_NO_MEMORY;
@@ -798,7 +828,8 @@ enum vpe_status vpe_color_update_movable_cm(
             }
 
             if (!stream_ctx->blend_tf) {
-                stream_ctx->blend_tf = vpe_zalloc(sizeof(struct transfer_func));
+                stream_ctx->blend_tf =
+                    (struct transfer_func *)vpe_zalloc(sizeof(struct transfer_func));
                 if (!stream_ctx->blend_tf) {
                     vpe_log("err: out of memory for blend/post1d tf!");
                     ret = VPE_STATUS_NO_MEMORY;
@@ -807,7 +838,7 @@ enum vpe_status vpe_color_update_movable_cm(
             }
 
             if (!stream_ctx->lut3d_func) {
-                stream_ctx->lut3d_func = vpe_zalloc(sizeof(struct vpe_3dlut));
+                stream_ctx->lut3d_func = (struct vpe_3dlut *)vpe_zalloc(sizeof(struct vpe_3dlut));
                 if (!stream_ctx->lut3d_func) {
                     vpe_log("err: out of memory for 3d lut!");
                     ret = VPE_STATUS_NO_MEMORY;
@@ -816,25 +847,26 @@ enum vpe_status vpe_color_update_movable_cm(
             }
 
             if (!output_ctx->gamut_remap) {
-                output_ctx->gamut_remap = vpe_zalloc(sizeof(struct colorspace_transform));
+                output_ctx->gamut_remap =
+                    (struct colorspace_transform *)vpe_zalloc(sizeof(struct colorspace_transform));
                 if (!output_ctx->gamut_remap) {
                     vpe_log("err: out of memory for post blend gamut remap!");
                     ret = VPE_STATUS_NO_MEMORY;
                     goto exit;
                 }
             }
-
+            // Get the normalization factor for the shaper based on tone mapping parameters.
             get_shaper_norm_factor(&stream_ctx->stream.tm_params, stream_ctx, &shaper_norm_factor);
 
-            vpe_color_tm_update_hdr_mult(SHAPER_EXP_MAX_IN, shaper_norm_factor,
+            // Update the HDR multiplier based on the shaper normalization factor and other
+            // parameters.
+            vpe_color_tm_update_hdr_mult(shaper_norm_factor,
                 &stream_ctx->lut3d_func->hdr_multiplier, enable_3dlut,
-                vpe_is_fp16(stream_ctx->stream.surface_info.format));
+                stream_ctx->stream.surface_info.cs.tf == VPE_TF_G10);
 
-            vpe_color_build_shaper_cs(
-                &stream_ctx->stream.tm_params, &vpe_priv->output_ctx.surface, &cs);
-            vpe_color_get_color_space_and_tf(&cs, &out_lut_cs, &lut_in_tf);
-            vpe_color_update_shaper(
-                vpe_priv, SHAPER_EXP_MAX_IN, stream_ctx, lut_in_tf, enable_3dlut);
+            vpe_color_update_3dlut(vpe_priv, stream_ctx, enable_3dlut);
+
+            vpe_priv->resource.calculate_shaper(vpe_priv, stream_ctx);
 
             vpe_color_build_tm_cs(
                 &stream_ctx->stream.tm_params, &vpe_priv->output_ctx.surface, &tm_out_cs);

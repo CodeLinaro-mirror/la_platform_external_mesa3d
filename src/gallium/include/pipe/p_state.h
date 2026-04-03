@@ -145,6 +145,12 @@ struct pipe_rasterizer_state
    unsigned rasterizer_discard:1;
 
    /**
+    * Which vertex stream to rasterize (0-3).
+    * Only meaningful with geometry shaders and stream output.
+    */
+   unsigned rasterization_stream:2;
+
+   /**
     * Exposed by pipe_caps.tile_raster_order.  When true,
     * tile_raster_order_increasing_* indicate the order that the rasterizer
     * should render tiles, to meet the requirements of
@@ -203,6 +209,8 @@ struct pipe_rasterizer_state
     */
    unsigned clip_plane_enable:PIPE_MAX_CLIP_PLANES;
 
+   unsigned representative_fragment_test:1;
+
    unsigned line_stipple_factor:8;  /**< [1..256] actually */
    unsigned line_stipple_pattern:16;
 
@@ -242,10 +250,10 @@ struct pipe_viewport_state
 
 struct pipe_scissor_state
 {
-   unsigned minx:16;
-   unsigned miny:16;
-   unsigned maxx:16;
-   unsigned maxy:16;
+   unsigned minx;
+   unsigned miny;
+   unsigned maxx;
+   unsigned maxy;
 };
 
 
@@ -427,12 +435,14 @@ struct pipe_surface
  */
 struct pipe_framebuffer_state
 {
-   uint16_t width, height;
+   uint32_t width, height;
    uint16_t layers;  /**< Number of layers  in a no-attachment framebuffer */
    uint8_t samples; /**< Number of samples in a no-attachment framebuffer */
 
    /** multiple color buffers for multiple render targets */
    uint8_t nr_cbufs;
+   /** true if pixel local storage is enabled */
+   bool pls_enabled;
    /** used for multiview */
    uint8_t viewmask;
    struct pipe_surface cbufs[PIPE_MAX_COLOR_BUFS];
@@ -469,6 +479,7 @@ struct pipe_sampler_state
 };
 
 struct pipe_tex2d_from_buf {
+   /* Only 32K x 32K textures are supported. */
    unsigned offset;  /**< offset in pixels */
    uint16_t row_stride; /**< size of the image row_stride in pixels */
    uint16_t width;      /**< width of image provided by application */
@@ -549,7 +560,7 @@ struct pipe_resource
    EXCLUSIVE_CACHELINE(struct pipe_reference reference);
 
    uint32_t width0; /**< Used by both buffers and textures. */
-   uint16_t height0; /* Textures: The maximum height/depth/array_size is 16k. */
+   uint32_t height0;    /* textures >= 64K are possible */
    uint16_t depth0;
    uint16_t array_size;
 
@@ -848,11 +859,9 @@ struct pipe_draw_info
    bool index_bounds_valid:1; /**< whether min_index and max_index are valid;
                                    they're always invalid if index_size == 0 */
    bool increment_draw_id:1;  /**< whether drawid increments for direct draws */
-   bool take_index_buffer_ownership:1; /**< callee inherits caller's refcount
-         (no need to reference indexbuf, but still needs to unreference it) */
    bool index_bias_varies:1;   /**< true if index_bias varies between draws */
    bool was_line_loop:1; /**< true if mesa_prim was LINE_LOOP before translation */
-   uint8_t _pad:1;
+   uint8_t _pad:2;
 
    unsigned start_instance; /**< first instance id */
    unsigned instance_count; /**< number of instances */
@@ -1054,6 +1063,13 @@ enum pipe_ml_operation_type {
    PIPE_ML_OPERATION_TYPE_LOGISTIC,
    PIPE_ML_OPERATION_TYPE_SUBTRACT,
    PIPE_ML_OPERATION_TYPE_TRANSPOSE,
+   PIPE_ML_OPERATION_TYPE_STRIDED_SLICE,
+   PIPE_ML_OPERATION_TYPE_RESIZE,
+};
+
+enum pipe_ml_pooling_type {
+   PIPE_ML_POOLING_TYPE_AVG,
+   PIPE_ML_POOLING_TYPE_MAX,
 };
 
 /**
@@ -1124,6 +1140,12 @@ struct pipe_ml_operation
          unsigned dilation_height_factor;
       } conv;
       struct {
+
+         /**
+          * Type of pooling operation.
+          */
+         enum pipe_ml_pooling_type type;
+
          /**
           * Stride used to access the input tensor on the x axis.
           */
@@ -1221,6 +1243,12 @@ struct pipe_ml_operation
       struct {
          unsigned perm[4];
       } transpose;
+
+      struct {
+         int begin[4];
+         int end[4];
+         int strides[4];
+      } slice;
    };
 };
 

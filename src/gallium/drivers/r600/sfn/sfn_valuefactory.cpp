@@ -352,7 +352,8 @@ ValueFactory::dest(const nir_def& ssa, int chan, Pin pin_channel, uint8_t chan_m
       sel = m_next_register_index++;
       sfn_log << SfnLog::reg << "Assign " << sel << " to index " << ssa.index << " in "
               << &m_ssa_index_to_sel << "\n";
-      m_ssa_index_to_sel[ssa.index] = sel;
+      if (pin_channel != pin_free)
+         m_ssa_index_to_sel[ssa.index] = sel;
    }
 
    if (pin_channel == pin_free)
@@ -592,7 +593,7 @@ split_register_string(const string& s,
 }
 
 PRegister
-ValueFactory::dest_from_string(const std::string& s)
+ValueFactory::dest_from_string(const std::string& s, int *dest_chan)
 {
    if (s == "AR") {
       if (!m_ar)
@@ -615,7 +616,7 @@ ValueFactory::dest_from_string(const std::string& s)
 
    assert(s.length() >= 4);
 
-   assert(strchr("ARS_", s[0]));
+   assert(strchr("ARS_(", s[0]));
 
    split_register_string(s, index_str, size_str, swizzle_str, pin_str);
 
@@ -623,7 +624,9 @@ ValueFactory::dest_from_string(const std::string& s)
    if (s[0] == '_') {
       /* Since these instructions still may use or switch to a different
        * channel we have to create a new instance for each occurrence */
-      sel = std::numeric_limits<int>::max() - m_nowrite_idx++;
+      sel = -1;
+   } else if (s[0] == '(') {
+      sel = g_registers_unused;
    } else {
       std::istringstream n(index_str);
       n >> sel;
@@ -643,6 +646,7 @@ ValueFactory::dest_from_string(const std::string& s)
    case '_':
       pool = vp_ignore;
       break;
+   case '(':
    case 'S':
       pool = vp_ssa;
       break;
@@ -651,6 +655,12 @@ ValueFactory::dest_from_string(const std::string& s)
    }
 
    bool is_ssa = s[0] == 'S';
+
+   if (pool == vp_ignore) {
+      assert(dest_chan);
+      *dest_chan = chan;
+      return nullptr;
+   }
 
    RegisterKey key(sel, chan, pool);
 
@@ -777,6 +787,13 @@ ValueFactory::src_from_string(const std::string& s)
          }
          return array->element(offset, addr, chan - array->frac());
       } else {
+         auto old_pin = ireg->second->pin();
+         if (old_pin != p) {
+            if ((old_pin == pin_group && p == pin_chgr) ||
+                ((old_pin == pin_free || old_pin == pin_none) &&
+                 (p == pin_chan || p == pin_group)))
+               ireg->second->set_pin(p);
+         }
          return ireg->second;
       }
    } else {
@@ -968,7 +985,7 @@ ValueFactory::prepare_live_range_map()
             result.append_register(a);
          }
       } else {
-         if (reg->chan() < 4)
+         if (reg->chan() < 4 && reg->sel() != g_registers_unused)
             result.append_register(reg);
       }
    }

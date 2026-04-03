@@ -10,6 +10,7 @@ dep_paste = dependency('paste',
 )
 
 dep_rustc_hash = dependency('rustc-hash',
+  version: '>= 2.0',
   fallback: ['rustc-hash-2-rs', 'dep_rustc_hash'],
   required: true,
 )
@@ -64,6 +65,7 @@ _nak_bindings_rs = rust.bindgen(
     '--allowlist-type', 'nak_.*',
     '--allowlist-type', 'nouveau_ws_.*',
     '--allowlist-var', 'DRM_.*',
+    '--allowlist-var', 'NAK_.*',
     '--allowlist-var', 'NVIDIA_VENDOR_ID',
     '--allowlist-function', 'drm.*',
     '--allowlist-function', 'nak_.*',
@@ -94,6 +96,7 @@ _libnak_ir_proc_rs = rust.proc_macro(
   'nak_ir_proc',
   files('nak/ir_proc.rs'),
   dependencies : [idep_compiler_proc_rs],
+  rust_args : rust_global_args,
 )
 
 _libnak_rs = static_library(
@@ -164,7 +167,7 @@ nak_nir_algebraic_c = custom_target(
 _libnak = static_library(
   'nak',
   [libnak_c_files, nak_nir_algebraic_c],
-  include_directories : [inc_include, inc_src, inc_mapi, inc_mesa, inc_gallium],
+  include_directories : [inc_include, inc_src],
   dependencies : libnak_deps,
   link_with : [_libnak_rs],
   c_args : [no_override_init_args],

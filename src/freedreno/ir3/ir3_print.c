@@ -82,6 +82,14 @@ print_instr_name(struct log_stream *stream, struct ir3_instruction *instr,
          mesa_log_stream_printf(stream, "(ul)");
       if (instr->flags & IR3_INSTR_SAT)
          mesa_log_stream_printf(stream, "(sat)");
+      if (instr->flags & IR3_INSTR_EQ)
+         mesa_log_stream_printf(stream, "(eq)");
+      if (instr->flags & IR3_INSTR_NEEDS_HELPERS)
+         mesa_log_stream_printf(stream, "(needs_helpers)");
+      if (instr->flags & IR3_INSTR_EOLM)
+         mesa_log_stream_printf(stream, "(eolm)");
+      if (instr->flags & IR3_INSTR_EOGM)
+         mesa_log_stream_printf(stream, "(eogm)");
    } else {
       mesa_log_stream_printf(stream, " ");
    }
@@ -192,6 +200,10 @@ print_instr_name(struct log_stream *stream, struct ir3_instruction *instr,
          mesa_log_stream_printf(stream, ".a1en");
       if (instr->flags & IR3_INSTR_U)
          mesa_log_stream_printf(stream, ".u");
+      if (instr->flags & IR3_INSTR_RCK)
+         mesa_log_stream_printf(stream, ".rck");
+      if (instr->flags & IR3_INSTR_CLP)
+         mesa_log_stream_printf(stream, ".clp");
       if (instr->opc == OPC_LDC)
          mesa_log_stream_printf(stream, ".offset%d", instr->cat6.d);
       if (instr->opc == OPC_LDC_K)
@@ -245,6 +257,12 @@ print_instr_name(struct log_stream *stream, struct ir3_instruction *instr,
 
          mesa_log_stream_printf(stream, ".%s", type_name(instr->cat6.type));
          break;
+      case OPC_IMG_BINDLESS: {
+         mesa_log_stream_printf(
+            stream, ".%s",
+            instr->cat5.match_mode == IR3_MATCH_MODE_SSD ? "ssd" : "sad");
+         break;
+      }
       case OPC_ALIAS:
          switch (instr->cat7.alias_scope) {
          case ALIAS_TEX:
@@ -355,6 +373,8 @@ print_reg_name(struct log_stream *stream, struct ir3_instruction *instr,
          mesa_log_stream_printf(stream, "!");
    }
 
+   if (reg->flags & IR3_REG_UNIFORM)
+      mesa_log_stream_printf(stream, "u");
    if (reg->flags & IR3_REG_SHARED)
       mesa_log_stream_printf(stream, "s");
    if (reg->flags & IR3_REG_HALF)
@@ -450,6 +470,9 @@ print_instr(struct log_stream *stream, struct ir3_instruction *instr, int lvl)
       }
    }
 
+   if (instr->flags & IR3_INSTR_SAT)
+      mesa_log_stream_printf(stream, "(sat)");
+
    bool first = true;
    foreach_dst (reg, instr) {
       if (reg->wrmask == 0)
@@ -475,6 +498,11 @@ print_instr(struct log_stream *stream, struct ir3_instruction *instr, int lvl)
       if (instr->opc == OPC_END || instr->opc == OPC_CHMASK)
          mesa_log_stream_printf(stream, " (%u)", instr->end.outidxs[n]);
       first = false;
+   }
+
+   if ((opc_cat(instr->opc) == 1) && (instr->cat1.r[0] || instr->cat1.r[1])) {
+      mesa_log_stream_printf(stream, ", %u, %u",
+                             instr->cat1.r[0], instr->cat1.r[1]);
    }
 
    if (is_tex(instr) && !(instr->flags & IR3_INSTR_S2EN) &&

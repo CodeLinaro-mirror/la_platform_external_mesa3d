@@ -14,12 +14,14 @@
 #include "nvk_shader.h"
 
 #include "util/bitpack_helpers.h"
+#include "util/compiler.h"
 #include "vk_format.h"
 #include "vk_render_pass.h"
 #include "vk_standard_sample_locations.h"
 
 #include "nv_push_cl902d.h"
 #include "nv_push_cl9097.h"
+#include "nv_push_cl9297.h"
 #include "nv_push_cl90b5.h"
 #include "nv_push_cl90c0.h"
 #include "nv_push_cla097.h"
@@ -30,6 +32,7 @@
 #include "nv_push_clc597.h"
 #include "nv_push_clcb97.h"
 #include "nv_push_clcd97.h"
+#include "clc7c0.h"
 #include "clcb97.h"
 #include "clcd97.h"
 #include "drf.h"
@@ -278,6 +281,11 @@ nvk_push_draw_state_init(struct nvk_queue *queue, struct nv_push *p)
    P_IMMD(p, NV9097, SET_SINGLE_ROP_CONTROL, ENABLE_FALSE);
    P_IMMD(p, NV9097, SET_TWO_SIDED_STENCIL_TEST, ENABLE_TRUE);
 
+   P_IMMD(p, NV9097, SET_ALPHA_TO_COVERAGE_OVERRIDE, {
+      .qualify_by_anti_alias_enable = true,
+      .qualify_by_ps_sample_mask_output = false,
+   });
+
    P_IMMD(p, NV9097, SET_SHADE_MODE, V_OGL_SMOOTH);
 
    P_IMMD(p, NV9097, SET_API_VISIBLE_CALL_LIMIT, V__128);
@@ -385,6 +393,9 @@ nvk_push_draw_state_init(struct nvk_queue *queue, struct nv_push *p)
       .output7 = OUTPUT7_FALSE,
    });
 
+   /* The blob driver just always leaves this on. */
+   P_IMMD(p, NV9097, SET_ZPASS_PIXEL_COUNT, ENABLE_TRUE);
+
    P_IMMD(p, NV9097, SET_POINT_SIZE, fui(1.0));
    P_IMMD(p, NV9097, SET_ATTRIBUTE_POINT_SIZE, { .enable = ENABLE_TRUE });
 
@@ -466,8 +477,17 @@ nvk_push_draw_state_init(struct nvk_queue *queue, struct nv_push *p)
    P_NV9097_SET_WINDOW_OFFSET_X(p, 0);
    P_NV9097_SET_WINDOW_OFFSET_Y(p, 0);
 
-   P_IMMD(p, NV9097, SET_ACTIVE_ZCULL_REGION, 0x3f);
-   P_IMMD(p, NV9097, SET_WINDOW_CLIP_ENABLE, V_FALSE);
+   P_IMMD(p, NV9097, SET_ZCULL_BOUNDS, {
+      .z_min_unbounded_enable = false,
+      .z_max_unbounded_enable = false,
+   });
+   P_IMMD(p, NV9097, SET_ZCULL, {
+      .z_enable = true,
+      .stencil_enable = false,
+   });
+
+   P_1INC(p, NV9097, CALL_MME_MACRO(NVK_MME_UPDATE_WINDOW_CLIP));
+   P_INLINE_DATA(p, 1);
    P_IMMD(p, NV9097, SET_CLIP_ID_TEST, ENABLE_FALSE);
 
 //   P_IMMD(p, NV9097, X_X_X_SET_CLEAR_CONTROL, {
@@ -690,8 +710,9 @@ void
 nvk_cmd_buffer_begin_graphics(struct nvk_cmd_buffer *cmd,
                               const VkCommandBufferBeginInfo *pBeginInfo)
 {
+   const struct nvk_device *dev = nvk_cmd_buffer_device(cmd);
    if (cmd->vk.level == VK_COMMAND_BUFFER_LEVEL_PRIMARY) {
-      struct nv_push *p = nvk_cmd_buffer_push(cmd, 5);
+      struct nv_push *p = nvk_cmd_buffer_push(cmd, 9);
       P_MTHD(p, NV9097, INVALIDATE_SAMPLER_CACHE_NO_WFI);
       P_NV9097_INVALIDATE_SAMPLER_CACHE_NO_WFI(p, {
          .lines = LINES_ALL,
@@ -703,6 +724,13 @@ nvk_cmd_buffer_begin_graphics(struct nvk_cmd_buffer *cmd,
       P_IMMD(p, NVA097, INVALIDATE_SHADER_CACHES_NO_WFI, {
          .constant = CONSTANT_TRUE,
       });
+      if (dev->vk.enabled_extensions.EXT_discard_rectangles) {
+         P_IMMD(p, NV9097,
+                SET_MME_SHADOW_SCRATCH(NVK_MME_SCRATCH_WINDOW_CLIP_ENABLED),
+                0);
+         P_1INC(p, NV9097, CALL_MME_MACRO(NVK_MME_UPDATE_WINDOW_CLIP));
+         P_INLINE_DATA(p, 1);
+      }
    }
 
    cmd->state.gfx.descriptors.flush_root = nvk_cmd_flush_gfx_root_desc;
@@ -793,6 +821,7 @@ nvk_attachment_init(struct nvk_attachment *att,
 
    VK_FROM_HANDLE(nvk_image_view, iview, info->imageView);
    *att = (struct nvk_attachment) {
+      .flags = vk_get_rendering_attachment_flags(info),
       .vk_format = iview->vk.format,
       .iview = iview,
    };
@@ -992,13 +1021,39 @@ get_depth_stencil_plane_params(struct nvk_image_view *iview,
    *image_out = nil_image;
 }
 
+static struct nvk_zcull_plane*
+nvk_get_zcull_plane(struct nvk_rendering_state *render) {
+   if (render->depth_att.iview) {
+      struct nvk_image *img = (struct nvk_image*) render->depth_att.iview->vk.image;
+      if (img->zcull.nil.size_B > 0) {
+         return &img->zcull;
+      }
+   }
+   return NULL;
+}
+
+static uint32_t
+nvk_vk_format_to_zcull_format(VkFormat format) {
+   switch (format) {
+      case VK_FORMAT_D32_SFLOAT:
+      case VK_FORMAT_D32_SFLOAT_S8_UINT:
+         return NV9097_SET_ZCULL_DIR_FORMAT_ZFORMAT_ZF32_1;
+      case VK_FORMAT_D16_UNORM:
+      case VK_FORMAT_D24_UNORM_S8_UINT:
+      case VK_FORMAT_X8_D24_UNORM_PACK32:
+         return NV9097_SET_ZCULL_DIR_FORMAT_ZFORMAT_FP;
+      default:
+         assert(!"Unknown depth format");
+         return NV9097_SET_ZCULL_DIR_FORMAT_ZFORMAT_ZF32_1;
+   }
+}
 
 VKAPI_ATTR void VKAPI_CALL
 nvk_CmdBeginRendering(VkCommandBuffer commandBuffer,
                       const VkRenderingInfo *pRenderingInfo)
 {
    VK_FROM_HANDLE(nvk_cmd_buffer, cmd, commandBuffer);
-   struct nvk_device *dev = nvk_cmd_buffer_device(cmd);
+   const struct nvk_device *dev = nvk_cmd_buffer_device(cmd);
    const struct nvk_physical_device *pdev = nvk_device_physical(dev);
    struct nvk_rendering_state *render = &cmd->state.gfx.render;
 
@@ -1047,7 +1102,10 @@ nvk_CmdBeginRendering(VkCommandBuffer commandBuffer,
 
    nvk_cmd_buffer_dirty_render_pass(cmd);
 
-   struct nv_push *p = nvk_cmd_buffer_push(cmd, NVK_MAX_RTS * 12 + 44);
+   const size_t zcull_count = 51;
+   struct nv_push *p = nvk_cmd_buffer_push(
+      cmd, NVK_MAX_RTS * 12 + 44 + zcull_count
+   );
 
    P_IMMD(p, NV9097, SET_MME_SHADOW_SCRATCH(NVK_MME_SCRATCH_VIEW_MASK),
           render->view_mask);
@@ -1179,7 +1237,7 @@ nvk_CmdBeginRendering(VkCommandBuffer commandBuffer,
             P_NV9097_SET_COLOR_TARGET_LAYER(p, i, 0);
          }
 
-         P_IMMD(p, NV9097, SET_COLOR_COMPRESSION(i), nil_image->compressed);
+         P_IMMD(p, NV9097, SET_COLOR_COMPRESSION(i), image->is_compressed);
       } else {
          P_MTHD(p, NV9097, SET_COLOR_TARGET_A(i));
          P_NV9097_SET_COLOR_TARGET_A(p, i, 0);
@@ -1224,7 +1282,7 @@ nvk_CmdBeginRendering(VkCommandBuffer commandBuffer,
 
       /* We want the combined Z/S format for the SET_ZT_FORMAT packet */
       const enum pipe_format zs_p_format =
-         nvk_format_to_pipe_format(iview->vk.format);
+         nvk_format_to_pipe_format(image->vk.format);
       const uint8_t zs_format = nil_format_to_depth_stencil(zs_p_format);
 
       if (pdev->info.cls_eng3d >= BLACKWELL_A) {
@@ -1269,7 +1327,7 @@ nvk_CmdBeginRendering(VkCommandBuffer commandBuffer,
 
       P_IMMD(p, NV9097, SET_ZT_LAYER, base_array_layer);
 
-      P_IMMD(p, NV9097, SET_Z_COMPRESSION, nil_image.compressed);
+      P_IMMD(p, NV9097, SET_Z_COMPRESSION, image->is_compressed);
 
       if (nvk_cmd_buffer_3d_cls(cmd) >= MAXWELL_B) {
          P_IMMD(p, NVC597, SET_ZT_SPARSE, {
@@ -1306,6 +1364,132 @@ nvk_CmdBeginRendering(VkCommandBuffer commandBuffer,
       }
    } else {
       P_IMMD(p, NV9097, SET_ZT_SELECT, 0 /* target_count */);
+   }
+
+   /* TODO: zcull for depth-stencil */
+   struct nvk_zcull_plane *zcull_plane = nvk_get_zcull_plane(render);
+   bool use_zcull = pdev->info.has_zcull_info &&
+      pRenderingInfo->pDepthAttachment != NULL &&
+      pRenderingInfo->pDepthAttachment->imageView != VK_NULL_HANDLE &&
+      pRenderingInfo->pDepthAttachment->loadOp != VK_ATTACHMENT_LOAD_OP_NONE &&
+      (zcull_plane ||
+       pRenderingInfo->pDepthAttachment->loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR);
+
+   if (use_zcull) {
+      uint32_t start_count = nv_push_dw_count(p);
+      struct nil_zcull zcull_info;
+      uint64_t addr_begin, addr_end;
+
+      if (zcull_plane) {
+         zcull_info = zcull_plane->nil;
+         addr_begin = zcull_plane->addr;
+         addr_end = zcull_plane->addr + zcull_plane->nil.size_B;
+      } else {
+         zcull_info = nil_zcull_new(
+            &pdev->info.zcull_info,
+            render->area.offset.x,
+            render->area.offset.y,
+            render->area.extent.width,
+            render->area.extent.height
+         );
+         addr_begin = 0;
+         addr_end = 0;
+      }
+
+      P_IMMD(p, NV9097, SET_ACTIVE_ZCULL_REGION, 0);
+
+      P_MTHD(p, NV9097, SET_ZCULL_REGION_LOCATION);
+      P_NV9097_SET_ZCULL_REGION_LOCATION(p, {
+         .start_aliquot = 0,
+         .aliquot_count = zcull_info.aliquot_count,
+      });
+      P_NV9097_SET_ZCULL_REGION_ALIQUOTS(p, zcull_info.aliquot_count);
+
+      P_MTHD(p, NV9097, SET_ZCULL_STORAGE_A);
+      P_NV9097_SET_ZCULL_STORAGE_A(p, addr_begin >> 32);
+      P_NV9097_SET_ZCULL_STORAGE_B(p, addr_begin & UINT32_MAX);
+      P_NV9097_SET_ZCULL_STORAGE_C(p, addr_end >> 32);
+      P_NV9097_SET_ZCULL_STORAGE_D(p, addr_end & UINT32_MAX);
+
+      P_IMMD(p, NV9097, SET_ZCULL_REGION_FORMAT, TYPE_Z_4X4);
+
+      P_MTHD(p, NV9097, SET_ZCULL_REGION_SIZE_A);
+      P_NV9097_SET_ZCULL_REGION_SIZE_A(p, zcull_info.width);
+      P_NV9097_SET_ZCULL_REGION_SIZE_B(p, zcull_info.height);
+      P_NV9097_SET_ZCULL_REGION_SIZE_C(p, 1);
+      P_NV9097_SET_ZCULL_REGION_PIXEL_OFFSET_C(p, 0);
+
+      P_MTHD(p, NV9097, SET_ZCULL_REGION_PIXEL_OFFSET_A);
+      P_NV9097_SET_ZCULL_REGION_PIXEL_OFFSET_A(p, zcull_info.x);
+      P_NV9097_SET_ZCULL_REGION_PIXEL_OFFSET_B(p, zcull_info.y);
+
+      P_IMMD(p, NV9297, SET_ZCULL_SUBREGION, {
+         .enable = true,
+         .normalized_aliquots = zcull_info.normalized_aliquots,
+      });
+
+      P_IMMD(p, NV9097, SET_ZCULL_CRITERION, {
+         .sfunc = SFUNC_NEVER,  /* stencil func */
+         .no_invalidate = false,
+         .force_match = false,
+         .sref = 0,
+         .smask = 0,
+      });
+
+      VkFormat fmt = render->depth_att.iview->vk.format;
+      P_IMMD(p, NV9097, SET_ZCULL_DIR_FORMAT, {
+         /* I've tried a variety of depthCompareOp values and depth clear
+          * values, but the blob seems to always use ZDIR_LESS
+          */
+         .zdir = ZDIR_LESS,
+         .zformat = nvk_vk_format_to_zcull_format(fmt),
+      });
+
+      P_0INC(p, NV9297, SET_ZCULL_SUBREGION_ALLOCATION);
+      for (int i = 0; i < zcull_info.subregion_count; i++) {
+         nv_push_val(p, NV9297_SET_ZCULL_SUBREGION_ALLOCATION,
+                     zcull_info.subregions[i]);
+      }
+
+      P_IMMD(p, NV9297, ASSIGN_ZCULL_SUBREGIONS,
+             zcull_info.subregion_algorithm);
+
+      P_IMMD(p, NV9297, SET_ZCULL_SUBREGION_REPORT_TYPE, {
+         .enable = true,
+         .type = TYPE_DEPTH_TEST,
+      });
+
+      float depth = 0.0f;
+      switch (pRenderingInfo->pDepthAttachment->loadOp) {
+         case VK_ATTACHMENT_LOAD_OP_CLEAR:
+            depth =
+               pRenderingInfo->pDepthAttachment->clearValue.depthStencil.depth;
+            FALLTHROUGH;
+         case VK_ATTACHMENT_LOAD_OP_DONT_CARE:
+            P_IMMD(p, NV9097, SET_Z_CLEAR_VALUE, fui(depth));
+
+            P_IMMD(p, NV9097, CLEAR_ZCULL_REGION, {
+               .z_enable = true,
+               .stencil_enable = false,
+               .use_clear_rect = false,
+               .use_rt_array_index = false,
+               .make_conservative = true,
+            });
+            break;
+
+         case VK_ATTACHMENT_LOAD_OP_LOAD:
+            assert(zcull_plane);
+            P_IMMD(p, NV9097, LOAD_ZCULL, 0);
+            break;
+
+         default:
+            assert(!"Unhandled loadOp");
+            break;
+      }
+      uint32_t end_count = nv_push_dw_count(p);
+      assert(end_count - start_count <= zcull_count);
+   } else {
+      P_IMMD(p, NV9097, SET_ACTIVE_ZCULL_REGION, 0x3f);
    }
 
    if (nvk_cmd_buffer_3d_cls(cmd) < TURING_A) {
@@ -1470,10 +1654,18 @@ nvk_CmdBeginRendering(VkCommandBuffer commandBuffer,
 }
 
 VKAPI_ATTR void VKAPI_CALL
-nvk_CmdEndRendering(VkCommandBuffer commandBuffer)
+nvk_CmdEndRendering2KHR(VkCommandBuffer commandBuffer,
+                        const VkRenderingEndInfoKHR *pRenderingEndInfo)
 {
    VK_FROM_HANDLE(nvk_cmd_buffer, cmd, commandBuffer);
    struct nvk_rendering_state *render = &cmd->state.gfx.render;
+
+   struct nvk_zcull_plane* zcull_plane = nvk_get_zcull_plane(render);
+   if (zcull_plane &&
+       render->depth_att.store_op == VK_ATTACHMENT_STORE_OP_STORE) {
+      struct nv_push *p = nvk_cmd_buffer_push(cmd, 2);
+      P_IMMD(p, NV9097, STORE_ZCULL, 0);
+   }
 
    if (!(render->flags & VK_RENDERING_SUSPENDING_BIT)) {
       for (uint32_t i = 0; i < render->color_att_count; i++) {
@@ -1495,12 +1687,19 @@ nvk_CmdEndRendering(VkCommandBuffer commandBuffer)
 
    /* Translate render state back to VK for meta */
    VkRenderingAttachmentInfo vk_color_att[NVK_MAX_RTS];
+   VkRenderingAttachmentFlagsInfoKHR vk_color_att_flags[NVK_MAX_RTS];
    for (uint32_t i = 0; i < render->color_att_count; i++) {
       if (render->color_att[i].resolve_mode != VK_RESOLVE_MODE_NONE)
          need_resolve = true;
 
+      vk_color_att_flags[i] = (VkRenderingAttachmentFlagsInfoKHR) {
+         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_FLAGS_INFO_KHR,
+         .flags = render->color_att[i].flags,
+      };
+
       vk_color_att[i] = (VkRenderingAttachmentInfo) {
          .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+         .pNext = &vk_color_att_flags[i],
          .imageView = nvk_image_view_to_handle(render->color_att[i].iview),
          .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
          .resolveMode = render->color_att[i].resolve_mode,
@@ -1510,8 +1709,13 @@ nvk_CmdEndRendering(VkCommandBuffer commandBuffer)
       };
    }
 
+   const VkRenderingAttachmentFlagsInfoKHR vk_depth_att_flags = {
+      .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_FLAGS_INFO_KHR,
+      .flags = render->depth_att.flags,
+   };
    const VkRenderingAttachmentInfo vk_depth_att = {
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+      .pNext = &vk_depth_att_flags,
       .imageView = nvk_image_view_to_handle(render->depth_att.iview),
       .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
       .resolveMode = render->depth_att.resolve_mode,
@@ -1522,8 +1726,13 @@ nvk_CmdEndRendering(VkCommandBuffer commandBuffer)
    if (render->depth_att.resolve_mode != VK_RESOLVE_MODE_NONE)
       need_resolve = true;
 
+   const VkRenderingAttachmentFlagsInfoKHR vk_stencil_att_flags = {
+      .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_FLAGS_INFO_KHR,
+      .flags = render->stencil_att.flags,
+   };
    const VkRenderingAttachmentInfo vk_stencil_att = {
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+      .pNext = &vk_stencil_att_flags,
       .imageView = nvk_image_view_to_handle(render->stencil_att.iview),
       .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
       .resolveMode = render->stencil_att.resolve_mode,
@@ -1562,7 +1771,7 @@ nvk_CmdEndRendering(VkCommandBuffer commandBuffer)
 
 void
 nvk_cmd_bind_graphics_shader(struct nvk_cmd_buffer *cmd,
-                             const gl_shader_stage stage,
+                             const mesa_shader_stage stage,
                              struct nvk_shader *shader)
 {
    assert(stage < ARRAY_SIZE(cmd->state.gfx.shaders));
@@ -1573,24 +1782,61 @@ nvk_cmd_bind_graphics_shader(struct nvk_cmd_buffer *cmd,
    cmd->state.gfx.shaders_dirty |= mesa_to_vk_shader_stage(stage);
 }
 
+#define NVK_MME_TESS_PARAMS(domain, spacing, prims) \
+   NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, DOMAIN_TYPE, domain) | \
+   NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, SPACING, spacing) | \
+   NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, OUTPUT_PRIMITIVES, prims)
+
+#define NVK_MME_TESS_STATE(domain, spacing, flags) \
+   NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, DOMAIN_TYPE, domain) | \
+   NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, SPACING, spacing) | \
+   flags
+
+#define NVK_MME_FULL_TESS_STATE(ctrl, eval) (ctrl << 8) | (eval)
+
+#define POINT_MODE_BIT 2
+#define CCW_BIT        3
+#define LOWER_LEFT_BIT 6
+
+#define POINT_MODE BITFIELD_BIT(POINT_MODE_BIT)
+#define CCW        BITFIELD_BIT(CCW_BIT)
+#define LOWER_LEFT BITFIELD_BIT(LOWER_LEFT_BIT)
+
 uint32_t
-nvk_mme_tess_params(enum nak_ts_domain domain,
+nvk_mme_tess_params(mesa_shader_stage stage,
+                    enum nak_ts_domain domain,
                     enum nak_ts_spacing spacing,
-                    enum nak_ts_prims prims)
+                    bool ccw, bool point_mode)
 {
    /* This is laid out the same as SET_TESSELLATION_PARAMETERS, only with an
     * extra bit for lower_left
     */
    uint16_t params = ((uint16_t)domain << 0) |
-                     ((uint16_t)spacing << 4) |
-                     ((uint16_t)prims << 8);
-   return nvk_mme_val_mask(params, 0x0fff);
+                     ((uint16_t)spacing << 4);
+   if (ccw)
+      params |= CCW;
+   if (point_mode)
+      params |= POINT_MODE;
+
+   uint16_t mask = DRF_SMASK(NV9097_SET_TESSELLATION_PARAMETERS_DOMAIN_TYPE) |
+                   DRF_SMASK(NV9097_SET_TESSELLATION_PARAMETERS_SPACING) |
+                   POINT_MODE | CCW;
+
+   if (stage == MESA_SHADER_TESS_CTRL) {
+      assert(domain == 0);
+      params <<= 8;
+      mask <<= 8;
+   } else {
+      assert(stage == MESA_SHADER_TESS_EVAL);
+   }
+
+   return nvk_mme_val_mask(params, mask);
 }
 
 static uint32_t
 nvk_mme_tess_lower_left(bool lower_left)
 {
-   return nvk_mme_val_mask((uint16_t)lower_left << 12, 1u << 12);
+   return nvk_mme_val_mask(lower_left ? LOWER_LEFT : 0, LOWER_LEFT);
 }
 
 void
@@ -1604,32 +1850,78 @@ nvk_mme_set_tess_params(struct mme_builder *b)
    mme_if(b, ine, params, old_params) {
       nvk_mme_store_scratch(b, TESS_PARAMS, params);
 
-      /* lower_left lives at bit 12 */
-      struct mme_value lower_left = mme_merge(b, mme_zero(), params, 0, 1, 12);
+      /* Merge tese and tesc state. The state space has been designed so we can
+       * just OR then together - unspecified inputs are zero and where they're
+       * both specifed we're guaranteed that they match by draw time.
+       */
+      struct mme_value tesc = mme_merge(b, mme_zero(), params, 0, 8, 8);
+      mme_or_to(b, params, params, tesc);
+      mme_free_reg(b, tesc);
 
-      /* Only the bottom 12 bits are valid to put in HW */
-      mme_merge_to(b, params, mme_zero(), params, 0, 12, 0);
+      /* Compute primitives value */
+      #define PRIMS(x) \
+         mme_imm(NV9097_SET_TESSELLATION_PARAMETERS_OUTPUT_PRIMITIVES_##x)
+
+      struct mme_value prims = mme_mov(b, PRIMS(TRIANGLES_CW));
 
       /* If we're using a lower-left orientation, we need to flip triangles
        * between CW and CCW.
        */
-      mme_if(b, ine, lower_left, mme_zero()) {
-         struct mme_value prims_cw = mme_imm(NAK_TS_PRIMS_TRIANGLES_CW);
-         struct mme_value prims_ccw = mme_imm(NAK_TS_PRIMS_TRIANGLES_CCW);
+      struct mme_value lower_left =
+         mme_merge(b, mme_zero(), params, 0, 1, LOWER_LEFT_BIT);
+      struct mme_value ccw =
+         mme_merge(b, mme_zero(), params, 0, 1, CCW_BIT);
 
-         struct mme_value prims = mme_merge(b, mme_zero(), params, 0, 4, 8);
-         mme_if(b, ieq, prims, prims_cw) {
-            mme_merge_to(b, params, params, prims_ccw, 8, 4, 0);
-         }
-         mme_if(b, ieq, prims, prims_ccw) {
-            mme_merge_to(b, params, params, prims_cw, 8, 4, 0);
-         }
-         mme_free_reg(b, prims);
-      }
+      mme_xor_to(b, ccw, ccw, lower_left);
       mme_free_reg(b, lower_left);
 
-      mme_mthd(b, NV9097_SET_TESSELLATION_PARAMETERS);
-      mme_emit(b, params);
+      mme_if(b, ine, ccw, mme_zero()) {
+         mme_mov_to(b, prims, PRIMS(TRIANGLES_CCW));
+      }
+      mme_free_reg(b, ccw);
+
+      /* Check for lines */
+      struct mme_value domain =
+         mme_merge(b, mme_zero(), params, 0,
+                   DRF_BITS(NV9097_SET_TESSELLATION_PARAMETERS_DOMAIN_TYPE),
+                   DRF_LO(NV9097_SET_TESSELLATION_PARAMETERS_DOMAIN_TYPE));
+      mme_if(b, ieq, domain, mme_imm(NV9097_SET_TESSELLATION_PARAMETERS_DOMAIN_TYPE_ISOLINE)) {
+         mme_mov_to(b, prims, PRIMS(LINES));
+      }
+      mme_free_reg(b, domain);
+
+      /* Point mode overrides prims */
+      struct mme_value point_mode =
+         mme_merge(b, mme_zero(), params, 0, 1, POINT_MODE_BIT);
+      mme_if(b, ine, point_mode, mme_zero()) {
+         mme_mov_to(b, prims, PRIMS(POINTS));
+      }
+      mme_free_reg(b, point_mode);
+
+      /* Mask off bits that are valid to put in HW */
+      mme_and_to(b, params, params, mme_imm(
+         DRF_SMASK(NV9097_SET_TESSELLATION_PARAMETERS_DOMAIN_TYPE) |
+         DRF_SMASK(NV9097_SET_TESSELLATION_PARAMETERS_SPACING)));
+      mme_merge_to(b, params, params, prims,
+         DRF_LO(NV9097_SET_TESSELLATION_PARAMETERS_OUTPUT_PRIMITIVES),
+         DRF_BITS(NV9097_SET_TESSELLATION_PARAMETERS_OUTPUT_PRIMITIVES), 0);
+      mme_free_reg(b, prims);
+
+      /* If the current state is never used in a draw, we can end up with
+       * temporary invalid values while binding different shaders. Check
+       * for this so we can avoid setting a state that will cause
+       * context loss. This happens when `spacing == 3`. The same cannot
+       * happen with `domain` because we never set it for TESS_CTRL.
+       */
+      struct mme_value spacing =
+         mme_merge(b, mme_zero(), params, 0,
+                   DRF_BITS(NV9097_SET_TESSELLATION_PARAMETERS_SPACING),
+                   DRF_LO(NV9097_SET_TESSELLATION_PARAMETERS_SPACING));
+
+      mme_if(b, ine, spacing, mme_imm(0x3)) {
+         mme_mthd(b, NV9097_SET_TESSELLATION_PARAMETERS);
+         mme_emit(b, params);
+      }
    }
 }
 
@@ -1639,44 +1931,165 @@ const struct nvk_mme_test_case nvk_mme_set_tess_params_tests[] = {{
       { NVK_SET_MME_SCRATCH(TESS_PARAMS), 0 },
       { }
    },
-   .params = (uint32_t[]) { 0xffff0000 },
+   .params = (uint32_t[]) { NVK_MME_VAL_MASK(0, 0xffff) },
    .expected = (struct nvk_mme_mthd_data[]) {
       { }
    },
 }, {
-   /* TRIANGLE, INTEGER, TRIANGLES_CW, lower_left = false */
    .init = (struct nvk_mme_mthd_data[]) {
       { NVK_SET_MME_SCRATCH(TESS_PARAMS), 0 },
       { }
    },
-   .params = (uint32_t[]) { 0xffff0201 },
+   .params = (uint32_t[]) {
+      NVK_MME_VAL_MASK(NVK_MME_TESS_STATE(TRIANGLE, INTEGER, 0), 0xffff)
+   },
    .expected = (struct nvk_mme_mthd_data[]) {
-      { NVK_SET_MME_SCRATCH(TESS_PARAMS), 0x0201 },
-      { NV9097_SET_TESSELLATION_PARAMETERS, 0x0201 },
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_TESS_STATE(TRIANGLE, INTEGER, 0)
+      },
+      {
+         NV9097_SET_TESSELLATION_PARAMETERS,
+         NVK_MME_TESS_PARAMS(TRIANGLE, INTEGER, TRIANGLES_CW)
+      },
       { }
    },
 }, {
-   /* TRIANGLE, INTEGER, TRIANGLES_CW, lower_left = true */
    .init = (struct nvk_mme_mthd_data[]) {
-      { NVK_SET_MME_SCRATCH(TESS_PARAMS), 0x0201 },
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_TESS_STATE(TRIANGLE, INTEGER, 0)
+      },
       { }
    },
-   .params = (uint32_t[]) { 0x10001000 },
+   .params = (uint32_t[]) { NVK_MME_VAL_MASK(LOWER_LEFT, LOWER_LEFT) },
    .expected = (struct nvk_mme_mthd_data[]) {
-      { NVK_SET_MME_SCRATCH(TESS_PARAMS), 0x1201 },
-      { NV9097_SET_TESSELLATION_PARAMETERS, 0x0301 },
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_TESS_STATE(TRIANGLE, INTEGER, LOWER_LEFT)
+      },
+      {
+         NV9097_SET_TESSELLATION_PARAMETERS,
+         NVK_MME_TESS_PARAMS(TRIANGLE, INTEGER, TRIANGLES_CCW)
+      },
       { }
    },
 }, {
-   /* TRIANGLE, INTEGER, TRIANGLES_CCW, lower_left = true */
    .init = (struct nvk_mme_mthd_data[]) {
-      { NVK_SET_MME_SCRATCH(TESS_PARAMS), 0x0301 },
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_TESS_STATE(TRIANGLE, INTEGER, CCW)
+      },
       { }
    },
-   .params = (uint32_t[]) { 0x10001000 },
+   .params = (uint32_t[]) { NVK_MME_VAL_MASK(LOWER_LEFT, LOWER_LEFT)},
    .expected = (struct nvk_mme_mthd_data[]) {
-      { NVK_SET_MME_SCRATCH(TESS_PARAMS), 0x1301 },
-      { NV9097_SET_TESSELLATION_PARAMETERS, 0x0201 },
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_TESS_STATE(TRIANGLE, INTEGER, LOWER_LEFT | CCW)
+      },
+      {
+         NV9097_SET_TESSELLATION_PARAMETERS,
+         NVK_MME_TESS_PARAMS(TRIANGLE, INTEGER, TRIANGLES_CW)
+      },
+      { }
+   },
+}, {
+   .init = (struct nvk_mme_mthd_data[]) {
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_TESS_STATE(TRIANGLE, INTEGER, CCW)
+      },
+      { }
+   },
+   .params = (uint32_t[]) { NVK_MME_VAL_MASK(POINT_MODE, POINT_MODE)},
+   .expected = (struct nvk_mme_mthd_data[]) {
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_TESS_STATE(TRIANGLE, INTEGER, CCW | POINT_MODE)
+      },
+      {
+         NV9097_SET_TESSELLATION_PARAMETERS,
+         NVK_MME_TESS_PARAMS(TRIANGLE, INTEGER, POINTS)
+      },
+      { }
+   },
+}, {
+   .init = (struct nvk_mme_mthd_data[]) {
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_TESS_STATE(TRIANGLE, INTEGER, 0)
+      },
+      { }
+   },
+   .params = (uint32_t[]) {
+      NVK_MME_VAL_MASK(NVK_MME_TESS_STATE(ISOLINE, INTEGER, 0), 0xffff)
+   },
+   .expected = (struct nvk_mme_mthd_data[]) {
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_TESS_STATE(ISOLINE, INTEGER, 0)
+      },
+      {
+         NV9097_SET_TESSELLATION_PARAMETERS,
+         NVK_MME_TESS_PARAMS(ISOLINE, INTEGER, LINES)
+      },
+      { }
+   },
+}, {
+   /* Test tese/tesc merge */
+   .init = (struct nvk_mme_mthd_data[]) {
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_TESS_STATE(TRIANGLE, INTEGER, 0)
+      },
+      { }
+   },
+   .params = (uint32_t[]) {
+      NVK_MME_VAL_MASK(NVK_MME_FULL_TESS_STATE(
+         NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, DOMAIN_TYPE, TRIANGLE),
+         NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, SPACING, FRACTIONAL_ODD)
+      ), 0xffff)
+   },
+   .expected = (struct nvk_mme_mthd_data[]) {
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_FULL_TESS_STATE(
+            NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, DOMAIN_TYPE, TRIANGLE),
+            NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, SPACING, FRACTIONAL_ODD)
+         )
+      },
+      {
+         NV9097_SET_TESSELLATION_PARAMETERS,
+         NVK_MME_TESS_PARAMS(TRIANGLE, FRACTIONAL_ODD, TRIANGLES_CW)
+      },
+      { }
+   },
+}, {
+   /* Test skipping invalid spacing */
+   .init = (struct nvk_mme_mthd_data[]) {
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_TESS_STATE(TRIANGLE, INTEGER, 0)
+      },
+      { }
+   },
+   .params = (uint32_t[]) {
+      NVK_MME_VAL_MASK(NVK_MME_FULL_TESS_STATE(
+         NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, DOMAIN_TYPE, TRIANGLE) |
+         NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, SPACING, FRACTIONAL_EVEN),
+         NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, SPACING, FRACTIONAL_ODD)
+      ), 0xffff)
+   },
+   .expected = (struct nvk_mme_mthd_data[]) {
+      {
+         NVK_SET_MME_SCRATCH(TESS_PARAMS),
+         NVK_MME_FULL_TESS_STATE(
+            NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, DOMAIN_TYPE, TRIANGLE) |
+            NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, SPACING, FRACTIONAL_EVEN),
+            NVDEF(NV9097, SET_TESSELLATION_PARAMETERS, SPACING, FRACTIONAL_ODD)
+         )
+      },
       { }
    },
 }, {}};
@@ -1693,7 +2106,7 @@ nvk_cmd_flush_gfx_shaders(struct nvk_cmd_buffer *cmd)
 
    u_foreach_bit(s, cmd->state.gfx.shaders_dirty &
                     NVK_SHADER_STAGE_GRAPHICS_BITS) {
-      gl_shader_stage stage = vk_to_mesa_shader_stage(1 << s);
+      mesa_shader_stage stage = vk_to_mesa_shader_stage(1 << s);
       uint32_t type = mesa_to_nv9097_shader_type(stage);
       types_dirty |= BITFIELD_BIT(type);
 
@@ -1736,7 +2149,7 @@ nvk_cmd_flush_gfx_shaders(struct nvk_cmd_buffer *cmd)
    if (cmd->state.gfx.shaders_dirty & NVK_SHADER_STAGE_VTGM_BITS) {
       struct nvk_shader *last_vtgm = NULL;
       u_foreach_bit(s, NVK_SHADER_STAGE_VTGM_BITS) {
-         gl_shader_stage stage = vk_to_mesa_shader_stage(1 << s);
+         mesa_shader_stage stage = vk_to_mesa_shader_stage(1 << s);
          if (cmd->state.gfx.shaders[stage] != NULL)
             last_vtgm = cmd->state.gfx.shaders[stage];
       }
@@ -1822,17 +2235,48 @@ nvk_flush_vi_state(struct nvk_cmd_buffer *cmd)
 
    if (BITSET_TEST(dyn->dirty, MESA_VK_DYNAMIC_VI) ||
        BITSET_TEST(dyn->dirty, MESA_VK_DYNAMIC_VI_BINDINGS_VALID)) {
-      u_foreach_bit(a, dyn->vi->attributes_valid) {
-         const struct nvk_va_format *fmt =
-            nvk_get_va_format(pdev, dyn->vi->attributes[a].format);
+      P_MTHD(p, NV9097, SET_VERTEX_ATTRIBUTE_A(0));
+      for (uint32_t a = 0; a < 32; a++) {
+         if (dyn->vi->attributes_valid & BITFIELD_BIT(a)) {
+            const struct vk_vertex_attribute_state *att =
+               &dyn->vi->attributes[a];
+            const struct nvk_va_format *fmt =
+               nvk_get_va_format(pdev, att->format);
 
-         P_IMMD(p, NV9097, SET_VERTEX_ATTRIBUTE_A(a), {
-            .stream                 = dyn->vi->attributes[a].binding,
-            .offset                 = dyn->vi->attributes[a].offset,
-            .component_bit_widths   = fmt->bit_widths,
-            .numerical_type         = fmt->type,
-            .swap_r_and_b           = fmt->swap_rb,
-         });
+            P_NV9097_SET_VERTEX_ATTRIBUTE_A(p, a, {
+               .stream                 = att->binding,
+               .source                 = SOURCE_ACTIVE,
+               .offset                 = att->offset,
+               .component_bit_widths   = fmt->bit_widths,
+               .numerical_type         = fmt->type,
+               .swap_r_and_b           = fmt->swap_rb,
+            });
+
+            if (fmt->bit_widths_high != NVK_VA_BIT_WIDTH_NONE) {
+               /* 64-bit vec3 and vec4 formats consume two attributes */
+               a++;
+               assert(a < 32);
+               assert(!(dyn->vi->attributes_valid & BITFIELD_BIT(a)));
+
+               /* There are no BGRA 64-bit formats */
+               assert(!fmt->swap_rb);
+
+               P_NV9097_SET_VERTEX_ATTRIBUTE_A(p, a, {
+                  .stream                 = att->binding,
+                  .source                 = SOURCE_ACTIVE,
+                  .offset                 = att->offset + 16,
+                  .component_bit_widths   = fmt->bit_widths_high,
+                  .numerical_type         = fmt->type,
+               });
+            }
+         } else {
+            P_NV9097_SET_VERTEX_ATTRIBUTE_A(p, a, {
+               .source                 = SOURCE_INACTIVE,
+               /* Using RGBA32 gives us (0, 0, 0, 0) for inactive attributes. */
+               .component_bit_widths   = COMPONENT_BIT_WIDTHS_R32_G32_B32_A32,
+               .numerical_type         = NUMERICAL_TYPE_NUM_FLOAT,
+            });
+         }
       }
 
       u_foreach_bit(b, dyn->vi->bindings_valid) {
@@ -1896,17 +2340,9 @@ nvk_flush_ia_state(struct nvk_cmd_buffer *cmd)
       &cmd->vk.dynamic_graphics_state;
 
    if (BITSET_TEST(dyn->dirty, MESA_VK_DYNAMIC_IA_PRIMITIVE_TOPOLOGY)) {
-      uint32_t begin;
-      V_NV9097_BEGIN(begin, {
-         .op = vk_to_nv9097_primitive_topology(dyn->ia.primitive_topology),
-         .primitive_id = NV9097_BEGIN_PRIMITIVE_ID_FIRST,
-         .instance_id = NV9097_BEGIN_INSTANCE_ID_FIRST,
-         .split_mode = SPLIT_MODE_NORMAL_BEGIN_NORMAL_END,
-      });
-
       struct nv_push *p = nvk_cmd_buffer_push(cmd, 2);
-      P_MTHD(p, NV9097, SET_MME_SHADOW_SCRATCH(NVK_MME_SCRATCH_DRAW_BEGIN));
-      P_INLINE_DATA(p, begin);
+      P_MTHD(p, NV9097, SET_MME_SHADOW_SCRATCH(NVK_MME_SCRATCH_DRAW_TOPOLOGY));
+      P_INLINE_DATA(p, vk_to_nv9097_primitive_topology(dyn->ia.primitive_topology));
    }
 
    if (BITSET_TEST(dyn->dirty, MESA_VK_DYNAMIC_IA_PRIMITIVE_RESTART_ENABLE)) {
@@ -2068,6 +2504,74 @@ nvk_flush_vp_state(struct nvk_cmd_buffer *cmd)
             .xmax = xmax,
          });
          P_NV9097_SET_SCISSOR_VERTICAL(p, i, {
+            .ymin = ymin,
+            .ymax = ymax,
+         });
+      }
+   }
+}
+
+static uint32_t
+vk_to_nv9097_dr_mode(VkDiscardRectangleModeEXT vk_mode)
+{
+   STATIC_ASSERT(VK_DISCARD_RECTANGLE_MODE_INCLUSIVE_EXT ==
+                 NV9097_SET_WINDOW_CLIP_TYPE_V_INCLUSIVE);
+   STATIC_ASSERT(VK_DISCARD_RECTANGLE_MODE_EXCLUSIVE_EXT ==
+                 NV9097_SET_WINDOW_CLIP_TYPE_V_EXCLUSIVE);
+   assert(vk_mode <= NV9097_SET_WINDOW_CLIP_TYPE_V_EXCLUSIVE);
+   return vk_mode;
+}
+
+static void
+nvk_flush_dr_state(struct nvk_cmd_buffer *cmd)
+{
+   struct nvk_device *dev = nvk_cmd_buffer_device(cmd);
+   const struct nvk_physical_device *pdev = nvk_device_physical(dev);
+
+   const struct vk_dynamic_graphics_state *dyn =
+      &cmd->vk.dynamic_graphics_state;
+
+   /* VK_EXT_discard_rectangles */
+   if (BITSET_TEST(dyn->dirty, MESA_VK_DYNAMIC_DR_ENABLE)) {
+      struct nv_push *p = nvk_cmd_buffer_push(cmd, 4);
+      P_IMMD(p, NV9097, SET_MME_SHADOW_SCRATCH(NVK_MME_SCRATCH_WINDOW_CLIP_ENABLED),
+             dyn->dr.enable);
+      P_1INC(p, NV9097, CALL_MME_MACRO(NVK_MME_UPDATE_WINDOW_CLIP));
+      P_INLINE_DATA(p, 1);
+   }
+   if (BITSET_TEST(dyn->dirty, MESA_VK_DYNAMIC_DR_MODE)) {
+      struct nv_push *p = nvk_cmd_buffer_push(cmd, 2);
+      P_IMMD(p, NV9097, SET_WINDOW_CLIP_TYPE, vk_to_nv9097_dr_mode(dyn->dr.mode));
+   }
+   if (BITSET_TEST(dyn->dirty, MESA_VK_DYNAMIC_DR_RECTANGLES)) {
+      const uint32_t sr_max =
+         nvk_image_max_dimension(&pdev->info, VK_IMAGE_TYPE_2D);
+
+      struct nv_push *p =
+         nvk_cmd_buffer_push(cmd, 1 + 2 * NVK_MAX_DISCARD_RECTANGLES);
+
+      P_MTHD(p, NV9097, SET_WINDOW_CLIP_HORIZONTAL(0));
+      for (unsigned i = 0; i < NVK_MAX_DISCARD_RECTANGLES; i++) {
+         const bool is_rect_enabled = i < dyn->dr.rectangle_count;
+         uint32_t xmin = 0;
+         uint32_t xmax = 0;
+         uint32_t ymin = 0;
+         uint32_t ymax = 0;
+
+         if (is_rect_enabled) {
+            const VkRect2D *r = &dyn->dr.rectangles[i];
+
+            xmin = MIN2(sr_max, r->offset.x);
+            xmax = MIN2(sr_max, r->offset.x + r->extent.width);
+            ymin = MIN2(sr_max, r->offset.y);
+            ymax = MIN2(sr_max, r->offset.y + r->extent.height);
+         }
+
+         P_NV9097_SET_WINDOW_CLIP_HORIZONTAL(p, i, {
+            .xmin = xmin,
+            .xmax = xmax,
+         });
+         P_NV9097_SET_WINDOW_CLIP_VERTICAL(p, i, {
             .ymin = ymin,
             .ymax = ymax,
          });
@@ -3351,7 +3855,7 @@ nvk_flush_cb_state(struct nvk_cmd_buffer *cmd)
       int8_t loc_att[NVK_MAX_RTS] = { -1, -1, -1, -1, -1, -1, -1, -1};
       uint8_t max_loc = 0;
       uint32_t att_used = 0;
-      for (uint8_t a = 0; a < MESA_VK_MAX_COLOR_ATTACHMENTS; a++) {
+      for (uint8_t a = 0; a < render->color_att_count; a++) {
          if (dyn->cal.color_map[a] == MESA_VK_ATTACHMENT_UNUSED)
             continue;
 
@@ -3413,6 +3917,7 @@ nvk_cmd_flush_gfx_dynamic_state(struct nvk_cmd_buffer *cmd)
    nvk_flush_ia_state(cmd);
    nvk_flush_ts_state(cmd);
    nvk_flush_vp_state(cmd);
+   nvk_flush_dr_state(cmd);
    nvk_flush_rs_state(cmd);
    nvk_flush_fsr_state(cmd);
    nvk_flush_ms_state(cmd);
@@ -3519,7 +4024,7 @@ nvk_cmd_flush_gfx_cbufs(struct nvk_cmd_buffer *cmd)
 
    /* Find cbuf maps for the 5 cbuf groups */
    const struct nvk_shader *cbuf_shaders[5] = { NULL, };
-   for (gl_shader_stage stage = 0; stage < MESA_SHADER_STAGES; stage++) {
+   for (mesa_shader_stage stage = 0; stage < MESA_SHADER_STAGES; stage++) {
       const struct nvk_shader *shader = cmd->state.gfx.shaders[stage];
       if (shader == NULL)
          continue;
@@ -3617,6 +4122,9 @@ nvk_cmd_flush_gfx_state(struct nvk_cmd_buffer *cmd)
    nvk_cmd_flush_gfx_dynamic_state(cmd);
    nvk_cmd_flush_gfx_shaders(cmd);
    nvk_cmd_flush_gfx_cbufs(cmd);
+
+   if (NAK_CAN_PRINTF)
+      nvk_cmd_buffer_flush_printf_buffer(cmd, &cmd->state.gfx.descriptors);
 }
 
 void
@@ -3964,32 +4472,49 @@ nvk_mme_build_draw_loop(struct mme_builder *b,
                         struct mme_value first_vertex,
                         struct mme_value vertex_count)
 {
-   struct mme_value begin = nvk_mme_load_scratch(b, DRAW_BEGIN);
 
-   if (b->devinfo->cls_eng3d < PASCAL_B) {
-      mme_start_loop(b, instance_count);
-   } else {
-      mme_mthd(b, NVC197_SET_INSTANCE_COUNT);
+   if (b->devinfo->cls_eng3d >= TURING_A) {
+      struct mme_value draw_control_a = nvk_mme_load_scratch(b, DRAW_TOPOLOGY);
+      mme_set_field_enum(b, draw_control_a, NVC597_SET_DRAW_CONTROL_A_INSTANCE_ITERATE_ENABLE, TRUE);
+
+      mme_mthd(b, NVC597_SET_DRAW_CONTROL_A);
+      mme_emit(b, draw_control_a);
       mme_emit(b, instance_count);
-      mme_set_field_enum(b, begin, NVC197_BEGIN_INSTANCE_ITERATE_ENABLE, TRUE);
+
+      mme_mthd(b, NVC597_DRAW_VERTEX_ARRAY_BEGIN_END_A);
+      mme_emit(b, first_vertex);
+      mme_emit(b, vertex_count);
+
+      mme_free_reg(b, draw_control_a);
+   } else {
+      struct mme_value begin = nvk_mme_load_scratch(b, DRAW_TOPOLOGY);
+
+      if (b->devinfo->cls_eng3d < PASCAL_B) {
+         mme_start_loop(b, instance_count);
+      } else {
+         mme_mthd(b, NVC197_SET_INSTANCE_COUNT);
+         mme_emit(b, instance_count);
+         mme_set_field_enum(b, begin, NVC197_BEGIN_INSTANCE_ITERATE_ENABLE, TRUE);
+      }
+
+      mme_mthd(b, NV9097_BEGIN);
+      mme_emit(b, begin);
+
+      mme_mthd(b, NV9097_SET_VERTEX_ARRAY_START);
+      mme_emit(b, first_vertex);
+      mme_emit(b, vertex_count);
+
+      mme_mthd(b, NV9097_END);
+      mme_emit(b, mme_zero());
+
+      if (b->devinfo->cls_eng3d < PASCAL_B) {
+         mme_set_field_enum(b, begin, NV9097_BEGIN_INSTANCE_ID, SUBSEQUENT);
+         mme_end_loop(b);
+      }
+
+      mme_free_reg(b, begin);
    }
 
-   mme_mthd(b, NV9097_BEGIN);
-   mme_emit(b, begin);
-
-   mme_mthd(b, NV9097_SET_VERTEX_ARRAY_START);
-   mme_emit(b, first_vertex);
-   mme_emit(b, vertex_count);
-
-   mme_mthd(b, NV9097_END);
-   mme_emit(b, mme_zero());
-
-   if (b->devinfo->cls_eng3d < PASCAL_B) {
-      mme_set_field_enum(b, begin, NV9097_BEGIN_INSTANCE_ID, SUBSEQUENT);
-      mme_end_loop(b);
-   }
-
-   mme_free_reg(b, begin);
 }
 
 static void
@@ -4067,6 +4592,9 @@ nvk_CmdDraw(VkCommandBuffer commandBuffer,
 {
    VK_FROM_HANDLE(nvk_cmd_buffer, cmd, commandBuffer);
 
+   if (unlikely(!vertexCount || !instanceCount))
+      return;
+
    nvk_cmd_flush_gfx_state(cmd);
 
    struct nv_push *p = nvk_cmd_buffer_push(cmd, 6);
@@ -4087,6 +4615,9 @@ nvk_CmdDrawMultiEXT(VkCommandBuffer commandBuffer,
                     uint32_t stride)
 {
    VK_FROM_HANDLE(nvk_cmd_buffer, cmd, commandBuffer);
+
+   if (unlikely(!drawCount || !pVertexInfo->vertexCount || !instanceCount))
+      return;
 
    nvk_cmd_flush_gfx_state(cmd);
 
@@ -4109,32 +4640,46 @@ nvk_mme_build_draw_indexed_loop(struct mme_builder *b,
                                 struct mme_value first_index,
                                 struct mme_value index_count)
 {
-   struct mme_value begin = nvk_mme_load_scratch(b, DRAW_BEGIN);
 
-   if (b->devinfo->cls_eng3d < PASCAL_B) {
-      mme_start_loop(b, instance_count);
-   } else {
-      mme_mthd(b, NVC197_SET_INSTANCE_COUNT);
+   if (b->devinfo->cls_eng3d >= TURING_A) {
+      struct mme_value draw_control_a = nvk_mme_load_scratch(b, DRAW_TOPOLOGY);
+      mme_set_field_enum(b, draw_control_a, NVC597_SET_DRAW_CONTROL_A_INSTANCE_ITERATE_ENABLE, TRUE);
+
+      mme_mthd(b, NVC597_SET_DRAW_CONTROL_A);
+      mme_emit(b, draw_control_a);
       mme_emit(b, instance_count);
-      mme_set_field_enum(b, begin, NVC197_BEGIN_INSTANCE_ITERATE_ENABLE, TRUE);
+      mme_emit(b, first_index);
+      mme_emit(b, index_count);
+
+      mme_free_reg(b, draw_control_a);
+   } else {
+      struct mme_value begin = nvk_mme_load_scratch(b, DRAW_TOPOLOGY);
+
+      if (b->devinfo->cls_eng3d < PASCAL_B) {
+         mme_start_loop(b, instance_count);
+      } else {
+         mme_mthd(b, NVC197_SET_INSTANCE_COUNT);
+         mme_emit(b, instance_count);
+         mme_set_field_enum(b, begin, NVC197_BEGIN_INSTANCE_ITERATE_ENABLE, TRUE);
+      }
+
+      mme_mthd(b, NV9097_BEGIN);
+      mme_emit(b, begin);
+
+      mme_mthd(b, NV9097_SET_INDEX_BUFFER_F);
+      mme_emit(b, first_index);
+      mme_emit(b, index_count);
+
+      mme_mthd(b, NV9097_END);
+      mme_emit(b, mme_zero());
+
+      if (b->devinfo->cls_eng3d < PASCAL_B) {
+         mme_set_field_enum(b, begin, NV9097_BEGIN_INSTANCE_ID, SUBSEQUENT);
+         mme_end_loop(b);
+      }
+
+      mme_free_reg(b, begin);
    }
-
-   mme_mthd(b, NV9097_BEGIN);
-   mme_emit(b, begin);
-
-   mme_mthd(b, NV9097_SET_INDEX_BUFFER_F);
-   mme_emit(b, first_index);
-   mme_emit(b, index_count);
-
-   mme_mthd(b, NV9097_END);
-   mme_emit(b, mme_zero());
-
-   if (b->devinfo->cls_eng3d < PASCAL_B) {
-      mme_set_field_enum(b, begin, NV9097_BEGIN_INSTANCE_ID, SUBSEQUENT);
-      mme_end_loop(b);
-   }
-
-   mme_free_reg(b, begin);
 }
 
 static void
@@ -4216,6 +4761,9 @@ nvk_CmdDrawIndexed(VkCommandBuffer commandBuffer,
 {
    VK_FROM_HANDLE(nvk_cmd_buffer, cmd, commandBuffer);
 
+   if (unlikely(!indexCount || !instanceCount))
+      return;
+
    nvk_cmd_flush_gfx_state(cmd);
 
    struct nv_push *p = nvk_cmd_buffer_push(cmd, 7);
@@ -4238,6 +4786,9 @@ nvk_CmdDrawMultiIndexedEXT(VkCommandBuffer commandBuffer,
                            const int32_t *pVertexOffset)
 {
    VK_FROM_HANDLE(nvk_cmd_buffer, cmd, commandBuffer);
+
+   if (unlikely(!drawCount || !pIndexInfo->indexCount || !instanceCount))
+      return;
 
    nvk_cmd_flush_gfx_state(cmd);
 
@@ -4306,6 +4857,9 @@ nvk_CmdDrawIndirect(VkCommandBuffer commandBuffer,
 {
    VK_FROM_HANDLE(nvk_cmd_buffer, cmd, commandBuffer);
    VK_FROM_HANDLE(nvk_buffer, buffer, _buffer);
+
+   if (unlikely(!drawCount))
+      return;
 
    /* From the Vulkan 1.3.238 spec:
     *
@@ -4587,7 +5141,7 @@ nvk_mme_xfb_draw_indirect_loop(struct mme_builder *b,
                                struct mme_value instance_count,
                                struct mme_value counter)
 {
-   struct mme_value begin = nvk_mme_load_scratch(b, DRAW_BEGIN);
+   struct mme_value begin = nvk_mme_load_scratch(b, DRAW_TOPOLOGY);
 
    /* NVC197_BEGIN_INSTANCE_ITERATE_ENABLE seems to be incompatible with xfb.
     * Always use an mme loop instead.
@@ -4671,6 +5225,9 @@ nvk_CmdDrawIndirectByteCountEXT(VkCommandBuffer commandBuffer,
 {
    VK_FROM_HANDLE(nvk_cmd_buffer, cmd, commandBuffer);
    VK_FROM_HANDLE(nvk_buffer, counter_buffer, counterBuffer);
+
+   if (unlikely(!instanceCount))
+      return;
 
    nvk_cmd_flush_gfx_state(cmd);
 
@@ -4836,11 +5393,10 @@ nvk_CmdEndTransformFeedbackEXT(VkCommandBuffer commandBuffer,
    }
 }
 
-VKAPI_ATTR void VKAPI_CALL
-nvk_CmdBeginConditionalRenderingEXT(VkCommandBuffer commandBuffer,
-                                    const VkConditionalRenderingBeginInfoEXT *pConditionalRenderingBegin)
+static void
+nvk_cmd_begin_cond_render_copy_engine(struct nvk_cmd_buffer *cmd,
+                                      const VkConditionalRenderingBeginInfoEXT *pConditionalRenderingBegin)
 {
-   VK_FROM_HANDLE(nvk_cmd_buffer, cmd, commandBuffer);
    VK_FROM_HANDLE(nvk_buffer, buffer, pConditionalRenderingBegin->buffer);
 
    const uint64_t addr =
@@ -4854,55 +5410,135 @@ nvk_CmdBeginConditionalRenderingEXT(VkCommandBuffer commandBuffer,
     *     then the rendering commands are discarded,
     *     otherwise they are executed as normal."
     *
-    * The hardware compare a 64-bit value, as such we are required to copy it.
+    * The hardware compares a pair of 64-bit values, so we need to copy the
+    * input value into one operand and zero into the other operatnd.
     */
-   uint64_t tmp_addr;
-   VkResult result = nvk_cmd_buffer_cond_render_alloc(cmd, &tmp_addr);
-   if (result != VK_SUCCESS) {
-      vk_command_buffer_set_error(&cmd->vk, result);
-      return;
+   if (cmd->cond_render_mem == NULL) {
+      VkResult result = nvk_cmd_buffer_alloc_mem(cmd, false,
+                                                 &cmd->cond_render_mem);
+      if (result != VK_SUCCESS) {
+         vk_command_buffer_set_error(&cmd->vk, result);
+         return;
+      }
+
+      /* Zero-initialize the beginning of the buffer. As an invariant, the bytes
+       * for operand B and the upper half of operand A are always zero.
+       */
+      assert(cmd->cond_render_mem->mem->size_B > 32);
+      memset(cmd->cond_render_mem->mem->map, 0x00, 32);
    }
+   const uint64_t tmp_addr = cmd->cond_render_mem->mem->va->addr;
 
-   struct nv_push *p = nvk_cmd_buffer_push(cmd, 26);
+   /* Frustratingly, the u64s are not packed together */
+   const uint64_t operand_a_addr = tmp_addr + 0;
 
+   struct nv_push *p = nvk_cmd_buffer_push(cmd, 15);
+
+   /* Copy value into operand A */
    P_MTHD(p, NV90B5, OFFSET_IN_UPPER);
    P_NV90B5_OFFSET_IN_UPPER(p, addr >> 32);
    P_NV90B5_OFFSET_IN_LOWER(p, addr & 0xffffffff);
-   P_NV90B5_OFFSET_OUT_UPPER(p, tmp_addr >> 32);
-   P_NV90B5_OFFSET_OUT_LOWER(p, tmp_addr & 0xffffffff);
-   P_NV90B5_PITCH_IN(p, 4);
-   P_NV90B5_PITCH_OUT(p, 4);
+   P_NV90B5_OFFSET_OUT_UPPER(p, operand_a_addr >> 32);
+   P_NV90B5_OFFSET_OUT_LOWER(p, operand_a_addr & 0xffffffff);
+   P_NV90B5_PITCH_IN(p, 1);
+   P_NV90B5_PITCH_OUT(p, 1);
    P_NV90B5_LINE_LENGTH_IN(p, 4);
    P_NV90B5_LINE_COUNT(p, 1);
 
-   P_IMMD(p, NV90B5, SET_REMAP_COMPONENTS, {
-      .dst_x = DST_X_SRC_X,
-      .dst_y = DST_Y_SRC_X,
-      .dst_z = DST_Z_NO_WRITE,
-      .dst_w = DST_W_NO_WRITE,
-      .component_size = COMPONENT_SIZE_ONE,
-      .num_src_components = NUM_SRC_COMPONENTS_ONE,
-      .num_dst_components = NUM_DST_COMPONENTS_TWO,
-   });
-
    P_IMMD(p, NV90B5, LAUNCH_DMA, {
       .data_transfer_type = DATA_TRANSFER_TYPE_PIPELINED,
-      .multi_line_enable = MULTI_LINE_ENABLE_TRUE,
+      .multi_line_enable = MULTI_LINE_ENABLE_FALSE,
       .flush_enable = FLUSH_ENABLE_TRUE,
       .src_memory_layout = SRC_MEMORY_LAYOUT_PITCH,
       .dst_memory_layout = DST_MEMORY_LAYOUT_PITCH,
-      .remap_enable = REMAP_ENABLE_TRUE,
+      .remap_enable = REMAP_ENABLE_FALSE,
    });
 
-   P_MTHD(p, NV9097, SET_RENDER_ENABLE_A);
-   P_NV9097_SET_RENDER_ENABLE_A(p, tmp_addr >> 32);
-   P_NV9097_SET_RENDER_ENABLE_B(p, tmp_addr & 0xfffffff0);
-   P_NV9097_SET_RENDER_ENABLE_C(p, inverted ? MODE_RENDER_IF_EQUAL : MODE_RENDER_IF_NOT_EQUAL);
+   /* Compare the operands */
+   if (nvk_cmd_buffer_last_subchannel(cmd) == SUBC_NV9097) {
+      P_MTHD(p, NV9097, SET_GLOBAL_RENDER_ENABLE_A);
+      P_NV9097_SET_GLOBAL_RENDER_ENABLE_A(p, tmp_addr >> 32);
+      P_NV9097_SET_GLOBAL_RENDER_ENABLE_B(p, tmp_addr & 0xfffffff0);
+      P_NV9097_SET_GLOBAL_RENDER_ENABLE_C(p, inverted ? MODE_RENDER_IF_EQUAL : MODE_RENDER_IF_NOT_EQUAL);
+   } else {
+      P_MTHD(p, NV90C0, SET_GLOBAL_RENDER_ENABLE_A);
+      P_NV90C0_SET_GLOBAL_RENDER_ENABLE_A(p, tmp_addr >> 32);
+      P_NV90C0_SET_GLOBAL_RENDER_ENABLE_B(p, tmp_addr & 0xfffffff0);
+      P_NV90C0_SET_GLOBAL_RENDER_ENABLE_C(p, inverted ? MODE_RENDER_IF_EQUAL : MODE_RENDER_IF_NOT_EQUAL);
+   }
+}
 
-   P_MTHD(p, NV90C0, SET_RENDER_ENABLE_A);
-   P_NV90C0_SET_RENDER_ENABLE_A(p, tmp_addr >> 32);
-   P_NV90C0_SET_RENDER_ENABLE_B(p, tmp_addr & 0xfffffff0);
-   P_NV90C0_SET_RENDER_ENABLE_C(p, inverted ? MODE_RENDER_IF_EQUAL : MODE_RENDER_IF_NOT_EQUAL);
+void
+nvk_mme_begin_cond_render(struct mme_builder *b)
+{
+   if (b->devinfo->cls_eng3d < TURING_A)
+      return;
+
+   struct mme_value64 cond_render_addr = mme_load_addr64(b);
+
+   struct mme_value inverted = mme_merge(b, mme_zero(), cond_render_addr.lo, 0, 1, 0);
+   mme_merge_to(b, cond_render_addr.lo, mme_zero(), cond_render_addr.lo, 1, 31, 1);
+
+   mme_tu104_read_fifoed(b, cond_render_addr, mme_imm(1));
+   struct mme_value read_value = mme_load(b);
+
+   struct mme_value enable = mme_mov(b, mme_zero());
+   mme_if(b, ine, read_value, mme_zero()) {
+      mme_mov_to(b, enable, mme_imm(1));
+   }
+   mme_xor_to(b, enable, enable, inverted);
+
+   mme_if(b, ieq, enable, mme_zero()) {
+      STATIC_ASSERT(NV9097_SET_GLOBAL_RENDER_ENABLE_A ==
+                    NV90C0_SET_GLOBAL_RENDER_ENABLE_A);
+      mme_mthd(b, NV9097_SET_GLOBAL_RENDER_ENABLE_A);
+      mme_emit(b, mme_zero());
+      mme_emit(b, mme_zero());
+      mme_emit(b, mme_imm(NV9097_SET_GLOBAL_RENDER_ENABLE_C_MODE_FALSE));
+   }
+}
+
+static void
+nvk_cmd_begin_cond_render_mme(struct nvk_cmd_buffer *cmd,
+                              const VkConditionalRenderingBeginInfoEXT *pConditionalRenderingBegin)
+{
+   VK_FROM_HANDLE(nvk_buffer, buffer, pConditionalRenderingBegin->buffer);
+   struct nvk_device *dev = nvk_cmd_buffer_device(cmd);
+   const struct nvk_physical_device *pdev = nvk_device_physical(dev);
+
+   uint64_t addr =
+      vk_buffer_address(&buffer->vk, pConditionalRenderingBegin->offset);
+   bool inverted = pConditionalRenderingBegin->flags &
+      VK_CONDITIONAL_RENDERING_INVERTED_BIT_EXT;
+
+   if (inverted)
+      addr |= 1;
+
+   struct nv_push *p = nvk_cmd_buffer_push(cmd, 4);
+
+   if (pdev->info.cls_compute >= AMPERE_COMPUTE_B &&
+       nvk_cmd_buffer_last_subchannel(cmd) != SUBC_NV9097)
+      P_1INC(p, NV90C0, CALL_MME_MACRO(NVK_MME_BEGIN_COND_RENDER));
+   else
+      P_1INC(p, NV9097, CALL_MME_MACRO(NVK_MME_BEGIN_COND_RENDER));
+
+   P_INLINE_DATA(p, addr >> 32);
+   P_INLINE_DATA(p, addr);
+}
+
+VKAPI_ATTR void VKAPI_CALL
+nvk_CmdBeginConditionalRenderingEXT(VkCommandBuffer commandBuffer,
+                                    const VkConditionalRenderingBeginInfoEXT *pConditionalRenderingBegin)
+{
+   VK_FROM_HANDLE(nvk_cmd_buffer, cmd, commandBuffer);
+   struct nvk_device *dev = nvk_cmd_buffer_device(cmd);
+   const struct nvk_physical_device *pdev = nvk_device_physical(dev);
+
+   if (pdev->info.cls_eng3d >= TURING_A) {
+      nvk_cmd_begin_cond_render_mme(cmd, pConditionalRenderingBegin);
+   } else {
+      nvk_cmd_begin_cond_render_copy_engine(cmd, pConditionalRenderingBegin);
+   }
 }
 
 VKAPI_ATTR void VKAPI_CALL
@@ -4910,14 +5546,17 @@ nvk_CmdEndConditionalRenderingEXT(VkCommandBuffer commandBuffer)
 {
    VK_FROM_HANDLE(nvk_cmd_buffer, cmd, commandBuffer);
 
-   struct nv_push *p = nvk_cmd_buffer_push(cmd, 12);
-   P_MTHD(p, NV9097, SET_RENDER_ENABLE_A);
-   P_NV9097_SET_RENDER_ENABLE_A(p, 0);
-   P_NV9097_SET_RENDER_ENABLE_B(p, 0);
-   P_NV9097_SET_RENDER_ENABLE_C(p, MODE_TRUE);
-
-   P_MTHD(p, NV90C0, SET_RENDER_ENABLE_A);
-   P_NV90C0_SET_RENDER_ENABLE_A(p, 0);
-   P_NV90C0_SET_RENDER_ENABLE_B(p, 0);
-   P_NV90C0_SET_RENDER_ENABLE_C(p, MODE_TRUE);
+   struct nv_push *p = nvk_cmd_buffer_push(cmd, 4);
+   if (nvk_cmd_buffer_last_subchannel(cmd) == SUBC_NV9097) {
+      /* The GLOBAL variant sets render enable across both 3d and compute */
+      P_MTHD(p, NV9097, SET_GLOBAL_RENDER_ENABLE_A);
+      P_NV9097_SET_GLOBAL_RENDER_ENABLE_A(p, 0);
+      P_NV9097_SET_GLOBAL_RENDER_ENABLE_B(p, 0);
+      P_NV9097_SET_GLOBAL_RENDER_ENABLE_C(p, MODE_TRUE);
+   } else {
+      P_MTHD(p, NV90C0, SET_GLOBAL_RENDER_ENABLE_A);
+      P_NV90C0_SET_GLOBAL_RENDER_ENABLE_A(p, 0);
+      P_NV90C0_SET_GLOBAL_RENDER_ENABLE_B(p, 0);
+      P_NV90C0_SET_GLOBAL_RENDER_ENABLE_C(p, MODE_TRUE);
+   }
 }
