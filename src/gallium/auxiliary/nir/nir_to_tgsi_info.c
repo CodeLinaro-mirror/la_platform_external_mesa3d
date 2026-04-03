@@ -253,11 +253,10 @@ void nir_tgsi_scan_shader(const struct nir_shader *nir,
 {
    unsigned i;
 
-   info->processor = pipe_shader_type_from_mesa(nir->info.stage);
+   info->processor = nir->info.stage;
    info->num_instructions = 1;
 
-   info->properties[TGSI_PROPERTY_NEXT_SHADER] =
-      pipe_shader_type_from_mesa(nir->info.next_stage);
+   info->properties[TGSI_PROPERTY_NEXT_SHADER] = nir->info.next_stage;
 
    if (nir->info.stage == MESA_SHADER_VERTEX) {
       info->properties[TGSI_PROPERTY_VS_WINDOW_SPACE_POSITION] =
@@ -321,8 +320,8 @@ void nir_tgsi_scan_shader(const struct nir_shader *nir,
       }
    }
 
-   if (gl_shader_stage_is_compute(nir->info.stage) ||
-       gl_shader_stage_is_mesh(nir->info.stage)) {
+   if (mesa_shader_stage_is_compute(nir->info.stage) ||
+       mesa_shader_stage_is_mesh(nir->info.stage)) {
       info->properties[TGSI_PROPERTY_CS_FIXED_BLOCK_WIDTH] = nir->info.workgroup_size[0];
       info->properties[TGSI_PROPERTY_CS_FIXED_BLOCK_HEIGHT] = nir->info.workgroup_size[1];
       info->properties[TGSI_PROPERTY_CS_FIXED_BLOCK_DEPTH] = nir->info.workgroup_size[2];
@@ -561,7 +560,7 @@ void nir_tgsi_scan_shader(const struct nir_shader *nir,
             info->writes_edgeflag = true;
             break;
          case TGSI_SEMANTIC_POSITION:
-            if (info->processor == PIPE_SHADER_FRAGMENT) {
+            if (info->processor == MESA_SHADER_FRAGMENT) {
                if (!variable->data.fb_fetch_output)
                   info->writes_z = true;
             } else {
@@ -632,7 +631,7 @@ void nir_tgsi_scan_shader(const struct nir_shader *nir,
    info->num_written_clipdistance = nir->info.clip_distance_array_size;
    info->num_written_culldistance = nir->info.cull_distance_array_size;
 
-   if (info->processor == PIPE_SHADER_FRAGMENT)
+   if (info->processor == MESA_SHADER_FRAGMENT)
       info->uses_kill = nir->info.fs.uses_discard;
 
    nir_function *func = (struct nir_function *)

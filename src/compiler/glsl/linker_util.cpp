@@ -27,7 +27,9 @@
 #include "linker_util.h"
 #include "util/bitscan.h"
 #include "util/set.h"
+#include "util/u_range_remap.h"
 #include "main/consts_exts.h"
+#include "main/context.h"
 
 void
 linker_error(gl_shader_program *prog, const char *fmt, ...)
@@ -74,7 +76,7 @@ link_shaders_init(struct gl_context *ctx, struct gl_shader_program *prog)
     * missing.
     */
    if (prog->NumShaders == 0) {
-      if (ctx->API != API_OPENGL_COMPAT)
+      if (!_mesa_is_desktop_gl_compat(ctx))
          linker_error(prog, "no shaders attached to the program\n");
       return;
    }
@@ -249,24 +251,42 @@ link_util_find_empty_block(struct gl_shader_program *prog,
 }
 
 void
-link_util_update_empty_uniform_locations(struct gl_shader_program *prog)
+link_util_update_empty_uniform_locations(const struct gl_constants *consts,
+                                         struct gl_shader_program *prog)
 {
-   struct empty_uniform_block *current_block = NULL;
-
-   for (unsigned i = 0; i < prog->NumUniformRemapTable; i++) {
-      /* We found empty space in UniformRemapTable. */
-      if (prog->UniformRemapTable[i] == NULL) {
+   int prev_end = -1;
+   list_for_each_entry_safe(struct list_range_entry, e,
+                            &prog->UniformRemapTable->r_list, node) {
+      unsigned next_slot = prev_end + 1;
+      if (e->entry.start > next_slot) {
          /* We've found the beginning of a new continous block of empty slots */
-         if (!current_block || current_block->start + current_block->slots != i) {
-            current_block = rzalloc(prog, struct empty_uniform_block);
-            current_block->start = i;
-            ir_exec_list_push_tail(&prog->EmptyUniformLocations,
+         struct empty_uniform_block *current_block =
+            rzalloc(prog, struct empty_uniform_block);
+         current_block->start = next_slot;
+         current_block->slots = e->entry.start - next_slot;
+         ir_exec_list_push_tail(&prog->EmptyUniformLocations,
                                 &current_block->link);
-         }
-
-         /* The current block continues, so we simply increment its slots */
-         current_block->slots++;
       }
+
+      prev_end = e->entry.end;
+   }
+
+   /* Add the remaining continous block of empty slots */
+   unsigned next_slot = prev_end + 1;
+   /* Some drivers assign a max assignable value greater than max block size
+    * so we work around this by taking the max of either to get the remaining
+    * empty slots.
+    */
+   unsigned max_slot = MAX2(consts->MaxUniformBlockSize,
+                            consts->MaxUserAssignableUniformLocations) - 1;
+   if (max_slot >= next_slot) {
+      struct empty_uniform_block *current_block =
+         rzalloc(prog, struct empty_uniform_block);
+      current_block->start = next_slot;
+      current_block->slots = max_slot + 1 - next_slot;
+
+      ir_exec_list_push_tail(&prog->EmptyUniformLocations,
+                             &current_block->link);
    }
 }
 
@@ -285,10 +305,6 @@ link_util_check_subroutine_resources(struct gl_shader_program *prog)
    }
 }
 
-#if defined(_MSC_VER) && DETECT_ARCH_AARCH64
-// Work around https://developercommunity.visualstudio.com/t/Incorrect-ARM64-codegen-with-optimizatio/10564605
-#pragma optimize("", off)
-#endif
 /**
  * Validate uniform resources used by a program versus the implementation limits
  */
@@ -299,7 +315,7 @@ link_util_check_uniform_resources(const struct gl_constants *consts,
    unsigned total_uniform_blocks = 0;
    unsigned total_shader_storage_blocks = 0;
 
-   for (unsigned i = 0; i < MESA_SHADER_STAGES; i++) {
+   for (unsigned i = 0; i < MESA_SHADER_MESH_STAGES; i++) {
       struct gl_linked_shader *sh = prog->_LinkedShaders[i];
 
       if (sh == NULL)
@@ -368,9 +384,6 @@ link_util_check_uniform_resources(const struct gl_constants *consts,
       }
    }
 }
-#if defined(_MSC_VER) && DETECT_ARCH_AARCH64
-#pragma optimize("", on)
-#endif
 
 void
 link_util_calculate_subroutine_compat(struct gl_shader_program *prog)

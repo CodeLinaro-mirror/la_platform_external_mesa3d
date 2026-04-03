@@ -482,20 +482,19 @@ static const struct ac_vtx_format_info vb_formats_gfx10[] = {VB_FORMATS};
 static const struct ac_vtx_format_info vb_formats_gfx11[] = {VB_FORMATS};
 
 const struct ac_vtx_format_info *
-ac_get_vtx_format_info_table(enum amd_gfx_level level, enum radeon_family family)
+ac_get_vtx_format_info_table(enum amd_gfx_level level, bool has_alpha_adjust_bug)
 {
    if (level >= GFX11)
       return vb_formats_gfx11;
    else if (level >= GFX10)
       return vb_formats_gfx10;
-   bool alpha_adjust = level <= GFX8 && family != CHIP_STONEY;
-   return alpha_adjust ? vb_formats_gfx6_alpha_adjust : vb_formats_gfx6;
+   return has_alpha_adjust_bug ? vb_formats_gfx6_alpha_adjust : vb_formats_gfx6;
 }
 
 const struct ac_vtx_format_info *
-ac_get_vtx_format_info(enum amd_gfx_level level, enum radeon_family family, enum pipe_format fmt)
+ac_get_vtx_format_info(enum amd_gfx_level level, bool has_alpha_adjust_bug, enum pipe_format fmt)
 {
-   return &ac_get_vtx_format_info_table(level, family)[fmt];
+   return &ac_get_vtx_format_info_table(level, has_alpha_adjust_bug)[fmt];
 }
 
 /**
@@ -865,7 +864,7 @@ unsigned ac_compute_cs_workgroup_size(const uint16_t sizes[3], bool variable, un
    return sizes[0] * sizes[1] * sizes[2];
 }
 
-unsigned ac_compute_lshs_workgroup_size(enum amd_gfx_level gfx_level, gl_shader_stage stage,
+unsigned ac_compute_lshs_workgroup_size(enum amd_gfx_level gfx_level, mesa_shader_stage stage,
                                         unsigned tess_num_patches,
                                         unsigned tess_patch_in_vtx,
                                         unsigned tess_patch_out_vtx)
@@ -919,14 +918,15 @@ static unsigned get_tcs_wg_output_mem_size(uint32_t num_tcs_output_cp, uint32_t 
     * in wave64 will cover 4 channels (1024B). If an output was only aligned to 128B, wave64 could
     * cover 5 channels (128B .. 1.125K) instead of 4, which could increase VMEM latency.
     */
-   unsigned mem_one_pervertex_output = align(16 * num_tcs_output_cp * num_patches, 256);
-   unsigned mem_one_perpatch_output = align(16 * num_patches, 256);
+   unsigned mem_one_pervertex_output = align(16 * num_tcs_output_cp * num_patches,
+                                             AMD_MEMCHANNEL_INTERLEAVE_BYTES);
+   unsigned mem_one_perpatch_output = align(16 * num_patches, AMD_MEMCHANNEL_INTERLEAVE_BYTES);
 
    return mem_one_pervertex_output * num_mem_tcs_outputs +
           mem_one_perpatch_output * num_mem_tcs_patch_outputs;
 }
 
-uint32_t ac_compute_num_tess_patches(const struct radeon_info *info, uint32_t num_tcs_input_cp,
+uint32_t ac_compute_num_tess_patches(const struct ac_compiler_info *info, uint32_t num_tcs_input_cp,
                                      uint32_t num_tcs_output_cp, uint32_t num_mem_tcs_outputs,
                                      uint32_t num_mem_tcs_patch_outputs, uint32_t lds_per_patch,
                                      uint32_t wave_size, bool tess_uses_primid)
@@ -938,8 +938,7 @@ uint32_t ac_compute_num_tess_patches(const struct radeon_info *info, uint32_t nu
     * SWITCH_ON_EOI, which should cause IA to split instances up. However, this doesn't work
     * correctly on GFX6 when there is no other SE to switch to.
     */
-   const bool has_primid_instancing_bug = info->gfx_level == GFX6 && info->max_se == 1;
-   if (has_primid_instancing_bug && tess_uses_primid)
+   if (info->has_primid_instancing_bug && tess_uses_primid)
       return 1;
 
    /* 256 threads per workgroup is the hw limit, but 192 performs better. */
@@ -952,7 +951,7 @@ uint32_t ac_compute_num_tess_patches(const struct radeon_info *info, uint32_t nu
    /* When distributed tessellation is unsupported, switch between SEs
     * at a higher frequency to manually balance the workload between SEs.
     */
-   if (!info->has_distributed_tess && info->max_se > 1)
+   if (info->smaller_tcs_workgroups)
       num_patches = MIN2(num_patches, 16); /* recommended */
 
    /* Make sure the output data fits in the offchip buffer */
@@ -1044,6 +1043,8 @@ ac_compute_scratch_wavesize(const struct radeon_info *info, uint32_t bytes_per_w
    /* Add 1 scratch item to make the number of items odd. This should improve
     * scratch performance by more randomly distributing scratch waves among
     * memory channels.
+    *
+    * On GFX11+, this is exactly "|= AMD_MEMCHANNEL_INTERLEAVE_BYTES".
     */
    if (bytes_per_wave)
       bytes_per_wave |= info->scratch_wavesize_granularity;
@@ -1080,22 +1081,18 @@ void ac_get_scratch_tmpring_size(const struct radeon_info *info, unsigned num_sc
                    S_0286E8_WAVESIZE(bytes_per_wave >> info->scratch_wavesize_granularity_shift);
 }
 
-/* Convert chip-agnostic memory access flags into hw-specific cache flags.
- *
- * "access" must be a result of ac_nir_get_mem_access_flags() with the appropriate ACCESS_TYPE_*
- * flags set.
- */
+/* Convert chip-agnostic memory access flags into hw-specific cache flags. */
 union ac_hw_cache_flags ac_get_hw_cache_flags(enum amd_gfx_level gfx_level,
-                                              enum gl_access_qualifier access)
+                                              enum gl_access_qualifier access,
+                                              enum ac_access_type type)
 {
    union ac_hw_cache_flags result;
    result.value = 0;
 
-   assert(util_bitcount(access & (ACCESS_TYPE_LOAD | ACCESS_TYPE_STORE |
-                                  ACCESS_TYPE_ATOMIC)) == 1);
-   assert(!(access & ACCESS_TYPE_SMEM) || access & ACCESS_TYPE_LOAD);
-   assert(!(access & ACCESS_IS_SWIZZLED_AMD) || !(access & ACCESS_TYPE_SMEM));
-   assert(!(access & ACCESS_MAY_STORE_SUBDWORD) || access & ACCESS_TYPE_STORE);
+   bool is_store = type == ac_access_type_store || type == ac_access_type_store_subdword;
+
+   assert(!(access & ACCESS_SMEM_AMD) || type == ac_access_type_load);
+   assert(!(access & ACCESS_IS_SWIZZLED_AMD) || !(access & ACCESS_SMEM_AMD));
 
    bool scope_is_device = access & (ACCESS_COHERENT | ACCESS_VOLATILE);
 
@@ -1111,11 +1108,11 @@ union ac_hw_cache_flags ac_get_hw_cache_flags(enum amd_gfx_level gfx_level,
       }
 
       if (access & ACCESS_NON_TEMPORAL) {
-         if (access & ACCESS_TYPE_LOAD) {
+         if (type == ac_access_type_load) {
             /* Don't use non_temporal for SMEM because it can't set regular_temporal for MALL. */
-            if (!(access & ACCESS_TYPE_SMEM))
+            if (!(access & ACCESS_SMEM_AMD))
                result.gfx12.temporal_hint = gfx12_load_near_non_temporal_far_regular_temporal;
-         } else if (access & ACCESS_TYPE_STORE) {
+         } else if (is_store) {
             result.gfx12.temporal_hint = gfx12_store_near_non_temporal_far_regular_temporal;
          } else {
             result.gfx12.temporal_hint = gfx12_atomic_non_temporal;
@@ -1130,10 +1127,10 @@ union ac_hw_cache_flags ac_get_hw_cache_flags(enum amd_gfx_level gfx_level,
        *
        * GL0 doesn't have a non-temporal flag, so you always get LRU caching in CU scope.
        */
-      if (access & ACCESS_TYPE_LOAD && scope_is_device)
+      if (type == ac_access_type_load && scope_is_device)
          result.value |= ac_glc;
 
-      if (access & ACCESS_NON_TEMPORAL && !(access & ACCESS_TYPE_SMEM))
+      if (access & ACCESS_NON_TEMPORAL && !(access & ACCESS_SMEM_AMD))
          result.value |= ac_slc;
    } else if (gfx_level >= GFX10) {
       /* GFX10-10.3:
@@ -1162,10 +1159,10 @@ union ac_hw_cache_flags ac_get_hw_cache_flags(enum amd_gfx_level gfx_level,
        * "stream" allows write combining in GL2. "coherent bypass" doesn't.
        * "non-coherent bypass" doesn't guarantee ordering with any coherent stores.
        */
-      if (scope_is_device && !(access & ACCESS_TYPE_ATOMIC))
-         result.value |= ac_glc | (access & ACCESS_TYPE_LOAD ? ac_dlc : 0);
+      if (scope_is_device && type != ac_access_type_atomic)
+         result.value |= ac_glc | (type == ac_access_type_load ? ac_dlc : 0);
 
-      if (access & ACCESS_NON_TEMPORAL && !(access & ACCESS_TYPE_SMEM))
+      if (access & ACCESS_NON_TEMPORAL && !(access & ACCESS_SMEM_AMD))
          result.value |= ac_slc;
    } else {
       /* GFX6-GFX9:
@@ -1187,19 +1184,19 @@ union ac_hw_cache_flags ac_get_hw_cache_flags(enum amd_gfx_level gfx_level,
        * SMEM loads:
        *  GLC means device scope (available on GFX8+)
        */
-      if (scope_is_device && !(access & ACCESS_TYPE_ATOMIC)) {
+      if (scope_is_device && type != ac_access_type_atomic) {
          /* SMEM doesn't support the device scope on GFX6-7. */
-         assert(gfx_level >= GFX8 || !(access & ACCESS_TYPE_SMEM));
+         assert(gfx_level >= GFX8 || !(access & ACCESS_SMEM_AMD));
          result.value |= ac_glc;
       }
 
-      if (access & ACCESS_NON_TEMPORAL && !(access & ACCESS_TYPE_SMEM))
+      if (access & ACCESS_NON_TEMPORAL && !(access & ACCESS_SMEM_AMD))
          result.value |= ac_slc;
 
       /* GFX6 has a TC L1 bug causing corruption of 8bit/16bit stores. All store opcodes not
        * aligned to a dword are affected.
        */
-      if (gfx_level == GFX6 && access & ACCESS_MAY_STORE_SUBDWORD)
+      if (gfx_level == GFX6 && type == ac_access_type_store_subdword)
          result.value |= ac_glc;
    }
 
@@ -1352,10 +1349,12 @@ ac_legacy_gs_compute_subgroup_info(enum mesa_prim input_prim, unsigned gs_vertic
  * upload depend on the subgroup size.
  */
 bool
-ac_ngg_compute_subgroup_info(enum amd_gfx_level gfx_level, gl_shader_stage es_stage, bool is_gs,
-                             enum mesa_prim input_prim, unsigned gs_vertices_out, unsigned gs_invocations,
-                             unsigned max_workgroup_size, unsigned wave_size, unsigned esgs_vertex_stride,
-                             unsigned ngg_lds_vertex_size, unsigned ngg_lds_scratch_size, bool tess_turns_off_ngg,
+ac_ngg_compute_subgroup_info(enum amd_gfx_level gfx_level, mesa_shader_stage es_stage, bool is_gs,
+                             enum mesa_prim input_prim, unsigned gs_vertices_out,
+                             unsigned gs_invocations, unsigned target_workgroup_size,
+                             unsigned max_workgroup_size, unsigned wave_size,
+                             unsigned esgs_vertex_stride, unsigned ngg_lds_vertex_size,
+                             unsigned ngg_lds_scratch_size, bool tess_turns_off_ngg,
                              unsigned max_esgs_lds_padding, ac_ngg_subgroup_info *out)
 {
    const unsigned gs_num_invocations = MAX2(gs_invocations, 1);
@@ -1377,16 +1376,19 @@ ac_ngg_compute_subgroup_info(enum amd_gfx_level gfx_level, gl_shader_stage es_st
    bool max_vert_out_per_gs_instance = false;
    unsigned max_gsprims_base, max_esverts_base;
 
-   max_gsprims_base = max_esverts_base = max_workgroup_size;
+   /* In the worst case, we can run 1 GS invocation per workgroup. */
+   assert(!is_gs || gs_vertices_out <= max_workgroup_size);
+
+   max_gsprims_base = max_esverts_base = target_workgroup_size;
 
    if (is_gs) {
       bool force_multi_cycling = false;
       unsigned max_out_verts_per_gsprim = gs_vertices_out * gs_num_invocations;
 
 retry_select_mode:
-      if (max_out_verts_per_gsprim <= 256 && !force_multi_cycling) {
+      if (max_out_verts_per_gsprim <= max_workgroup_size && !force_multi_cycling) {
          if (max_out_verts_per_gsprim) {
-            max_gsprims_base = MIN2(max_gsprims_base, 256 / max_out_verts_per_gsprim);
+            max_gsprims_base = MIN2(max_gsprims_base, max_workgroup_size / max_out_verts_per_gsprim);
          }
       } else {
          /* Use special multi-cycling mode in which each GS
@@ -1487,7 +1489,7 @@ retry_select_mode:
          : is_gs
               ? max_gsprims * gs_num_invocations * gs_vertices_out
               : max_esverts;
-   assert(max_out_vertices <= 256);
+   assert(max_out_vertices <= max_workgroup_size);
 
    out->hw_max_esverts = max_esverts;
    out->max_gsprims = max_gsprims;
@@ -1508,6 +1510,6 @@ retry_select_mode:
 
    /* If asserts are disabled, we use the same conditions to return false */
    return max_esverts >= max_verts_per_prim && max_gsprims >= 1 &&
-          max_out_vertices <= 256 &&
+          max_out_vertices <= max_workgroup_size &&
           out->hw_max_esverts >= min_esverts;
 }

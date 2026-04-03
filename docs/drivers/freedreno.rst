@@ -54,8 +54,8 @@ Hardware acronyms
   SQE
     a6xx+ replacement for PFP/ME.  This is the microcontroller that runs the
     microcode (loaded from Linux) which actually processes the command stream
-    and writes to the hardware registers.  See `afuc
-    <https://gitlab.freedesktop.org/mesa/mesa/-/blob/main/src/freedreno/afuc/README.rst>`__.
+    and writes to the hardware registers.  See `qrisc
+    <https://gitlab.freedesktop.org/mesa/mesa/-/blob/main/src/freedreno/qrisc/README.rst>`__.
 
   ROQ
     DMA engine used by the SQE for reading memory, with some prefetch buffering.
@@ -300,6 +300,8 @@ management and command stream generation.
 
    freedreno/*
 
+.. _freedreno-gpu-devcoredump:
+
 GPU devcoredump
 ^^^^^^^^^^^^^^^^^^
 
@@ -348,7 +350,7 @@ You would need to disassemble the firmware (/lib/firmware/qcom/aXXX_sqe.fw) via:
 
 .. code-block:: sh
 
-  afuc-disasm -v a650_sqe.fw > a650_sqe.fw.disasm
+  qrisc-disasm -v a650_sqe.fw > a650_sqe.fw.disasm
 
 Now you should search for PC value in the disassembly, e.g.:
 
@@ -409,6 +411,11 @@ Output dump files and trigger file (when enabled) are hard-coded to be placed
 under ``/tmp``, or ``/data/local/tmp`` under Android. `FD_RD_DUMP_TESTNAME` can
 be used to specify a more descriptive prefix for the output or trigger files.
 
+Dumping can be limited to specific ranges of frames or submits. For example,
+``FD_RD_DUMP_SUBMITS=120-140,160,165`` will dump command streams only for the
+specified submits. Similarly, ``FD_RD_DUMP_FRAMES`` can be set to specify for
+which frames any submitted command stream should be dumped.
+
 Functionality is generic to any Freedreno-based backend, but is currently only
 integrated in the MSM backend of Turnip. Using the existing ``TU_DEBUG=rd``
 option will translate to ``FD_RD_DUMP=enable``.
@@ -456,6 +463,8 @@ More examples:
 .. code-block:: sh
 
   ./replay --override=0 test_replay.rd
+
+.. _freedreno-editing-command-stream:
 
 Editing Command Stream (a6xx+)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -568,7 +577,7 @@ A typical work flow would be:
 
 .. code-block:: sh
 
-   nc -lvup $PORT | stdbuf -o0 xxd -pc -c 4 | awk -Wposix '{printf("%u:%u\n", "0x" $0, a[$0]++)}'
+   nc -lkvup $PORT | stdbuf -o0 xxd -pc -c 4 | awk -Wposix '{printf("%u:%u\n", "0x" $0, a[$0]++)}'
 
 - Start capturing command stream;
 - Replay the hanging trace with:
@@ -643,8 +652,9 @@ Runtime toggling of ``TU_DEBUG`` options
 In some cases, it is useful to toggle ``TU_DEBUG`` options at runtime, such as
 when assessing the performance impact of a particular option. This can be done
 by setting the ``TU_DEBUG_FILE`` environment variable to a file path, and writing
-the desired ``TU_DEBUG`` options to that file. The driver will check the file for
-changes and apply them.
+the desired ``TU_DEBUG`` options to that file. The driver will check the file at
+startup and apply all debug options (runtime and non-runtime) but then will
+continue to monitor the file for changes and only apply runtime options.
 
 The folder containing the file should exist prior to running the application, and
 deleting the folder during runtime will result in the driver no longer picking up

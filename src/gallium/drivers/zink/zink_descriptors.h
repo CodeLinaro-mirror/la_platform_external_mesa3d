@@ -34,6 +34,8 @@ extern "C" {
 
 #define ZINK_DESCRIPTOR_COMPACT 2
 
+enum zink_pipeline_idx;
+
 
 #define ZINK_BINDLESS_IS_BUFFER(HANDLE) (HANDLE >= ZINK_MAX_BINDLESS_HANDLES)
 
@@ -133,6 +135,17 @@ zink_descriptor_type_from_bindless_index(unsigned idx)
    }
 }
 
+ALWAYS_INLINE static unsigned
+zink_descriptor_stage_idx(enum mesa_shader_stage stage)
+{
+   if (stage == MESA_SHADER_TASK || stage == MESA_SHADER_MESH)
+      return stage - MESA_SHADER_TASK;
+   /* clamp compute bindings for better driver efficiency */
+   if (mesa_shader_stage_is_compute(stage))
+      return 0;
+   return stage;
+}
+
 bool
 zink_descriptor_layouts_init(struct zink_screen *screen);
 
@@ -143,8 +156,6 @@ bool
 zink_descriptor_util_alloc_sets(struct zink_screen *screen, VkDescriptorSetLayout dsl, VkDescriptorPool pool, VkDescriptorSet *sets, unsigned num_sets);
 void
 zink_descriptor_util_init_fbfetch(struct zink_context *ctx);
-bool
-zink_descriptor_util_push_layouts_get(struct zink_context *ctx, struct zink_descriptor_layout **dsls, struct zink_descriptor_layout_key **layout_keys);
 VkImageLayout
 zink_descriptor_util_image_layout_eval(const struct zink_context *ctx, const struct zink_resource *res, bool is_compute);
 void
@@ -168,13 +179,13 @@ void
 zink_descriptor_program_deinit(struct zink_screen *screen, struct zink_program *pg);
 
 void
-zink_descriptors_update(struct zink_context *ctx, bool is_compute);
+zink_descriptors_update(struct zink_context *ctx, enum zink_pipeline_idx pidx);
 
 
 void
-zink_context_invalidate_descriptor_state(struct zink_context *ctx, gl_shader_stage shader, enum zink_descriptor_type type, unsigned, unsigned);
+zink_context_invalidate_descriptor_state(struct zink_context *ctx, mesa_shader_stage shader, enum zink_descriptor_type type, unsigned, unsigned);
 void
-zink_context_invalidate_descriptor_state_compact(struct zink_context *ctx, gl_shader_stage shader, enum zink_descriptor_type type, unsigned, unsigned);
+zink_context_invalidate_descriptor_state_compact(struct zink_context *ctx, mesa_shader_stage shader, enum zink_descriptor_type type, unsigned, unsigned);
 
 void
 zink_batch_descriptor_deinit(struct zink_screen *screen, struct zink_batch_state *bs);
@@ -189,8 +200,6 @@ zink_descriptors_init(struct zink_context *ctx);
 void
 zink_descriptors_deinit(struct zink_context *ctx);
 
-void
-zink_descriptors_update_masked(struct zink_context *ctx, bool is_compute, uint8_t changed_sets, uint8_t bind_sets);
 #ifdef __cplusplus
 }
 #endif

@@ -60,7 +60,7 @@ if dep_libdrm.found()
 endif
 
 if with_platform_android
-  vulkan_lite_runtime_files += files('vk_android.c', 'vk_android_hal.c')
+  vulkan_lite_runtime_files += files('vk_android.c')
   vulkan_lite_runtime_deps += [dep_android, idep_u_gralloc]
 endif
 
@@ -203,7 +203,7 @@ libvulkan_lite_runtime = static_library(
   vulkan_lite_runtime_files,
   include_directories : [inc_include, inc_src],
   dependencies : vulkan_lite_runtime_deps,
-  c_args : c_msvc_compat_args,
+  c_args : [c_msvc_compat_args, '-DMESA_VK_LOG=@0@'.format(get_option('debug').to_int())],
   gnu_symbol_visibility : 'hidden',
   build_by_default : false,
 )
@@ -276,8 +276,14 @@ vulkan_runtime_deps = [
 ]
 
 if prog_glslang.found()
-  subdir('radix_sort')
-  subdir('bvh')
+  if with_bvh
+    subdir('radix_sort')
+    vulkan_runtime_files += radix_sort_files
+    vulkan_runtime_files += radix_sort_spv
+    subdir('bvh')
+    vulkan_runtime_files += files('vk_acceleration_structure.c')
+    vulkan_runtime_files += bvh_spv
+  endif
   vulkan_runtime_files += files('vk_texcompress_astc.c')
   vulkan_runtime_files += custom_target(
     'astc_spv.h',
@@ -289,10 +295,6 @@ if prog_glslang.found()
     ],
     depfile : 'astc_spv.h.d',
   )
-  vulkan_runtime_files += files('vk_acceleration_structure.c')
-  vulkan_runtime_files += radix_sort_files
-  vulkan_runtime_files += bvh_spv
-  vulkan_runtime_files += radix_sort_spv
 endif
 
 libvulkan_runtime = static_library(

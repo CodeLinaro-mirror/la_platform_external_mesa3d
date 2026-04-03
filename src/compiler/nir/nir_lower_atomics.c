@@ -33,7 +33,7 @@
  * eg:
  * atomicAdd(a[0], 1) ->
  *
- * uint expected = a[0];
+ * uint expected = atomicLoad(a[0]);
  * while (true) {
  *    uint before = expected;
  *    expected += 1;
@@ -52,43 +52,45 @@ build_atomic(nir_builder *b, nir_intrinsic_instr *intr)
       load = nir_load_ssbo(b, 1, intr->def.bit_size, intr->src[0].ssa,
                            intr->src[1].ssa,
                            .align_mul = intr->def.bit_size / 8,
-                           .align_offset = 0);
+                           .align_offset = 0,
+                           .offset_shift = nir_intrinsic_offset_shift(intr),
+                           .access = ACCESS_ATOMIC | ACCESS_COHERENT);
       break;
    case nir_intrinsic_shared_atomic:
       load = nir_load_shared(b, 1, intr->def.bit_size,
                              intr->src[0].ssa,
                              .align_mul = intr->def.bit_size / 8,
-                             .align_offset = 0);
+                             .align_offset = 0,
+                             .access = ACCESS_ATOMIC);
       break;
    case nir_intrinsic_global_atomic:
-      load = nir_load_global(b, intr->src[0].ssa,
-                             intr->def.bit_size / 8,
-                             1, intr->def.bit_size);
+      load = nir_load_global(b, 1, intr->def.bit_size, intr->src[0].ssa,
+                             .access = ACCESS_ATOMIC | ACCESS_COHERENT);
       break;
    default:
       UNREACHABLE("unsupported atomic type");
    }
 
-   nir_def *data = intr->intrinsic == nir_intrinsic_ssbo_atomic ? intr->src[2].ssa : intr->src[1].ssa;
+   nir_def *data = nir_get_io_data_src(intr)->ssa;
    nir_loop *loop = nir_push_loop(b);
    nir_def *xchg;
    {
       nir_phi_instr *phi = nir_phi_instr_create(b->shader);
       nir_def_init(&phi->instr, &phi->def, 1, intr->def.bit_size);
-      nir_phi_instr_add_src(phi, load->parent_instr->block, load);
+      nir_phi_instr_add_src(phi, nir_def_block(load), load);
       nir_def *before = &phi->def;
       nir_def *expected = nir_build_alu2(
          b, nir_atomic_op_to_alu(nir_intrinsic_atomic_op(intr)), before, data);
-      nir_alu_instr *op = nir_instr_as_alu(expected->parent_instr);
-      op->exact = true;
-      op->fp_fast_math = 0;
+      nir_alu_instr *op = nir_def_as_alu(expected);
+      op->fp_math_ctrl = nir_op_valid_fp_math_ctrl(op->op, nir_fp_no_fast_math);
       switch (intr->intrinsic) {
       case nir_intrinsic_ssbo_atomic:
          xchg = nir_ssbo_atomic_swap(b, intr->def.bit_size,
                                      intr->src[0].ssa,
                                      intr->src[1].ssa,
                                      before, expected,
-                                     .atomic_op = nir_atomic_op_cmpxchg);
+                                     .atomic_op = nir_atomic_op_cmpxchg,
+                                     .offset_shift = nir_intrinsic_offset_shift(intr));
          break;
       case nir_intrinsic_shared_atomic:
          xchg = nir_shared_atomic_swap(b, intr->def.bit_size,

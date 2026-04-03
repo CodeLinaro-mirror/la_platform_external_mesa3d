@@ -29,7 +29,7 @@
 
 #include <windows.h>
 
-#include "glapi/glapi.h"
+#include "glapi/glapi/glapi.h"
 #include "util/u_debug.h"
 #include "util/u_math.h"
 #include "util/u_memory.h"
@@ -113,6 +113,7 @@ static const driOptionDescription gallium_driconf[] = {
 DRI_CONF_SECTION("WGL")
    DRI_CONF_WGL_FRAME_LATENCY(2)
    DRI_CONF_WGL_SWAP_INTERVAL(1)
+   DRI_CONF_WGL_REQUIRE_GDI_COMPAT(false)
 DRI_CONF_SECTION_END
 };
 

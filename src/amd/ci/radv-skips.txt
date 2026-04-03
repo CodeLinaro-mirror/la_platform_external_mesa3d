@@ -1,10 +1,5 @@
-# Exclude WSI related tests.
-dEQP-VK.image.swapchain_mutable.*
-dEQP-VK.wsi.*
-
 # Exclude these memory tests that usually take more than 30s to complete.
 dEQP-VK.memory.mapping.dedicated_alloc.image.full.1048577.*
-dEQP-VK.memory.mapping.suballocation.full.variable.implicit_unmap
 dEQP-VK.memory.pipeline_barrier.all.1048576_vertex_buffer_stride_2
 dEQP-VK.memory.pipeline_barrier.all.1048576_vertex_buffer_stride_4
 dEQP-VK.memory.pipeline_barrier.all.65536_vertex_buffer_stride_2
@@ -53,5 +48,8 @@ dEQP-VK.reconvergence.maximal.compute.nesting4.7.38
 # investigated.
 dEQP-VK.api.command_buffers.many_indirect_disps_on_secondary
 
-# CTS bug
-dEQP-VK.api.debug_utils.long_labels_video_decode
+# These tests are expected to hang on GFX10+. I have a pending fix.
+dEQP-VK.sparse_resources.buffer.misc.null_address_read*
+
+# These tests require PCIe atomics, causing random hangs
+dEQP-VK.video.synchronization.*.basic.event.*

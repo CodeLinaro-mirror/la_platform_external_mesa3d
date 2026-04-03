@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <amdgpu.h>
 #include "drm-uapi/amdgpu_drm.h"
 #include "drm-uapi/drm_fourcc.h"
 
@@ -17,7 +16,7 @@
 #include "util/mesa-sha1.h"
 #include "addrlib/inc/addrinterface.h"
 
-#include "ac_fake_hw_db.h"
+#include "ac_surface_test.h"
 
 /*
  * The main goal of this test is making sure that we do
@@ -32,17 +31,17 @@ struct test_entry {
    enum pipe_format format;
 
    /* debug info */
-   const char *name;
    uint8_t pipes;
    uint8_t rb;
    uint8_t banks_or_pkrs;
    uint8_t se;
+   const char *name;
 
    /* value to determine uniqueness */
-   unsigned char hash[20];
+   unsigned char hash[SHA1_DIGEST_LENGTH];
 
    /* u_vector requires power of two sizing */
-   char padding[sizeof(void*) == 8 ? 8 : 16];
+   char padding[sizeof(void*) == 8 ? 0 : 4];
 };
 
 static uint64_t
@@ -277,6 +276,10 @@ static void test_modifier(const struct radeon_info *info,
             .num_channels = 3,
             .array_size = 1
          },
+         .blk_w = 1,
+         .blk_h = 1,
+         .bpe = util_format_get_blocksize(format),
+         .modifier = modifier,
       };
 
       struct test_entry entry = {
@@ -293,12 +296,7 @@ static void test_modifier(const struct radeon_info *info,
             G_0098F8_NUM_PKRS(info->gb_addr_config) : G_0098F8_NUM_BANKS(info->gb_addr_config)
       };
 
-      struct radeon_surf surf = (struct radeon_surf) {
-         .blk_w = 1,
-         .blk_h = 1,
-         .bpe = util_format_get_blocksize(format),
-         .modifier = modifier,
-      };
+      struct radeon_surf surf;
 
       int r = ac_compute_surface(addrlib, info, &config, RADEON_SURF_MODE_2D, &surf);
       assert(!r);

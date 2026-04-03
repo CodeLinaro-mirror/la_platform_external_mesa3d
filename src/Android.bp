@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2024 The Android Open Source Project
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * Submit patches, do not hand-edit.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package {
@@ -19,9 +14,20 @@ package {
     default_applicable_licenses: ["external_mesa3d_license"],
 }
 
+genrule {
+    name: "git_sha1.h",
+    out: [
+        "git_sha1.h",
+    ],
+    tools: [
+        "git_sha1_py_binary",
+    ],
+    cmd: "$(location git_sha1_py_binary) --output $(location git_sha1.h)",
+}
+
 cc_library_headers {
-    name: "mesa_src_headers",
-    vendor_available: true,
+    name: "inc_src",
+    vendor: true,
     host_supported: true,
     export_include_dirs: [
         ".",
@@ -29,37 +35,19 @@ cc_library_headers {
 }
 
 cc_library_headers {
-    name: "mesa_gallium_headers",
+    name: "inc_util",
     vendor: true,
     host_supported: true,
     export_include_dirs: [
-        "gallium/include",
+        ".",
     ],
 }
 
 cc_library_headers {
-    name: "mesa_llvmpipe_headers",
+    name: "inc_util_c11",
     vendor: true,
     host_supported: true,
     export_include_dirs: [
-        "gallium/drivers/llvmpipe",
-    ],
-}
-
-cc_library_headers {
-    name: "mesa_mesa_headers",
-    vendor: true,
-    host_supported: true,
-    export_include_dirs: [
-        "mesa",
-    ],
-}
-
-cc_library_headers {
-    name: "mesa_mapi_headers",
-    vendor: true,
-    host_supported: true,
-    export_include_dirs: [
-        "mapi",
+        ".",
     ],
 }

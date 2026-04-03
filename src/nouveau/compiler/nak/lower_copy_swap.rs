@@ -95,7 +95,9 @@ impl LowerCopySwap {
                         b.push_op(OpLd {
                             dst: copy.dst,
                             addr: Src::ZERO,
+                            pred: true.into(),
                             offset: addr.try_into().unwrap(),
+                            stride: OffsetStride::X1,
                             access: access,
                         });
                     }
@@ -175,6 +177,7 @@ impl LowerCopySwap {
                             addr: Src::ZERO,
                             data: copy.src,
                             offset: addr.try_into().unwrap(),
+                            stride: OffsetStride::X1,
                             access: access,
                         });
                     }
@@ -249,42 +252,42 @@ impl LowerCopySwap {
 
     fn run(&mut self, s: &mut Shader) {
         let sm = s.sm;
-        s.map_instrs(|instr: Box<Instr>, _| -> MappedInstrs {
+        s.map_instrs(|instr: Instr, _| -> MappedInstrs {
             match instr.op {
                 Op::R2UR(r2ur) => {
                     debug_assert!(instr.pred.is_true());
                     let mut b = InstrBuilder::new(sm);
                     if DEBUG.annotate() {
-                        b.push_instr(Instr::new_boxed(OpAnnotate {
+                        b.push_instr(Instr::new(OpAnnotate {
                             annotation: "r2ur lowered by lower_copy_swap"
                                 .into(),
                         }));
                     }
-                    self.lower_r2ur(&mut b, r2ur);
+                    self.lower_r2ur(&mut b, *r2ur);
                     b.into_mapped_instrs()
                 }
                 Op::Copy(copy) => {
                     debug_assert!(instr.pred.is_true());
                     let mut b = InstrBuilder::new(sm);
                     if DEBUG.annotate() {
-                        b.push_instr(Instr::new_boxed(OpAnnotate {
+                        b.push_instr(Instr::new(OpAnnotate {
                             annotation: "copy lowered by lower_copy_swap"
                                 .into(),
                         }));
                     }
-                    self.lower_copy(&mut b, copy);
+                    self.lower_copy(&mut b, *copy);
                     b.into_mapped_instrs()
                 }
                 Op::Swap(swap) => {
                     debug_assert!(instr.pred.is_true());
                     let mut b = InstrBuilder::new(sm);
                     if DEBUG.annotate() {
-                        b.push_instr(Instr::new_boxed(OpAnnotate {
+                        b.push_instr(Instr::new(OpAnnotate {
                             annotation: "swap lowered by lower_copy_swap"
                                 .into(),
                         }));
                     }
-                    self.lower_swap(&mut b, swap);
+                    self.lower_swap(&mut b, *swap);
                     b.into_mapped_instrs()
                 }
                 _ => MappedInstrs::One(instr),

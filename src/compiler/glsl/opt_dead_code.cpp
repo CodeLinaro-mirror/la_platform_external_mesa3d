@@ -50,7 +50,7 @@ do_dead_code(ir_exec_list *instructions)
 
    v.run(instructions);
 
-   hash_table_foreach(v.ht, e) {
+   hash_table_foreach(&v.ht, e) {
       ir_variable_refcount_entry *entry = (ir_variable_refcount_entry *)e->data;
 
       /* Since each assignment is a reference, the refereneced count must be
@@ -96,7 +96,6 @@ do_dead_code(ir_exec_list *instructions)
                }
 
                assignment_entry->link.remove();
-               free(assignment_entry);
             }
             progress = true;
 	 }

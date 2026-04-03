@@ -1,24 +1,6 @@
 /*
  * Copyright © 2018 Intel Corporation
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- * IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 
 #include <gtest/gtest.h>
@@ -97,8 +79,7 @@ void dead_code_eliminate_vec4_test::SetUp()
    params.mem_ctx = ctx;
 
    prog_data = ralloc(ctx, struct elk_vue_prog_data);
-   nir_shader *shader =
-      nir_shader_create(ctx, MESA_SHADER_VERTEX, NULL, NULL);
+   nir_shader *shader = nir_shader_create(ctx, MESA_SHADER_VERTEX, NULL);
 
   v = new dead_code_eliminate_vec4_visitor(compiler, &params, shader, prog_data);
 
@@ -118,7 +99,7 @@ void dead_code_eliminate_vec4_test::TearDown()
 static void
 dead_code_eliminate(vec4_visitor *v)
 {
-   const bool print = getenv("TEST_DEBUG");
+   const bool print = os_get_option("TEST_DEBUG");
 
    if (print) {
       fprintf(stderr, "instructions before:\n");

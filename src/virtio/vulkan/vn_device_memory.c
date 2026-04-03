@@ -115,16 +115,11 @@ vn_device_memory_import_dma_buf(struct vn_device *dev,
    const VkMemoryType *mem_type =
       &dev->physical_device->memory_properties
           .memoryTypes[alloc_info->memoryTypeIndex];
-   const VkMemoryDedicatedAllocateInfo *dedicated_info =
-      vk_find_struct_const(alloc_info->pNext, MEMORY_DEDICATED_ALLOCATE_INFO);
-   const bool is_dedicated =
-      dedicated_info && (dedicated_info->image != VK_NULL_HANDLE ||
-                         dedicated_info->buffer != VK_NULL_HANDLE);
 
    struct vn_renderer_bo *bo;
    VkResult result = vn_renderer_bo_create_from_dma_buf(
-      dev->renderer, is_dedicated ? alloc_info->allocationSize : 0, fd,
-      mem_type->propertyFlags, &bo);
+      dev->renderer, alloc_info->allocationSize, fd, mem_type->propertyFlags,
+      &bo);
    if (result != VK_SUCCESS)
       return result;
 
@@ -357,7 +352,7 @@ vn_device_memory_emit_report(struct vn_device *dev,
                                 mem_type->heapIndex);
 }
 
-VkResult
+VKAPI_ATTR VkResult VKAPI_CALL
 vn_AllocateMemory(VkDevice device,
                   const VkMemoryAllocateInfo *pAllocateInfo,
                   const VkAllocationCallbacks *pAllocator,
@@ -383,6 +378,8 @@ vn_AllocateMemory(VkDevice device,
                                                import_fd_info->fd);
    } else {
       result = vn_device_memory_alloc(dev, mem, pAllocateInfo);
+      if (result == VK_SUCCESS)
+         vn_wsi_memory_info_init(mem, pAllocateInfo);
    }
 
    vn_device_memory_emit_report(dev, mem, /* is_alloc */ true, result);
@@ -397,7 +394,7 @@ vn_AllocateMemory(VkDevice device,
    return VK_SUCCESS;
 }
 
-void
+VKAPI_ATTR void VKAPI_CALL
 vn_FreeMemory(VkDevice device,
               VkDeviceMemory memory,
               const VkAllocationCallbacks *pAllocator)
@@ -419,7 +416,7 @@ vn_FreeMemory(VkDevice device,
    vk_device_memory_destroy(&dev->base.vk, pAllocator, &mem->base.vk);
 }
 
-uint64_t
+VKAPI_ATTR uint64_t VKAPI_CALL
 vn_GetDeviceMemoryOpaqueCaptureAddress(
    VkDevice device, const VkDeviceMemoryOpaqueCaptureAddressInfo *pInfo)
 {
@@ -428,7 +425,7 @@ vn_GetDeviceMemoryOpaqueCaptureAddress(
                                                         device, pInfo);
 }
 
-VkResult
+VKAPI_ATTR VkResult VKAPI_CALL
 vn_MapMemory2(VkDevice device,
               const VkMemoryMapInfo *pMemoryMapInfo,
               void **ppData)
@@ -441,6 +438,7 @@ vn_MapMemory2(VkDevice device,
    const VkDeviceSize size = pMemoryMapInfo->size;
    const struct vk_device_memory *mem_vk = &mem->base.vk;
    const bool need_bo = !mem->base_bo;
+   void *placed_addr = NULL;
    void *ptr = NULL;
    VkResult result;
 
@@ -462,7 +460,14 @@ vn_MapMemory2(VkDevice device,
          return vn_error(dev->instance, result);
    }
 
-   ptr = vn_renderer_bo_map(dev->renderer, mem->base_bo);
+   if (pMemoryMapInfo->flags & VK_MEMORY_MAP_PLACED_BIT_EXT) {
+      const VkMemoryMapPlacedInfoEXT *placed_info = vk_find_struct_const(
+         pMemoryMapInfo->pNext, MEMORY_MAP_PLACED_INFO_EXT);
+      assert(placed_info != NULL);
+      placed_addr = placed_info->pPlacedAddress;
+   }
+
+   ptr = vn_renderer_bo_map(dev->renderer, mem->base_bo, placed_addr);
    if (!ptr) {
       /* vn_renderer_bo_map implies a roundtrip on success, but not here. */
       if (need_bo) {
@@ -484,13 +489,13 @@ vn_MapMemory2(VkDevice device,
    return VK_SUCCESS;
 }
 
-VkResult
+VKAPI_ATTR VkResult VKAPI_CALL
 vn_UnmapMemory2(VkDevice device, const VkMemoryUnmapInfo *pMemoryUnmapInfo)
 {
    return VK_SUCCESS;
 }
 
-VkResult
+VKAPI_ATTR VkResult VKAPI_CALL
 vn_FlushMappedMemoryRanges(VkDevice device,
                            uint32_t memoryRangeCount,
                            const VkMappedMemoryRange *pMemoryRanges)
@@ -511,7 +516,7 @@ vn_FlushMappedMemoryRanges(VkDevice device,
    return VK_SUCCESS;
 }
 
-VkResult
+VKAPI_ATTR VkResult VKAPI_CALL
 vn_InvalidateMappedMemoryRanges(VkDevice device,
                                 uint32_t memoryRangeCount,
                                 const VkMappedMemoryRange *pMemoryRanges)
@@ -533,7 +538,7 @@ vn_InvalidateMappedMemoryRanges(VkDevice device,
    return VK_SUCCESS;
 }
 
-void
+VKAPI_ATTR void VKAPI_CALL
 vn_GetDeviceMemoryCommitment(VkDevice device,
                              VkDeviceMemory memory,
                              VkDeviceSize *pCommittedMemoryInBytes)
@@ -543,7 +548,7 @@ vn_GetDeviceMemoryCommitment(VkDevice device,
                                        pCommittedMemoryInBytes);
 }
 
-VkResult
+VKAPI_ATTR VkResult VKAPI_CALL
 vn_GetMemoryFdKHR(VkDevice device,
                   const VkMemoryGetFdInfoKHR *pGetFdInfo,
                   int *pFd)
@@ -598,7 +603,7 @@ vn_get_memory_dma_buf_properties(struct vn_device *dev,
    return VK_SUCCESS;
 }
 
-VkResult
+VKAPI_ATTR VkResult VKAPI_CALL
 vn_GetMemoryFdPropertiesKHR(VkDevice device,
                             VkExternalMemoryHandleTypeFlagBits handleType,
                             int fd,

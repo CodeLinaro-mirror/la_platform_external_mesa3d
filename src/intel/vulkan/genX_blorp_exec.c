@@ -56,7 +56,9 @@ static void blorp_measure_end(struct blorp_batch *_batch,
                          params->y1 - params->y0,
                          params->num_samples,
                          params->shader_pipeline,
-                         params->dst.view.format,
+                         params->depth.enabled ? params->depth.view.format :
+                         params->stencil.enabled ? params->stencil.view.format :
+                                                   params->dst.view.format,
                          params->src.view.format,
                          (_batch->flags & BLORP_BATCH_PREDICATE_ENABLE));
 }
@@ -313,8 +315,9 @@ blorp_exec_on_render(struct blorp_batch *batch,
     */
    if (blorp_uses_bti_rt_writes(batch, params)) {
       anv_add_pending_pipe_bits(cmd_buffer,
-                                ANV_PIPE_RENDER_TARGET_CACHE_FLUSH_BIT |
-                                ANV_PIPE_STALL_AT_SCOREBOARD_BIT,
+                                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                ANV_PIPE_RT_BTI_CHANGE,
                                 "before blorp BTI change");
    }
 #endif
@@ -328,14 +331,13 @@ blorp_exec_on_render(struct blorp_batch *batch,
           * will trigger a PIPE_CONTROL too.
           */
          hw_state->ds_write_state = blorp_ds_state;
-         BITSET_SET(hw_state->dirty, ANV_GFX_STATE_WA_18019816803);
+         BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_WA_18019816803);
 
-         /* Add the stall that will flush prior to the blorp operation by
-          * genX(cmd_buffer_apply_pipe_flushes)
-          */
-         anv_add_pending_pipe_bits(cmd_buffer,
-                                   ANV_PIPE_PSS_STALL_SYNC_BIT,
-                                   "Wa_18019816803");
+         genX(batch_emit_pipe_control)(&cmd_buffer->batch,
+                                       cmd_buffer->device->info,
+                                       cmd_buffer->state.current_pipeline,
+                                       ANV_PIPE_PSS_STALL_SYNC_BIT,
+                                       "Wa_18019816803");
       }
    }
 #endif
@@ -381,52 +383,53 @@ blorp_exec_on_render(struct blorp_batch *batch,
     */
    if (blorp_uses_bti_rt_writes(batch, params)) {
       anv_add_pending_pipe_bits(cmd_buffer,
-                                ANV_PIPE_RENDER_TARGET_CACHE_FLUSH_BIT |
-                                ANV_PIPE_STALL_AT_SCOREBOARD_BIT,
+                                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                ANV_PIPE_RT_BTI_CHANGE,
                                 "after blorp BTI change");
    }
 #endif
 
    /* Flag all the instructions emitted by BLORP. */
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_URB);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VF_STATISTICS);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VF);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VF_TOPOLOGY);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VERTEX_INPUT);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VF_SGVS);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_URB);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VF_STATISTICS);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VF);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VF_TOPOLOGY);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VERTEX_INPUT);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VF_SGVS);
 #if GFX_VER >= 11
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VF_SGVS_2);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VF_SGVS_2);
 #endif
 #if GFX_VER >= 12
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_PRIMITIVE_REPLICATION);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_PRIMITIVE_REPLICATION);
 #endif
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VIEWPORT_CC_PTR);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_STREAMOUT);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_RASTER);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_CLIP);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_SAMPLE_MASK);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_MULTISAMPLE);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_SF);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_SBE);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_SBE_SWIZ);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_DEPTH_BOUNDS);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_WM);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_WM_DEPTH_STENCIL);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VS);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_HS);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_DS);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_TE);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_GS);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_PS);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_PS_EXTRA);
-   BITSET_SET(hw_state->dirty, ANV_GFX_STATE_BLEND_STATE_PTR);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VIEWPORT_CC);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_STREAMOUT);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_RASTER);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_CLIP);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_SAMPLE_MASK);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_MULTISAMPLE);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_SF);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_SBE);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_SBE_SWIZ);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_DEPTH_BOUNDS);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_WM);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_WM_DEPTH_STENCIL);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VS);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_HS);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_DS);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_TE);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_GS);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_PS);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_PS_EXTRA);
+   BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_BLEND_STATE);
    if (batch->blorp->config.use_mesh_shading) {
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_MESH_CONTROL);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_TASK_CONTROL);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_MESH_CONTROL);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_TASK_CONTROL);
    }
-   if (params->wm_prog_data) {
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_CC_STATE_PTR);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_PS_BLEND);
+   if (params->fs_prog_data) {
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_CC_STATE);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_PS_BLEND);
    }
 
    anv_cmd_dirty_mask_t dirty = ~(ANV_CMD_DIRTY_INDEX_BUFFER |
@@ -436,6 +439,8 @@ blorp_exec_on_render(struct blorp_batch *batch,
 
    cmd_buffer->state.gfx.vb_dirty = ~0;
    cmd_buffer->state.gfx.dirty |= dirty;
+   if (blorp_uses_bti_rt_writes(batch, params))
+      cmd_buffer->state.descriptors_pointers_dirty |= VK_SHADER_STAGE_ALL_GRAPHICS;
    cmd_buffer->state.push_constants_dirty |= VK_SHADER_STAGE_ALL_GRAPHICS;
 }
 
@@ -448,16 +453,21 @@ blorp_exec_on_compute(struct blorp_batch *batch,
    struct anv_cmd_buffer *cmd_buffer = batch->driver_batch;
    assert(cmd_buffer->queue_family->queueFlags & VK_QUEUE_COMPUTE_BIT);
 
-   genX(flush_pipeline_select_gpgpu)(cmd_buffer);
+   genX(flush_pipeline_select_gpgpu)(cmd_buffer, false);
 
    /* Apply any outstanding flushes in case pipeline select haven't. */
    genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
 
    blorp_exec(batch, params);
 
-   cmd_buffer->state.descriptors_dirty |= VK_SHADER_STAGE_COMPUTE_BIT;
+   anv_cmd_buffer_dirty_descriptors(cmd_buffer,
+                                    VK_SHADER_STAGE_COMPUTE_BIT,
+                                    "blorp compute");
+   cmd_buffer->state.descriptors_pointers_dirty |= VK_SHADER_STAGE_COMPUTE_BIT;
    cmd_buffer->state.push_constants_dirty |= VK_SHADER_STAGE_COMPUTE_BIT;
    cmd_buffer->state.compute.pipeline_dirty = true;
+
+   genX(cmd_buffer_post_dispatch_wa)(cmd_buffer);
 }
 
 static void
@@ -506,6 +516,7 @@ get_color_aux_op(const struct blorp_params *params)
    case BLORP_OP_HIZ_AMBIGUATE:
    case BLORP_OP_HIZ_CLEAR:
    case BLORP_OP_HIZ_RESOLVE:
+   case BLORP_OP_HIZ_PARTIAL_RESOLVE:
    case BLORP_OP_SLOW_DEPTH_CLEAR:
       assert(params->fast_clear_op == ISL_AUX_OP_NONE);
       return ISL_AUX_OP_NONE;

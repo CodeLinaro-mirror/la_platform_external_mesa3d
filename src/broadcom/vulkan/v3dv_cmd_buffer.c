@@ -28,6 +28,9 @@
 #include "vk_common_entrypoints.h"
 #include "vk_util.h"
 
+#define V3D_VERSION 42
+#include "v3dv_format_table.h"
+
 float
 v3dv_get_aa_line_width(struct v3dv_pipeline *pipeline,
                        struct v3dv_cmd_buffer *buffer)
@@ -1238,13 +1241,11 @@ cmd_buffer_state_set_attachment_clear_color(struct v3dv_cmd_buffer *cmd_buffer,
    v3d_X((&cmd_buffer->device->devinfo), get_internal_type_bpp_for_output_format)
       (format->planes[0].rt_type, &internal_type, &internal_bpp);
 
-   uint32_t internal_size = 4 << internal_bpp;
-
    struct v3dv_cmd_buffer_attachment_state *attachment_state =
       &cmd_buffer->state.attachments[attachment_idx];
 
    v3d_X((&cmd_buffer->device->devinfo), get_hw_clear_color)
-      (color, internal_type, internal_size, &attachment_state->clear_value.color[0]);
+      (color, &format->planes[0], &attachment_state->clear_value.color[0]);
 
    attachment_state->vk_clear_value.color = *color;
 }
@@ -1285,20 +1286,24 @@ cmd_buffer_state_set_clear_values(struct v3dv_cmd_buffer *cmd_buffer,
       const struct v3dv_render_pass_attachment *attachment =
          &pass->attachments[i];
 
-      if (attachment->desc.loadOp != VK_ATTACHMENT_LOAD_OP_CLEAR)
-         continue;
-
       VkImageAspectFlags aspects = vk_format_aspects(attachment->desc.format);
       if (aspects & VK_IMAGE_ASPECT_COLOR_BIT) {
-         cmd_buffer_state_set_attachment_clear_color(cmd_buffer, i,
-                                                     &values[i].color);
-      } else if (aspects & (VK_IMAGE_ASPECT_DEPTH_BIT |
-                            VK_IMAGE_ASPECT_STENCIL_BIT)) {
-         cmd_buffer_state_set_attachment_clear_depth_stencil(
-            cmd_buffer, i,
-            aspects & VK_IMAGE_ASPECT_DEPTH_BIT,
-            aspects & VK_IMAGE_ASPECT_STENCIL_BIT,
-            &values[i].depthStencil);
+         if (attachment->desc.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR) {
+            cmd_buffer_state_set_attachment_clear_color(cmd_buffer, i,
+                                                        &values[i].color);
+         }
+      } else {
+         bool clear_depth = aspects & VK_IMAGE_ASPECT_DEPTH_BIT &&
+            attachment->desc.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR;
+         bool clear_stencil = aspects & VK_IMAGE_ASPECT_STENCIL_BIT &&
+            attachment->desc.stencilLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR;
+         if (clear_depth || clear_stencil) {
+            cmd_buffer_state_set_attachment_clear_depth_stencil(
+               cmd_buffer, i,
+               clear_depth,
+               clear_stencil,
+               &values[i].depthStencil);
+         }
       }
    }
 }
@@ -2067,17 +2072,17 @@ cmd_buffer_execute_outside_pass(struct v3dv_cmd_buffer *primary,
             return;
 
          if (pending_barrier.dst_mask) {
-            /* FIXME: do the same we do for primaries and only choose the
-             * relevant src masks.
-             */
-            job->serialize = pending_barrier.src_mask_graphics |
-                             pending_barrier.src_mask_transfer |
-                             pending_barrier.src_mask_compute;
-            if (pending_barrier.bcl_buffer_access ||
-                pending_barrier.bcl_image_access) {
+            const uint8_t prev_dst_mask = pending_barrier.dst_mask;
+            v3dv_job_apply_barrier_state(job, &pending_barrier);
+
+            if ((prev_dst_mask & V3DV_BARRIER_GRAPHICS_BIT) &&
+                !(pending_barrier.dst_mask & V3DV_BARRIER_GRAPHICS_BIT) &&
+                (pending_barrier.bcl_buffer_access ||
+                 pending_barrier.bcl_image_access)) {
                job->needs_bcl_sync = true;
+               pending_barrier.bcl_buffer_access = 0;
+               pending_barrier.bcl_image_access = 0;
             }
-            memset(&pending_barrier, 0, sizeof(pending_barrier));
          }
       }
 
@@ -3062,8 +3067,18 @@ v3dv_cmd_buffer_emit_pre_draw(struct v3dv_cmd_buffer *cmd_buffer,
    if (BITSET_TEST(dyn->dirty, MESA_VK_DYNAMIC_RS_LINE_WIDTH))
       v3d_X((&device->devinfo), cmd_buffer_emit_line_width)(cmd_buffer);
 
-   if (dyn->ia.primitive_topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST &&
-       !job->emitted_default_point_size) {
+   /* There is a bug in V3D 4.2 hardware where a FIFO in the binner may
+    * overflow in some scenarios where geometry is dropped in the pipeline
+    * (for example, if using primitive discards). The work around requires the
+    * driver to emit any CLE command, which will trigger the binner to flush
+    * the FIFO. The recommendation is to emit a very small packet that is fast
+    * to process by the CLE hardware such as PointSize in between all draw
+    * calls to ensure this flush always happens and there is never a chance of
+    * overflowing the binner.
+    */
+   if ((dyn->ia.primitive_topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST &&
+       !job->emitted_default_point_size) ||
+       device->devinfo.ver == 42) {
       v3d_X((&device->devinfo), cmd_buffer_emit_default_point_size)(cmd_buffer);
    }
 
@@ -3716,7 +3731,8 @@ handle_sample_from_linear_image(struct v3dv_cmd_buffer *cmd_buffer,
       } else {
          VkImageViewCreateInfo view_info = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .flags = view->vk.create_flags,
+            .flags = view->vk.create_flags |
+                     VK_IMAGE_VIEW_CREATE_DRIVER_INTERNAL_BIT_MESA,
             .image = tiled_image,
             .viewType = view->vk.view_type,
             .format = view->vk.format,
@@ -4319,7 +4335,7 @@ cmd_buffer_create_csd_job(struct v3dv_cmd_buffer *cmd_buffer,
    uint32_t wgs_per_sg =
       v3d_csd_choose_workgroups_per_supergroup(
          &cmd_buffer->device->devinfo,
-         cs_variant->prog_data.cs->has_subgroups,
+         cs_variant->prog_data.cs->can_use_supergroups,
          cs_variant->prog_data.cs->base.has_control_barrier,
          cs_variant->prog_data.cs->base.threads,
          num_wgs, wg_size);

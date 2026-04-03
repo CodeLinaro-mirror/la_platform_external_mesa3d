@@ -1,24 +1,6 @@
 /*
  * Copyright © 2014 Intel Corporation
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- * IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 
 /** @file elk_fs_combine_constants.cpp
@@ -861,13 +843,6 @@ struct imm {
    /** When promoting half-float we need to account for certain restrictions */
    bool is_half_float;
 
-   /**
-    * The GRF register and subregister number where we've decided to store the
-    * constant value.
-    */
-   uint8_t subreg_offset;
-   uint16_t nr;
-
    /** The number of coissuable instructions using this immediate. */
    uint16_t uses_by_coissue;
 
@@ -880,8 +855,15 @@ struct imm {
    /** Is the value used only in a single basic block? */
    bool used_in_single_block;
 
-   uint16_t first_use_ip;
-   uint16_t last_use_ip;
+   /**
+    * The GRF register and subregister number where we've decided to store the
+    * constant value.
+    */
+   uint8_t subreg_offset;
+   uint32_t nr;
+
+   uint32_t first_use_ip;
+   uint32_t last_use_ip;
 };
 
 /** The working set of information about immediates. */
@@ -1347,7 +1329,7 @@ elk_fs_visitor::opt_combine_constants()
       imm->must_promote = false;
       imm->is_half_float = false;
 
-      imm->first_use_ip = UINT16_MAX;
+      imm->first_use_ip = UINT32_MAX;
       imm->last_use_ip = 0;
 
       imm->uses = new(const_ctx) brw_exec_list;
@@ -1461,7 +1443,7 @@ elk_fs_visitor::opt_combine_constants()
           * instructions seem to have additional alignment requirements, so
           * account for that too.
           */
-         reg.offset = ALIGN(reg.offset, get_alignment_for_imm(imm));
+         reg.offset = align(reg.offset, get_alignment_for_imm(imm));
 
          /* Ensure we have enough space in the register to copy the immediate */
          if (reg.offset + imm->size > REG_SIZE) {
@@ -1555,7 +1537,7 @@ elk_fs_visitor::opt_combine_constants()
        * seem to have additional alignment requirements, so account for that
        * too.
        */
-      assert(reg.offset == ALIGN(reg.offset, get_alignment_for_imm(imm)));
+      assert(reg.offset == align(reg.offset, get_alignment_for_imm(imm)));
 
       struct elk_reg imm_reg = build_imm_reg_for_copy(imm);
 

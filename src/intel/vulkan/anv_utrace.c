@@ -219,13 +219,12 @@ anv_device_utrace_flush_cmd_buffers(struct anv_queue *queue,
                                     anv_device_utrace_emit_gfx_copy_buffer);
             }
          }
-         anv_genX(device->info, emit_so_memcpy_fini)(&submit->memcpy_state);
 
          trace_intel_end_trace_copy_cb(&submit->ds.trace, batch, num_traces);
 
          anv_genX(device->info, emit_so_memcpy_end)(&submit->memcpy_state);
       } else {
-         struct anv_shader_bin *copy_kernel;
+         struct anv_shader_internal *copy_kernel;
          VkResult ret =
             anv_device_get_internal_shader(device,
                                            ANV_INTERNAL_KERNEL_MEMCPY_COMPUTE,
@@ -307,13 +306,6 @@ anv_utrace_create_buffer(struct u_trace_context *utctx, uint64_t size_B)
                         &bo);
    assert(result == VK_SUCCESS);
 
-   memset(bo->map, 0, bo->size);
-#ifdef SUPPORT_INTEL_INTEGRATED_GPUS
-   if (device->physical->memory.need_flush &&
-       anv_bo_needs_host_cache_flush(bo->alloc_flags))
-      intel_flush_range(bo->map, bo->size);
-#endif
-
    return bo;
 }
 
@@ -365,7 +357,7 @@ anv_utrace_record_ts(struct u_trace *ut, void *cs,
           ANV_TIMESTAMP_REWRITE_COMPUTE_WALKER) :
           ANV_TIMESTAMP_CAPTURE_END_OF_PIPE;
    } else {
-      capture_type = (flags & INTEL_DS_TRACEPOINT_FLAG_END_CS) ?
+      capture_type = (flags & INTEL_DS_TRACEPOINT_FLAG_END_OF_PIPE) ?
          ANV_TIMESTAMP_CAPTURE_END_OF_PIPE :
          ANV_TIMESTAMP_CAPTURE_TOP_OF_PIPE;
    }
@@ -422,10 +414,10 @@ anv_utrace_read_ts(struct u_trace_context *utctx,
 
    uint64_t timestamp;
 
-   /* Detect a 16/32 bytes timestamp write */
-   if (ts->gfx20_postsync_data[1] != 0 ||
-       ts->gfx20_postsync_data[2] != 0 ||
-       ts->gfx20_postsync_data[3] != 0) {
+   /* Gfx12.5+ use the COMPUTE_WALKER timestamp write which has a different
+    * format than a dummy 64bit timestamp.
+    */
+   if (device->info->verx10 >= 125 && (flags & INTEL_DS_TRACEPOINT_FLAG_END_CS)) {
       if (device->info->ver >= 20) {
          timestamp = ts->gfx20_postsync_data[3];
       } else {
@@ -673,16 +665,22 @@ anv_QueueBeginDebugUtilsLabelEXT(
 {
    VK_FROM_HANDLE(anv_queue, queue, _queue);
 
-   vk_common_QueueBeginDebugUtilsLabelEXT(_queue, pLabelInfo);
+   vk_queue_lock(&queue->vk);
+
+   vk_queue_begin_debug_utils_label(&queue->vk, pLabelInfo);
 
    anv_queue_trace(queue, pLabelInfo->pLabelName,
                    false /* frame */, true /* begin */);
+
+   vk_queue_unlock(&queue->vk);
 }
 
 void
 anv_QueueEndDebugUtilsLabelEXT(VkQueue _queue)
 {
    VK_FROM_HANDLE(anv_queue, queue, _queue);
+
+   vk_queue_lock(&queue->vk);
 
    if (queue->vk.labels.size > 0) {
       const VkDebugUtilsLabelEXT *label =
@@ -693,5 +691,7 @@ anv_QueueEndDebugUtilsLabelEXT(VkQueue _queue)
       intel_ds_device_process(&queue->device->ds, true);
    }
 
-   vk_common_QueueEndDebugUtilsLabelEXT(_queue);
+   vk_queue_end_debug_utils_label(&queue->vk);
+
+   vk_queue_unlock(&queue->vk);
 }

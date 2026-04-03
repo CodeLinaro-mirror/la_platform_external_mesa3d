@@ -28,6 +28,9 @@
 #include "util/u_pack_color.h"
 #include "vk_common_entrypoints.h"
 
+#define V3D_VERSION 42
+#include "v3dv_format_table.h"
+
 static uint32_t
 meta_blit_key_hash(const void *key)
 {
@@ -279,6 +282,7 @@ get_compatible_tlb_format(VkFormat format)
 {
    switch (format) {
    case VK_FORMAT_R8G8B8A8_SNORM:
+   case VK_FORMAT_B8G8R8A8_SNORM:
       return VK_FORMAT_R8G8B8A8_UINT;
 
    case VK_FORMAT_R8G8_SNORM:
@@ -1151,8 +1155,8 @@ copy_image_tfu(struct v3dv_cmd_buffer *cmd_buffer,
       return false;
    }
 
-   /* Destination can't be raster format */
-   if (!dst->tiled)
+   /* Destination can't be raster format on V3D 4.2 */
+   if (cmd_buffer->device->devinfo.ver < 71 && !dst->tiled)
       return false;
 
    /* We can only do full copies, so if the format is D24S8 both aspects need
@@ -1265,7 +1269,8 @@ copy_image_tfu(struct v3dv_cmd_buffer *cmd_buffer,
          dst->planes[dst_plane].mem->bo->handle,
          dst_offset,
          dst_slice->tiling,
-         dst_slice->padded_height,
+         dst_slice->tiling == V3D_TILING_RASTER ?
+                              dst_slice->stride : dst_slice->padded_height,
          dst->planes[dst_plane].cpp,
          src->planes[src_plane].mem->bo->handle,
          src_offset,
@@ -1868,8 +1873,8 @@ copy_buffer_to_image_tfu(struct v3dv_cmd_buffer *cmd_buffer,
 
    assert(image->vk.samples == VK_SAMPLE_COUNT_1_BIT);
 
-   /* Destination can't be raster format */
-   if (!image->tiled)
+   /* Destination can't be raster format on V3D 4.2 */
+   if (cmd_buffer->device->devinfo.ver < 71 && !image->tiled)
       return false;
 
    /* We can't copy D24S8 because buffer to image copies only copy one aspect
@@ -1967,7 +1972,8 @@ copy_buffer_to_image_tfu(struct v3dv_cmd_buffer *cmd_buffer,
              dst_bo->handle,
              dst_offset,
              slice->tiling,
-             slice->padded_height,
+             slice->tiling == V3D_TILING_RASTER ?
+                              slice->stride : slice->padded_height,
              image->planes[plane].cpp,
              src_bo->handle,
              src_offset,
@@ -2724,6 +2730,7 @@ texel_buffer_shader_copy(struct v3dv_cmd_buffer *cmd_buffer,
 
    VkImageViewCreateInfo image_view_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .flags = VK_IMAGE_VIEW_CREATE_DRIVER_INTERNAL_BIT_MESA,
       .image = v3dv_image_to_handle(image),
       .viewType = v3dv_image_type_to_view_type(image->vk.image_type),
       .format = dst_format,
@@ -3396,8 +3403,8 @@ blit_tfu(struct v3dv_cmd_buffer *cmd_buffer,
    if (src->vk.format != dst->vk.format)
       return false;
 
-   /* Destination can't be raster format */
-   if (!dst->tiled)
+   /* Destination can't be raster format on V3D 4.2 */
+   if (cmd_buffer->device->devinfo.ver < 71 && !dst->tiled)
       return false;
 
    /* Source region must start at (0,0) */
@@ -3505,7 +3512,8 @@ blit_tfu(struct v3dv_cmd_buffer *cmd_buffer,
          dst->planes[0].mem->bo->handle,
          dst_offset,
          dst_slice->tiling,
-         dst_slice->padded_height,
+         dst_slice->tiling == V3D_TILING_RASTER ?
+                              dst_slice->stride : dst_slice->padded_height,
          dst->planes[0].cpp,
          src->planes[0].mem->bo->handle,
          src_offset,
@@ -4635,6 +4643,7 @@ blit_shader(struct v3dv_cmd_buffer *cmd_buffer,
       /* Setup framebuffer */
       VkImageViewCreateInfo dst_image_view_info = {
          .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+         .flags = VK_IMAGE_VIEW_CREATE_DRIVER_INTERNAL_BIT_MESA,
          .image = v3dv_image_to_handle(dst),
          .viewType = v3dv_image_type_to_view_type(dst->vk.image_type),
          .format = dst_format,
@@ -4693,6 +4702,7 @@ blit_shader(struct v3dv_cmd_buffer *cmd_buffer,
 
       VkImageViewCreateInfo src_image_view_info = {
          .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+         .flags = VK_IMAGE_VIEW_CREATE_DRIVER_INTERNAL_BIT_MESA,
          .image = v3dv_image_to_handle(src),
          .viewType = v3dv_image_type_to_view_type(src->vk.image_type),
          .format = src_format,

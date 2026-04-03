@@ -11,6 +11,7 @@
 #include "aco_shader_info.h"
 #include "aco_util.h"
 
+#include "util/bitset.h"
 #include "util/compiler.h"
 #include "util/shader_stats.h"
 
@@ -25,6 +26,7 @@
 #include <vector>
 
 typedef struct nir_shader nir_shader;
+typedef struct nir_parameter nir_parameter;
 
 namespace aco {
 
@@ -64,11 +66,13 @@ enum memory_semantics : uint8_t {
    semantic_none = 0x0,
    /* for loads: don't move any access after this load to before this load (even other loads)
     * for barriers: don't move any access after the barrier to before any
-    * atomics/control_barriers/sendmsg_gs_done/position-primitive-export before the barrier */
+    * atomic_loads/control_barriers/p_pops_gfx9_add_exiting_wave_id or
+    * certain s_wait_event before the barrier */
    semantic_acquire = 0x1,
    /* for stores: don't move any access before this store to after this store
     * for barriers: don't move any access before the barrier to after any
-    * atomics/control_barriers/sendmsg_gs_done/position-primitive-export after the barrier */
+    * atomic_stores/control_barriers/p_pops_gfx9_ordered_section_done or
+    * certain sendmsg/exports after the barrier */
    semantic_release = 0x2,
 
    /* the rest are for load/stores/atomics only */
@@ -375,6 +379,8 @@ static constexpr RegClass v3b{RegClass::v3b};
 static constexpr RegClass v4b{RegClass::v4b};
 static constexpr RegClass v6b{RegClass::v6b};
 static constexpr RegClass v8b{RegClass::v8b};
+static constexpr RegClass lv1{RegClass::v1_linear};
+static constexpr RegClass lv2{RegClass::v2_linear};
 
 /**
  * Temp Class
@@ -1045,6 +1051,11 @@ struct RegisterDemand {
       return a.vgpr == b.vgpr && a.sgpr == b.sgpr;
    }
 
+   constexpr friend bool operator!=(const RegisterDemand a, const RegisterDemand b) noexcept
+   {
+      return !(a == b);
+   }
+
    constexpr bool exceeds(const RegisterDemand other) const noexcept
    {
       return vgpr > other.vgpr || sgpr > other.sgpr;
@@ -1107,6 +1118,96 @@ struct RegisterDemand {
    }
 };
 
+struct ABI {
+   struct GPRRange {
+      uint16_t sgpr;
+      uint16_t vgpr;
+   };
+
+   struct RegisterBlock {
+      GPRRange clobbered_size;
+      GPRRange preserved_size;
+      bool clobbered_first;
+   };
+
+   RegisterBlock block_size;
+   /* Maximum number of registers allowed to be used by parameters */
+   RegisterDemand max_param_demand;
+
+   void preservedRegisters(BITSET_DECLARE(regs, 512),
+                           RegisterDemand reg_limit = RegisterDemand(256, 128)) const
+   {
+      unsigned size = DIV_ROUND_UP(512, BITSET_WORDBITS) * sizeof(BITSET_WORD);
+      memset(regs, 0, size);
+
+      /* Fill out preserved ranges by repeating the register block across the register file */
+
+      /* SGPR ranges */
+      unsigned gpr_offset = block_size.clobbered_first ? block_size.clobbered_size.sgpr : 0;
+      while (gpr_offset < (unsigned)reg_limit.sgpr) {
+         unsigned end = MIN2((unsigned)reg_limit.sgpr, gpr_offset + block_size.preserved_size.sgpr);
+         BITSET_SET_RANGE(regs, gpr_offset, end - 1);
+         gpr_offset = end + block_size.clobbered_size.sgpr;
+      }
+      /* VGPR ranges */
+      gpr_offset = block_size.clobbered_first ? block_size.clobbered_size.vgpr : 0;
+      while (gpr_offset < (unsigned)reg_limit.vgpr) {
+         unsigned end = MIN2((unsigned)reg_limit.vgpr, gpr_offset + block_size.preserved_size.vgpr);
+         BITSET_SET_RANGE(regs, 256 + gpr_offset, 256 + end - 1);
+         gpr_offset = end + block_size.clobbered_size.vgpr;
+      }
+   }
+
+   RegisterDemand numClobbered(RegisterDemand reg_limit) const
+   {
+      RegisterDemand clobbered_regs;
+
+      unsigned stride = block_size.clobbered_size.vgpr + block_size.preserved_size.vgpr;
+      int clobbered_start = block_size.clobbered_first ? 0 : block_size.preserved_size.vgpr;
+      clobbered_regs.vgpr = (reg_limit.vgpr / stride) * block_size.clobbered_size.vgpr;
+      clobbered_regs.vgpr += std::max((int)(reg_limit.vgpr % stride) - clobbered_start, 0);
+
+      stride = block_size.clobbered_size.sgpr + block_size.preserved_size.sgpr;
+      clobbered_start = block_size.clobbered_first ? 0 : block_size.preserved_size.sgpr;
+      clobbered_regs.sgpr = (reg_limit.sgpr / stride) * block_size.clobbered_size.sgpr;
+      clobbered_regs.sgpr += std::max((int)(reg_limit.sgpr % stride) - clobbered_start, 0);
+
+      return clobbered_regs;
+   }
+
+   RegisterDemand numPreserved(RegisterDemand reg_limit) const
+   {
+      return reg_limit - numClobbered(reg_limit);
+   }
+};
+
+static constexpr ABI rtRaygenABI = {
+   ABI::RegisterBlock{
+      ABI::GPRRange{128u, 256u}, /* clobbered_size */
+      ABI::GPRRange{0u, 0u},     /* preserved_size */
+      true,                      /* preserved_first */
+   },
+   RegisterDemand(48, 48), /* max_param_demand */
+};
+
+static constexpr ABI rtTraversalABI = {
+   ABI::RegisterBlock{
+      ABI::GPRRange{128u, 256u}, /* clobbered_size */
+      ABI::GPRRange{0u, 0u},     /* preserved_size */
+      true,                      /* preserved_first */
+   },
+   RegisterDemand(48, 48), /* max_param_demand */
+};
+
+static constexpr ABI rtAnyHitABI = {
+   ABI::RegisterBlock{
+      ABI::GPRRange{128u, 256u}, /* clobbered_size */
+      ABI::GPRRange{80u, 80u},   /* preserved_size */
+      false,                     /* preserved_first */
+   },
+   RegisterDemand(48, 48), /* max_param_demand */
+};
+
 struct Block;
 struct Instruction;
 struct Pseudo_instruction;
@@ -1122,6 +1223,7 @@ struct FLAT_instruction;
 struct Pseudo_branch_instruction;
 struct Pseudo_barrier_instruction;
 struct Pseudo_reduction_instruction;
+struct Pseudo_call_instruction;
 struct VALU_instruction;
 struct VINTERP_inreg_instruction;
 struct VINTRP_instruction;
@@ -1322,6 +1424,17 @@ struct Instruction {
       return *(Pseudo_reduction_instruction*)this;
    }
    constexpr bool isReduction() const noexcept { return format == Format::PSEUDO_REDUCTION; }
+   Pseudo_call_instruction& call() noexcept
+   {
+      assert(isCall());
+      return *(Pseudo_call_instruction*)this;
+   }
+   const Pseudo_call_instruction& call() const noexcept
+   {
+      assert(isCall());
+      return *(Pseudo_call_instruction*)this;
+   }
+   constexpr bool isCall() const noexcept { return format == Format::PSEUDO_CALL; }
    constexpr bool isVOP3P() const noexcept { return (uint16_t)format & (uint16_t)Format::VOP3P; }
    VINTERP_inreg_instruction& vinterp_inreg() noexcept
    {
@@ -1434,6 +1547,7 @@ struct Instruction {
 
    constexpr bool isVMEM() const noexcept { return isMTBUF() || isMUBUF() || isMIMG(); }
 
+   bool hasPrecoloredGPRs() const noexcept;
    bool accessesLDS() const noexcept;
    bool isTrans() const noexcept;
 };
@@ -1737,7 +1851,8 @@ struct Export_instruction : public Instruction {
    bool done : 1;
    bool valid_mask : 1;
    bool row_en : 1;
-   uint8_t padding0 : 4;
+   bool disable_wqm : 1;
+   uint8_t padding0 : 3;
    uint8_t padding1;
 };
 static_assert(sizeof(Export_instruction) == sizeof(Instruction) + 4, "Unexpected padding");
@@ -1808,6 +1923,34 @@ struct Pseudo_reduction_instruction : public Instruction {
 static_assert(sizeof(Pseudo_reduction_instruction) == sizeof(Instruction) + 4,
               "Unexpected padding");
 
+struct Pseudo_call_instruction : public Instruction {
+   /* The amount of "free" preserved registers we can use to stash caller-owned temporaries instead
+    * of needing to spill them. This is equal to the amount of preserved registers given by the ABI,
+    * minus the amount of preserved registers already occupied by call parameters.
+    */
+   RegisterDemand callee_preserved_limit;
+   /* Register demand of caller-owned temporaries we need to preserve a copy of throughout the
+    * callee. This includes all live variables not used by the call instruction as well as clobbered
+    * Operand temporaries (unless the call kills the operand - we don't need to preserve a copy in
+    * that case). Non-clobbered Operand temporaries are not included in this demand - they occupy a
+    * preserved register, which is accounted for in the calculation of callee_preserved_limit
+    * already.
+    *
+    * Iff this demand is higher than callee_preserved_limit, some of the temporaries need to be
+    * spilled to scratch.
+    */
+   RegisterDemand caller_preserved_demand;
+
+   ABI abi;
+};
+
+inline bool
+Instruction::hasPrecoloredGPRs() const noexcept
+{
+   return isCall() || opcode == aco_opcode::p_startpgm || opcode == aco_opcode::p_return ||
+          opcode == aco_opcode::p_end_with_regs || opcode == aco_opcode::p_jump_to_epilog;
+}
+
 inline bool
 Instruction::accessesLDS() const noexcept
 {
@@ -1875,14 +2018,21 @@ is_phi(aco_ptr<Instruction>& instr)
 }
 
 bool is_wait_export_ready(amd_gfx_level gfx_level, const Instruction* instr);
+
+class Program;
+
+uint16_t is_atomic_or_control_instr(Program* program, const Instruction* instr,
+                                    memory_sync_info sync, unsigned semantic);
+
 memory_sync_info get_sync_info(const Instruction* instr);
 
 inline bool
 is_dead(const std::vector<uint16_t>& uses, const Instruction* instr)
 {
-   if (instr->definitions.empty() || instr->isBranch() || instr->opcode == aco_opcode::p_startpgm ||
-       instr->opcode == aco_opcode::p_init_scratch ||
-       instr->opcode == aco_opcode::p_dual_src_export_gfx11)
+   if (instr->definitions.empty() || instr->isBranch() || instr->isCall() ||
+       instr->opcode == aco_opcode::p_startpgm || instr->opcode == aco_opcode::p_init_scratch ||
+       instr->opcode == aco_opcode::p_dual_src_export_gfx11 ||
+       instr->opcode == aco_opcode::p_reload_preserved)
       return false;
 
    if (std::any_of(instr->definitions.begin(), instr->definitions.end(),
@@ -1897,6 +2047,7 @@ bool can_use_opsel(amd_gfx_level gfx_level, aco_opcode op, int idx);
 bool instr_is_16bit(amd_gfx_level gfx_level, aco_opcode op);
 uint8_t get_gfx11_true16_mask(aco_opcode op);
 bool can_use_SDWA(amd_gfx_level gfx_level, const aco_ptr<Instruction>& instr, bool pre_ra);
+bool opcode_supports_dpp(amd_gfx_level gfx_level, aco_opcode opcode, bool vop3p);
 bool can_use_DPP(amd_gfx_level gfx_level, const aco_ptr<Instruction>& instr, bool dpp8);
 bool can_write_m0(const aco_ptr<Instruction>& instr);
 /* updates "instr" and returns the old instruction (or NULL if no update was needed) */
@@ -1916,6 +2067,10 @@ bool can_swap_operands(aco_ptr<Instruction>& instr, aco_opcode* new_op, unsigned
 
 uint32_t get_reduction_identity(ReduceOp op, unsigned idx);
 
+bool instr_disables_wqm(Instruction* instr);
+Operand& instr_exact_mask(Instruction* instr);
+Operand& instr_wqm_mask(Instruction* instr);
+
 unsigned get_mimg_nsa_dwords(const Instruction* instr);
 
 unsigned get_vopd_opy_start(const Instruction* instr);
@@ -1933,7 +2088,7 @@ enum vmem_type : uint8_t {
 /* VMEM instructions of the same type return in-order. For GFX12+, this determines which counter
  * is used.
  */
-uint8_t get_vmem_type(amd_gfx_level gfx_level, radeon_family family, Instruction* instr);
+uint8_t get_vmem_type(Instruction* instr, bool has_point_sample_accel);
 
 /* For all of the counters, the maximum value means no wait.
  * Some of the counters are larger than their bit field,
@@ -1963,6 +2118,10 @@ struct depctr_wait {
       };
       unsigned packed = -1;
    };
+
+   bool empty() const { return packed == (unsigned)-1; }
+
+   uint16_t pack() const;
 };
 
 depctr_wait parse_depctr_wait(const Instruction* instr);
@@ -1985,6 +2144,8 @@ enum block_kind {
    block_kind_resume = 1 << 12,
    block_kind_export_end = 1 << 13,
    block_kind_end_with_regs = 1 << 14,
+   block_kind_contains_call = 1 << 15,
+   block_kind_loop_latch = 1 << 16,
 };
 
 /* CFG */
@@ -2001,6 +2162,7 @@ struct Block {
    edge_vec linear_succs;
    RegisterDemand register_demand = RegisterDemand();
    RegisterDemand live_in_demand = RegisterDemand();
+   RegisterDemand call_spills = RegisterDemand();
    uint32_t kind = 0;
    int32_t logical_idom = -1;
    int32_t linear_idom = -1;
@@ -2104,8 +2266,6 @@ static constexpr Stage geometry_gs(AC_HW_LEGACY_GEOMETRY_SHADER, SWStage::GS);
 static constexpr Stage raytracing_cs(AC_HW_COMPUTE_SHADER, SWStage::RT);
 
 struct DeviceInfo {
-   uint16_t lds_encoding_granule;
-   uint16_t lds_alloc_granule;
    uint32_t lds_limit; /* in bytes */
    bool has_16bank_lds;
    uint16_t physical_sgprs;
@@ -2120,9 +2280,12 @@ struct DeviceInfo {
    bool has_fast_fma32 = false;
    bool has_mac_legacy32 = false;
    bool has_fmac_legacy32 = false;
+   bool has_mad32 = false;
    bool fused_mad_mix = false;
    bool xnack_enabled = false;
    bool sram_ecc_enabled = false;
+   bool has_point_sample_accel = false;
+   bool has_gfx6_mrt_export_bug = false;
 
    int32_t scratch_global_offset_min;
    int32_t scratch_global_offset_max;
@@ -2146,10 +2309,11 @@ public:
    std::vector<Block> blocks;
    std::vector<RegClass> temp_rc = {s1};
    RegisterDemand max_reg_demand = RegisterDemand();
+   RegisterDemand max_call_spills = RegisterDemand();
+   RegisterDemand fixed_reg_demand = RegisterDemand();
    ac_shader_config* config;
    struct aco_shader_info info;
    enum amd_gfx_level gfx_level;
-   enum radeon_family family;
    DeviceInfo dev;
    unsigned wave_size;
    RegClass lane_mask;
@@ -2169,7 +2333,6 @@ public:
    /* Private segment buffers and scratch offsets. One entry per start/resume block */
    aco::small_vec<Temp, 2> private_segment_buffers;
    aco::small_vec<Temp, 2> scratch_offsets;
-   Temp static_scratch_rsrc;
    Temp stack_ptr;
 
    uint16_t num_waves = 0;
@@ -2178,6 +2341,7 @@ public:
    bool wgp_mode;
 
    bool needs_vcc = false;
+   bool preserve_s2 = false;
 
    CompilationProgress progress;
 
@@ -2195,6 +2359,12 @@ public:
    bool pending_lds_access = false;
 
    bool should_repair_ssa = false;
+
+   bool is_callee = false;
+   bool has_call = false;
+   ABI callee_abi = {};
+   RegisterDemand callee_param_demand = RegisterDemand();
+   unsigned scratch_arg_size = 0;
 
    struct {
       monotonic_buffer_resource memory;
@@ -2255,8 +2425,7 @@ struct ra_test_policy {
 void init();
 
 void init_program(Program* program, Stage stage, const struct aco_shader_info* info,
-                  enum amd_gfx_level gfx_level, enum radeon_family family, bool wgp_mode,
-                  ac_shader_config* config);
+                  const aco_compiler_options* options, ac_shader_config* config);
 
 void select_program(Program* program, unsigned shader_count, struct nir_shader* const* shaders,
                     ac_shader_config* config, const struct aco_compiler_options* options,
@@ -2268,7 +2437,8 @@ void select_trap_handler_shader(Program* program, ac_shader_config* config,
 void select_rt_prolog(Program* program, ac_shader_config* config,
                       const struct aco_compiler_options* options,
                       const struct aco_shader_info* info, const struct ac_shader_args* in_args,
-                      const struct ac_shader_args* out_args);
+                      const struct ac_arg* descriptors, unsigned raygen_param_count,
+                      nir_parameter* raygen_params);
 void select_vs_prolog(Program* program, const struct aco_vs_prolog_info* pinfo,
                       ac_shader_config* config, const struct aco_compiler_options* options,
                       const struct aco_shader_info* info, const struct ac_shader_args* args);
@@ -2290,6 +2460,7 @@ void live_var_analysis(Program* program);
 std::vector<uint16_t> dead_code_analysis(Program* program);
 void dominator_tree(Program* program);
 void insert_exec_mask(Program* program);
+void disable_wqm(Program* program);
 void value_numbering(Program* program);
 void optimize(Program* program);
 void optimize_postRA(Program* program);
@@ -2298,6 +2469,7 @@ void setup_reduce_temp(Program* program);
 void lower_to_cssa(Program* program);
 void register_allocation(Program* program, ra_test_policy = {});
 void reindex_ssa(Program* program);
+void spill_preserved(Program* program);
 void ssa_elimination(Program* program);
 void lower_to_hw_instr(Program* program);
 void schedule_program(Program* program);
@@ -2308,7 +2480,6 @@ void spill(Program* program);
 void insert_waitcnt(Program* program);
 void insert_delay_alu(Program* program);
 void combine_delay_alu(Program* program);
-bool dealloc_vgprs(Program* program);
 void insert_NOPs(Program* program);
 void form_hard_clauses(Program* program);
 unsigned emit_program(Program* program, std::vector<uint32_t>& code,
@@ -2317,8 +2488,9 @@ unsigned emit_program(Program* program, std::vector<uint32_t>& code,
  * Returns true if print_asm can disassemble the given program for the current build/runtime
  * configuration
  */
-bool check_print_asm_support(Program* program);
-bool print_asm(Program* program, std::vector<uint32_t>& binary, unsigned exec_size, FILE* output);
+bool check_print_asm_support(Program* program, enum radeon_family family);
+bool print_asm(Program* program, enum radeon_family family, std::vector<uint32_t>& binary,
+               unsigned exec_size, FILE* output);
 bool validate_ir(Program* program);
 bool validate_cfg(Program* program);
 bool validate_ra(Program* program);
@@ -2460,5 +2632,11 @@ typedef struct {
 extern const Info instr_info;
 
 } // namespace aco
+
+namespace std {
+template <> struct hash<aco::PhysReg> {
+   size_t operator()(aco::PhysReg reg) const noexcept { return std::hash<uint32_t>{}(reg.reg_b); }
+};
+} // namespace std
 
 #endif /* ACO_IR_H */

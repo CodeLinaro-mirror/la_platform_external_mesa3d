@@ -44,8 +44,12 @@ can_alias_srcs_of_def(struct ir3_register *src)
       return true;
    }
    if (def_instr->opc == OPC_MOV) {
+      /* We haven't seen any indication that aliasing supports the address
+       * register, nor does it seem important to do so based on how many fossils
+       * it took to find a case of it being attempted during alias setup.
+       */
       return is_same_type_mov(def_instr) &&
-             !(def_instr->srcs[0]->flags & IR3_REG_SHARED);
+             !(def_instr->srcs[0]->flags & (IR3_REG_SHARED | IR3_REG_RELATIV));
    }
 
    return false;
@@ -72,8 +76,8 @@ alias_srcs(struct ir3_instruction *instr)
 
    struct ir3_register **old_srcs = instr->srcs;
    unsigned old_srcs_count = instr->srcs_count;
-   instr->srcs =
-      ir3_alloc(instr->block->shader, new_srcs_count * sizeof(instr->srcs[0]));
+   instr->srcs = linear_alloc_array(instr->block->shader->lin_ctx,
+                                    struct ir3_register *, new_srcs_count);
    instr->srcs_count = 0;
    unsigned num_aliases = 0;
 
@@ -275,7 +279,7 @@ find_free_alias_regs_in_range(const reg_bitset *alloc_regs,
    assert(end >= num_aliases);
 
    for (unsigned reg = start; reg < end - num_aliases; reg++) {
-      if (!BITSET_TEST_RANGE(*alloc_regs, reg, reg + num_aliases - 1)) {
+      if (!BITSET_TEST_COUNT(*alloc_regs, reg, num_aliases)) {
          return reg;
       }
    }
@@ -380,8 +384,7 @@ alloc_alias(struct alias_table_state *state, struct ir3_instruction *instr,
        */
       unsigned first_reg = alias->num - alias_n;
 
-      if (BITSET_TEST_RANGE(*alloc_regs, first_reg,
-                            first_reg + num_aliases - 1)) {
+      if (BITSET_TEST_COUNT(*alloc_regs, first_reg, num_aliases)) {
          continue;
       }
 
@@ -422,10 +425,9 @@ alloc_alias(struct alias_table_state *state, struct ir3_instruction *instr,
    }
 
    /* Mark used registers as allocated. */
-   unsigned end_reg = best_reg + num_aliases - 1;
-   assert(end_reg < GPR_REG_SIZE);
-   assert(!BITSET_TEST_RANGE(*alloc_regs, best_reg, end_reg));
-   BITSET_SET_RANGE(*alloc_regs, best_reg, end_reg);
+   assert(best_reg + num_aliases <= GPR_REG_SIZE);
+   assert(!BITSET_TEST_COUNT(*alloc_regs, best_reg, num_aliases));
+   BITSET_SET_COUNT(*alloc_regs, best_reg, num_aliases);
 
    /* Add the allocated registers that differ from the ones already used to the
     * alias table.
@@ -744,7 +746,7 @@ create_output_aliases(struct ir3_shader_variant *v, struct ir3_instruction *end)
 bool
 ir3_create_alias_rt(struct ir3 *ir, struct ir3_shader_variant *v)
 {
-   if (!ir->compiler->has_alias_rt)
+   if (!ir->compiler->info->props.has_alias_rt)
       return false;
    if (ir3_shader_debug & IR3_DBG_NOALIASRT)
       return false;

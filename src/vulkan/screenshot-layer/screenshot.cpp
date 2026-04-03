@@ -878,10 +878,8 @@ cleanup:
       png_destroy_write_struct(&png, &info);
    if (file)
       fclose(file);
-   if (filename)
-      free(filename);
-   if (tmpFilename)
-      free(tmpFilename);
+   free(filename);
+   free(tmpFilename);
    return nullptr;
 }
 
@@ -1485,7 +1483,7 @@ static VkResult screenshot_CreateInstance(
                                           instance_data->instance);
    instance_data_map_physical_devices(instance_data, true);
 
-   parse_screenshot_env(&instance_data->params, getenv("VK_LAYER_MESA_SCREENSHOT_CONFIG"));
+   parse_screenshot_env(&instance_data->params, os_get_option("VK_LAYER_MESA_SCREENSHOT_CONFIG"));
 
    if (!globalLockInitialized) {
       loader_platform_thread_create_mutex(&globalLock);

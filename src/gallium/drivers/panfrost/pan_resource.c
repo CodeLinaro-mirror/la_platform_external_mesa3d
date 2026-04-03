@@ -5,30 +5,7 @@
  * Copyright (C) 2018-2019 Alyssa Rosenzweig
  * Copyright (C) 2019 Collabora, Ltd.
  * Copyright (C) 2023 Amazon.com, Inc. or its affiliates
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- * Authors (Collabora):
- *   Tomeu Vizoso <tomeu.vizoso@collabora.com>
- *   Alyssa Rosenzweig <alyssa.rosenzweig@collabora.com>
- *
+ * SPDX-License-Identifier: MIT
  */
 
 #include <fcntl.h>
@@ -45,7 +22,6 @@
 #include "util/u_surface.h"
 #include "util/u_transfer.h"
 #include "util/u_transfer_helper.h"
-#include "util/perf/cpu_trace.h"
 #include "util/streaming-load-memcpy.h"
 
 #include "decode.h"
@@ -56,6 +32,7 @@
 #include "pan_resource.h"
 #include "pan_screen.h"
 #include "pan_tiling.h"
+#include "pan_trace.h"
 #include "pan_util.h"
 
 static void
@@ -65,6 +42,8 @@ panfrost_clear_depth_stencil(struct pipe_context *pipe,
                              unsigned dsty, unsigned width, unsigned height,
                              bool render_condition_enabled)
 {
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
+
    struct panfrost_context *ctx = pan_context(pipe);
 
    if (render_condition_enabled && !panfrost_render_condition_check(ctx))
@@ -88,6 +67,8 @@ panfrost_clear_render_target(struct pipe_context *pipe,
                              unsigned dsty, unsigned width, unsigned height,
                              bool render_condition_enabled)
 {
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
+
    struct panfrost_context *ctx = pan_context(pipe);
 
    if (render_condition_enabled && !panfrost_render_condition_check(ctx))
@@ -141,11 +122,9 @@ panfrost_resource_init_image(
 
    assert(plane_idx == util_format_get_num_planes(iprops->format));
 
-   plane_idx = 1;
    for (struct panfrost_resource *plane = pan_resource(rsc->base.next);
         plane; plane = pan_resource(plane->base.next)) {
-      memcpy(plane->image.planes, rsc->image.planes,
-             plane_idx * sizeof(plane->image.planes[0]));
+      memcpy(plane->image.planes, rsc->image.planes, sizeof(plane->image.planes));
    }
 
    return true;
@@ -241,7 +220,7 @@ pan_resource_afbcp_stop(struct panfrost_resource *prsrc)
 static void
 panfrost_resource_destroy(struct pipe_screen *screen, struct pipe_resource *pt)
 {
-   MESA_TRACE_FUNC();
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
 
    struct panfrost_device *dev = pan_device(screen);
    struct panfrost_resource *rsrc = (struct panfrost_resource *)pt;
@@ -353,6 +332,8 @@ panfrost_resource_from_handle(struct pipe_screen *pscreen,
                               const struct pipe_resource *templat,
                               struct winsys_handle *whandle, unsigned usage)
 {
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
+
    struct panfrost_device *dev = pan_device(pscreen);
    struct panfrost_resource *rsc;
    struct pipe_resource *prsc;
@@ -466,8 +447,7 @@ panfrost_set_resource_label(UNUSED struct pipe_screen *pscreen,
       return;
 
    char *old_label = (char *)panfrost_bo_set_label(rsrc->bo, new_label);
-   if (old_label)
-      free(old_label);
+   free(old_label);
 }
 
 static bool
@@ -537,7 +517,12 @@ panfrost_resource_get_param(struct pipe_screen *pscreen,
                             enum pipe_resource_param param, unsigned usage,
                             uint64_t *value)
 {
-   struct panfrost_resource *rsrc = pan_resource(prsc);
+   struct panfrost_resource *rsrc =
+      pan_resource(util_resource_at_index(prsc, plane));
+
+   /* Lowered multi plane resource gets each plane allocated independently. */
+   if (!rsrc->image.planes[plane])
+      plane = 0;
 
    switch (param) {
    case PIPE_RESOURCE_PARAM_STRIDE:
@@ -603,8 +588,30 @@ panfrost_should_afbc(struct panfrost_device *dev,
    if (pres->base.bind & PIPE_BIND_CONST_BW)
       return false;
 
+   /* We can't do AFBC(Z32)+S8 on v7- because the AFBC ZS target layout overlaps
+    * the S target layout. Since we don't know at this point if the Z32 buffer
+    * will be attached an S8 buffer, we have to reject AFBC(Z32)
+    * unconditionally. */
+   if (dev->arch <= 7 && fmt == PIPE_FORMAT_Z32_FLOAT)
+      return false;
+
    /* Only a small selection of formats are AFBC'able */
    if (!pan_afbc_supports_format(dev->arch, fmt))
+      return false;
+
+   /* According to the GL spec, -2^(b-1) and -2^(b-1)+1 both map to -1 in the
+    * SNORM representation. The Mali implementation seems to clamp the value
+    * to the [-2^(b-1)+1, 2^(b-1)-1] range, which is problematic in our
+    * staging_resource (LINEAR) -> final_resource (AFBC) transfer path, because
+    * we need a bit-exact copy (typically fails tests like
+    * dEQP-GLES31.functional.copy_image.non_compressed.viewclass_16_bits.rg8_snorm_r16ui.texture2d_to_renderbuffer
+    * if we don't).
+    * FIXME: We could get away with src/dst view format adjustments
+    * (SNORM->UNORM) in our blits, but we'd have to clearly identify which
+    * copies/blits we want to act like that and which ones we don't, and this is
+    * far from obvious when looking at the code, so let's filter out AFBC(SNORM)
+    * for now. */
+   if (util_format_is_snorm(fmt))
       return false;
 
    /* AFBC does not support layered (GLES3 style) multisampling. Use
@@ -1037,7 +1044,7 @@ panfrost_resource_create_with_modifier(struct pipe_screen *screen,
                                        const struct pipe_resource *template,
                                        uint64_t modifier, unsigned plane_idx)
 {
-   MESA_TRACE_FUNC();
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
 
    struct panfrost_device *dev = pan_device(screen);
 
@@ -1535,7 +1542,7 @@ panfrost_ptr_map(struct pipe_context *pctx, struct pipe_resource *resource,
                  const struct pipe_box *box,
                  struct pipe_transfer **out_transfer)
 {
-   MESA_TRACE_FUNC();
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
 
    struct panfrost_context *ctx = pan_context(pctx);
    struct panfrost_device *dev = pan_device(pctx->screen);
@@ -1779,7 +1786,7 @@ pan_resource_modifier_convert(struct panfrost_context *ctx,
                               struct panfrost_resource *rsrc, uint64_t modifier,
                               bool copy_resource, const char *reason)
 {
-   MESA_TRACE_FUNC();
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
 
    bool need_shadow = rsrc->modifier_constant;
 
@@ -1978,7 +1985,7 @@ static bool
 pan_resource_afbcp_get_payload_sizes(struct panfrost_context *ctx,
                                      struct panfrost_resource *prsrc)
 {
-   MESA_TRACE_FUNC();
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
 
    afbcp_debug(ctx,
                "AFBC-P prsrc=%p: Get payload sizes (reads=%u bo_size=%zu, gpu=%s)",
@@ -1989,6 +1996,7 @@ pan_resource_afbcp_get_payload_sizes(struct panfrost_context *ctx,
 
    struct panfrost_screen *screen = pan_screen(ctx->base.screen);
    struct panfrost_device *dev = pan_device(ctx->base.screen);
+   enum pipe_format format = prsrc->base.format;
    uint64_t modifier = prsrc->modifier;
    unsigned last_level = prsrc->base.last_level;
    unsigned layout_size = 0;
@@ -1998,9 +2006,9 @@ pan_resource_afbcp_get_payload_sizes(struct panfrost_context *ctx,
          &prsrc->plane.layout.slices[level];
       unsigned nr_blocks =
          pan_afbc_stride_blocks(
-            modifier, slice->afbc.header.row_stride_B) *
+            format, modifier, slice->afbc.header.row_stride_B) *
          pan_afbc_height_blocks(
-            modifier, u_minify(prsrc->image.props.extent_px.height, level));
+            format, modifier, u_minify(prsrc->image.props.extent_px.height, level));
       prsrc->afbcp->layout_offsets[level] = layout_size;
       layout_size += nr_blocks * sizeof(struct pan_afbc_payload_extent);
    }
@@ -2078,7 +2086,7 @@ static void
 pan_resource_afbcp_get_payload_offsets(struct panfrost_context *ctx,
                                        struct panfrost_resource *prsrc)
 {
-   MESA_TRACE_FUNC();
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
 
    afbcp_debug(ctx,
                "AFBC-P prsrc=%p: Get payload offsets (reads=%u bo_size=%zu)",
@@ -2087,6 +2095,7 @@ pan_resource_afbcp_get_payload_offsets(struct panfrost_context *ctx,
 
    struct panfrost_device *dev = pan_device(ctx->base.screen);
    uint64_t modifier = prsrc->modifier;
+   enum pipe_format format = prsrc->base.format;
    unsigned last_level = prsrc->base.last_level;
    unsigned total_size = 0;
 
@@ -2097,9 +2106,9 @@ pan_resource_afbcp_get_payload_offsets(struct panfrost_context *ctx,
          &prsrc->afbcp->plane.layout.slices[level];
       unsigned nr_blocks_total =
          pan_afbc_stride_blocks(
-            modifier, src_slice->afbc.header.row_stride_B) *
+            format, modifier, src_slice->afbc.header.row_stride_B) *
          pan_afbc_height_blocks(
-            modifier, u_minify(prsrc->image.props.extent_px.height, level));
+            format, modifier, u_minify(prsrc->image.props.extent_px.height, level));
       uint32_t body_offset_B = pan_afbc_body_offset(
          dev->arch, modifier, src_slice->afbc.header.surface_size_B);
       struct pan_afbc_payload_extent *layout =
@@ -2134,7 +2143,7 @@ static bool
 pan_resource_afbcp_pack(struct panfrost_context *ctx,
                         struct panfrost_resource *prsrc)
 {
-   MESA_TRACE_FUNC();
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
 
    afbcp_debug(ctx, "AFBC-P prsrc=%p: Pack (reads=%u bo_size=%zu ratio=%.2f)",
                prsrc, prsrc->afbcp->nr_consecutive_reads,
@@ -2181,7 +2190,7 @@ static void
 pan_resource_afbcp_commit(struct panfrost_context *ctx,
                           struct panfrost_resource *prsrc)
 {
-   MESA_TRACE_FUNC();
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
 
    afbcp_debug(ctx,
                "AFBC-P prsrc=%p: Commit (reads=%u bo_size=%zu ratio=%.2f)",
@@ -2284,7 +2293,7 @@ pan_resource_afbcp_update(struct panfrost_context *ctx,
 static void
 panfrost_ptr_unmap(struct pipe_context *pctx, struct pipe_transfer *transfer)
 {
-   MESA_TRACE_FUNC();
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
 
    /* Gallium expects writeback here, so we tile */
 
@@ -2473,6 +2482,8 @@ panfrost_generate_mipmap(struct pipe_context *pctx, struct pipe_resource *prsrc,
                          unsigned last_level, unsigned first_layer,
                          unsigned last_layer)
 {
+   PAN_TRACE_FUNC(PAN_TRACE_GL_RESOURCE);
+
    struct panfrost_resource *rsrc = pan_resource(prsrc);
 
    perf_debug(pan_context(pctx), "Unoptimized mipmap generation");

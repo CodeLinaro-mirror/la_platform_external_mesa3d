@@ -228,7 +228,7 @@ v3d_ensure_prim_counts_allocated(struct v3d_context *ctx)
 
         /* Init all 7 counters and 1 padding to 0 */
         uint32_t zeroes[8] = { 0 };
-        u_upload_data(ctx->uploader,
+        u_upload_data_ref(ctx->uploader,
                       0, sizeof(zeroes), 32, zeroes,
                       &ctx->prim_counts_offset,
                       &ctx->prim_counts);
@@ -236,19 +236,19 @@ v3d_ensure_prim_counts_allocated(struct v3d_context *ctx)
 
 void
 v3d_flag_dirty_sampler_state(struct v3d_context *v3d,
-                             enum pipe_shader_type shader)
+                             mesa_shader_stage shader)
 {
         switch (shader) {
-        case PIPE_SHADER_VERTEX:
+        case MESA_SHADER_VERTEX:
                 v3d->dirty |= V3D_DIRTY_VERTTEX;
                 break;
-        case PIPE_SHADER_GEOMETRY:
+        case MESA_SHADER_GEOMETRY:
                 v3d->dirty |= V3D_DIRTY_GEOMTEX;
                 break;
-        case PIPE_SHADER_FRAGMENT:
+        case MESA_SHADER_FRAGMENT:
                 v3d->dirty |= V3D_DIRTY_FRAGTEX;
                 break;
-        case PIPE_SHADER_COMPUTE:
+        case MESA_SHADER_COMPUTE:
                 v3d->dirty |= V3D_DIRTY_COMPTEX;
                 break;
         default:

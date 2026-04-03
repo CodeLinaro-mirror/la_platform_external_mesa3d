@@ -6,6 +6,7 @@
 
 #include "aco_instruction_selection.h"
 #include "aco_interface.h"
+#include "aco_nir_call_attribs.h"
 
 #include "nir_builder.h"
 #include "nir_control_flow.h"
@@ -64,7 +65,8 @@ only_used_by_cross_lane_instrs(nir_def* ssa, bool follow_phis = true)
  * block instead. This is so that we can use any SGPR live-out of the side
  * without the branch without creating a linear phi in the invert or merge block.
  *
- * This also removes any unreachable merge blocks.
+ * This also removes any unreachable merge blocks and ensures that branches are
+ * in THEN side.
  */
 bool
 sanitize_if(nir_function_impl* impl, nir_if* nif)
@@ -76,11 +78,11 @@ sanitize_if(nir_function_impl* impl, nir_if* nif)
    if (!then_jump && !else_jump)
       return false;
 
-   /* If the continue from block is empty then return as there is nothing to
-    * move.
-    */
-   if (nir_cf_list_is_empty_block(then_jump ? &nif->else_list : &nif->then_list))
+   /* If the else block is empty then return as there is nothing to move. */
+   if (nir_cf_list_is_empty_block(&nif->else_list)) {
+      assert(then_jump);
       return false;
+   }
 
    /* Even though this if statement has a jump on one side, we may still have
     * phis afterwards.  Single-source phis can be produced by loop unrolling
@@ -89,19 +91,29 @@ sanitize_if(nir_function_impl* impl, nir_if* nif)
     */
    nir_remove_single_src_phis_block(nir_cf_node_as_block(nir_cf_node_next(&nif->cf_node)));
 
-   /* Finally, move the continue from branch after the if-statement. */
-   nir_block* last_continue_from_blk = then_jump ? else_block : then_block;
-   nir_block* first_continue_from_blk =
-      then_jump ? nir_if_first_else_block(nif) : nir_if_first_then_block(nif);
-
    /* We don't need to repair SSA. nir_remove_after_cf_node() replaces any uses with undef. */
    if (then_jump && else_jump)
       nir_remove_after_cf_node(&nif->cf_node);
 
-   nir_cf_list tmp;
-   nir_cf_extract(&tmp, nir_before_block(first_continue_from_blk),
-                  nir_after_block(last_continue_from_blk));
-   nir_cf_reinsert(&tmp, nir_after_cf_node(&nif->cf_node));
+   nir_cf_list else_list;
+   nir_cf_extract(&else_list, nir_before_cf_list(&nif->else_list), nir_after_block(else_block));
+
+   if (then_jump) {
+      /* Move the else block from branch after the if-statement. */
+      nir_cf_reinsert(&else_list, nir_after_cf_node(&nif->cf_node));
+   } else if (else_jump) {
+      /* If the jump is in the else block, move the then block after the if-statement. */
+      nir_cf_list then_list;
+      nir_cf_extract(&then_list, nir_before_cf_list(&nif->then_list), nir_after_block(then_block));
+      nir_cf_reinsert(&then_list, nir_after_cf_node(&nif->cf_node));
+
+      /* Move the previous then block to the else list and invert the condition. */
+      nir_cf_reinsert(&else_list, nir_before_cf_list(&nif->then_list));
+      nir_builder b = nir_builder_create(impl);
+      b.cursor = nir_before_src(&nif->condition);
+      nir_def* cond = nir_inot(&b, nif->condition.ssa);
+      nir_src_rewrite(&nif->condition, cond);
+   }
 
    return true;
 }
@@ -129,7 +141,7 @@ sanitize_cf_list(nir_function_impl* impl, struct exec_list* cf_list)
           * from the loop header are live. Handle this without complicating the ACO IR by creating a
           * dummy break.
           */
-         if (nir_cf_node_cf_tree_next(&loop->cf_node)->predecessors->entries == 0) {
+         if (nir_cf_node_cf_tree_next(&loop->cf_node)->predecessors.entries == 0) {
             nir_builder b = nir_builder_create(impl);
             b.cursor = nir_after_block_before_jump(nir_loop_last_block(loop));
 
@@ -160,7 +172,7 @@ apply_nuw_to_ssa(isel_context* ctx, nir_def* ssa)
    if (!nir_scalar_is_alu(scalar) || nir_scalar_alu_op(scalar) != nir_op_iadd)
       return;
 
-   nir_alu_instr* add = nir_instr_as_alu(ssa->parent_instr);
+   nir_alu_instr* add = nir_def_as_alu(ssa);
 
    if (add->no_unsigned_wrap)
       return;
@@ -172,9 +184,8 @@ apply_nuw_to_ssa(isel_context* ctx, nir_def* ssa)
       std::swap(src0, src1);
    }
 
-   uint32_t src1_ub = nir_unsigned_upper_bound(ctx->shader, ctx->range_ht, src1, &ctx->ub_config);
-   add->no_unsigned_wrap =
-      !nir_addition_might_overflow(ctx->shader, ctx->range_ht, src0, src1_ub, &ctx->ub_config);
+   uint32_t src1_ub = nir_unsigned_upper_bound(ctx->shader, ctx->range_ht, src1);
+   add->no_unsigned_wrap = !nir_addition_might_overflow(ctx->shader, ctx->range_ht, src0, src1_ub);
 }
 
 void
@@ -203,8 +214,11 @@ apply_nuw_to_offsets(isel_context* ctx, nir_function_impl* impl)
                apply_nuw_to_ssa(ctx, intrin->src[2].ssa);
             break;
          case nir_intrinsic_load_scratch: apply_nuw_to_ssa(ctx, intrin->src[0].ssa); break;
-         case nir_intrinsic_store_scratch:
-         case nir_intrinsic_load_smem_amd: apply_nuw_to_ssa(ctx, intrin->src[1].ssa); break;
+         case nir_intrinsic_store_scratch: apply_nuw_to_ssa(ctx, intrin->src[1].ssa); break;
+         case nir_intrinsic_load_global_amd:
+            if (nir_intrinsic_access(intrin) & ACCESS_SMEM_AMD)
+               apply_nuw_to_ssa(ctx, intrin->src[1].ssa);
+            break;
          default: break;
          }
       }
@@ -228,33 +242,19 @@ setup_tcs_info(isel_context* ctx)
 }
 
 void
-setup_lds_size(isel_context* ctx, nir_shader* nir)
-{
-   /* TCS and GFX9 GS are special cases, already in units of the allocation granule. */
-   if (ctx->stage.has(SWStage::TCS))
-      ctx->program->config->lds_size = ctx->program->info.tcs.num_lds_blocks;
-   else if (ctx->stage.hw == AC_HW_LEGACY_GEOMETRY_SHADER && ctx->options->gfx_level >= GFX9)
-      ctx->program->config->lds_size = ctx->program->info.gfx9_gs_ring_lds_size;
-   else
-      ctx->program->config->lds_size =
-         DIV_ROUND_UP(nir->info.shared_size, ctx->program->dev.lds_encoding_granule);
-
-   /* Make sure we fit the available LDS space. */
-   assert((ctx->program->config->lds_size * ctx->program->dev.lds_encoding_granule) <=
-          ctx->program->dev.lds_limit);
-}
-
-void
 setup_nir(isel_context* ctx, nir_shader* nir)
 {
    nir_convert_to_lcssa(nir, true, false);
    if (nir_lower_phis_to_scalar(nir, ac_nir_lower_phis_to_scalar_cb, NULL)) {
-      nir_copy_prop(nir);
+      nir_opt_copy_prop(nir);
       nir_opt_dce(nir);
    }
 
-   nir_function_impl* func = nir_shader_get_entrypoint(nir);
-   nir_index_ssa_defs(func);
+   /* nir_shader_get_entrypoint returns NULL for RT shaders, but there should only be
+    * one impl at this stage.
+    */
+   nir_foreach_function_impl (func, nir)
+      nir_index_ssa_defs(func);
 }
 
 /* Returns true if we can skip uniformization of a merge phi. This makes the destination divergent,
@@ -340,32 +340,61 @@ skip_uniformize_merge_phi(nir_def* ssa, unsigned depth)
    return true;
 }
 
+bool
+intrinsic_try_skip_helpers(nir_intrinsic_instr* intr, UNUSED void* data)
+{
+   switch (intr->intrinsic) {
+   case nir_intrinsic_load_ssbo:
+   case nir_intrinsic_load_ubo:
+   case nir_intrinsic_load_constant:
+   case nir_intrinsic_load_scratch:
+   case nir_intrinsic_load_global_amd:
+   case nir_intrinsic_load_buffer_amd:
+   case nir_intrinsic_bindless_image_load:
+   case nir_intrinsic_bindless_image_fragment_mask_load_amd:
+   case nir_intrinsic_bindless_image_sparse_load:
+      return !(nir_intrinsic_access(intr) & ACCESS_SMEM_AMD);
+   default: return false;
+   }
+}
+
 } /* end namespace */
 
 void
 init_context(isel_context* ctx, nir_shader* shader)
 {
    nir_function_impl* impl = nir_shader_get_entrypoint(shader);
+   if (!impl) {
+      /* RT shaders have no NIR entrypoint, but only one function impl exists at this stage */
+      nir_foreach_function_impl (func, shader) {
+         impl = func;
+         break;
+      }
+   }
    ctx->shader = shader;
+
+   assert(shader->info.max_subgroup_size >= ctx->program->wave_size);
+   assert(shader->info.min_subgroup_size <= ctx->program->wave_size);
+   shader->info.max_subgroup_size = ctx->program->wave_size;
+   shader->info.min_subgroup_size = ctx->program->wave_size;
 
    /* Init NIR range analysis. */
    ctx->range_ht = _mesa_pointer_hash_table_create(NULL);
-   ctx->ub_config.min_subgroup_size = ctx->program->wave_size;
-   ctx->ub_config.max_subgroup_size = ctx->program->wave_size;
-   ctx->ub_config.max_workgroup_invocations = 2048;
-   ctx->ub_config.max_workgroup_count[0] = 4294967295;
-   ctx->ub_config.max_workgroup_count[1] = 65535;
-   ctx->ub_config.max_workgroup_count[2] = 65535;
-   ctx->ub_config.max_workgroup_size[0] = 1024;
-   ctx->ub_config.max_workgroup_size[1] = 1024;
-   ctx->ub_config.max_workgroup_size[2] = 1024;
+   ctx->numlsb_ht = _mesa_pointer_hash_table_create(NULL);
+   ctx->fp_class_ht = nir_create_fp_analysis_state(impl);
 
    uint32_t options =
       shader->options->divergence_analysis_options | nir_divergence_ignore_undef_if_phi_srcs;
    nir_divergence_analysis_impl(impl, (nir_divergence_options)options);
 
    apply_nuw_to_offsets(ctx, impl);
-   ac_nir_flag_smem_for_loads(shader, ctx->program->gfx_level, false, true);
+
+   if (shader->info.stage == MESA_SHADER_FRAGMENT) {
+      nir_opt_load_skip_helpers_options skip_helper_options = {};
+      skip_helper_options.no_add_divergence = true;
+      skip_helper_options.intrinsic_cb = intrinsic_try_skip_helpers;
+      nir_opt_load_skip_helpers(shader, &skip_helper_options);
+   }
 
    /* sanitize control flow */
    sanitize_cf_list(impl, &impl->body);
@@ -386,6 +415,8 @@ init_context(isel_context* ctx, nir_shader* shader)
    ctx->program->allocateRange(impl->ssa_alloc);
    RegClass* regclasses = ctx->program->temp_rc.data() + ctx->first_temp_id;
 
+   unsigned call_count = 0;
+
    /* TODO: make this recursive to improve compile times */
    bool done = false;
    while (!done) {
@@ -399,7 +430,7 @@ init_context(isel_context* ctx, nir_shader* shader)
 
                /* Packed 16-bit instructions have to be VGPR. */
                if (alu_instr->def.num_components == 2 &&
-                   aco_nir_op_supports_packed_math_16bit(alu_instr))
+                   ac_nir_op_supports_packed_math_16bit(alu_instr))
                   type = RegType::vgpr;
 
                switch (alu_instr->op) {
@@ -444,9 +475,16 @@ init_context(isel_context* ctx, nir_shader* shader)
                case nir_op_sdot_2x16_iadd:
                case nir_op_udot_2x16_uadd_sat:
                case nir_op_sdot_2x16_iadd_sat:
+               case nir_op_bfdot2_fadd:
                case nir_op_bfdot2_bfadd:
+               case nir_op_f16dot2_fadd:
+               case nir_op_e4m3fn_dot4_fadd:
+               case nir_op_e5m2_dot4_fadd:
+               case nir_op_e4m3fn_e5m2_dot4_fadd:
                case nir_op_byte_perm_amd:
-               case nir_op_alignbyte_amd: type = RegType::vgpr; break;
+               case nir_op_alignbyte_amd:
+               case nir_op_f2f16_ru:
+               case nir_op_f2f16_rd: type = RegType::vgpr; break;
                case nir_op_fmul:
                case nir_op_ffma:
                case nir_op_fadd:
@@ -479,9 +517,7 @@ init_context(isel_context* ctx, nir_shader* shader)
                case nir_op_fsin_amd:
                case nir_op_fcos_amd:
                case nir_op_pack_half_2x16_rtz_split:
-               case nir_op_pack_half_2x16_split:
-               case nir_op_unpack_half_2x16_split_x:
-               case nir_op_unpack_half_2x16_split_y: {
+               case nir_op_pack_half_2x16_split: {
                   if (ctx->program->gfx_level < GFX11_5 ||
                       alu_instr->src[0].src.ssa->bit_size > 32) {
                      type = RegType::vgpr;
@@ -517,18 +553,12 @@ init_context(isel_context* ctx, nir_shader* shader)
                   break;
                if (intrinsic->intrinsic == nir_intrinsic_strict_wqm_coord_amd) {
                   regclasses[intrinsic->def.index] =
-                     RegClass::get(RegType::vgpr, intrinsic->def.num_components * 4 +
-                                                     nir_intrinsic_base(intrinsic))
-                        .as_linear();
+                     lv1.resize(intrinsic->def.num_components * 4 + nir_intrinsic_base(intrinsic));
                   break;
                }
                RegType type = RegType::sgpr;
                switch (intrinsic->intrinsic) {
                case nir_intrinsic_load_push_constant:
-               case nir_intrinsic_load_workgroup_id:
-               case nir_intrinsic_load_num_workgroups:
-               case nir_intrinsic_load_sbt_base_amd:
-               case nir_intrinsic_load_subgroup_id:
                case nir_intrinsic_load_num_subgroups:
                case nir_intrinsic_vote_all:
                case nir_intrinsic_vote_any:
@@ -540,8 +570,7 @@ init_context(isel_context* ctx, nir_shader* shader)
                case nir_intrinsic_ballot_relaxed:
                case nir_intrinsic_bindless_image_samples:
                case nir_intrinsic_load_scalar_arg_amd:
-               case nir_intrinsic_load_smem_amd:
-               case nir_intrinsic_unit_test_uniform_amd: type = RegType::sgpr; break;
+               case nir_intrinsic_unit_test_uniform_input: type = RegType::sgpr; break;
                case nir_intrinsic_load_input:
                case nir_intrinsic_load_per_primitive_input:
                case nir_intrinsic_load_output:
@@ -563,8 +592,6 @@ init_context(isel_context* ctx, nir_shader* shader)
                case nir_intrinsic_shared_atomic:
                case nir_intrinsic_shared_atomic_swap:
                case nir_intrinsic_load_scratch:
-               case nir_intrinsic_load_typed_buffer_amd:
-               case nir_intrinsic_load_buffer_amd:
                case nir_intrinsic_load_initial_edgeflags_amd:
                case nir_intrinsic_gds_atomic_add_amd:
                case nir_intrinsic_bvh64_intersect_ray_amd:
@@ -572,7 +599,7 @@ init_context(isel_context* ctx, nir_shader* shader)
                case nir_intrinsic_load_vector_arg_amd:
                case nir_intrinsic_ordered_xfb_counter_add_gfx11_amd:
                case nir_intrinsic_cmat_muladd_amd:
-               case nir_intrinsic_unit_test_divergent_amd: type = RegType::vgpr; break;
+               case nir_intrinsic_unit_test_divergent_input: type = RegType::vgpr; break;
                case nir_intrinsic_load_shared:
                case nir_intrinsic_load_shared2_amd:
                   /* When the result of these loads is only used by cross-lane instructions,
@@ -605,7 +632,17 @@ init_context(isel_context* ctx, nir_shader* shader)
                case nir_intrinsic_ddx_fine:
                case nir_intrinsic_ddy_fine:
                case nir_intrinsic_ddx_coarse:
-               case nir_intrinsic_ddy_coarse: type = RegType::vgpr; break;
+               case nir_intrinsic_ddy_coarse:
+               case nir_intrinsic_load_return_param_amd: {
+                  type = RegType::vgpr;
+                  break;
+               }
+               case nir_intrinsic_load_param: {
+                  nir_parameter* param =
+                     &impl->function->params[nir_intrinsic_param_idx(intrinsic)];
+                  type = param->is_uniform ? RegType::sgpr : RegType::vgpr;
+                  break;
+               }
                default:
                   for (unsigned i = 0; i < nir_intrinsic_infos[intrinsic->intrinsic].num_srcs;
                        i++) {
@@ -621,11 +658,8 @@ init_context(isel_context* ctx, nir_shader* shader)
             }
             case nir_instr_type_tex: {
                nir_tex_instr* tex = nir_instr_as_tex(instr);
-               RegType type = tex->def.divergent ? RegType::vgpr : RegType::sgpr;
-
-               if (tex->op == nir_texop_texture_samples) {
-                  assert(!tex->def.divergent);
-               }
+               RegType type =
+                  tex->def.divergent || tex->skip_helpers ? RegType::vgpr : RegType::sgpr;
 
                RegClass rc = get_reg_class(ctx, type, tex->def.num_components, tex->def.bit_size);
                regclasses[tex->def.index] = rc;
@@ -677,11 +711,17 @@ init_context(isel_context* ctx, nir_shader* shader)
                regclasses[phi->def.index] = rc;
                break;
             }
+            case nir_instr_type_call: {
+               ++call_count;
+               break;
+            }
             default: break;
             }
          }
       }
    }
+
+   ctx->call_infos.reserve(call_count);
 
    ctx->program->config->spi_ps_input_ena = ctx->program->info.ps.spi_ps_input_ena;
    ctx->program->config->spi_ps_input_addr = ctx->program->info.ps.spi_ps_input_addr;
@@ -694,13 +734,15 @@ init_context(isel_context* ctx, nir_shader* shader)
                                       (uint8_t*)shader->constant_data,
                                       (uint8_t*)shader->constant_data + shader->constant_data_size);
 
-   BITSET_CLEAR_RANGE(ctx->output_args, 0, BITSET_SIZE(ctx->output_args));
+   BITSET_ZERO(ctx->output_args);
 }
 
 void
 cleanup_context(isel_context* ctx)
 {
+   _mesa_hash_table_destroy(ctx->numlsb_ht, NULL);
    _mesa_hash_table_destroy(ctx->range_ht, NULL);
+   nir_free_fp_analysis_state(&ctx->fp_class_ht);
 }
 
 isel_context
@@ -730,8 +772,7 @@ setup_isel_context(Program* program, unsigned shader_count, struct nir_shader* c
       }
    }
 
-   init_program(program, Stage{info->hw_stage, sw_stage}, info, options->gfx_level, options->family,
-                options->wgp_mode, config);
+   init_program(program, Stage{info->hw_stage, sw_stage}, info, options, config);
 
    isel_context ctx = {};
    ctx.program = program;
@@ -751,20 +792,28 @@ setup_isel_context(Program* program, unsigned shader_count, struct nir_shader* c
    calc_min_waves(program);
 
    unsigned scratch_size = 0;
-   for (unsigned i = 0; i < shader_count; i++) {
-      nir_shader* nir = shaders[i];
-      setup_nir(&ctx, nir);
-      setup_lds_size(&ctx, nir);
-   }
+   for (unsigned i = 0; i < shader_count; i++)
+      setup_nir(&ctx, shaders[i]);
 
    for (unsigned i = 0; i < shader_count; i++)
       scratch_size = std::max(scratch_size, shaders[i]->scratch_size);
 
-   ctx.program->config->scratch_bytes_per_wave = scratch_size * ctx.program->wave_size;
+   ctx.program->config->scratch_bytes_per_wave = align(scratch_size, 4) * ctx.program->wave_size;
+   ctx.program->config->lds_size = program->info.lds_size;
+   assert(ctx.program->config->lds_size <= ctx.program->dev.lds_limit);
 
    unsigned nir_num_blocks = 0;
-   for (unsigned i = 0; i < shader_count; i++)
-      nir_num_blocks += nir_shader_get_entrypoint(shaders[i])->num_blocks;
+   for (unsigned i = 0; i < shader_count; i++) {
+      nir_function_impl* entrypoint = nir_shader_get_entrypoint(shaders[i]);
+      if (!entrypoint) {
+         /* RT shaders have no NIR entrypoint, but only one function impl exists at this stage */
+         nir_foreach_function_impl (func, shaders[i]) {
+            entrypoint = func;
+            break;
+         }
+      }
+      nir_num_blocks += entrypoint->num_blocks;
+   }
    ctx.program->blocks.reserve(nir_num_blocks * 2);
    ctx.block = ctx.program->create_and_insert_block();
    ctx.block->kind = block_kind_top_level;

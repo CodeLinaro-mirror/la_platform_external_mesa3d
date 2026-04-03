@@ -177,8 +177,7 @@ rra_dump_asic_info(const struct radeon_info *gpu_info, FILE *output)
       .rev_id = gpu_info->pci_rev_id,
    };
 
-   strncpy(asic_info.device_name, gpu_info->marketing_name ? gpu_info->marketing_name : gpu_info->name,
-           RRA_FILE_DEVICE_NAME_MAX_SIZE - 1);
+   strncpy(asic_info.device_name, gpu_info->marketing_name, RRA_FILE_DEVICE_NAME_MAX_SIZE - 1);
 
    fwrite(&asic_info, sizeof(struct rra_asic_info), 1, output);
 }
@@ -199,7 +198,8 @@ rra_fill_accel_struct_header_common(const struct radv_physical_device *pdev, str
       /* TODO: calculate active primitives */
       .active_primitive_count = primitive_count,
       .geometry_description_count = header->geometry_count,
-      .interior_fp32_node_count = bvh_info->internal_nodes_size / sizeof(struct radv_bvh_box32_node),
+      .interior_fp32_node_count = bvh_info->box32_count,
+      .interior_fp16_node_count = bvh_info->box16_count,
       .leaf_node_count = primitive_count,
       .rt_driver_interface_version = 8 << 16,
       .rt_ip_version = pdev->info.rt_ip_version,
@@ -487,7 +487,7 @@ radv_rra_trace_init(struct radv_device *device)
       radv_find_memory_index(pdev, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
                                       VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
 
-   util_dynarray_init(&device->rra_trace.ray_history, NULL);
+   device->rra_trace.ray_history = UTIL_DYNARRAY_INIT;
 
    device->rra_trace.ray_history_buffer_size = debug_get_num_option("RADV_RRA_TRACE_HISTORY_SIZE", 100 * 1024 * 1024);
    if (device->rra_trace.ray_history_buffer_size <
@@ -790,7 +790,7 @@ rra_map_accel_struct_data(struct rra_copy_context *ctx, uint32_t i)
    if (radv_GetEventStatus(ctx->device, data->build_event) != VK_EVENT_SET)
       return NULL;
 
-   if (data->buffer->memory) {
+   if (data->buffer && data->buffer->memory) {
       VkMemoryMapInfo memory_map_info = {
          .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
          .memory = data->buffer->memory,

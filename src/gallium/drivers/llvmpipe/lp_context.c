@@ -84,7 +84,7 @@ llvmpipe_destroy(struct pipe_context *pipe)
 
    util_unreference_framebuffer_state(&llvmpipe->framebuffer);
 
-   for (enum pipe_shader_type s = PIPE_SHADER_VERTEX; s < PIPE_SHADER_MESH_TYPES; s++) {
+   for (mesa_shader_stage s = MESA_SHADER_VERTEX; s < MESA_SHADER_MESH_STAGES; s++) {
       for (i = 0; i < ARRAY_SIZE(llvmpipe->sampler_views[0]); i++) {
          pipe_sampler_view_reference(&llvmpipe->sampler_views[s][i], NULL);
       }
@@ -174,7 +174,7 @@ llvmpipe_texture_barrier(struct pipe_context *pipe, unsigned flags)
 static void
 lp_draw_disk_cache_find_shader(void *cookie,
                                struct lp_cached_code *cache,
-                               unsigned char ir_sha1_cache_key[20])
+                               unsigned char ir_sha1_cache_key[SHA1_DIGEST_LENGTH])
 {
    struct llvmpipe_screen *screen = cookie;
    lp_disk_cache_find_shader(screen, cache, ir_sha1_cache_key);
@@ -184,7 +184,7 @@ lp_draw_disk_cache_find_shader(void *cookie,
 static void
 lp_draw_disk_cache_insert_shader(void *cookie,
                                  struct lp_cached_code *cache,
-                                 unsigned char ir_sha1_cache_key[20])
+                                 unsigned char ir_sha1_cache_key[SHA1_DIGEST_LENGTH])
 {
    struct llvmpipe_screen *screen = cookie;
    lp_disk_cache_insert_shader(screen, cache, ir_sha1_cache_key);
