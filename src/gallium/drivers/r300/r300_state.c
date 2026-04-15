@@ -41,6 +41,122 @@
         r300_mark_atom_dirty(r300, &(atom));   \
     }
 
+static void
+r300_get_scissor_from_viewport(const struct pipe_viewport_state *vp,
+                               struct pipe_scissor_state *scissor)
+{
+    /* SC_CLIP_*_A/B fields are 13 bits. */
+    unsigned max_scissor = 16384;
+    float half_w = fabsf(vp->scale[0]);
+    float half_h = fabsf(vp->scale[1]);
+    scissor->minx = CLAMP(-half_w + vp->translate[0], 0, max_scissor);
+    scissor->maxx = CLAMP(half_w + vp->translate[0], 0, max_scissor);
+    scissor->miny = CLAMP(-half_h + vp->translate[1], 0, max_scissor);
+    scissor->maxy = CLAMP(half_h + vp->translate[1], 0, max_scissor);
+}
+
+#define R300_MAX_VIEWPORT_RANGE 16384.0f
+
+void r300_update_guardband_state(struct r300_context *r300)
+{
+    struct r300_guardband_state *guard =
+        (struct r300_guardband_state *)r300->guardband_state.state;
+
+    if (!guard)
+        return;
+
+    const float distance = r300->current_clip_discard_distance;
+
+    if (distance == 0.0f) {
+        if (guard->vert_clip != 1.0f || guard->vert_disc != 1.0f ||
+            guard->horz_clip != 1.0f || guard->horz_disc != 1.0f) {
+            DBG(r300, DBG_RS, "r300: guardband reset for zero distance\n");
+            guard->vert_clip = 1.0f;
+            guard->vert_disc = 1.0f;
+            guard->horz_clip = 1.0f;
+            guard->horz_disc = 1.0f;
+            r300_mark_atom_dirty(r300, &r300->pvs_flush);
+            r300_mark_atom_dirty(r300, &r300->guardband_state);
+        }
+        return;
+    }
+
+    const struct pipe_viewport_state *vp = &r300->viewport;
+    float scale_x = fabs(vp->scale[0]);
+    float scale_y = fabs(vp->scale[1]);
+    float translate_x = vp->translate[0];
+    float translate_y = vp->translate[1];
+
+    /* Treat a 0x0 viewport as 1x1 to prevent a division by zero. */
+    if (scale_x == 0.0f)
+        scale_x = 0.5f;
+    if (scale_y == 0.0f)
+        scale_y = 0.5f;
+
+    /* Find the biggest guard band that is inside the supported viewport
+     * range. The guard band is specified as a horizontal and vertical
+     * distance from (0,0) in clip space.
+     *
+     * This is done by applying the inverse viewport transformation
+     * on the viewport limits to get those limits in clip space.
+     *
+     * Use a limit one pixel smaller to allow for some precision error.
+     */
+    const float max_range = R300_MAX_VIEWPORT_RANGE - 1.0f;
+    float left = (-max_range - translate_x) / scale_x;
+    float right = (max_range - translate_x) / scale_x;
+    float top = (-max_range - translate_y) / scale_y;
+    float bottom = (max_range - translate_y) / scale_y;
+    assert(left <= -1 && top <= -1 && right >= 1 && bottom >= 1);
+
+    float guardband_x = MIN2(-left, right);
+    float guardband_y = MIN2(-top, bottom);
+
+    float discard_x = 1.0f + distance / (2.0f * scale_x);
+    float discard_y = 1.0f + distance / (2.0f * scale_y);
+
+    discard_x = MIN2(discard_x, guardband_x);
+    discard_y = MIN2(discard_y, guardband_y);
+
+    if (guard->vert_clip == guardband_y &&
+        guard->vert_disc == discard_y &&
+        guard->horz_clip == guardband_x &&
+        guard->horz_disc == discard_x) {
+        return;
+    }
+
+    guard->vert_clip = guardband_y;
+    guard->vert_disc = discard_y;
+    guard->horz_clip = guardband_x;
+    guard->horz_disc = discard_x;
+
+    r300_mark_atom_dirty(r300, &r300->pvs_flush);
+    r300_mark_atom_dirty(r300, &r300->guardband_state);
+}
+
+void r300_set_clip_discard_distance(struct r300_context *r300, float distance)
+{
+    /* Determine whether the guardband registers change.
+     *
+     * When we see a value greater than min_clip_discard_distance_watermark, we increase it
+     * up to a certain number to eliminate those state changes next time they happen.
+     * See the comment at min_clip_discard_distance_watermark.
+     */
+    if (distance > r300->min_clip_discard_distance_watermark) {
+        /* This is based on r600, which is based on Viewperf. The number is in half-pixels. */
+        r300->min_clip_discard_distance_watermark = MIN2(distance, 6.0f);
+    }
+
+    float new_distance = distance > 0.0f ?
+        MAX2(distance, r300->min_clip_discard_distance_watermark) : 0.0f;
+
+    if (r300->current_clip_discard_distance != new_distance) {
+        r300->current_clip_discard_distance = new_distance;
+    }
+
+    r300_update_guardband_state(r300);
+}
+
 static void r300_delete_vs_state(struct pipe_context* pipe, void* shader);
 static void r300_delete_fs_state(struct pipe_context* pipe, void* shader);
 
@@ -865,6 +981,10 @@ void r300_mark_fb_state_dirty(struct r300_context *r300,
         r300_mark_atom_dirty(r300, &r300->fb_state_pipelined);
     }
 
+    if (r300->query_current) {
+        r300_mark_atom_dirty(r300, &r300->query_start);
+    }
+
     /* Now compute the fb_state atom size. */
     r300->fb_state.size = 2 + (8 * state->nr_cbufs);
 
@@ -884,6 +1004,44 @@ void r300_mark_fb_state_dirty(struct r300_context *r300,
     }
 
     /* The size of the rest of atoms stays the same. */
+}
+
+void
+r300_framebuffer_init(struct pipe_context *pctx, const struct pipe_framebuffer_state *fb, struct pipe_surface **cbufs, struct pipe_surface **zsbuf)
+{
+   if (fb) {
+      for (unsigned i = 0; i < fb->nr_cbufs; i++) {
+         if (cbufs[i] && pipe_surface_equal(&fb->cbufs[i], cbufs[i]))
+            continue;
+
+         struct pipe_surface *psurf = fb->cbufs[i].texture ? pctx->create_surface(pctx, fb->cbufs[i].texture, &fb->cbufs[i]) : NULL;
+         if (cbufs[i])
+            pipe_surface_unref(pctx, &cbufs[i]);
+         cbufs[i] = psurf;
+      }
+
+      for (unsigned i = fb->nr_cbufs; i < PIPE_MAX_COLOR_BUFS; i++) {
+         if (cbufs[i])
+            pipe_surface_unref(pctx, &cbufs[i]);
+         cbufs[i] = NULL;
+      }
+
+      if (*zsbuf && pipe_surface_equal(&fb->zsbuf, *zsbuf))
+         return;
+      struct pipe_surface *zsurf = fb->zsbuf.texture ? pctx->create_surface(pctx, fb->zsbuf.texture, &fb->zsbuf) : NULL;
+      if (*zsbuf)
+         pipe_surface_unref(pctx, zsbuf);
+      *zsbuf = zsurf;
+   } else {
+      for (unsigned i = 0; i < PIPE_MAX_COLOR_BUFS; i++) {
+         if (cbufs[i])
+            pipe_surface_unref(pctx, &cbufs[i]);
+         cbufs[i] = NULL;
+      }
+      if (*zsbuf)
+         pipe_surface_unref(pctx, zsbuf);
+      *zsbuf = NULL;
+   }
 }
 
 static void
@@ -944,8 +1102,34 @@ r300_set_framebuffer_state(struct pipe_context* pipe,
         r300_mark_atom_dirty(r300, &r300->dsa_state);
     }
 
-    util_framebuffer_init(pipe, state, r300->fb_cbufs, &r300->fb_zsbuf);
+    r300_framebuffer_init(pipe, state, r300->fb_cbufs, &r300->fb_zsbuf);
     util_copy_framebuffer_state(r300->fb_state.state, state);
+
+    /* DXTC blits require that blocks are 2x1 or 4x1 pixels, but
+     * pipe_surface_width sets the framebuffer width as if blocks were 1x1
+     * pixels. Override the width to correct that.
+     */
+    if (state->nr_cbufs == 1 && state->cbufs[0].texture &&
+        state->cbufs[0].format == PIPE_FORMAT_R8G8B8A8_UNORM &&
+        util_format_is_compressed(state->cbufs[0].texture->format)) {
+        struct pipe_framebuffer_state *fb =
+            (struct pipe_framebuffer_state*)r300->fb_state.state;
+        const struct util_format_description *desc =
+            util_format_description(state->cbufs[0].texture->format);
+        unsigned width = u_minify(state->cbufs[0].texture->width0,
+                                  state->cbufs[0].level);
+
+        assert(desc->block.width == 4 && desc->block.height == 4);
+
+        /* Each 64-bit DXT block is 2x1 pixels, and each 128-bit DXT
+         * block is 4x1 pixels when blitting.
+         */
+        width = align(width, 4); /* align to the DXT block width. */
+        if (desc->block.bits == 64)
+           width = DIV_ROUND_UP(width, 2);
+
+        fb->width = width;
+    }
 
     /* Remove trailing NULL colorbuffers. */
     while (current_state->nr_cbufs && !current_state->cbufs[current_state->nr_cbufs-1].texture)
@@ -1139,11 +1323,10 @@ static void r300_delete_fs_state(struct pipe_context* pipe, void* shader)
     struct r300_fragment_shader* fs = (struct r300_fragment_shader*)shader;
     struct r300_fragment_shader_code *tmp, *ptr = fs->first;
 
-    free(fs->shader->code.constants_remap_table);
-
     while (ptr) {
         tmp = ptr;
         ptr = ptr->next;
+        FREE(tmp->code.constants_remap_table);
         rc_constants_destroy(&tmp->code.constants);
         FREE(tmp->cb_code);
         free(tmp->error);
@@ -1226,6 +1409,7 @@ static void* r300_create_rs_state(struct pipe_context* pipe,
         (pack_float_16_6x(state->point_size) << R300_POINTSIZE_X_SHIFT);
 
     /* Point size clamping. */
+    float max_point_size;
     if (state->point_size_per_vertex) {
         /* Per-vertex point size.
          * Clamp to [0, max FB size] */
@@ -1234,6 +1418,7 @@ static void* r300_create_rs_state(struct pipe_context* pipe,
         point_minmax =
             (pack_float_16_6x(min_psiz) << R300_GA_POINT_MINMAX_MIN_SHIFT) |
             (pack_float_16_6x(max_psiz) << R300_GA_POINT_MINMAX_MAX_SHIFT);
+        max_point_size = max_psiz;
     } else {
         /* We cannot disable the point-size vertex output,
          * so clamp it. */
@@ -1241,6 +1426,7 @@ static void* r300_create_rs_state(struct pipe_context* pipe,
         point_minmax =
             (pack_float_16_6x(psiz) << R300_GA_POINT_MINMAX_MIN_SHIFT) |
             (pack_float_16_6x(psiz) << R300_GA_POINT_MINMAX_MAX_SHIFT);
+        max_point_size = psiz;
     }
 
     /* Line control. */
@@ -1304,7 +1490,8 @@ static void* r300_create_rs_state(struct pipe_context* pipe,
         rs->color_control = R300_SHADE_MODEL_SMOOTH;
     }
 
-    clip_rule = state->scissor ? 0xAAAA : 0xFFFF;
+    /* We always clip, either to the user specified settings or the viewport. */
+    clip_rule = 0xAAAA;
 
     /* Point sprites coord mode */
     if (rs->rs.sprite_coord_enable) {
@@ -1359,8 +1546,8 @@ static void* r300_create_rs_state(struct pipe_context* pipe,
 
     /* Build the two command buffers for polygon offset setup. */
     if (polygon_offset_enable) {
-        float scale = state->offset_scale * 12;
-        float offset = state->offset_units * 4;
+        float scale = state->offset_scale * 256 * 12;
+        float offset = state->offset_units * 256 * 2;
 
         BEGIN_CB(rs->cb_poly_offset_zb16, 5);
         OUT_CB_REG_SEQ(R300_SU_POLY_OFFSET_FRONT_SCALE, 4);
@@ -1371,6 +1558,7 @@ static void* r300_create_rs_state(struct pipe_context* pipe,
         END_CB;
 
         offset = state->offset_units * 2;
+        scale = state->offset_scale * 12;
 
         BEGIN_CB(rs->cb_poly_offset_zb24, 5);
         OUT_CB_REG_SEQ(R300_SU_POLY_OFFSET_FRONT_SCALE, 4);
@@ -1380,6 +1568,9 @@ static void* r300_create_rs_state(struct pipe_context* pipe,
         OUT_CB_32F(offset);
         END_CB;
     }
+
+    rs->max_point_size = max_point_size;
+    rs->line_width = state->line_width;
 
     return (void*)rs;
 }
@@ -1394,6 +1585,7 @@ static void r300_bind_rs_state(struct pipe_context* pipe, void* state)
     bool last_msaa_enable = r300->msaa_enable;
     bool last_flatshade = r300->flatshade;
     bool last_clip_halfz = r300->clip_halfz;
+    bool last_scissor_enabled = r300->scissor_enabled;
 
     if (r300->draw && rs) {
         draw_set_rasterizer_state(r300->draw, &rs->rs_draw, state);
@@ -1406,6 +1598,7 @@ static void r300_bind_rs_state(struct pipe_context* pipe, void* state)
         r300->msaa_enable = rs->rs.multisample;
         r300->flatshade = rs->rs.flatshade;
         r300->clip_halfz = rs->rs.clip_halfz;
+        r300->scissor_enabled = rs->rs.scissor;
     } else {
         r300->polygon_offset_enabled = false;
         r300->sprite_coord_enable = 0;
@@ -1413,6 +1606,7 @@ static void r300_bind_rs_state(struct pipe_context* pipe, void* state)
         r300->msaa_enable = false;
         r300->flatshade = false;
         r300->clip_halfz = false;
+        r300->scissor_enabled = false;
     }
 
     UPDATE_STATE(state, r300->rs_state);
@@ -1437,6 +1631,20 @@ static void r300_bind_rs_state(struct pipe_context* pipe, void* state)
 
     if (r300->screen->caps.has_tcl && last_clip_halfz != r300->clip_halfz) {
         r300_mark_atom_dirty(r300, &r300->vs_state);
+    }
+
+    if (last_scissor_enabled != r300->scissor_enabled) {
+        r300_mark_atom_dirty(r300, &r300->scissor_state);
+    }
+
+    if (rs) {
+        if (r300->current_rast_prim == MESA_PRIM_POINTS) {
+            r300_set_clip_discard_distance(r300, rs->max_point_size);
+        } else if (r300_prim_is_lines(r300->current_rast_prim)) {
+            r300_set_clip_discard_distance(r300, rs->line_width);
+        }
+    } else {
+        r300_set_clip_discard_distance(r300, 0.0f);
     }
 }
 
@@ -1519,7 +1727,7 @@ static void*
 }
 
 static void r300_bind_sampler_states(struct pipe_context* pipe,
-                                     enum pipe_shader_type shader,
+                                     mesa_shader_stage shader,
                                      unsigned start, unsigned count,
                                      void** states)
 {
@@ -1530,7 +1738,7 @@ static void r300_bind_sampler_states(struct pipe_context* pipe,
 
     assert(start == 0);
 
-    if (shader != PIPE_SHADER_FRAGMENT)
+    if (shader != MESA_SHADER_FRAGMENT)
        return;
 
     if (count > tex_units)
@@ -1573,7 +1781,7 @@ static uint32_t r300_assign_texture_cache_region(unsigned index, unsigned num)
 }
 
 static void r300_set_sampler_views(struct pipe_context* pipe,
-                                   enum pipe_shader_type shader,
+                                   mesa_shader_stage shader,
                                    unsigned start, unsigned count,
                                    unsigned unbind_num_trailing_slots,
                                    struct pipe_sampler_view** views)
@@ -1588,7 +1796,7 @@ static void r300_set_sampler_views(struct pipe_context* pipe,
 
     assert(start == 0);  /* non-zero not handled yet */
 
-    if (shader != PIPE_SHADER_FRAGMENT || count > tex_units) {
+    if (shader != MESA_SHADER_FRAGMENT || count > tex_units) {
        return;
     }
 
@@ -1744,6 +1952,13 @@ static void r300_set_viewport_states(struct pipe_context* pipe,
 
     r300->viewport = *state;
 
+    struct pipe_scissor_state vp_scissor;
+    r300_get_scissor_from_viewport(state, &vp_scissor);
+    if (memcmp(&vp_scissor, &r300->viewport_scissor, sizeof(vp_scissor)) != 0) {
+        r300->viewport_scissor = vp_scissor;
+        r300_mark_atom_dirty(r300, &r300->scissor_state);
+    }
+
     if (r300->draw) {
         draw_set_viewport_states(r300->draw, start_slot, num_viewports, state);
         viewport->vte_control = R300_VTX_XY_FMT | R300_VTX_Z_FMT;
@@ -1792,14 +2007,13 @@ static void r300_set_vertex_buffers_hwtcl(struct pipe_context* pipe,
     struct r300_context* r300 = r300_context(pipe);
 
     util_set_vertex_buffers_count(r300->vertex_buffer,
-                                  &r300->nr_vertex_buffers, buffers, count,
-                                  true);
+                                  &r300->nr_vertex_buffers, buffers, count);
 
     /* There must be at least one vertex buffer set, otherwise it locks up. */
     if (!r300->nr_vertex_buffers) {
         util_set_vertex_buffers_count(r300->vertex_buffer,
                                       &r300->nr_vertex_buffers,
-                                      &r300->dummy_vb, 1, false);
+                                      &r300->dummy_vb, 1);
     }
 
     r300->vertex_arrays_dirty = true;
@@ -1813,8 +2027,7 @@ static void r300_set_vertex_buffers_swtcl(struct pipe_context* pipe,
     unsigned i;
 
     util_set_vertex_buffers_count(r300->vertex_buffer,
-                                  &r300->nr_vertex_buffers, buffers, count,
-                                  true);
+                                  &r300->nr_vertex_buffers, buffers, count);
     draw_set_vertex_buffers(r300->draw, count, buffers);
 
     if (!buffers)
@@ -2062,8 +2275,7 @@ static void r300_delete_vs_state(struct pipe_context* pipe, void* shader)
 }
 
 static void r300_set_constant_buffer(struct pipe_context *pipe,
-                                     enum pipe_shader_type shader, uint index,
-                                     bool take_ownership,
+                                     mesa_shader_stage shader, uint index,
                                      const struct pipe_constant_buffer *cb)
 {
     struct r300_context* r300 = r300_context(pipe);
@@ -2074,10 +2286,10 @@ static void r300_set_constant_buffer(struct pipe_context *pipe,
         return;
 
     switch (shader) {
-        case PIPE_SHADER_VERTEX:
+        case MESA_SHADER_VERTEX:
             cbuf = (struct r300_constant_buffer*)r300->vs_constants.state;
             break;
-        case PIPE_SHADER_FRAGMENT:
+        case MESA_SHADER_FRAGMENT:
             cbuf = (struct r300_constant_buffer*)r300->fs_constants.state;
             break;
         default:
@@ -2096,12 +2308,12 @@ static void r300_set_constant_buffer(struct pipe_context *pipe,
             return;
     }
 
-    if (shader == PIPE_SHADER_FRAGMENT ||
-        (shader == PIPE_SHADER_VERTEX && r300->screen->caps.has_tcl)) {
+    if (shader == MESA_SHADER_FRAGMENT ||
+        (shader == MESA_SHADER_VERTEX && r300->screen->caps.has_tcl)) {
         cbuf->ptr = mapped;
     }
 
-    if (shader == PIPE_SHADER_VERTEX) {
+    if (shader == MESA_SHADER_VERTEX) {
         if (r300->screen->caps.has_tcl) {
             struct r300_vertex_shader *vs = r300_vs(r300);
 
@@ -2119,10 +2331,10 @@ static void r300_set_constant_buffer(struct pipe_context *pipe,
             }
             r300_mark_atom_dirty(r300, &r300->vs_constants);
         } else if (r300->draw) {
-            draw_set_mapped_constant_buffer(r300->draw, PIPE_SHADER_VERTEX,
+            draw_set_mapped_constant_buffer(r300->draw, MESA_SHADER_VERTEX,
                 0, mapped, cb->buffer_size);
         }
-    } else if (shader == PIPE_SHADER_FRAGMENT) {
+    } else if (shader == MESA_SHADER_FRAGMENT) {
         r300_mark_atom_dirty(r300, &r300->fs_constants);
     }
 }
@@ -2178,6 +2390,7 @@ void r300_init_state_functions(struct r300_context* r300)
     r300->context.create_sampler_view = r300_create_sampler_view;
     r300->context.sampler_view_destroy = r300_sampler_view_destroy;
     r300->context.sampler_view_release = u_default_sampler_view_release;
+    r300->context.resource_release = u_default_resource_release;
 
     r300->context.set_scissor_states = r300_set_scissor_states;
 

@@ -72,16 +72,7 @@
  * block (8k) allocator, which operates out of a bo.  Allocation is done by
  * either pulling a block from the free list or growing the used range of the
  * bo.  Growing the range may run out of space in the bo which we then need to
- * grow.  Growing the bo is tricky in a multi-threaded, lockless environment:
- * we need to keep all pointers and contents in the old map valid.  GEM bos in
- * general can't grow, but we use a trick: we create a memfd and use ftruncate
- * to grow it as necessary.  We mmap the new size and then create a gem bo for
- * it using the new gem userptr ioctl.  Without heavy-handed locking around
- * our allocation fast-path, there isn't really a way to munmap the old mmap,
- * so we just keep it around until garbage collection time.  While the block
- * allocator is lockless for normal operations, we block other threads trying
- * to allocate while we're growing the map.  It shouldn't happen often, and
- * growing is fast anyway.
+ * grow.
  *
  * At the next level we can use various sub-allocators.  The state pool is a
  * pool of smaller, fixed size objects, which operates much like the block
@@ -104,7 +95,9 @@
 
 /* Allocations are always at least 64 byte aligned, so 1 is an invalid value.
  * We use it to indicate the free list is empty. */
-#define EMPTY UINT32_MAX
+#define ANV_FREE_LIST_EMPTY_VAL UINT32_MAX
+
+#define ANV_FREE_LIST_EMPTY ((union anv_free_list) { { ANV_FREE_LIST_EMPTY_VAL, 0 } })
 
 /* On FreeBSD PAGE_SIZE is already defined in
  * /usr/include/machine/param.h that is indirectly
@@ -329,7 +322,7 @@ anv_free_list_pop(union anv_free_list *list,
    union anv_free_list current, new, old;
 
    current.u64 = list->u64;
-   while (current.offset != EMPTY) {
+   while (current.offset != ANV_FREE_LIST_EMPTY_VAL) {
       __sync_synchronize();
       new.offset = table->map[current.offset].next;
       new.count = current.count + 1;
@@ -358,8 +351,8 @@ anv_block_pool_init(struct anv_block_pool *pool,
    VkResult result;
 
    /* Make sure VMA addresses are aligned for the block pool */
-   assert(anv_is_aligned(start_address, device->info->mem_alignment));
-   assert(anv_is_aligned(initial_size, device->info->mem_alignment));
+   assert(util_is_aligned(start_address, device->info->mem_alignment));
+   assert(util_is_aligned(initial_size, device->info->mem_alignment));
    assert(max_size > 0);
    assert(max_size > initial_size);
 
@@ -463,12 +456,17 @@ anv_block_pool_expand_range(struct anv_block_pool *pool, uint32_t size)
  * The returned pointer points to the map for the memory at the specified
  * offset. The offset parameter is relative to the "center" of the block pool
  * rather than the start of the block pool BO map.
+ *
+ * offset parameter here is a offset from the beginning of block_pool.
  */
-void*
-anv_block_pool_map(struct anv_block_pool *pool, int32_t offset, uint32_t size)
+void *
+anv_block_pool_map(struct anv_block_pool *pool, int64_t offset, uint32_t size)
 {
    struct anv_bo *bo = NULL;
-   int32_t bo_offset = 0;
+   int64_t bo_offset = 0;
+
+   assert(offset + size <= pool->max_size);
+
    anv_block_pool_foreach_bo(iter_bo, pool) {
       if (offset < bo_offset + iter_bo->size) {
          bo = iter_bo;
@@ -593,13 +591,13 @@ anv_block_pool_grow(struct anv_block_pool *pool, struct anv_block_state *state,
    return pool->size;
 }
 
-static VkResult
-anv_block_pool_alloc_new(struct anv_block_pool *pool,
-                         struct anv_block_state *pool_state,
-                         uint32_t block_size,
-                         int64_t *offset,
-                         uint32_t *padding)
+VkResult
+anv_block_pool_alloc(struct anv_block_pool *pool,
+                     uint32_t block_size,
+                     int64_t *offset,
+                     uint32_t *padding)
 {
+   struct anv_block_state *pool_state = &pool->state;
    struct anv_block_state state, old, new;
 
    /* Most allocations won't generate any padding */
@@ -654,14 +652,6 @@ anv_block_pool_alloc_new(struct anv_block_pool *pool,
          continue;
       }
    }
-}
-
-VkResult
-anv_block_pool_alloc(struct anv_block_pool *pool,
-                     uint32_t block_size,
-                     int64_t *offset, uint32_t *padding)
-{
-   return anv_block_pool_alloc_new(pool, &pool->state, block_size, offset, padding);
 }
 
 VkResult
@@ -780,7 +770,7 @@ anv_state_pool_get_bucket_size(uint32_t bucket)
  */
 static void
 anv_state_pool_return_blocks(struct anv_state_pool *pool,
-                             uint32_t chunk_offset, uint32_t count,
+                             uint64_t chunk_offset, uint32_t count,
                              uint32_t block_size)
 {
    /* Disallow returning 0 chunks */
@@ -796,10 +786,12 @@ anv_state_pool_return_blocks(struct anv_state_pool *pool,
       /* update states that were added back to the state table */
       struct anv_state *state_i = anv_state_table_get(&pool->table,
                                                       st_idx + i);
+      const int64_t offset = chunk_offset + block_size * i;
       state_i->alloc_size = block_size;
-      state_i->offset = pool->start_offset + chunk_offset + block_size * i;
+      state_i->offset = pool->start_offset + offset;
+
       state_i->map = anv_block_pool_map(&pool->block_pool,
-                                        state_i->offset,
+                                        offset,
                                         state_i->alloc_size);
    }
 
@@ -824,7 +816,7 @@ anv_state_pool_return_blocks(struct anv_state_pool *pool,
  */
 static void
 anv_state_pool_return_chunk(struct anv_state_pool *pool,
-                            uint32_t chunk_offset, uint32_t chunk_size,
+                            uint64_t chunk_offset, uint32_t chunk_size,
                             uint32_t small_size)
 {
    uint32_t divisor = pool->block_size;
@@ -837,7 +829,7 @@ anv_state_pool_return_chunk(struct anv_state_pool *pool,
        * aligned to divisor. Also anv_state_pool_return_blocks() only accepts
        * aligned chunks.
        */
-      uint32_t offset = chunk_offset + rest;
+      uint64_t offset = chunk_offset + rest;
       anv_state_pool_return_blocks(pool, offset, nblocks, divisor);
    }
 
@@ -890,7 +882,7 @@ anv_state_pool_alloc_no_vg(struct anv_state_pool *pool,
       state = anv_free_list_pop(&pool->buckets[b].free_list, &pool->table);
       if (state) {
          unsigned chunk_size = anv_state_pool_get_bucket_size(b);
-         int32_t chunk_offset = state->offset;
+         int64_t chunk_offset = state->offset - pool->start_offset;
 
          /* First lets update the state we got to its new size. offset and map
           * remain the same.
@@ -956,7 +948,7 @@ anv_state_pool_alloc_no_vg(struct anv_state_pool *pool,
    state->map = anv_block_pool_map(&pool->block_pool, offset, alloc_size);
 
    if (padding > 0) {
-      uint32_t return_offset = offset - padding;
+      uint64_t return_offset = offset - padding;
       anv_state_pool_return_chunk(pool, return_offset, padding, 0);
    }
 
@@ -1033,7 +1025,7 @@ anv_state_stream_init(struct anv_state_stream *stream,
    stream->next = block_size;
 
    stream->total_size = 0;
-   util_dynarray_init(&stream->all_blocks, NULL);
+   stream->all_blocks = UTIL_DYNARRAY_INIT;
 
    VG(VALGRIND_CREATE_MEMPOOL(stream, 0, false));
 }
@@ -1071,8 +1063,7 @@ anv_state_stream_alloc(struct anv_state_stream *stream,
       if (stream->block.alloc_size == 0)
          return ANV_STATE_NULL;
 
-      util_dynarray_append(&stream->all_blocks,
-                           struct anv_state, stream->block);
+      util_dynarray_append(&stream->all_blocks, stream->block);
       VG(VALGRIND_MAKE_MEM_NOACCESS(stream->block.map, block_size));
 
       /* Reset back to the start */
@@ -1161,7 +1152,7 @@ anv_state_reserved_array_pool_init(struct anv_state_reserved_array_pool *pool,
    if (pool->states == NULL)
       return vk_error(&device->vk, VK_ERROR_OUT_OF_HOST_MEMORY);
 
-   BITSET_SET_RANGE(pool->states, 0, pool->count - 1);
+   BITSET_SET_COUNT(pool->states, 0, pool->count);
    simple_mtx_init(&pool->mutex, mtx_plain);
 
    pool->state = anv_state_pool_alloc(pool->pool, pool->stride * count, alignment);
@@ -1292,7 +1283,7 @@ anv_bo_pool_alloc(struct anv_bo_pool *pool, uint32_t size,
    struct anv_bo *bo =
       util_sparse_array_free_list_pop_elem(&pool->free_list[bucket]);
    if (bo != NULL) {
-      VG(VALGRIND_MEMPOOL_ALLOC(pool, bo->map, size));
+      VG(VALGRIND_MEMPOOL_ALLOC(pool, bo->map, bo->size));
       *bo_out = bo;
       return VK_SUCCESS;
    }
@@ -1308,7 +1299,7 @@ anv_bo_pool_alloc(struct anv_bo_pool *pool, uint32_t size,
 
    /* We want it to look like it came from this pool */
    VG(VALGRIND_FREELIKE_BLOCK(bo->map, 0));
-   VG(VALGRIND_MEMPOOL_ALLOC(pool, bo->map, size));
+   VG(VALGRIND_MEMPOOL_ALLOC(pool, bo->map, bo->size));
 
    *bo_out = bo;
 
@@ -1376,15 +1367,15 @@ anv_scratch_pool_finish(struct anv_device *device, struct anv_scratch_pool *pool
 
 struct anv_bo *
 anv_scratch_pool_alloc(struct anv_device *device, struct anv_scratch_pool *pool,
-                       gl_shader_stage stage, unsigned per_thread_scratch)
+                       mesa_shader_stage stage, unsigned per_thread_scratch)
 {
    if (per_thread_scratch == 0)
       return NULL;
 
-   unsigned scratch_size_log2 = ffs(per_thread_scratch / 2048);
-   assert(scratch_size_log2 < 16);
-
-   assert(stage < ARRAY_SIZE(pool->bos));
+   unsigned scratch_size_log2 =
+      per_thread_scratch < 2048 ? 11 : util_logbase2_ceil(per_thread_scratch);
+   unsigned bucket = scratch_size_log2 - 11;
+   assert(bucket < 16);
 
    const struct intel_device_info *devinfo = device->info;
 
@@ -1396,13 +1387,14 @@ anv_scratch_pool_alloc(struct anv_device *device, struct anv_scratch_pool *pool,
    if (devinfo->verx10 >= 125)
       stage = MESA_SHADER_COMPUTE;
 
-   struct anv_bo *bo = p_atomic_read(&pool->bos[scratch_size_log2][stage]);
+   assert(stage < ARRAY_SIZE(pool->bos[0]));
+   struct anv_bo *bo = p_atomic_read(&pool->bos[bucket][stage]);
 
    if (bo != NULL)
       return bo;
 
    assert(stage < ARRAY_SIZE(devinfo->max_scratch_ids));
-   uint32_t size = per_thread_scratch * devinfo->max_scratch_ids[stage];
+   uint64_t size = (uint64_t) devinfo->max_scratch_ids[stage] << scratch_size_log2;
 
    /* Even though the Scratch base pointers in 3DSTATE_*S are 64 bits, they
     * are still relative to the general state base address.  When we emit
@@ -1429,7 +1421,7 @@ anv_scratch_pool_alloc(struct anv_device *device, struct anv_scratch_pool *pool,
       return NULL; /* TODO */
 
    struct anv_bo *current_bo =
-      p_atomic_cmpxchg(&pool->bos[scratch_size_log2][stage], NULL, bo);
+      p_atomic_cmpxchg(&pool->bos[bucket][stage], NULL, bo);
    if (current_bo) {
       anv_device_release_bo(device, bo);
       return current_bo;
@@ -1448,16 +1440,18 @@ anv_scratch_pool_get_surf(struct anv_device *device,
    if (per_thread_scratch == 0)
       return 0;
 
-   unsigned scratch_size_log2 = ffs(per_thread_scratch / 2048);
-   assert(scratch_size_log2 < 16);
+   unsigned scratch_size_log2 =
+      per_thread_scratch < 2048 ? 11 : util_logbase2_ceil(per_thread_scratch);
+   unsigned bucket = scratch_size_log2 - 11;
+   assert(bucket < 16);
 
-   uint32_t surf = p_atomic_read(&pool->surfs[scratch_size_log2]);
+   uint32_t surf = p_atomic_read(&pool->surfs[bucket]);
    if (surf > 0)
       return surf;
 
    struct anv_bo *bo =
       anv_scratch_pool_alloc(device, pool, MESA_SHADER_COMPUTE,
-                             per_thread_scratch);
+                             1u << scratch_size_log2);
    struct anv_address addr = { .bo = bo };
 
    struct anv_state state =
@@ -1474,17 +1468,16 @@ anv_scratch_pool_get_surf(struct anv_device *device,
                          .mocs = anv_mocs(device, bo, usage),
                          .format = ISL_FORMAT_RAW,
                          .swizzle = ISL_SWIZZLE_IDENTITY,
-                         .stride_B = per_thread_scratch,
+                         .stride_B = 1u << scratch_size_log2,
                          .is_scratch = true,
                          .usage = usage);
 
-   uint32_t current = p_atomic_cmpxchg(&pool->surfs[scratch_size_log2],
-                                       0, state.offset);
+   uint32_t current = p_atomic_cmpxchg(&pool->surfs[bucket], 0, state.offset);
    if (current) {
       anv_state_pool_free(&device->scratch_surface_state_pool, state);
       return current;
    } else {
-      pool->surf_states[scratch_size_log2] = state;
+      pool->surf_states[bucket] = state;
       return state.offset;
    }
 }
@@ -1551,9 +1544,18 @@ anv_bo_vma_calc_alignment_requirement(struct anv_device *device,
    const bool is_small_heap = anv_bo_is_small_heap(alloc_flags);
    uint32_t align = 64; /* A cache line */
 
-   /* If it's big enough to store a tiled resource, we need 64K alignment */
-   if (size >= 64 * 1024 && !is_small_heap)
-      align = MAX2(64 * 1024, align);
+   /* If it's big enough to store a 64K tiled resource, we need 64K alignment.
+    * Wa_22015614752 requires that some images be aligned to 64k when used on
+    * multiple engines, so allocation that might contain 4k tiled images need
+    * to be aligned to 64k.
+    */
+   const uint64_t image_alignment =
+      (size >= 64 * 1024 ||
+       (device->queue_count > 1 &&
+        intel_needs_workaround(device->info, 22015614752))) ?
+      64 * 1024 : 4 * 1024;
+   if (size >= 4 * 1024 && !is_small_heap)
+      align = MAX2(image_alignment, align);
 
    /* If we're using the AUX map, make sure we follow the required
     * alignment.
@@ -1602,40 +1604,6 @@ anv_bo_vma_alloc_or_close(struct anv_device *device,
    }
 
    return VK_SUCCESS;
-}
-
-enum intel_device_info_mmap_mode
-anv_bo_get_mmap_mode(struct anv_device *device, struct anv_bo *bo)
-{
-   enum anv_bo_alloc_flags alloc_flags = bo->alloc_flags;
-
-   if (device->info->has_set_pat_uapi)
-      return anv_device_get_pat_entry(device, alloc_flags)->mmap;
-
-   if (anv_physical_device_has_vram(device->physical)) {
-      if ((alloc_flags & ANV_BO_ALLOC_NO_LOCAL_MEM) ||
-          (alloc_flags & ANV_BO_ALLOC_IMPORTED))
-         return INTEL_DEVICE_INFO_MMAP_MODE_WB;
-
-      return INTEL_DEVICE_INFO_MMAP_MODE_WC;
-   }
-
-   /* gfx9 atom */
-   if (!device->info->has_llc) {
-      /* user wants a cached and coherent memory but to achieve it without
-       * LLC in older platforms DRM_IOCTL_I915_GEM_SET_CACHING needs to be
-       * supported and set.
-       */
-      if (alloc_flags & ANV_BO_ALLOC_HOST_CACHED)
-         return INTEL_DEVICE_INFO_MMAP_MODE_WB;
-
-      return INTEL_DEVICE_INFO_MMAP_MODE_WC;
-   }
-
-   if (alloc_flags & (ANV_BO_ALLOC_SCANOUT | ANV_BO_ALLOC_EXTERNAL))
-      return INTEL_DEVICE_INFO_MMAP_MODE_WC;
-
-   return INTEL_DEVICE_INFO_MMAP_MODE_WB;
 }
 
 VkResult
@@ -1811,8 +1779,9 @@ anv_device_map_bo(struct anv_device *device,
    if (real != bo) {
       offset += (bo->offset - real->offset);
 
+      const uint64_t page_size = device->physical->page_size;
       /* KMD rounds munmap() to whole pages, so here doing some adjustments */
-      const uint64_t munmap_offset = ROUND_DOWN_TO(offset, 4096);
+      const uint64_t munmap_offset = ROUND_DOWN_TO(offset, page_size);
       if (munmap_offset != offset) {
          offset_adjustment = offset - munmap_offset;
          size += offset_adjustment;
@@ -1822,7 +1791,7 @@ anv_device_map_bo(struct anv_device *device,
             placed_addr -= offset_adjustment;
       }
 
-      assert((offset & (4096 - 1)) == 0);
+      assert((offset & (page_size - 1)) == 0);
    }
 
    void *map = device->kmd_backend->gem_mmap(device, bo, offset, size, placed_addr);
@@ -1850,14 +1819,15 @@ anv_device_unmap_bo(struct anv_device *device,
 
    struct anv_bo *real = anv_bo_get_real(bo);
    if (real != bo) {
+      const uint64_t page_size = device->physical->page_size;
       uint64_t slab_offset = bo->offset - real->offset;
 
-      if (ROUND_DOWN_TO(slab_offset, 4096) != slab_offset) {
-         slab_offset -= ROUND_DOWN_TO(slab_offset, 4096);
+      if (ROUND_DOWN_TO(slab_offset, page_size) != slab_offset) {
+         slab_offset -= ROUND_DOWN_TO(slab_offset, page_size);
          map -= slab_offset;
          map_size += slab_offset;
       }
-      assert(((uintptr_t)map & (4096 - 1)) == 0);
+      assert(((uintptr_t)map & (page_size - 1)) == 0);
    }
 
    if (replace) {

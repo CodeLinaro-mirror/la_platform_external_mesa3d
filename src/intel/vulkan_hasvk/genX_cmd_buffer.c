@@ -28,6 +28,7 @@
 #include "anv_measure.h"
 #include "vk_format.h"
 #include "vk_render_pass.h"
+#include "vk_synchronization.h"
 #include "vk_util.h"
 #include "util/fast_idiv_by_const.h"
 
@@ -35,7 +36,7 @@
 #include "genxml/gen_macros.h"
 #include "genxml/genX_pack.h"
 #include "common/intel_guardband.h"
-#include "compiler/elk/elk_prim.h"
+#include "compiler/intel_prim.h"
 
 #include "nir/nir_xfb_info.h"
 
@@ -2296,7 +2297,9 @@ emit_binding_table(struct anv_cmd_buffer *cmd_buffer,
                             "descriptor does not have NonReadable "
                             "set and the image does not have a "
                             "corresponding SPIR-V format enum.");
-                  vk_debug_report(&cmd_buffer->device->physical->instance->vk,
+                  struct vk_instance *instance =
+                     &cmd_buffer->device->physical->instance->vk;
+                  vk_debug_report(&instance->debug_report,
                                   VK_DEBUG_REPORT_ERROR_BIT_EXT,
                                   &desc->image_view->vk.base,
                                   __LINE__, 0, "anv",
@@ -2465,7 +2468,7 @@ flush_descriptor_sets(struct anv_cmd_buffer *cmd_buffer,
       if (!shaders[i])
          continue;
 
-      gl_shader_stage stage = shaders[i]->stage;
+      mesa_shader_stage stage = shaders[i]->stage;
       VkShaderStageFlags vk_stage = mesa_to_vk_shader_stage(stage);
       if ((vk_stage & dirty) == 0)
          continue;
@@ -2504,7 +2507,7 @@ flush_descriptor_sets(struct anv_cmd_buffer *cmd_buffer,
          if (!shaders[i])
             continue;
 
-         gl_shader_stage stage = shaders[i]->stage;
+         mesa_shader_stage stage = shaders[i]->stage;
 
          result = emit_samplers(cmd_buffer, pipe_state, shaders[i],
                                 &cmd_buffer->state.samplers[stage]);
@@ -2665,7 +2668,7 @@ get_push_range_bound_size(struct anv_cmd_buffer *cmd_buffer,
       return (range->start + range->length) * 32;
 
    case ANV_DESCRIPTOR_SET_SHADER_CONSTANTS:
-      return ALIGN(shader->prog_data->const_data_size, ANV_UBO_ALIGNMENT);
+      return align(shader->prog_data->const_data_size, ANV_UBO_ALIGNMENT);
 
    default: {
       assert(range->set < MAX_SETS);
@@ -2712,7 +2715,7 @@ get_push_range_bound_size(struct anv_cmd_buffer *cmd_buffer,
 
 static void
 cmd_buffer_emit_push_constant(struct anv_cmd_buffer *cmd_buffer,
-                              gl_shader_stage stage,
+                              mesa_shader_stage stage,
                               struct anv_address *buffers,
                               unsigned buffer_count)
 {
@@ -5811,14 +5814,8 @@ void genX(CmdSetEvent2)(
    ANV_FROM_HANDLE(anv_cmd_buffer, cmd_buffer, commandBuffer);
    ANV_FROM_HANDLE(anv_event, event, _event);
 
-   VkPipelineStageFlags2 src_stages = 0;
-
-   for (uint32_t i = 0; i < pDependencyInfo->memoryBarrierCount; i++)
-      src_stages |= pDependencyInfo->pMemoryBarriers[i].srcStageMask;
-   for (uint32_t i = 0; i < pDependencyInfo->bufferMemoryBarrierCount; i++)
-      src_stages |= pDependencyInfo->pBufferMemoryBarriers[i].srcStageMask;
-   for (uint32_t i = 0; i < pDependencyInfo->imageMemoryBarrierCount; i++)
-      src_stages |= pDependencyInfo->pImageMemoryBarriers[i].srcStageMask;
+   VkPipelineStageFlags2 src_stages =
+      vk_collect_dependency_info_src_stages(pDependencyInfo);
 
    cmd_buffer->state.pending_pipe_bits |= ANV_PIPE_POST_SYNC_BIT;
    genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
@@ -5925,7 +5922,7 @@ void genX(CmdBindIndexBuffer2KHR)(
    cmd_buffer->state.gfx.index_buffer = buffer;
    cmd_buffer->state.gfx.index_type = vk_to_intel_index_type(indexType);
    cmd_buffer->state.gfx.index_offset = offset;
-   cmd_buffer->state.gfx.index_size = vk_buffer_range(&buffer->vk, offset, size);
+   cmd_buffer->state.gfx.index_size = buffer ? vk_buffer_range(&buffer->vk, offset, size) : 0;
    cmd_buffer->state.gfx.dirty |= ANV_CMD_DIRTY_INDEX_BUFFER;
 }
 

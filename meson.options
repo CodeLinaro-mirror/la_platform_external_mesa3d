@@ -86,7 +86,7 @@ option(
   value : ['auto'],
   choices : [
     'all', 'auto',
-    'asahi', 'crocus', 'd3d12', 'etnaviv', 'freedreno', 'i915', 'iris',
+    'asahi', 'crocus', 'd3d12', 'ethosu', 'etnaviv', 'freedreno', 'i915', 'iris',
     'lima', 'llvmpipe', 'nouveau', 'panfrost', 'r300', 'r600', 'radeonsi',
     'rocket', 'softpipe', 'svga', 'tegra', 'v3d', 'vc4', 'virgl', 'zink',
   ],
@@ -100,20 +100,6 @@ option(
   type : 'boolean',
   value : false,
   description : 'Enable HUD block/NIC I/O HUD status support',
-)
-
-option(
-  'gallium-vdpau',
-  type : 'feature',
-  deprecated: {'true': 'enabled', 'false': 'disabled'},
-  description : 'enable gallium vdpau frontend.',
-)
-
-option(
-  'vdpau-libs-path',
-  type : 'string',
-  value : '',
-  description : 'path to put vdpau libraries. defaults to $libdir/vdpau.'
 )
 
 option(
@@ -161,7 +147,8 @@ option(
 option(
   'gallium-rusticl-enable-drivers',
   type : 'array',
-  value : ['auto', 'asahi', 'freedreno', 'radeonsi'],
+  value : ['auto'],
+  choices : ['auto', 'asahi', 'freedreno', 'radeonsi'],
   description : 'List of gallium drivers for which rusticl will be enabled ' +
                 'by default',
 )
@@ -221,9 +208,9 @@ option(
   type : 'array',
   value : ['auto'],
   choices : ['auto', 'amd', 'broadcom', 'freedreno', 'intel', 'intel_hasvk',
-             'panfrost', 'swrast', 'virtio', 'imagination-experimental',
+             'panfrost', 'swrast', 'virtio', 'imagination',
              'microsoft-experimental', 'nouveau', 'asahi', 'gfxstream',
-             'all'],
+             'kosmickrisp', 'all'],
   description : 'List of vulkan drivers to build. If this is set to auto ' +
                 'all drivers applicable to the target OS/architecture ' +
                 'will be built'
@@ -253,6 +240,13 @@ option(
   value : false,
   description : 'Enable Services backend for Imagination Technologies ' +
                 'vulkan driver',
+)
+
+option('imagination-uscgen-devices',
+  type : 'array',
+  value : [],
+  choices : ['axe-1-16m', 'bxs-4-64', 'gx6250'],
+  description : 'List of devices for which to pre-build USC program binaries.',
 )
 
 option(
@@ -291,6 +285,19 @@ option(
   value : '',
   description : 'Location relative to prefix to put vulkan icds on install. ' +
                 'Default: $datadir/vulkan/icd.d'
+)
+
+option(
+  'vulkan-manifest-per-architecture',
+  type : 'boolean',
+  value : true,
+  description : 'If true, Vulkan ICDs have a separate JSON manifest per ' +
+                'architecture, for example lvp_icd.x86_64.json. ' +
+                '(Recommended for non-default ${prefix}.) ' +
+                'If false, all architectures share a single JSON manifest, ' +
+                'for example lvp_icd.json, referencing the library by its ' +
+                'basename. ' +
+                '(Recommended for Unix OS distros installing into /usr.)'
 )
 
 option(
@@ -545,7 +552,7 @@ option(
   value : [],
   choices : ['drm-shim', 'etnaviv', 'freedreno', 'glsl', 'intel', 'intel-ui',
              'nir', 'nouveau', 'lima', 'panfrost', 'asahi', 'imagination',
-             'all', 'dlclose-skip'],
+             'zink', 'all', 'dlclose-skip'],
   description : 'List of tools to build. (Note: `intel-ui` selects `intel`)',
 )
 
@@ -588,8 +595,8 @@ option(
   type : 'integer',
   min : 25,
   max : 10000,
-  value : 34,
-  description : 'Android Platform SDK version. Default: Android14 version.'
+  value : 35,
+  description : 'Android Platform SDK version. Default: Android15 version.'
 )
 
 option(
@@ -613,6 +620,12 @@ option(
    deprecated: {'true': 'enabled', 'false': 'disabled'},
    value : 'enabled',
    description : 'Use ZLIB to build driver. Default: enabled'
+)
+
+option(
+   'display-info',
+   type : 'feature',
+   description : 'Use libdisplay-info to build driver.'
 )
 
 option(
@@ -686,24 +699,6 @@ option(
 )
 
 option(
-  'intel-clc',
-  type : 'combo',
-  deprecated: {'true': 'enabled'},
-  value : 'auto',
-  choices : [
-    'enabled', 'system', 'auto'
-  ],
-  description : 'Build the intel-clc compiler or use a system version.'
-)
-
-option(
-  'install-intel-clc',
-  type : 'boolean',
-  value : false,
-  description : 'Install the intel-clc compiler (if needed for cross builds).'
-)
-
-option(
   'intel-rt',
   type : 'feature',
   deprecated: {'true': 'enabled', 'false': 'disabled'},
@@ -724,12 +719,13 @@ option(
   type : 'array',
   value : ['all_free'],
   choices: [
-    'all', 'all_free', 'vc1dec', 'h264dec', 'h264enc', 'h265dec', 'h265enc', 'av1dec', 'av1enc', 'vp9dec'
+    'all', 'all_free', 'vc1dec', 'h264dec', 'h264enc', 'h265dec', 'h265enc',
+    'av1dec', 'av1enc', 'vp9dec', 'mpeg12dec', 'jpegdec'
   ],
   description : 'List of codecs to build support for. ' +
                 'Distros might want to consult their legal department before ' +
                 'enabling these. This is used for all video APIs (vaapi, ' +
-                'vdpau, vulkan). Non-patent encumbered codecs will be ' +
+                'vulkan). Non-patent encumbered codecs will be ' +
                 'enabled by default with the all_free default value.'
 )
 
@@ -852,7 +848,7 @@ option(
   type : 'array',
   value : ['perfetto'],
   choices : [
-    'libdrm', 'perfetto',
+    'libdrm', 'libva', 'perfetto',
   ],
   description : 'Allows the fallback mechanism if the dependency is not available on the system, or too old.'
 )
@@ -862,4 +858,24 @@ option(
   type : 'boolean',
   value : false,
   description : 'Build virtgpu_kumquat (only useful with gfxstream currently)'
+)
+
+option(
+  'spirv-tools',
+  type : 'feature',
+  description : 'Use SPIRV-Tools for dumping SPIR-V for debugging purposes (required by CLC)'
+)
+
+option(
+  'allow-broken-lto',
+  type : 'boolean',
+  value : false,
+  description : 'Manual override switch to enable LTO, which is unsupported due to being broken. WARNING: This option may break your driver randomly!'
+)
+
+option(
+  'intel-virtio-experimental',
+  type : 'boolean',
+  value : false,
+  description : 'use experimental virtio backend for intel driver',
 )

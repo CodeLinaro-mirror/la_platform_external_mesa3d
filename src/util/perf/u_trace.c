@@ -887,11 +887,17 @@ u_trace_clone_append(struct u_trace_iterator begin_it,
       if (from_chunk == end_it.chunk)
          to_copy = MIN2(to_copy, end_it.event_idx - from_idx);
 
+      /* Reserve space in the chunk before emitting the copy as it could also
+       * add its own tracepoints.
+       */
+      unsigned to_chunk_idx = to_chunk->num_traces;
+      to_chunk->num_traces += to_copy;
+
       copy_buffer(begin_it.ut->utctx, cmdstream,
                   from_chunk->timestamps,
                   begin_it.ut->utctx->timestamp_size_bytes * from_idx,
                   to_chunk->timestamps,
-                  begin_it.ut->utctx->timestamp_size_bytes * to_chunk->num_traces,
+                  begin_it.ut->utctx->timestamp_size_bytes * to_chunk_idx,
                   begin_it.ut->utctx->timestamp_size_bytes * to_copy);
 
       if (from_chunk->has_indirect) {
@@ -899,11 +905,11 @@ u_trace_clone_append(struct u_trace_iterator begin_it,
                      from_chunk->indirects,
                      begin_it.ut->utctx->max_indirect_size_bytes * from_idx,
                      to_chunk->indirects,
-                     begin_it.ut->utctx->max_indirect_size_bytes * to_chunk->num_traces,
+                     begin_it.ut->utctx->max_indirect_size_bytes * to_chunk_idx,
                      begin_it.ut->utctx->max_indirect_size_bytes * to_copy);
       }
 
-      memcpy(&to_chunk->traces[to_chunk->num_traces],
+      memcpy(&to_chunk->traces[to_chunk_idx],
              &from_chunk->traces[from_idx],
              to_copy * sizeof(struct u_trace_event));
 
@@ -919,7 +925,6 @@ u_trace_clone_append(struct u_trace_iterator begin_it,
       }
 
       into->num_traces += to_copy;
-      to_chunk->num_traces += to_copy;
       from_idx += to_copy;
 
       assert(from_idx <= from_chunk->num_traces);
@@ -953,8 +958,9 @@ u_trace_disable_event_range(struct u_trace_iterator begin_it,
          list_entry(current_chunk->node.next, struct u_trace_chunk, node);
    }
 
-   memset(&current_chunk->traces[start_idx], 0,
-          (end_it.event_idx - start_idx) * sizeof(struct u_trace_event));
+   if (current_chunk != NULL)
+      memset(&current_chunk->traces[start_idx], 0,
+             (end_it.event_idx - start_idx) * sizeof(struct u_trace_event));
 }
 
 /**
@@ -990,11 +996,13 @@ u_trace_appendv(struct u_trace *ut,
                                tp->flags);
 
    if (ut->utctx->enabled_traces & U_TRACE_TYPE_INDIRECTS) {
+      uint64_t dst_offset = 0;
       for (unsigned i = 0; i < n_indirects; i++) {
-         ut->utctx->capture_data(ut, cs, chunk->indirects,
-                                 ut->utctx->max_indirect_size_bytes * tp_idx,
-                                 addresses[i].bo, addresses[i].offset,
-                                 indirect_sizes_B[i]);
+         ut->utctx->capture_data(
+            ut, cs, chunk->indirects,
+            ut->utctx->max_indirect_size_bytes * tp_idx + dst_offset,
+            addresses[i].bo, addresses[i].offset, indirect_sizes_B[i]);
+         dst_offset += indirect_sizes_B[i];
       }
       chunk->has_indirect |= n_indirects > 0;
    }

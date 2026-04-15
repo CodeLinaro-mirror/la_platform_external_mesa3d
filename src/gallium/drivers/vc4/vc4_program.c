@@ -828,7 +828,7 @@ ntq_emit_pack_unorm_4x8(struct vc4_compile *c, nir_alu_instr *instr)
         /* If packing from a vec4 op (as expected), identify it so that we can
          * peek back at what generated its sources.
          */
-        if (instr->src[0].src.ssa->parent_instr->type == nir_instr_type_alu &&
+        if (nir_src_is_alu(instr->src[0].src) &&
             nir_def_as_alu(instr->src[0].src.ssa)->op ==
             nir_op_vec4) {
                 vec4 = nir_def_as_alu(instr->src[0].src.ssa);
@@ -997,7 +997,7 @@ static struct qreg ntq_emit_bcsel(struct vc4_compile *c, nir_alu_instr *instr,
 {
         if (nir_load_reg_for_def(instr->src[0].src.ssa))
                 goto out;
-        if (instr->src[0].src.ssa->parent_instr->type != nir_instr_type_alu)
+        if (!nir_src_is_alu(instr->src[0].src))
                 goto out;
         nir_alu_instr *compare =
                 nir_def_as_alu(instr->src[0].src.ssa);
@@ -1486,10 +1486,6 @@ static void
 vc4_optimize_nir(struct nir_shader *s)
 {
         bool progress;
-        unsigned lower_flrp =
-                (s->options->lower_flrp16 ? 16 : 0) |
-                (s->options->lower_flrp32 ? 32 : 0) |
-                (s->options->lower_flrp64 ? 64 : 0);
 
         do {
                 progress = false;
@@ -1497,7 +1493,7 @@ vc4_optimize_nir(struct nir_shader *s)
                 NIR_PASS(_, s, nir_lower_vars_to_ssa);
                 NIR_PASS(progress, s, nir_lower_alu_to_scalar, NULL, NULL);
                 NIR_PASS(progress, s, nir_lower_phis_to_scalar, NULL, NULL);
-                NIR_PASS(progress, s, nir_copy_prop);
+                NIR_PASS(progress, s, nir_opt_copy_prop);
                 NIR_PASS(progress, s, nir_opt_remove_phis);
                 NIR_PASS(progress, s, nir_opt_dce);
                 NIR_PASS(progress, s, nir_opt_dead_cf);
@@ -1511,23 +1507,6 @@ vc4_optimize_nir(struct nir_shader *s)
                 NIR_PASS(progress, s, nir_opt_peephole_select, &peephole_select_options);
                 NIR_PASS(progress, s, nir_opt_algebraic);
                 NIR_PASS(progress, s, nir_opt_constant_folding);
-                if (lower_flrp != 0) {
-                        bool lower_flrp_progress = false;
-
-                        NIR_PASS(lower_flrp_progress, s, nir_lower_flrp,
-                                 lower_flrp,
-                                 false /* always_precise */);
-                        if (lower_flrp_progress) {
-                                NIR_PASS(progress, s, nir_opt_constant_folding);
-                                progress = true;
-                        }
-
-                        /* Nothing should rematerialize any flrps, so we only
-                         * need to do this lowering once.
-                         */
-                        lower_flrp = 0;
-                }
-
                 NIR_PASS(progress, s, nir_opt_undef);
                 NIR_PASS(progress, s, nir_opt_loop_unroll);
         } while (progress);
@@ -2181,13 +2160,14 @@ static const nir_shader_compiler_options nir_options = {
         .has_texture_scaling = true,
         .lower_mul_high = true,
         .max_unroll_iterations = 32,
+        .max_samples = 4,
         .force_indirect_unrolling = (nir_var_shader_in | nir_var_shader_out | nir_var_function_temp),
         .scalarize_ddx = true,
 };
 
 const struct nir_shader_compiler_options *
 vc4_screen_get_compiler_options(struct pipe_screen *pscreen,
-                                enum pipe_shader_type shader)
+                                mesa_shader_stage shader)
 {
         return &nir_options;
 }
@@ -2312,7 +2292,7 @@ vc4_shader_ntq(struct vc4_context *vc4, enum qstage stage,
                 more_late_algebraic = false;
                 NIR_PASS(more_late_algebraic, c->s, nir_opt_algebraic_late);
                 NIR_PASS(_, c->s, nir_opt_constant_folding);
-                NIR_PASS(_, c->s, nir_copy_prop);
+                NIR_PASS(_, c->s, nir_opt_copy_prop);
                 NIR_PASS(_, c->s, nir_opt_dce);
                 NIR_PASS(_, c->s, nir_opt_cse);
         }
@@ -2485,6 +2465,17 @@ vc4_shader_precompile(struct vc4_context *vc4,
         }
 }
 
+static bool
+vc4_check_divergent_loops(nir_shader *s)
+{
+        nir_foreach_block(block, nir_shader_get_entrypoint(s)) {
+                nir_loop *loop = nir_block_get_following_loop(block);
+                if (loop && nir_loop_is_divergent(loop))
+                        return true;
+        }
+        return false;
+}
+
 static void *
 vc4_shader_state_create(struct pipe_context *pctx,
                         const struct pipe_shader_state *cso)
@@ -2521,6 +2512,7 @@ vc4_shader_state_create(struct pipe_context *pctx,
         NIR_PASS(_, s, nir_lower_io,
                  nir_var_shader_in | nir_var_shader_out | nir_var_uniform,
                  type_size, (nir_lower_io_options)0);
+        s->info.disable_output_offset_src_constant_folding = true;
 
         NIR_PASS(_, s, nir_normalize_cubemap_coords);
 
@@ -2533,12 +2525,32 @@ vc4_shader_state_create(struct pipe_context *pctx,
         /* Garbage collect dead instructions */
         nir_sweep(s);
 
+        /* VC4 hardware doesn't have a dispatch mask for the VS. This means
+         * that, if we submit a divergent loop to the hardware, some execution
+         * channels can have undefined/garbage contents and cause infinite
+         * loops and GPU hangs.
+         *
+         * Instead of potentially hanging the GPU, refuse shader linking.
+         */
+        if (s->info.stage == MESA_SHADER_VERTEX) {
+                nir_divergence_analysis(s);
+
+                if (vc4_check_divergent_loops(s) && cso->report_compile_error) {
+                        ((struct pipe_shader_state *)cso)->error_message =
+                                strdup("Non-uniform loops are unsupported "
+                                       "in the vertex shader.");
+                        ralloc_free(s);
+                        free(so);
+                        return NULL;
+                }
+        }
+
         so->base.type = PIPE_SHADER_IR_NIR;
         so->base.ir.nir = s;
 
         if (VC4_DBG(NIR)) {
                 fprintf(stderr, "%s prog %d NIR:\n",
-                        gl_shader_stage_name(s->info.stage),
+                        mesa_shader_stage_name(s->info.stage),
                         so->program_id);
                 nir_print_shader(s, stderr);
                 fprintf(stderr, "\n");
@@ -2691,9 +2703,7 @@ vc4_get_compiled_shader(struct vc4_context *vc4, enum qstage stage,
         }
 
         shader->failed = c->failed;
-        if (c->failed) {
-                shader->failed = true;
-        } else {
+        if (!shader->failed) {
                 copy_uniform_state_to_shader(shader, c);
                 shader->bo = vc4_bo_alloc_shader(vc4->screen, c->qpu_insts,
                                                  c->qpu_inst_count *
@@ -2801,7 +2811,7 @@ vc4_update_compiled_fs(struct vc4_context *vc4, uint8_t prim_mode)
                          PIPE_SPRITE_COORD_UPPER_LEFT);
         }
 
-        key->ubo_1_size = vc4->constbuf[PIPE_SHADER_FRAGMENT].cb[1].buffer_size;
+        key->ubo_1_size = vc4->constbuf[MESA_SHADER_FRAGMENT].cb[1].buffer_size;
 
         struct vc4_compiled_shader *old_fs = vc4->prog.fs;
         vc4->prog.fs = vc4_get_compiled_shader(vc4, QSTAGE_FRAG, &key->base);

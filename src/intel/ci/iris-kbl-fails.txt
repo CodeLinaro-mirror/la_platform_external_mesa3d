@@ -87,9 +87,6 @@ spec@khr_texture_compression_astc@sliced-3d-miptree-gles srgb-fp@sRGB decode ful
 spec@!opengl 1.1@line-smooth-coverage,Fail
 spec@!opengl 1.1@line-smooth-stipple,Fail
 
-# fails after Debian bookworm update
-spec@arb_viewport_array@display-list,Fail
-
 # Uprev Piglit in Mesa
 spec@arb_framebuffer_object@execution@msaa-alpha-to-coverage_alpha-to-one,Fail
 spec@arb_framebuffer_object@execution@msaa-alpha-to-coverage_alpha-to-one_write-z,Fail
@@ -107,6 +104,3 @@ glx@glx-multithread-buffer-busy-tracking-bug,Fail
 #   Current serial number in output stream:  1181
 glx@glx-visuals-depth -pixmap,Fail
 glx@glx-visuals-stencil -pixmap,Fail
-
-# New failures with GL CTS 4.6.6.0
-KHR-GL46.direct_state_access.vertex_arrays_vertex_buffers_errors,Fail

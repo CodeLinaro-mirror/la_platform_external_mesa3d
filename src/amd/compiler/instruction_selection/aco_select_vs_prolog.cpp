@@ -338,6 +338,21 @@ load_unaligned_vs_attrib(Builder& bld, PhysReg dst, Operand desc, Operand index,
    state->current_loads.push_back(load);
 }
 
+bool
+is_last_attribute_large(const struct aco_vs_prolog_info* pinfo)
+{
+   const struct ac_vtx_format_info* vtx_info_table = ac_get_vtx_format_info_table(GFX8, true);
+   unsigned last_attribute = pinfo->num_attributes - 1;
+
+   if ((pinfo->misaligned_mask & (1u << last_attribute))) {
+      const struct ac_vtx_format_info* vtx_info = &vtx_info_table[pinfo->formats[last_attribute]];
+      if (vtx_info->chan_byte_size == 8 && vtx_info->num_channels > 2)
+         return true;
+   }
+
+   return false;
+}
+
 } // namespace
 
 void
@@ -350,8 +365,7 @@ select_vs_prolog(Program* program, const struct aco_vs_prolog_info* pinfo, ac_sh
    /* This should be enough for any shader/stage. */
    unsigned max_user_sgprs = options->gfx_level >= GFX9 ? 32 : 16;
 
-   init_program(program, compute_cs, info, options->gfx_level, options->family, options->wgp_mode,
-                config);
+   init_program(program, compute_cs, info, options, config);
    program->dev.vgpr_limit = 256;
 
    Block* block = program->create_and_insert_block();
@@ -393,9 +407,11 @@ select_vs_prolog(Program* program, const struct aco_vs_prolog_info* pinfo, ac_sh
       has_nontrivial_divisors && (program->gfx_level <= GFX8 || program->gfx_level >= GFX11);
 
    int vgpr_offset = pinfo->misaligned_mask & (1u << (pinfo->num_attributes - 1)) ? 0 : -4;
+   const bool is_last_attr_large = is_last_attribute_large(pinfo);
 
    unsigned num_vgprs = args->num_vgprs_used;
-   PhysReg attributes_start = get_next_vgpr(pinfo->num_attributes * 4, &num_vgprs);
+   PhysReg attributes_start =
+      get_next_vgpr(pinfo->num_attributes * 4 + (is_last_attr_large ? 4 : 0), &num_vgprs);
    PhysReg vertex_index, instance_index, start_instance_vgpr, nontrivial_tmp_vgpr0,
       nontrivial_tmp_vgpr1;
    if (needs_vertex_index)
@@ -419,8 +435,7 @@ select_vs_prolog(Program* program, const struct aco_vs_prolog_info* pinfo, ac_sh
                Operand::c32((unsigned)options->address32_hi));
    }
 
-   const struct ac_vtx_format_info* vtx_info_table =
-      ac_get_vtx_format_info_table(GFX8, CHIP_POLARIS10);
+   const struct ac_vtx_format_info* vtx_info_table = ac_get_vtx_format_info_table(GFX8, true);
 
    UnalignedVsAttribLoadState unaligned_state;
    unaligned_state.max_vgprs = MAX2(84, num_vgprs + 8);
@@ -447,7 +462,7 @@ select_vs_prolog(Program* program, const struct aco_vs_prolog_info* pinfo, ac_sh
          }
 
          /* If there are no HS threads, SPI mistakenly loads the LS VGPRs starting at VGPR 0. */
-         if (info->hw_stage == AC_HW_HULL_SHADER && options->has_ls_vgpr_init_bug) {
+         if (info->hw_stage == AC_HW_HULL_SHADER && options->compiler_info->has_ls_vgpr_init_bug) {
             /* We don't want load_vb_descs() to write vcc. */
             assert(program->dev.sgpr_limit <= vcc.reg());
 
@@ -625,11 +640,20 @@ select_vs_prolog(Program* program, const struct aco_vs_prolog_info* pinfo, ac_sh
       continue_pc = Operand(prolog_input, s2);
    }
 
+   /* Wait for all pending VMEM loads when the prolog loads large 64-bit
+    * attributes because the vertex shader isn't required to consume all of
+    * them and they might be overwritten. This isn't the most optimal solution
+    * but 64-bit vertex attributes are rarely used.
+    */
+   if (is_last_attr_large)
+      wait_for_vmem_loads(bld);
+
    bld.sop1(aco_opcode::s_setpc_b64, continue_pc);
 
    program->config->float_mode = program->blocks[0].fp_mode.val;
    program->config->num_vgprs = std::min<uint16_t>(get_vgpr_alloc(program, num_vgprs), 256);
    program->config->num_sgprs = get_sgpr_alloc(program, num_sgprs);
+   program->progress = CompilationProgress::after_lower_to_hw;
 }
 
 } // namespace aco

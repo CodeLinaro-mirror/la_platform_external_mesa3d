@@ -374,7 +374,7 @@ ir3_nir_lower_to_explicit_input(nir_shader *shader,
     * HS uses a different primitive id, which starts at bit 16 in the header
     */
    if (shader->info.stage == MESA_SHADER_TESS_CTRL &&
-       v->compiler->tess_use_shared)
+       v->compiler->info->props.tess_use_shared)
       state.local_primitive_id_start = 16;
 
    nir_function_impl *impl = nir_shader_get_entrypoint(shader);
@@ -569,14 +569,8 @@ lower_tess_ctrl_block(nir_block *block, nir_builder *b, struct state *state)
 
          nir_def *address, *offset;
 
-         /* note if vectorization of the tess level loads ever happens:
-          * "ldg" across 16-byte boundaries can behave incorrectly if results
-          * are never used. most likely some issue with (sy) not properly
-          * syncing with values coming from a second memory transaction.
-          */
          gl_varying_slot location = nir_intrinsic_io_semantics(intr).location;
          if (is_tess_levels(location)) {
-            assert(intr->def.num_components == 1);
             address = load_tess_factor_base(b);
             offset = build_tessfactor_base(
                b, location, nir_intrinsic_component(intr), state);
@@ -607,8 +601,6 @@ lower_tess_ctrl_block(nir_block *block, nir_builder *b, struct state *state)
          if (is_tess_levels(location)) {
             uint32_t inner_levels, outer_levels, levels;
             tess_level_components(state, &inner_levels, &outer_levels);
-
-            assert(intr->src[0].ssa->num_components == 1);
 
             nir_if *nif = NULL;
             if (location != VARYING_SLOT_PRIMITIVE_ID) {
@@ -670,7 +662,13 @@ ir3_nir_lower_tess_ctrl(nir_shader *shader, struct ir3_shader_variant *v,
 
    build_primitive_map(shader, &state.map);
    memcpy(v->output_loc, state.map.loc, sizeof(v->output_loc));
-   v->output_size = state.map.stride;
+
+   /* Empirically, TCS outputs have to be aligned to 64 bytes,
+    * otherwise stale data may be read in rare cases. The exact
+    * reason is not clear, but tests and proprietary driver behavior
+    * strongly point at the need for 64 byte alignment.
+    */
+   v->output_size = ALIGN_POT(state.map.stride, 16);
 
    nir_function_impl *impl = nir_shader_get_entrypoint(shader);
    assert(impl);
@@ -759,14 +757,8 @@ lower_tess_eval_block(nir_block *block, nir_builder *b, struct state *state)
 
          nir_def *address, *offset;
 
-         /* note if vectorization of the tess level loads ever happens:
-          * "ldg" across 16-byte boundaries can behave incorrectly if results
-          * are never used. most likely some issue with (sy) not properly
-          * syncing with values coming from a second memory transaction.
-          */
          gl_varying_slot location = nir_intrinsic_io_semantics(intr).location;
          if (is_tess_levels(location)) {
-            assert(intr->def.num_components == 1);
             address = load_tess_factor_base(b);
             offset = build_tessfactor_base(
                b, location, nir_intrinsic_component(intr), state);
@@ -1030,14 +1022,14 @@ ir3_nir_lower_gs(nir_shader *shader)
       exec_list_push_tail(&state.new_outputs, &output->node);
 
       /* Rewrite the original output to be a shadow variable. */
-      var->name = ralloc_asprintf(var, "%s@gs-temp", output->name);
+      nir_variable_set_namef(shader, var, "%s@gs-temp", output->name);
       var->data.mode = nir_var_shader_temp;
 
       /* Clone the shadow variable to create the emit shadow variable that
        * we'll assign in the emit conditionals.
        */
       nir_variable *emit_output = nir_variable_clone(var, shader);
-      emit_output->name = ralloc_asprintf(var, "%s@emit-temp", output->name);
+      nir_variable_set_namef(shader, emit_output, "%s@emit-temp", output->name);
       exec_list_push_tail(&state.emit_outputs, &emit_output->node);
    }
 
@@ -1065,7 +1057,7 @@ ir3_nir_lower_gs(nir_shader *shader)
     * them to this new if statement, rather than emitting this code at every
     * return statement.
     */
-   assert(impl->end_block->predecessors->entries == 1);
+   assert(impl->end_block->predecessors.entries == 1);
    nir_block *block = nir_impl_last_block(impl);
    b.cursor = nir_after_block_before_jump(block);
 

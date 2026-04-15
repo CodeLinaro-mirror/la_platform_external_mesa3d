@@ -1,0 +1,109 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "pb_buffer_fenced_c_impl",
+    srcs: [
+        "pb_buffer_fenced.c",
+    ],
+}
+
+filegroup {
+    name: "pb_bufmgr_cache_c_impl",
+    srcs: [
+        "pb_bufmgr_cache.c",
+    ],
+}
+
+filegroup {
+    name: "pb_bufmgr_debug_c_impl",
+    srcs: [
+        "pb_bufmgr_debug.c",
+    ],
+}
+
+filegroup {
+    name: "pb_bufmgr_mm_c_impl",
+    srcs: [
+        "pb_bufmgr_mm.c",
+    ],
+}
+
+filegroup {
+    name: "pb_bufmgr_slab_c_impl",
+    srcs: [
+        "pb_bufmgr_slab.c",
+    ],
+}
+
+filegroup {
+    name: "pb_cache_c_impl",
+    srcs: [
+        "pb_cache.c",
+    ],
+}
+
+filegroup {
+    name: "pb_validate_c_impl",
+    srcs: [
+        "pb_validate.c",
+    ],
+}
+
+cc_library_headers {
+    name: "pb_buffer_fenced_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "pb_buffer_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "pb_bufmgr_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "pb_cache_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "pb_validate_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}

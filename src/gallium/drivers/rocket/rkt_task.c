@@ -101,7 +101,7 @@ fill_task(struct rkt_ml_subgraph *subgraph,
 
    task->input_height = operation->input_height;
    task->input_channels =
-      ALIGN(MAX2(operation->input_channels, FEATURE_ATOMIC_SIZE),
+      align(MAX2(operation->input_channels, FEATURE_ATOMIC_SIZE),
             FEATURE_ATOMIC_SIZE);
    task->input_channels_real = operation->input_channels;
    task->input_zero_point = operation->input_zero_point;
@@ -111,11 +111,11 @@ fill_task(struct rkt_ml_subgraph *subgraph,
    task->output_height = operation->output_height;
 
    task->output_channels_real = operation->output_channels;
-   task->output_channels = ALIGN(MAX2(operation->output_channels, 32), 32);
+   task->output_channels = align(MAX2(operation->output_channels, 32), 32);
    if (operation->depthwise) {
       if (task->output_channels_real <= 32)
          task->output_channels *= 2;
-      task->output_channels = ALIGN(task->output_channels, 64);
+      task->output_channels = align(task->output_channels, 64);
    }
 
    task->output_zero_point = operation->output_zero_point;
@@ -170,7 +170,7 @@ fill_task(struct rkt_ml_subgraph *subgraph,
    if (operation->depthwise)
       task->weights_kernels = 1;
    else
-      task->weights_kernels = ALIGN(operation->output_channels, 2);
+      task->weights_kernels = align(operation->output_channels, 2);
 
    task->surfaces_per_row = task->output_width * task->output_height * 2;
    if (operation->depthwise)
@@ -223,7 +223,7 @@ rkt_split_tasks(struct rkt_ml_subgraph *subgraph,
 
       task.atomic_count = task.output_width * task.output_height;
 
-      util_dynarray_append(&operation->tasks, struct split_task, task);
+      util_dynarray_append(&operation->tasks, task);
 
       return;
    }
@@ -244,7 +244,7 @@ rkt_split_tasks(struct rkt_ml_subgraph *subgraph,
    task.pad_left = pad_left;
    task.pad_right = pad_right;
 
-   util_dynarray_append(&operation->tasks, struct split_task, task);
+   util_dynarray_append(&operation->tasks, task);
 
    for (unsigned slice = operation->weights_height - pad_top - 1;
         slice < operation->input_height;) {
@@ -273,12 +273,12 @@ rkt_split_tasks(struct rkt_ml_subgraph *subgraph,
       if (task.bottom_slice >= operation->input_height - 1) {
          task.bottom_slice = operation->input_height - 1;
          task.pad_bottom = pad_bottom;
-         util_dynarray_append(&operation->tasks, struct split_task, task);
+         util_dynarray_append(&operation->tasks, task);
          break;
       }
 
       slice = task.top_slice + operation->weights_height - 1;
-      util_dynarray_append(&operation->tasks, struct split_task, task);
+      util_dynarray_append(&operation->tasks, task);
    }
 
    struct split_task *last_task = util_dynarray_element(

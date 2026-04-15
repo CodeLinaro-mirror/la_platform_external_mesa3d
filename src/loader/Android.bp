@@ -1,21 +1,21 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * Submit patches, do not hand-edit.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
 cc_library_headers {
-    name: "mesa_loader_headers",
+    name: "inc_loader",
     vendor: true,
     host_supported: true,
     export_include_dirs: [
@@ -23,28 +23,103 @@ cc_library_headers {
     ],
 }
 
+cc_defaults {
+    name: "loader_c_args",
+    vendor: true,
+    host_supported: true,
+    cflags: [
+        "-DUSE_DRICONF",
+    ],
+}
+
+cc_defaults {
+    name: "loader_c_flags",
+    vendor: true,
+    host_supported: true,
+    cflags: [
+        "-DXXH_FORCE_ALIGN_CHECK=0",
+        "-DXXH_FORCE_MEMORY_ACCESS=0",
+    ],
+}
+
+cc_defaults {
+    name: "loader_cpp_flags",
+    vendor: true,
+    host_supported: true,
+    cppflags: [
+        "-DXXH_FORCE_ALIGN_CHECK=0",
+        "-DXXH_FORCE_MEMORY_ACCESS=0",
+    ],
+}
+
 cc_library_static {
-    name: "mesa_loader",
+    name: "loader",
+    vendor: true,
+    c_std: "c11",
+    cpp_std: "c++17",
     host_supported: true,
     defaults: [
-        "mesa_common_defaults",
-    ],
-    generated_headers: [
-        "git_sha1_header",
-        "u_format_gen_header",
+        "aosp_mesa3d_c_link_args",
+        "aosp_mesa3d_c_project_args",
+        "aosp_mesa3d_cpp_link_args",
+        "aosp_mesa3d_cpp_project_args",
+        "loader_c_args",
+        "loader_c_flags",
+        "loader_cpp_flags",
     ],
     header_libs: [
-        "mesa_util_headers",
-        "mesa_gallium_headers",
+        "inc_gallium",
+        "inc_include",
+        "inc_src",
+        "inc_util",
+        "inc_util_c11",
+    ] + select(os(), {
+        "android": [
+            "hwvulkan_headers",
+        ],
+        default: [],
+    }),
+    generated_headers: [
+        "git_sha1.h",
+        "shader_stats.h",
+        "u_format_gen.h",
     ],
     srcs: [
         "loader.c",
         "loader_dri_helper.c",
     ],
     static_libs: [
+        "blake3",
         "mesa_util",
-    ],
+        "mesa_util_c11",
+        "mesa_util_simd",
+    ] + select((os(), soong_config_variable("aosp_mesa3d", "perfetto")), {
+        ("android", "true"): [
+            "libperfetto_client_experimental",
+        ],
+        (default, default): [],
+    }) + select(arch(), {
+        "x86_64": [
+            "mesa_util_clflush",
+            "mesa_util_clflushopt",
+        ],
+        "x86": [
+            "mesa_util_clflush",
+            "mesa_util_clflushopt",
+        ],
+        default: [],
+    }),
     shared_libs: [
         "libdrm",
-    ],
+        "libzstd",
+    ] + select(os(), {
+        "android": [
+            "libcutils",
+            "libhardware",
+            "liblog",
+            "libnativewindow",
+            "libsync",
+        ],
+        default: [],
+    }),
 }

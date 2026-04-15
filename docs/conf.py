@@ -141,9 +141,14 @@ linkcheck_ignore = [
     r'https://github.com/.*#.*',  # needs JS eval
     r'https://www.intel.com/.*',  # intel.com is blocking the linkcheck user-agent; maybe it can be customized to look like a browser?
     r'https://sourceforge.net/.*',  # blocking the linkcheck user-agent
-    r'https://.*\.sourceforge\.net/.*',  # blocking the linkcheck user-agent
+    r'https://.*\.sourceforge\.(net|io)/.*',  # blocking the linkcheck user-agent
     r'https://stackoverflow.com/.*',  # blocking the linkcheck user-agent
     r'https://(www|dev)\.vulkan\.org/.*',  # blocking the linkcheck user-agent
+    r'https://crates.io/.*',  # blocking the linkcheck user-agent
+    r'https://docs.vulkan.org/.*',  # blocking the linkcheck user-agent
+    r'https://wikis.khronos.org/.*',  # blocking the linkcheck user-agent
+    r'https://en.wikipedia.org/.*',  # rate-limited, which linkcheck doesn't respect
+    r'https://www.freedesktop.org/.*',  # protected by anubis
 ]
 linkcheck_exclude_documents = [r'relnotes/.*']
 
@@ -226,6 +231,7 @@ graphviz_output_format = 'svg'
 
 hawkmoth_root = os.path.abspath(os.pardir)
 mesa_root = os.path.join(os.path.dirname(__file__), os.pardir)
+mesa_build_root = os.environ.get('MESA_BUILD_ROOT')
 hawkmoth_clang = [
     '-I{}/docs/header-stubs/'.format(mesa_root),
     '-I{}/include/'.format(mesa_root),
@@ -233,6 +239,8 @@ hawkmoth_clang = [
     '-I{}/src/gallium/include/'.format(mesa_root),
     '-I{}/src/intel/'.format(mesa_root),
     '-I{}/src/mesa/'.format(mesa_root),
+    '-I{}/src/vulkan/util'.format(mesa_root),
+    '-I{}/src/'.format(mesa_build_root),
     '-DHAVE_STRUCT_TIMESPEC',
     '-DHAVE_PTHREAD',
     '-DHAVE_ENDIAN_H',

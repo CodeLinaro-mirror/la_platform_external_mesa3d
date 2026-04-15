@@ -270,7 +270,7 @@ fetch_pipeline_generic(struct draw_pt_middle_end *middle,
     */
    if (fpme->opt & PT_SHADE) {
       draw_vertex_shader_run(vshader,
-                             draw->pt.user.constants[PIPE_SHADER_VERTEX],
+                             draw->pt.user.constants[MESA_SHADER_VERTEX],
                              fetch_info,
                              vert_info,
                              &vs_vert_info);
@@ -285,7 +285,7 @@ fetch_pipeline_generic(struct draw_pt_middle_end *middle,
 
    if ((fpme->opt & PT_SHADE) && gshader) {
       draw_geometry_shader_run(gshader,
-                               draw->pt.user.constants[PIPE_SHADER_GEOMETRY],
+                               draw->pt.user.constants[MESA_SHADER_GEOMETRY],
                                vert_info,
                                prim_info,
                                &vshader->info,
@@ -338,6 +338,15 @@ fetch_pipeline_generic(struct draw_pt_middle_end *middle,
     */
    draw_pt_so_emit(fpme->so_emit, num_vertex_streams, vert_info, prim_info);
 
+   /* rasterization stream selection */
+   if ((fpme->opt & PT_SHADE) && gshader) {
+      unsigned rs = draw->rasterizer->rasterization_stream;
+      if (rs < gshader->num_vertex_streams) {
+         vert_info = &gs_vert_info[rs];
+         prim_info = &gs_prim_info[rs];
+      }
+   }
+
    draw_stats_clipper_primitives(draw, prim_info);
 
    /*
@@ -358,7 +367,12 @@ fetch_pipeline_generic(struct draw_pt_middle_end *middle,
          emit(fpme->emit, vert_info, prim_info);
       }
    }
-   FREE(vert_info->verts);
+   if ((fpme->opt & PT_SHADE) && gshader) {
+      for (unsigned i = 0; i < gshader->num_vertex_streams; i++)
+         FREE(gs_vert_info[i].verts);
+   } else {
+      FREE(vert_info->verts);
+   }
    if (free_prim_info) {
       FREE(prim_info->primitive_lengths);
    }

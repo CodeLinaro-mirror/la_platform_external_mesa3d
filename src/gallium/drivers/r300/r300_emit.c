@@ -69,6 +69,9 @@ void r300_emit_dsa_state(struct r300_context* r300, unsigned size, void* state)
     bool is_r500 = r300->screen->caps.is_r500;
     CS_LOCALS(r300);
     uint32_t alpha_func = dsa->alpha_function;
+    bool force_query_z =
+        r300->query_current &&
+        (!fb->zsbuf.texture || !dsa->dsa.depth_enabled);
 
     /* Choose the alpha ref value between 8-bit (FG_ALPHA_FUNC.AM_VAL) and
      * 16-bit (FG_ALPHA_VALUE). */
@@ -89,6 +92,27 @@ void r300_emit_dsa_state(struct r300_context* r300, unsigned size, void* state)
         /* Always set 3/6, it improves precision even for 2x and 4x MSAA. */
         alpha_func |= R300_FG_ALPHA_FUNC_MASK_ENABLE |
                       R300_FG_ALPHA_FUNC_CFG_3_OF_6;
+    }
+
+    if (force_query_z) {
+        uint32_t z_buffer_control = dsa->z_buffer_control | R300_Z_ENABLE;
+        uint32_t z_stencil_control = dsa->z_stencil_control;
+
+        z_stencil_control &= ~(R300_ZS_MASK << R300_Z_FUNC_SHIFT);
+        z_stencil_control |= R300_ZS_ALWAYS << R300_Z_FUNC_SHIFT;
+
+        BEGIN_CS(size);
+        OUT_CS_REG(R300_FG_ALPHA_FUNC, alpha_func);
+        OUT_CS_REG_SEQ(R300_ZB_CNTL, 3);
+        OUT_CS(z_buffer_control);
+        OUT_CS(z_stencil_control);
+        OUT_CS(dsa->stencil_ref_mask);
+        if (is_r500) {
+            OUT_CS_REG(R500_ZB_STENCILREFMASK_BF, dsa->stencil_ref_bf);
+            OUT_CS_REG(R500_FG_ALPHA_VALUE, dsa->alpha_value);
+        }
+        END_CS;
+        return;
     }
 
     BEGIN_CS(size);
@@ -639,17 +663,49 @@ void r300_emit_fb_state_pipelined(struct r300_context *r300,
 void r300_emit_query_start(struct r300_context *r300, unsigned size, void*state)
 {
     struct r300_query *query = r300->query_current;
+    struct pipe_framebuffer_state *fb =
+        (struct pipe_framebuffer_state *)r300->fb_state.state;
+    struct r300_surface *surf = NULL;
+    bool use_dummy_z = false;
+    unsigned dwords = 4;
     CS_LOCALS(r300);
 
     if (!query)
 	return;
 
-    BEGIN_CS(size);
+    /* If there is no depth buffer, bind a temporary dummy one to satisfy
+     * ZPASS accounting and the CS checker.
+     */
+    if (fb && !fb->zsbuf.texture && fb->nr_cbufs) {
+        struct pipe_surface *cb = r300_get_nonnull_cb(r300, fb, 0);
+
+        if (cb) {
+            surf = r300_surface(cb);
+            use_dummy_z = true;
+        }
+    }
+
+    if (use_dummy_z) {
+        dwords += 10;
+    }
+
+    BEGIN_CS(dwords);
     if (r300->screen->caps.family == CHIP_RV530) {
         OUT_CS_REG(RV530_FG_ZBREG_DEST, RV530_FG_ZBREG_DEST_PIPE_SELECT_ALL);
     } else {
         OUT_CS_REG(R300_SU_REG_DEST, R300_RASTER_PIPE_SELECT_ALL);
     }
+
+    if (use_dummy_z) {
+        OUT_CS_REG(R300_ZB_FORMAT, R300_DEPTHFORMAT_16BIT_INT_Z);
+
+        OUT_CS_REG(R300_ZB_DEPTHOFFSET, 0);
+        OUT_CS_RELOC(surf);
+
+        OUT_CS_REG(R300_ZB_DEPTHPITCH, 4 | R300_DEPTHMICROTILE_TILED_SQUARE);
+        OUT_CS_RELOC(surf);
+    }
+
     OUT_CS_REG(R300_ZB_ZPASS_DATA, 0);
     END_CS;
     query->begin_emitted = true;
@@ -859,24 +915,50 @@ void r300_emit_sample_mask(struct r300_context *r300,
     END_CS;
 }
 
+void r300_emit_guardband_state(struct r300_context *r300,
+                               unsigned size, void *state)
+{
+    struct r300_guardband_state *guard = (struct r300_guardband_state *)state;
+    CS_LOCALS(r300);
+
+    if (!guard)
+        return;
+
+    BEGIN_CS(size);
+    OUT_CS_REG_SEQ(R300_VAP_GB_VERT_CLIP_ADJ, 4);
+    OUT_CS_32F(guard->vert_clip);
+    OUT_CS_32F(guard->vert_disc);
+    OUT_CS_32F(guard->horz_clip);
+    OUT_CS_32F(guard->horz_disc);
+    END_CS;
+}
+
 void r300_emit_scissor_state(struct r300_context* r300,
                              unsigned size, void* state)
 {
     struct pipe_scissor_state* scissor = (struct pipe_scissor_state*)state;
+    struct pipe_scissor_state final = r300->viewport_scissor;
     CS_LOCALS(r300);
+
+    if (r300->scissor_enabled && scissor) {
+        final.minx = MAX2(final.minx, scissor->minx);
+        final.miny = MAX2(final.miny, scissor->miny);
+        final.maxx = MIN2(final.maxx, scissor->maxx);
+        final.maxy = MIN2(final.maxy, scissor->maxy);
+    }
 
     BEGIN_CS(size);
     OUT_CS_REG_SEQ(R300_SC_CLIPRECT_TL_0, 2);
     if (r300->screen->caps.is_r500) {
-        OUT_CS((scissor->minx << R300_CLIPRECT_X_SHIFT) |
-               (scissor->miny << R300_CLIPRECT_Y_SHIFT));
-        OUT_CS(((scissor->maxx - 1) << R300_CLIPRECT_X_SHIFT) |
-               ((scissor->maxy - 1) << R300_CLIPRECT_Y_SHIFT));
+        OUT_CS((final.minx << R300_CLIPRECT_X_SHIFT) |
+               (final.miny << R300_CLIPRECT_Y_SHIFT));
+        OUT_CS(((final.maxx - 1) << R300_CLIPRECT_X_SHIFT) |
+               ((final.maxy - 1) << R300_CLIPRECT_Y_SHIFT));
     } else {
-        OUT_CS(((scissor->minx + 1440) << R300_CLIPRECT_X_SHIFT) |
-               ((scissor->miny + 1440) << R300_CLIPRECT_Y_SHIFT));
-        OUT_CS(((scissor->maxx + 1440-1) << R300_CLIPRECT_X_SHIFT) |
-               ((scissor->maxy + 1440-1) << R300_CLIPRECT_Y_SHIFT));
+        OUT_CS(((final.minx + 1440) << R300_CLIPRECT_X_SHIFT) |
+               ((final.miny + 1440) << R300_CLIPRECT_Y_SHIFT));
+        OUT_CS(((final.maxx + 1440-1) << R300_CLIPRECT_X_SHIFT) |
+               ((final.maxy + 1440-1) << R300_CLIPRECT_Y_SHIFT));
     }
     END_CS;
 }

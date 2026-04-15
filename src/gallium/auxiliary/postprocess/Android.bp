@@ -1,0 +1,129 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "pp_celshade_c_impl",
+    srcs: [
+        "pp_celshade.c",
+    ],
+}
+
+filegroup {
+    name: "pp_colors_c_impl",
+    srcs: [
+        "pp_colors.c",
+    ],
+}
+
+filegroup {
+    name: "pp_init_c_impl",
+    srcs: [
+        "pp_init.c",
+    ],
+}
+
+filegroup {
+    name: "pp_mlaa_c_impl",
+    srcs: [
+        "pp_mlaa.c",
+    ],
+}
+
+filegroup {
+    name: "pp_program_c_impl",
+    srcs: [
+        "pp_program.c",
+    ],
+}
+
+filegroup {
+    name: "pp_run_c_impl",
+    srcs: [
+        "pp_run.c",
+    ],
+}
+
+cc_library_headers {
+    name: "filters_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "postprocess_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "pp_celshade_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "pp_colors_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "pp_filters_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "pp_mlaa_areamap_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "pp_mlaa_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "pp_private_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}

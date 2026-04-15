@@ -2,25 +2,7 @@
  * Copyright (C) 2017-2019 Alyssa Rosenzweig
  * Copyright (C) 2017-2019 Connor Abbott
  * Copyright (C) 2019 Collabora, Ltd.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 
 #include "genxml/gen_macros.h"
@@ -65,7 +47,7 @@ static void
 pandecode_attributes(struct pandecode_context *ctx, uint64_t addr, int count,
                      bool varying, enum mali_job_type job_type)
 {
-   char *prefix = varying ? "Varying" : "Attribute";
+   char *prefix = varying ? "Varying Buffer" : "Attribute Buffer";
    assert(addr);
 
    if (!count) {
@@ -521,13 +503,17 @@ pandecode_indexed_vertex_job(struct pandecode_context *ctx,
 
    pandecode_log(ctx, "Vertex:\n");
    pan_section_unpack(p, INDEXED_VERTEX_JOB, VERTEX_DRAW, vert_draw);
+   ctx->indent++;
    GENX(pandecode_dcd)(ctx, &vert_draw, h->type, gpu_id);
    DUMP_UNPACKED(ctx, DRAW, vert_draw, "Vertex Draw:\n");
+   ctx->indent--;
 
    pandecode_log(ctx, "Fragment:\n");
    pan_section_unpack(p, INDEXED_VERTEX_JOB, FRAGMENT_DRAW, frag_draw);
+   ctx->indent++;
    GENX(pandecode_dcd)(ctx, &frag_draw, MALI_JOB_TYPE_FRAGMENT, gpu_id);
    DUMP_UNPACKED(ctx, DRAW, frag_draw, "Fragment Draw:\n");
+   ctx->indent--;
 
    pan_section_unpack(p, INDEXED_VERTEX_JOB, TILER, tiler_ptr);
    pandecode_log(ctx, "Tiler Job Payload:\n");

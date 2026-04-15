@@ -9,6 +9,7 @@ libteflon = shared_library(
   dependencies : [
     driver_etnaviv,
     driver_rocket,
+    driver_ethosu,
     idep_nir,
     idep_mesautil,
   ],
@@ -44,6 +45,6 @@ if with_tests
     tflite_flatbuffer_h,
     dependencies : [ idep_mesautil, idep_gtest ],
     link_with : [ tensorflow_lite ],
-    include_directories : [ inc_include ],
+    include_directories : [ inc_include, inc_util ],
   )
 endif

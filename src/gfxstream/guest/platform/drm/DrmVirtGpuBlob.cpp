@@ -43,7 +43,7 @@ DrmVirtGpuResource::DrmVirtGpuResource(int64_t deviceHandle, uint32_t blobHandle
 }
 
 DrmVirtGpuResource::~DrmVirtGpuResource() {
-    if (mBlobHandle == INVALID_DESCRIPTOR) {
+    if (mBlobHandle == static_cast<uint32_t>(INVALID_DESCRIPTOR)) {
         return;
     }
 
@@ -97,7 +97,7 @@ VirtGpuResourceMappingPtr DrmVirtGpuResource::createMapping() {
     }
 
     uint8_t* ptr = static_cast<uint8_t*>(
-        mmap64(nullptr, mSize, PROT_WRITE | PROT_READ, MAP_SHARED, mDeviceHandle, map.offset));
+        mmap(nullptr, mSize, PROT_WRITE | PROT_READ, MAP_SHARED, mDeviceHandle, map.offset));
 
     if (ptr == MAP_FAILED) {
         mesa_loge("mmap64 failed with (%s)", strerror(errno));

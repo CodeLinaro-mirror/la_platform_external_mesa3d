@@ -2,7 +2,6 @@ spec@!opengl 1.0@rasterpos,Fail
 spec@!opengl 1.0@rasterpos@glsl_vs_gs_linked,Fail
 spec@!opengl 1.0@rasterpos@glsl_vs_tes_linked,Fail
 spec@!opengl 1.1@line-smooth-stipple,Fail
-spec@!opengl es 3.0@gles-3.0-transform-feedback-uniform-buffer-object,Fail
 spec@arb_fragment_layer_viewport@layer-gs-writes-out-of-range,Fail
 spec@arb_program_interface_query@arb_program_interface_query-getprogramresourceindex,Fail
 spec@arb_program_interface_query@arb_program_interface_query-getprogramresourceindex@'vs_input2[1][0]' on GL_PROGRAM_INPUT,Fail
@@ -10,13 +9,11 @@ spec@arb_shader_texture_lod@execution@arb_shader_texture_lod-texgradcube,Fail
 spec@arb_shading_language_packing@execution@built-in-functions@fs-packhalf2x16,Fail
 spec@arb_shading_language_packing@execution@built-in-functions@vs-packhalf2x16,Fail
 spec@arb_tessellation_shader@arb_tessellation_shader-tes-gs-max-output -small -scan 1 50,Fail
-spec@arb_viewport_array@display-list,Fail
 spec@egl 1.4@eglterminate then unbind context,Fail
 spec@egl_khr_surfaceless_context@viewport,Fail
 spec@ext_external_objects@vk-image-display,Crash
 spec@ext_external_objects@vk-semaphores,Crash
 spec@ext_external_objects@vk-semaphores-2,Crash
-spec@glsl-es-1.00@linker@glsl-mismatched-uniform-precision-unused,Fail
 spec@glsl-es-3.00@execution@built-in-functions@fs-packhalf2x16,Fail
 spec@glsl-es-3.00@execution@built-in-functions@vs-packhalf2x16,Fail
 spec@khr_texture_compression_astc@miptree-gles srgb-fp,Fail
@@ -413,7 +410,3 @@ KHR-GL46.sparse_texture2_tests.UncommittedRegionsAccess_texture_cube_map_r32i,Fa
 KHR-GL46.sparse_texture2_tests.UncommittedRegionsAccess_texture_2d_multisample_r32ui,Fail
 KHR-GL46.sparse_texture2_tests.StandardPageSizesTestCase_texture_1d_array_r32ui,Fail
 KHR-GL46.sparse_texture2_tests.UncommittedRegionsAccess_texture_2d_array_rg16f,Fail
-
-# New failures with GL CTS 4.6.6.0
-KHR-GL46.es_31_compatibility.shader_image_load_store.basic-allFormats-store-fs,Fail
-KHR-GL46.direct_state_access.vertex_arrays_vertex_buffers_errors,Fail

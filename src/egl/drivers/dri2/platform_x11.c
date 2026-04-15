@@ -51,6 +51,7 @@
 #include "util/log.h"
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/ipc.h>
 #include "x11_dri3.h"
 #include "x11_display.h"
 #include "kopper_interface.h"
@@ -706,9 +707,9 @@ dri2_x11_kopper_swap_buffers_with_damage(_EGLDisplay *disp, _EGLSurface *draw,
 
    /* swrast path unsupported for now */
    if (numRects)
-      kopperSwapBuffersWithDamage(dri2_surf->dri_drawable, __DRI2_FLUSH_INVALIDATE_ANCILLARY, numRects, rects);
+      kopperSwapBuffersWithDamage(dri2_surf->dri_drawable, __DRI2_FLUSH_CONTEXT | __DRI2_FLUSH_INVALIDATE_ANCILLARY, numRects, rects);
    else
-      kopperSwapBuffers(dri2_surf->dri_drawable, __DRI2_FLUSH_INVALIDATE_ANCILLARY);
+      kopperSwapBuffers(dri2_surf->dri_drawable, __DRI2_FLUSH_CONTEXT | __DRI2_FLUSH_INVALIDATE_ANCILLARY);
 
    /* If the X11 window has been resized, vkQueuePresentKHR() or
     * vkAcquireNextImageKHR() may return VK_ERROR_SURFACE_LOST or
@@ -874,6 +875,8 @@ dri2_x11_get_msc_rate(_EGLDisplay *display, _EGLSurface *surface,
     * We defaulted to the first CRTC in the list's refresh rate, earlier.
     */
 
+   free(reply);
+
    return EGL_TRUE;
 }
 
@@ -994,8 +997,6 @@ kopperSetSurfaceCreateInfo(void *_draw, struct kopper_loader_info *ci)
       dri2_egl_display(dri2_surf->base.Resource.Display);
    VkXcbSurfaceCreateInfoKHR *xcb = (VkXcbSurfaceCreateInfoKHR *)&ci->bos;
 
-   if (dri2_surf->base.Type != EGL_WINDOW_BIT)
-      return;
    xcb->sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
    xcb->pNext = NULL;
    xcb->flags = 0;
@@ -1069,8 +1070,6 @@ dri2_get_xcb_connection(_EGLDisplay *disp, struct dri2_egl_display *dri2_dpy)
       screen = dri2_find_screen_for_display(disp, screen);
    } else if (disp->Platform == _EGL_PLATFORM_X11) {
       Display *dpy = disp->PlatformDisplay;
-      if (!x11_xlib_display_is_thread_safe(dpy))
-         return EGL_FALSE;
       dri2_dpy->conn = XGetXCBConnection(dpy);
       screen = DefaultScreen(dpy);
    } else {
@@ -1122,37 +1121,6 @@ dri2_x11_setup_swap_interval(_EGLDisplay *disp)
       arbitrary_max_interval = 1;
 
    dri2_setup_swap_interval(disp, arbitrary_max_interval);
-}
-
-static bool
-check_xshm(struct dri2_egl_display *dri2_dpy)
-{
-   xcb_void_cookie_t cookie;
-   xcb_generic_error_t *error;
-   int ret = true;
-   xcb_query_extension_cookie_t shm_cookie;
-   xcb_query_extension_reply_t *shm_reply;
-   bool has_mit_shm;
-
-   shm_cookie = xcb_query_extension(dri2_dpy->conn, 7, "MIT-SHM");
-   shm_reply = xcb_query_extension_reply(dri2_dpy->conn, shm_cookie, NULL);
-
-   has_mit_shm = shm_reply && shm_reply->present;
-   free(shm_reply);
-   if (!has_mit_shm)
-      return false;
-
-   cookie = xcb_shm_detach_checked(dri2_dpy->conn, 0);
-   if ((error = xcb_request_check(dri2_dpy->conn, cookie))) {
-      /* BadRequest means we're a remote client. If we were local we'd
-       * expect BadValue since 'info' has an invalid segment name.
-       */
-      if (error->error_code == BadRequest)
-         ret = false;
-      free(error);
-   }
-
-   return ret;
 }
 
 static bool
@@ -1221,7 +1189,7 @@ dri2_initialize_x11_swrast(_EGLDisplay *disp)
 {
    struct dri2_egl_display *dri2_dpy = dri2_egl_display(disp);
 
-   if (check_xshm(dri2_dpy)) {
+   if (x11_xcb_display_supports_xshm(dri2_dpy->conn)) {
       dri2_dpy->loader_extensions = swrast_loader_shm_extensions;
    } else {
       dri2_dpy->loader_extensions = swrast_loader_extensions;

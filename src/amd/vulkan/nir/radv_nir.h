@@ -18,13 +18,13 @@ extern "C" {
 
 typedef struct nir_shader nir_shader;
 struct radeon_info;
-struct radv_pipeline_layout;
 struct radv_shader_stage;
 struct radv_shader_info;
 struct radv_shader_args;
 struct radv_shader_layout;
 struct radv_device;
 struct radv_graphics_state_key;
+struct radv_ps_epilog_key;
 
 bool radv_nir_apply_pipeline_layout(nir_shader *shader, struct radv_device *device,
                                     const struct radv_shader_stage *stage);
@@ -79,6 +79,8 @@ bool radv_nir_lower_draw_id_to_zero(nir_shader *shader);
 
 bool radv_nir_remap_color_attachment(nir_shader *shader, const struct radv_graphics_state_key *gfx_state);
 
+bool radv_nir_trim_fs_color_exports(nir_shader *shader, const struct radv_ps_epilog_key *epilog_key);
+
 bool radv_nir_lower_printf(nir_shader *shader);
 
 typedef struct radv_nir_opt_tid_function_options {
@@ -96,7 +98,15 @@ typedef struct radv_nir_opt_tid_function_options {
 
 bool radv_nir_opt_tid_function(nir_shader *shader, const radv_nir_opt_tid_function_options *options);
 
-bool radv_nir_opt_fs_builtins(nir_shader *shader, const struct radv_graphics_state_key *gfx_state);
+bool radv_nir_opt_fs_builtins(nir_shader *shader, const struct radv_graphics_state_key *gfx_state,
+                              unsigned vgt_outprim_type);
+
+bool radv_nir_lower_immediate_samplers(nir_shader *shader, struct radv_device *device,
+                                       const struct radv_shader_stage *stage);
+
+void radv_nir_lower_callee_signature(nir_function *function);
+
+bool radv_nir_lower_call_abi(nir_shader *shader, unsigned wave_size);
 
 #ifdef __cplusplus
 }

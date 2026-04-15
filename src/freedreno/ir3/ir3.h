@@ -26,6 +26,7 @@ struct ir3_compiler;
 struct ir3;
 struct ir3_instruction;
 struct ir3_block;
+struct linear_context;
 
 struct ir3_info {
    /* Size in bytes of the shader binary, including NIR constants and
@@ -41,6 +42,7 @@ struct ir3_info {
    uint16_t nops_count;   /* # of nop instructions, including nopN */
    uint16_t mov_count;
    uint16_t cov_count;
+   uint16_t loops;
    uint16_t stp_count;
    uint16_t ldp_count;
    /* NOTE: max_reg, etc, does not include registers not touched
@@ -191,6 +193,12 @@ typedef enum ir3_register_flags {
     * dummy src and dst of prefetch sam/ldc/resinfo.
     */
    IR3_REG_DUMMY = BIT(23),
+
+   /* Used to mark predicate registers as uniform. Uniform predicate registers
+    * can be written by the scalar ALU but can only be read as a vector, needing
+    * (ss) to synchronize like any scalar ALU result.
+    */
+   IR3_REG_UNIFORM = BIT(24),
 } ir3_register_flags;
 
 struct ir3_register {
@@ -396,6 +404,22 @@ typedef enum ir3_instruction_flags {
     * their sources.
     */
    IR3_INSTR_IMM_OFFSET = BIT(21),
+
+   /* a7xx, set on a nop after all cat6 */
+   IR3_INSTR_EOLM = BIT(22),
+
+   /* a7xx, set on a nop after all cat5/cat6 */
+   IR3_INSTR_EOGM = BIT(23),
+
+   /* Residency ChecK. Returns if the equivalent access would've accesssed a
+    * non-resident page. Only allowed for cat5 texture loads and ldib.
+    */
+   IR3_INSTR_RCK = BIT(24),
+
+   /* Clamp computed LOD using the given minimum. Only for cat5. */
+   IR3_INSTR_CLP = BIT(25),
+
+   IR3_INSTR_EOSTSC = BIT(26),
 } ir3_instruction_flags;
 
 struct ir3_instruction {
@@ -422,6 +446,7 @@ struct ir3_instruction {
          type_t src_type, dst_type;
          round_t round;
          reduce_op_t reduce_op;
+         uint16_t r[2];
       } cat1;
       struct {
          enum {
@@ -449,6 +474,10 @@ struct ir3_instruction {
          unsigned tex_base : 3;
          unsigned cluster_size : 4;
          type_t type;
+         enum {
+            IR3_MATCH_MODE_SAD = 0, /* Sum of Absolute Difference */
+            IR3_MATCH_MODE_SSD = 1, /* Sum of Squared Differences */
+         } match_mode; /* for block matching textures */
       } cat5;
       struct {
          type_t type;
@@ -587,22 +616,12 @@ struct ir3_instruction {
 
    /* List of this instruction's repeat group. Vectorized NIR instructions are
     * emitted as multiple scalar instructions that are linked together using
-    * this field. After RA, the ir3_combine_rpt pass iterates these groups and,
-    * if the register assignment allows it, merges them into a (rptN)
+    * these fields. After RA, the ir3_combine_rpt pass iterates these groups
+    * and, if the register assignment allows it, merges them into a (rptN)
     * instruction.
-    *
-    * NOTE: this is not a typical list as there is no empty list head. The list
-    * head is stored in the first instruction of the repeat group so also refers
-    * to a list entry. In order to distinguish the list's first entry, we use
-    * serialno: instructions in a repeat group are always emitted consecutively
-    * so the first will have the lowest serialno.
-    *
-    * As this is not a typical list, we have to be careful with using the
-    * existing list helper. For example, using list_length on the first
-    * instruction will yield one less than the number of instructions in its
-    * group.
     */
-   struct list_head rpt_node;
+   struct ir3_instruction *rpt_prev;
+   struct ir3_instruction *rpt_next;
 
    uint32_t serialno;
 
@@ -619,7 +638,12 @@ struct ir3_instruction_rpt {
 
 struct ir3 {
    struct ir3_compiler *compiler;
-   gl_shader_stage type;
+   mesa_shader_stage type;
+
+   /* Ralloc linear context we use for instructions and regs, to reduce
+    * allocation overhead and pack better than using ralloc directly.
+    */
+   struct linear_ctx *lin_ctx;
 
    DECLARE_ARRAY(struct ir3_instruction *, inputs);
 
@@ -728,7 +752,18 @@ struct ir3_block {
 
    uint16_t start_ip, end_ip;
 
+   /**
+    * Is the block a reconvergence point within a wave:
+    */
    bool reconvergence_point;
+
+   /**
+    * If the block is not a recoverngence point within a wave, it may
+    * still be a point where parallel waves recoverge.  This should
+    * be considered for (jp) marking and branchstack, but need not be
+    * considered for constructing physical edges for uGPR allocation.
+    */
+   bool wave_reconvergence_point;
 
    bool in_early_preamble;
 
@@ -751,10 +786,6 @@ struct ir3_block {
    uint32_t dom_post_index;
 
    uint32_t loop_depth;
-
-#if MESA_DEBUG
-   uint32_t serialno;
-#endif
 };
 
 enum ir3_cursor_option {
@@ -776,15 +807,7 @@ struct ir3_builder {
    struct ir3_cursor cursor;
 };
 
-static inline uint32_t
-block_id(struct ir3_block *block)
-{
-#if MESA_DEBUG
-   return block->serialno;
-#else
-   return (uint32_t)(unsigned long)block;
-#endif
-}
+uint32_t block_id(struct ir3_block *block);
 
 static inline struct ir3_block *
 ir3_start_block(struct ir3 *ir)
@@ -844,6 +867,7 @@ unsigned ir3_block_get_pred_index(struct ir3_block *block,
 
 void ir3_calc_dominance(struct ir3 *ir);
 bool ir3_block_dominates(struct ir3_block *a, struct ir3_block *b);
+struct ir3_block *ir3_dominance_lca(struct ir3_block *b1, struct ir3_block *b2);
 
 struct ir3_shader_variant;
 
@@ -1289,58 +1313,6 @@ is_input(struct ir3_instruction *instr)
    }
 }
 
-/* Whether non-helper invocations can read the value of helper invocations. We
- * cannot insert (eq) before these instructions.
- */
-static inline bool
-uses_helpers(struct ir3_instruction *instr)
-{
-   switch (instr->opc) {
-   /* These require helper invocations to be present */
-   case OPC_SAMB:
-   case OPC_GETLOD:
-   case OPC_DSX:
-   case OPC_DSY:
-   case OPC_DSXPP_1:
-   case OPC_DSYPP_1:
-   case OPC_DSXPP_MACRO:
-   case OPC_DSYPP_MACRO:
-   case OPC_QUAD_SHUFFLE_BRCST:
-   case OPC_QUAD_SHUFFLE_HORIZ:
-   case OPC_QUAD_SHUFFLE_VERT:
-   case OPC_QUAD_SHUFFLE_DIAG:
-   case OPC_META_TEX_PREFETCH:
-      return true;
-
-   /* sam requires helper invocations except for dummy prefetch instructions */
-   case OPC_SAM:
-      return !has_dummy_dst(instr);
-
-   /* Subgroup operations don't require helper invocations to be present, but
-    * will use helper invocations if they are present.
-    */
-   case OPC_BALLOT_MACRO:
-   case OPC_ANY_MACRO:
-   case OPC_ALL_MACRO:
-   case OPC_READ_FIRST_MACRO:
-   case OPC_READ_COND_MACRO:
-   case OPC_MOVMSK:
-   case OPC_BRCST_ACTIVE:
-      return true;
-
-   /* Catch lowered READ_FIRST/READ_COND. For elect, don't include the getone
-    * in the preamble because it doesn't actually matter which fiber is
-    * selected.
-    */
-   case OPC_MOV:
-   case OPC_ELECT_MACRO:
-      return instr->flags & IR3_INSTR_NEEDS_HELPERS;
-
-   default:
-      return false;
-   }
-}
-
 static inline bool
 is_bool(struct ir3_instruction *instr)
 {
@@ -1723,104 +1695,44 @@ ir3_cat2_int(opc_t opc)
 }
 
 /* map cat2 instruction to valid abs/neg flags: */
-static inline unsigned
-ir3_cat2_absneg(opc_t opc)
-{
-   switch (opc) {
-   case OPC_ADD_F:
-   case OPC_MIN_F:
-   case OPC_MAX_F:
-   case OPC_MUL_F:
-   case OPC_SIGN_F:
-   case OPC_CMPS_F:
-   case OPC_ABSNEG_F:
-   case OPC_CMPV_F:
-   case OPC_FLOOR_F:
-   case OPC_CEIL_F:
-   case OPC_RNDNE_F:
-   case OPC_RNDAZ_F:
-   case OPC_TRUNC_F:
-   case OPC_BARY_F:
-      return IR3_REG_FABS | IR3_REG_FNEG;
-
-   case OPC_ADD_U:
-   case OPC_ADD_S:
-   case OPC_SUB_U:
-   case OPC_SUB_S:
-   case OPC_CMPS_U:
-   case OPC_CMPS_S:
-   case OPC_MIN_U:
-   case OPC_MIN_S:
-   case OPC_MAX_U:
-   case OPC_MAX_S:
-   case OPC_CMPV_U:
-   case OPC_CMPV_S:
-   case OPC_MUL_U24:
-   case OPC_MUL_S24:
-   case OPC_MULL_U:
-   case OPC_CLZ_S:
-      return 0;
-
-   case OPC_ABSNEG_S:
-      return IR3_REG_SABS | IR3_REG_SNEG;
-
-   case OPC_AND_B:
-   case OPC_OR_B:
-   case OPC_NOT_B:
-   case OPC_XOR_B:
-   case OPC_BFREV_B:
-   case OPC_CLZ_B:
-   case OPC_SHL_B:
-   case OPC_SHR_B:
-   case OPC_ASHR_B:
-   case OPC_MGEN_B:
-   case OPC_GETBIT_B:
-   case OPC_CBITS_B:
-      return IR3_REG_BNOT;
-
-   default:
-      return 0;
-   }
-}
+unsigned ir3_cat2_absneg(opc_t opc);
 
 /* map cat3 instructions to valid abs/neg flags: */
-static inline unsigned
-ir3_cat3_absneg(opc_t opc, unsigned src_n)
+unsigned ir3_cat3_absneg(struct ir3_compiler *compiler, opc_t opc,
+                         unsigned src_n);
+
+static inline bool
+ir3_cat3_int(opc_t opc)
 {
    switch (opc) {
    case OPC_MAD_F16:
    case OPC_MAD_F32:
    case OPC_SEL_F16:
    case OPC_SEL_F32:
-      return IR3_REG_FNEG;
-
-   case OPC_SAD_S16:
-   case OPC_SAD_S32:
-      return src_n == 1 ? IR3_REG_SNEG : 0;
-
+      return false;
    case OPC_MAD_U16:
    case OPC_MADSH_U16:
    case OPC_MAD_S16:
    case OPC_MADSH_M16:
    case OPC_MAD_U24:
    case OPC_MAD_S24:
-   case OPC_SEL_S16:
-   case OPC_SEL_S32:
-      /* neg *may* work on 3rd src.. */
-
    case OPC_SEL_B16:
    case OPC_SEL_B32:
-
+   case OPC_SEL_S16:
+   case OPC_SEL_S32:
+   case OPC_SAD_S16:
+   case OPC_SAD_S32:
    case OPC_SHRM:
    case OPC_SHLM:
    case OPC_SHRG:
    case OPC_SHLG:
    case OPC_ANDG:
+   case OPC_DP2ACC:
+   case OPC_DP4ACC:
    case OPC_WMM:
    case OPC_WMM_ACCU:
-
    default:
-      return 0;
+      return true;
    }
 }
 
@@ -2025,6 +1937,18 @@ ir3_src_is_first_in_group(struct ir3_register *src)
 #define foreach_src_in_alias_group(__alias, __instr, __start)                  \
    foreach_src_in_alias_group_n (__alias, __alias_n, __instr, __start)
 
+static inline unsigned
+ir3_alias_group_size(struct ir3_instruction *instr, unsigned src_n)
+{
+   unsigned size = 0;
+
+   foreach_src_in_alias_group (src, instr, src_n) {
+      size++;
+   }
+
+   return size;
+}
+
 /* iterator for an instructions's destinations (reg), also returns dst #: */
 #define foreach_dst_n(__dstreg, __n, __instr)                                  \
    if ((__instr)->dsts_count)                                                  \
@@ -2110,22 +2034,20 @@ __ssa_srcp_n(struct ir3_instruction *instr, unsigned n)
 /* Iterate over all instructions in a repeat group. */
 #define foreach_instr_rpt(__rpt, __instr)                                      \
    if (assert(ir3_instr_is_first_rpt(__instr)), true)                          \
-      for (struct ir3_instruction *__rpt = __instr, *__first = __instr;        \
-           __first || __rpt != __instr;                                        \
-           __first = NULL, __rpt =                                             \
-                              list_entry(__rpt->rpt_node.next,                 \
-                                         struct ir3_instruction, rpt_node))
+      for (struct ir3_instruction *__rpt = __instr; __rpt;                     \
+           __rpt = __rpt->rpt_next)
 
 /* Iterate over all instructions except the first one in a repeat group. */
 #define foreach_instr_rpt_excl(__rpt, __instr)                                 \
    if (assert(ir3_instr_is_first_rpt(__instr)), true)                          \
-      list_for_each_entry (struct ir3_instruction, __rpt, &__instr->rpt_node,  \
-                           rpt_node)
+      for (struct ir3_instruction *__rpt = __instr->rpt_next; __rpt;           \
+           __rpt = __rpt->rpt_next)
 
 #define foreach_instr_rpt_excl_safe(__rpt, __instr)                            \
-   if (assert(ir3_instr_is_first_rpt(__instr)), true)                          \
-      list_for_each_entry_safe (struct ir3_instruction, __rpt,                 \
-                                &__instr->rpt_node, rpt_node)
+   if (assert(ir3_instr_is_first_rpt(__instr)), __instr->rpt_next)             \
+      for (struct ir3_instruction *__rpt = __instr->rpt_next,                  \
+                                  *__next = __rpt->rpt_next;                   \
+           __rpt; __rpt = __next, __next = __next ? __next->rpt_next : NULL)
 
 /* iterators for blocks: */
 #define foreach_block(__block, __list)                                         \
@@ -2189,7 +2111,7 @@ static inline bool
 is_ss_producer(struct ir3_instruction *instr)
 {
    foreach_dst (dst, instr) {
-      if (dst->flags & IR3_REG_SHARED)
+      if (dst->flags & (IR3_REG_SHARED | IR3_REG_UNIFORM))
          return true;
    }
 
@@ -2249,14 +2171,18 @@ is_sy_producer(struct ir3_instruction *instr)
       is_atomic(instr->opc);
 }
 
+static inline bool
+is_compute_or_frag(mesa_shader_stage type)
+{
+   return mesa_shader_stage_is_compute(type) || (type == MESA_SHADER_FRAGMENT);
+}
+
 static inline unsigned
 soft_sy_delay(struct ir3_instruction *instr, struct ir3 *shader)
 {
    /* TODO: this is just an optimistic guess, we can do better post-RA.
     */
-   bool double_wavesize =
-      shader->type == MESA_SHADER_FRAGMENT ||
-      shader->type == MESA_SHADER_COMPUTE;
+   bool double_wavesize = is_compute_or_frag(shader->type);
 
    unsigned components = reg_elems(instr->dsts[0]);
 
@@ -3306,27 +3232,21 @@ static inline bool
 __regmask_get(regmask_t *regmask, enum ir3_reg_file file, unsigned n, unsigned size)
 {
    BITSET_WORD *regs = __regmask_file(regmask, file);
-   for (unsigned i = 0; i < size; i++) {
-      if (BITSET_TEST(regs, n + i))
-         return true;
-   }
-   return false;
+   return BITSET_TEST_COUNT(regs, n, size);
 }
 
 static inline void
 __regmask_set(regmask_t *regmask, enum ir3_reg_file file, unsigned n, unsigned size)
 {
    BITSET_WORD *regs = __regmask_file(regmask, file);
-   for (unsigned i = 0; i < size; i++)
-      BITSET_SET(regs, n + i);
+   BITSET_SET_COUNT(regs, n, size);
 }
 
 static inline void
 __regmask_clear(regmask_t *regmask, enum ir3_reg_file file, unsigned n, unsigned size)
 {
    BITSET_WORD *regs = __regmask_file(regmask, file);
-   for (unsigned i = 0; i < size; i++)
-      BITSET_CLEAR(regs, n + i);
+   BITSET_CLEAR_COUNT(regs, n, size);
 }
 
 static inline void
@@ -3360,7 +3280,8 @@ regmask_or_shared(regmask_t *dst, regmask_t *a, regmask_t *b)
 }
 
 static inline void
-regmask_set(regmask_t *regmask, struct ir3_register *reg)
+regmask_set_masked(regmask_t *regmask, struct ir3_register *reg,
+                   unsigned wrmask)
 {
    unsigned size = reg_elem_size(reg);
    enum ir3_reg_file file;
@@ -3369,10 +3290,16 @@ regmask_set(regmask_t *regmask, struct ir3_register *reg)
    if (reg->flags & IR3_REG_RELATIV) {
       __regmask_set(regmask, file, n, size * reg->size);
    } else {
-      for (unsigned mask = reg->wrmask; mask; mask >>= 1, n += size)
+      for (unsigned mask = reg->wrmask & wrmask; mask; mask >>= 1, n += size)
          if (mask & 1)
             __regmask_set(regmask, file, n, size);
    }
+}
+
+static inline void
+regmask_set(regmask_t *regmask, struct ir3_register *reg)
+{
+   regmask_set_masked(regmask, reg, ~0);
 }
 
 static inline void
@@ -3407,6 +3334,12 @@ regmask_get(regmask_t *regmask, struct ir3_register *reg)
                return true;
    }
    return false;
+}
+
+static inline bool
+regmask_get_any_shared(regmask_t *regmask)
+{
+   return BITSET_TEST_RANGE(regmask->shared, 0, 2 * SHARED_REG_SIZE);
 }
 /* ************************************************************************* */
 

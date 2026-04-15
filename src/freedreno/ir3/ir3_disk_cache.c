@@ -37,7 +37,7 @@ ir3_disk_cache_init(struct ir3_compiler *compiler)
    const struct build_id_note *note =
       build_id_find_nhdr_for_addr(ir3_disk_cache_init);
    unsigned build_id_len = build_id_length(note);
-   assert(note && build_id_len == 20); /* sha1 */
+   assert(note && build_id_len == BUILD_ID_EXPECTED_HASH_LENGTH); /* sha1 */
 
    const uint8_t *id_sha1 = build_id_data(note);
    assert(id_sha1);
@@ -50,7 +50,7 @@ ir3_disk_cache_init(struct ir3_compiler *compiler)
                      sizeof(compiler->options.uche_trap_base));
    _mesa_sha1_final(&ctx, sha1);
 
-   char timestamp[41];
+   char timestamp[SHA1_DIGEST_STRING_LENGTH];
    _mesa_sha1_format(timestamp, sha1);
 
    uint64_t driver_flags = ir3_shader_debug_hash_key();
@@ -61,7 +61,7 @@ void
 ir3_disk_cache_init_shader_key(struct ir3_compiler *compiler,
                                struct ir3_shader *shader)
 {
-   if (!compiler->disk_cache)
+   if (!compiler->disk_cache && !ir3_shader_bisect_need_shader_key())
       return;
 
    struct mesa_sha1 ctx;
@@ -128,7 +128,7 @@ retrieve_variant(struct blob_reader *blob, struct ir3_shader_variant *v)
       blob_copy_bytes(blob, v->const_state, sizeof(*v->const_state));
    }
 
-   if (!v->compiler->load_shader_consts_via_preamble) {
+   if (!v->compiler->info->props.load_shader_consts_via_preamble) {
       v->imm_state.size = blob_read_uint32(blob);
       v->imm_state.count = v->imm_state.size;
       uint32_t immeds_sz = v->imm_state.size * sizeof(v->imm_state.values[0]);
@@ -157,7 +157,7 @@ store_variant(struct blob *blob, const struct ir3_shader_variant *v)
    /* When load_shader_consts_via_preamble, immediates are loaded in the
     * preamble and hence part of bin.
     */
-   if (!v->compiler->load_shader_consts_via_preamble) {
+   if (!v->compiler->info->props.load_shader_consts_via_preamble) {
       blob_write_uint32(blob, v->imm_state.size);
       uint32_t immeds_sz = v->imm_state.size * sizeof(v->imm_state.values[0]);
       blob_write_bytes(blob, v->imm_state.values, immeds_sz);
@@ -225,7 +225,7 @@ ir3_disk_cache_retrieve(struct ir3_shader *shader,
    compute_variant_key(shader, v, cache_key);
 
    if (debug) {
-      char sha1[41];
+      char sha1[SHA1_DIGEST_STRING_LENGTH];
       _mesa_sha1_format(sha1, cache_key);
       fprintf(stderr, "[mesa disk cache] retrieving variant %s: ", sha1);
    }
@@ -264,7 +264,7 @@ ir3_disk_cache_store(struct ir3_shader *shader,
    compute_variant_key(shader, v, cache_key);
 
    if (debug) {
-      char sha1[41];
+      char sha1[SHA1_DIGEST_STRING_LENGTH];
       _mesa_sha1_format(sha1, cache_key);
       fprintf(stderr, "[mesa disk cache] storing variant %s\n", sha1);
    }

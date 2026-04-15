@@ -93,6 +93,8 @@ d3d12_resource_destroy(struct pipe_screen *pscreen,
       util_range_destroy(&resource->valid_buffer_range);
    if (resource->bo)
       d3d12_bo_unreference(resource->bo);
+   if (resource->logicop_texture)
+      pipe_resource_reference(&resource->logicop_texture, NULL);
    FREE(resource);
 }
 
@@ -352,6 +354,9 @@ init_texture(struct d3d12_screen *screen,
             D3D12_HEAP_FLAG_CREATE_NOT_RESIDENT : D3D12_HEAP_FLAG_NONE;
          init_residency = screen->support_create_not_resident ? d3d12_evicted : d3d12_resident;
 
+         if (templ->bind & PIPE_BIND_SHARED)
+            heap_flags |= D3D12_HEAP_FLAG_SHARED;
+
          hres = screen->dev10->CreateCommittedResource3(&heap_pris,
                                                         heap_flags,
                                                         &desc1,
@@ -379,6 +384,9 @@ init_texture(struct d3d12_screen *screen,
          D3D12_HEAP_FLAGS heap_flags = screen->support_create_not_resident ?
             D3D12_HEAP_FLAG_CREATE_NOT_RESIDENT : D3D12_HEAP_FLAG_NONE;
          init_residency = screen->support_create_not_resident ? d3d12_evicted : d3d12_resident;
+
+         if (templ->bind & PIPE_BIND_SHARED)
+            heap_flags |= D3D12_HEAP_FLAG_SHARED;
 
          hres = screen->dev->CreateCommittedResource(&heap_pris,
                                                      heap_flags,
@@ -576,7 +584,7 @@ d3d12_resource_from_handle(struct pipe_screen *pscreen,
 
          if (FAILED(hr)) {
             debug_printf("d3d12: Error %x - Couldn't export incoming resource com_obj "
-                         "(%p) via shared NT handle.\n", hr, handle->com_obj);
+                         "(%p) via shared NT handle.\n", (unsigned)hr, handle->com_obj);
             return NULL;
          }
       }
@@ -596,11 +604,18 @@ d3d12_resource_from_handle(struct pipe_screen *pscreen,
    if (res->bo) {
       d3d12_res = res->bo->res;
    } else if (handle->type == WINSYS_HANDLE_TYPE_D3D12_RES) {
+#ifdef _GAMING_XBOX
       if (handle->modifier == 1) {
          d3d12_heap = (ID3D12Heap *) handle->com_obj;
       } else {
          d3d12_res = (ID3D12Resource *) handle->com_obj;
       }
+#else
+      IUnknown *obj = (IUnknown *) handle->com_obj;
+      (void)obj->QueryInterface(&d3d12_res);
+      (void)obj->QueryInterface(&d3d12_heap);
+      obj->Release();
+#endif
    } else {
       screen->dev->OpenSharedHandle(d3d_handle, IID_PPV_ARGS(&d3d12_res));
    }
@@ -953,13 +968,17 @@ static constexpr unsigned d3d12_max_planes = 3;
  * Get stride and offset for the given pipe resource without the need to get
  * a winsys_handle.
  */
-void
-d3d12_resource_get_info(struct pipe_screen *pscreen,
-                        struct pipe_resource *pres,
-                        unsigned *stride,
-                        unsigned *offset)
+static bool
+d3d12_resource_get_param(struct pipe_screen *pscreen,
+                         struct pipe_context *context,
+                         struct pipe_resource *pres,
+                         unsigned plane,
+                         unsigned layer,
+                         unsigned level,
+                         enum pipe_resource_param param,
+                         unsigned handle_usage,
+                         uint64_t *value)
 {
-
    struct d3d12_resource* res = d3d12_resource(pres);
    unsigned num_planes = util_format_get_num_planes(res->overall_format);
 
@@ -978,12 +997,33 @@ d3d12_resource_get_info(struct pipe_screen *pscreen,
       &staging_res_size
    );
 
-   if(stride) {
-      *stride = strides[res->plane_slice];
-   }
+   switch (param) {
+   case PIPE_RESOURCE_PARAM_NPLANES:
+      *value = num_planes;
+      return true;
 
-   if(offset) {
-      *offset = offsets[res->plane_slice];
+   case PIPE_RESOURCE_PARAM_STRIDE:
+      *value = strides[res->plane_slice];
+      return true;
+
+   case PIPE_RESOURCE_PARAM_OFFSET:
+      *value = offsets[res->plane_slice];
+      return true;
+
+   case PIPE_RESOURCE_PARAM_LAYER_STRIDE:
+      *value = layer_strides[res->plane_slice];
+      return true;
+
+   case PIPE_RESOURCE_PARAM_DISJOINT_PLANES:
+      *value = num_planes > 1;
+      return true;
+
+   case PIPE_RESOURCE_PARAM_MODIFIER:
+   case PIPE_RESOURCE_PARAM_HANDLE_TYPE_SHARED:
+   case PIPE_RESOURCE_PARAM_HANDLE_TYPE_KMS:
+   case PIPE_RESOURCE_PARAM_HANDLE_TYPE_FD:
+   default:
+      return false;
    }
 }
 
@@ -1037,12 +1077,17 @@ d3d12_memobj_create_from_handle(struct pipe_screen *pscreen, struct winsys_handl
    }
    memobj->base.dedicated = dedicated;
 
+#ifdef _GAMING_XBOX
    obj->AddRef();
    if (handle->modifier == 1) {
       memobj->heap = (ID3D12Heap *) obj;
    } else {
       memobj->res = (ID3D12Resource *) obj;
    }
+#else
+   (void)obj->QueryInterface(&memobj->heap);
+   (void)obj->QueryInterface(&memobj->res);
+#endif
 
    obj->Release();
    if (!memobj->res && !memobj->heap) {
@@ -1090,7 +1135,9 @@ d3d12_resource_from_memobj(struct pipe_screen *pscreen,
 
    whandle.offset = static_cast<unsigned int>(offset);
    whandle.format = templ->format;
+#ifdef _GAMING_XBOX
    whandle.modifier = memobj->res ? 0 : 1;
+#endif
 
    // WINSYS_HANDLE_TYPE_D3D12_RES implies taking ownership of the reference
    ((IUnknown *)whandle.com_obj)->AddRef();
@@ -1104,7 +1151,7 @@ d3d12_screen_resource_init(struct pipe_screen *pscreen)
    pscreen->resource_from_handle = d3d12_resource_from_handle;
    pscreen->resource_get_handle = d3d12_resource_get_handle;
    pscreen->resource_destroy = d3d12_resource_destroy;
-   pscreen->resource_get_info = d3d12_resource_get_info;
+   pscreen->resource_get_param = d3d12_resource_get_param;
 
    pscreen->memobj_create_from_handle = d3d12_memobj_create_from_handle;
    pscreen->memobj_destroy = d3d12_memobj_destroy;
@@ -1166,11 +1213,11 @@ fill_buffer_location(struct d3d12_context *ctx,
       buf_loc.PlacedFootprint.Footprint.Height = res->base.b.height0;
       buf_loc.PlacedFootprint.Footprint.Depth = res->base.b.depth0;
    } else {
-      buf_loc.PlacedFootprint.Footprint.Width = ALIGN(trans->base.b.box.width,
+      buf_loc.PlacedFootprint.Footprint.Width = align(trans->base.b.box.width,
                                                       util_format_get_blockwidth(res->base.b.format));
-      buf_loc.PlacedFootprint.Footprint.Height = ALIGN(trans->base.b.box.height,
+      buf_loc.PlacedFootprint.Footprint.Height = align(trans->base.b.box.height,
                                                        util_format_get_blockheight(res->base.b.format));
-      buf_loc.PlacedFootprint.Footprint.Depth = ALIGN(depth,
+      buf_loc.PlacedFootprint.Footprint.Depth = align(depth,
                                                       util_format_get_blockdepth(res->base.b.format));
    }
 
@@ -2028,4 +2075,43 @@ d3d12_context_resource_init(struct pipe_context *pctx)
    pctx->transfer_flush_region = u_default_transfer_flush_region;
    pctx->buffer_subdata = u_default_buffer_subdata;
    pctx->texture_subdata = u_default_texture_subdata;
+}
+
+static void
+d3d12_resource_init_logicop_texture(const void *data)
+{
+   struct d3d12_resource *res = (struct d3d12_resource *)data;
+   struct pipe_resource templ = {};
+   struct pipe_resource *src = &res->base.b;
+
+   templ.format = PIPE_FORMAT_R8G8B8A8_UNORM;
+   templ.width0 = src->width0;
+   templ.height0 = src->height0;
+   templ.depth0 = src->depth0;
+   templ.array_size = src->array_size;
+   templ.nr_samples = src->nr_samples;
+   templ.nr_storage_samples = src->nr_storage_samples;
+   templ.usage = PIPE_USAGE_STAGING;
+   templ.bind = src->bind;
+   templ.target = src->target;
+
+   res->logicop_texture = src->screen->resource_create(src->screen, &templ);
+}
+
+struct pipe_resource *
+d3d12_resource_get_logicop_texture(struct d3d12_resource *res)
+{
+   switch (res->dxgi_format) {
+   case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+   case DXGI_FORMAT_B8G8R8A8_UNORM:
+   case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+   case DXGI_FORMAT_B8G8R8X8_UNORM:
+   case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
+   case DXGI_FORMAT_B8G8R8X8_TYPELESS:
+      break;
+   default:
+      return &res->base.b;
+   }
+   util_call_once_data(&res->logicop_texture_init_flag, d3d12_resource_init_logicop_texture, res);
+   return res->logicop_texture;
 }

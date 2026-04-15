@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2025 The Android Open Source Project
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * Submit patches, do not hand-edit.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package {
@@ -19,69 +14,203 @@ package {
     default_applicable_licenses: ["external_mesa3d_license"],
 }
 
-cc_library_headers {
-    name: "mesa_lvp_frontend_headers",
-    host_supported: true,
+genrule {
+    name: "lvp_entrypoints_headers",
+    out: [
+        "lvp_entrypoints.h",
+    ],
+    srcs: [
+        ":vk_api_xml",
+    ],
+    tools: [
+        "vk_entrypoints_py_binary",
+    ],
+    cmd: "$(location vk_entrypoints_py_binary) --xml $(location :vk_api_xml) " +
+        "--proto --weak --out-h $(location lvp_entrypoints.h) --out-c " +
+        "$(genDir)/lvp_entrypoints.c --prefix lvp --beta false",
+}
+
+genrule {
+    name: "lvp_entrypoints_impl",
+    out: [
+        "lvp_entrypoints.c",
+    ],
+    srcs: [
+        ":vk_api_xml",
+    ],
+    tools: [
+        "vk_entrypoints_py_binary",
+    ],
+    cmd: "$(location vk_entrypoints_py_binary) --xml $(location :vk_api_xml) " +
+        "--proto --weak --out-h $(genDir)/lvp_entrypoints.h --out-c $(location " +
+        "lvp_entrypoints.c) --prefix lvp --beta false",
+}
+
+cc_defaults {
+    name: "lavapipe_st_c_flags",
     vendor: true,
-    export_include_dirs: [
-        ".",
+    host_supported: true,
+    cflags: [
+        "-DXXH_FORCE_ALIGN_CHECK=0",
+        "-DXXH_FORCE_MEMORY_ACCESS=0",
     ],
 }
 
-genrule {
-    name: "mesa_lvp_vk_entrypoints_header",
-    srcs: [":mesa_vulkan_xml"],
-    out: ["lvp_entrypoints.h"],
-    tools: ["vk_entrypoints_gen"],
-    cmd: "python3 $(location vk_entrypoints_gen) --xml " +
-        "$(location :mesa_vulkan_xml) --proto --weak --out-h " +
-        "$(location lvp_entrypoints.h) --out-c " +
-        "$(genDir)/placeholder.c --prefix lvp --beta false",
+cc_defaults {
+    name: "lavapipe_st_cpp_flags",
+    vendor: true,
+    host_supported: true,
+    cppflags: [
+        "-DXXH_FORCE_ALIGN_CHECK=0",
+        "-DXXH_FORCE_MEMORY_ACCESS=0",
+    ],
 }
 
-genrule {
-    name: "mesa_lvp_vk_entrypoints_impl",
-    srcs: [":mesa_vulkan_xml"],
-    out: ["lvp_entrypoints.c"],
-    tools: ["vk_entrypoints_gen"],
-    cmd: "python3 $(location vk_entrypoints_gen) --xml " +
-        "$(location :mesa_vulkan_xml) --proto --weak --out-h " +
-        "$(genDir)/lvp_entrypoints.h --out-c " +
-        "$(location lvp_entrypoints.c) --prefix lvp " +
-        "--beta false",
-}
-
-filegroup {
-    name: "mesa_lavapipe_files",
+cc_library_static {
+    name: "lavapipe_st",
+    vendor: true,
+    c_std: "c11",
+    cpp_std: "c++17",
+    host_supported: true,
+    defaults: [
+        "_trial_msvc",
+        "aosp_mesa3d_c_link_args",
+        "aosp_mesa3d_c_project_args",
+        "aosp_mesa3d_cpp_link_args",
+        "aosp_mesa3d_cpp_project_args",
+        "lavapipe_st_c_flags",
+        "lavapipe_st_cpp_flags",
+        "vulkan_wsi_list",
+    ],
+    header_libs: [
+        "inc_compiler",
+        "inc_gallium",
+        "inc_gallium_aux",
+        "inc_include",
+        "inc_llvmpipe",
+        "inc_nir",
+        "inc_src",
+        "inc_src_vulkan_runtime",
+        "inc_src_vulkan_runtime_bvh",
+        "inc_src_vulkan_util",
+        "inc_src_vulkan_wsi",
+        "inc_util",
+        "inc_util_c11",
+    ] + select(os(), {
+        "android": [
+            "hwvulkan_headers",
+        ],
+        default: [],
+    }),
+    generated_headers: [
+        "builtin_types.h",
+        "git_sha1.h",
+        "ir_expression_operation.h",
+        "lvp_entrypoints_headers",
+        "nir_builder_opcodes.h",
+        "nir_intrinsics.h",
+        "nir_intrinsics_indices.h",
+        "nir_opcodes.h",
+        "shader_stats.h",
+        "spirv_info_headers",
+        "u_format_gen.h",
+        "vk_cmd_enqueue_entrypoints_headers",
+        "vk_cmd_queue_headers",
+        "vk_common_entrypoints_headers",
+        "vk_dispatch_table_headers",
+        "vk_enum_to_str_headers",
+        "vk_extensions_headers",
+        "vk_physical_device_features_headers",
+        "vk_physical_device_properties_headers",
+        "vk_struct_type_cast",
+        "wsi_entrypoints_headers",
+    ],
+    generated_sources: [
+        "lvp_entrypoints_impl",
+    ],
     srcs: [
-        "nir/lvp_nir_lower_exec_graph.c",
-        "nir/lvp_nir_lower_input_attachments.c",
-        "nir/lvp_nir_lower_pipeline_layout.c",
-        "nir/lvp_nir_lower_ray_queries.c",
-        "nir/lvp_nir_lower_sparse_residency.c",
-        "nir/lvp_nir_opt_robustness.c",
-        "nir/lvp_nir_ray_tracing.c",
-        "lvp_cmd_buffer.c",
-        "lvp_formats.c",
-        "lvp_pipeline.c",
-        "lvp_device.c",
-        "lvp_image.c",
-        "lvp_ray_tracing_pipeline.c",
-        "lvp_pipeline_cache.c",
-        "lvp_util.c",
-        "lvp_pipe_sync.c",
-        "lvp_device_generated_commands.c",
-        "lvp_query.c",
-        "lvp_wsi.c",
-        "lvp_execute.c",
+        ":lvp_nir_lower_cooperative_matrix_c_impl",
+        ":lvp_nir_lower_exec_graph_c_impl",
+        ":lvp_nir_lower_input_attachments_c_impl",
+        ":lvp_nir_lower_pipeline_layout_c_impl",
+        ":lvp_nir_lower_ray_queries_c_impl",
+        ":lvp_nir_lower_sparse_residency_c_impl",
+        ":lvp_nir_opt_robustness_c_impl",
+        ":lvp_nir_ray_tracing_c_impl",
         "lvp_acceleration_structure.c",
+        "lvp_cmd_buffer.c",
         "lvp_descriptor_set.c",
-    ],
-}
-
-filegroup {
-    name: "mesa_lvp_android_files",
-    srcs: [
-        "lvp_android.c",
+        "lvp_device.c",
+        "lvp_device_generated_commands.c",
+        "lvp_execute.c",
+        "lvp_formats.c",
+        "lvp_image.c",
+        "lvp_pipe_sync.c",
+        "lvp_pipeline.c",
+        "lvp_pipeline_cache.c",
+        "lvp_query.c",
+        "lvp_ray_tracing_pipeline.c",
+        "lvp_util.c",
+        "lvp_wsi.c",
+    ] + select(os(), {
+        "android": [
+            "lvp_android.c",
+        ],
+        default: [],
+    }),
+    static_libs: [
+        "blake3",
+        "compiler",
+        "libLLVM16_swiftshader",
+        "mesa_util",
+        "mesa_util_c11",
+        "mesa_util_simd",
+        "nir",
+        "vtn",
+        "vulkan_instance",
+        "vulkan_lite_runtime",
+        "vulkan_runtime",
+        "vulkan_util",
+        "vulkan_wsi",
+        "xmlconfig",
+    ] + select((os(), soong_config_variable("aosp_mesa3d", "perfetto")), {
+        ("android", "true"): [
+            "libperfetto_client_experimental",
+        ],
+        (default, default): [],
+    }) + select(os(), {
+        "android": [
+            "_mesa_u_gralloc",
+        ],
+        default: [],
+    }) + select(arch(), {
+        "x86_64": [
+            "mesa_util_clflush",
+            "mesa_util_clflushopt",
+        ],
+        "x86": [
+            "mesa_util_clflush",
+            "mesa_util_clflushopt",
+        ],
+        default: [],
+    }),
+    shared_libs: [
+        "libdrm",
+        "libzstd",
+    ] + select(os(), {
+        "android": [
+            "libcutils",
+            "libhardware",
+            "liblog",
+            "libnativewindow",
+            "libsync",
+        ],
+        default: [],
+    }),
+    whole_static_libs: [
+        "vulkan_instance",
+        "vulkan_lite_runtime",
+        "vulkan_runtime",
+        "vulkan_wsi",
     ],
 }
