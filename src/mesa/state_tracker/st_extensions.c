@@ -301,11 +301,17 @@ void st_init_limits(struct pipe_screen *screen,
           */
          pc->MaxAtomicCounters = temp;
          pc->MaxAtomicBuffers = screen->get_shader_param(screen, sh, PIPE_SHADER_CAP_MAX_HW_ATOMIC_COUNTER_BUFFERS);
-      } else if (pc->MaxShaderStorageBlocks) {
+      } else if (pc->MaxShaderStorageBlocks &&
+                 !_mesa_is_api_gles2(api)) {
          pc->MaxAtomicCounters = MAX_ATOMIC_COUNTERS;
          /*
           * without separate atomic counters, reserve half of the available
           * SSBOs for atomic buffers, and the other half for normal SSBOs.
+          * On GLES, atomic_uint and atomicCounterIncrement/Decrement are
+          * GLES 3.1 core, so the guest can use native atomic counters without
+          * consuming SSBO slots.  Extended ARB ops (atomicCounterAdd etc.) are
+          * not available in GLES at all, so no SSBO reservation is needed for
+          * their emulation either.
           */
          pc->MaxAtomicBuffers = pc->MaxShaderStorageBlocks / 2;
          pc->MaxShaderStorageBlocks -= pc->MaxAtomicBuffers;
