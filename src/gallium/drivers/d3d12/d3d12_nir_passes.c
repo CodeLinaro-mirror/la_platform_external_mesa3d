@@ -27,7 +27,7 @@
 #include "nir_builtin_builder.h"
 #include "nir_deref.h"
 #include "nir_format_convert.h"
-#include "program/prog_instruction.h"
+#include "mesa/program/prog_statevars.h"
 #include "dxil_nir.h"
 
 /**
@@ -517,7 +517,7 @@ d3d12_lower_state_vars(nir_shader *nir, struct d3d12_shader *shader)
          nir->info.num_ubos = (uint8_t) state.binding + 1;
       ubo->data.binding = state.binding;
       ubo->num_state_slots = 1;
-      ubo->state_slots = ralloc_array(ubo, nir_state_slot, 1);
+      ubo->state_slots = ralloc_array(nir, nir_state_slot, 1);
       memcpy(ubo->state_slots[0].tokens, tokens,
               sizeof(ubo->state_slots[0].tokens));
 

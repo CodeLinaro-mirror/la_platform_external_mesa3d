@@ -461,6 +461,7 @@ batch_clear_tracking(struct fd_batch *batch, unsigned buffers) assert_dt
 
 static void
 fd_clear(struct pipe_context *pctx, unsigned buffers,
+         uint32_t color_clear_mask, uint8_t stencil_clear_mask,
          const struct pipe_scissor_state *scissor_state,
          const union pipe_color_union *color, double depth,
          unsigned stencil) in_dt
@@ -558,7 +559,7 @@ fd_launch_grid(struct pipe_context *pctx,
 {
    struct fd_context *ctx = fd_context(pctx);
    const struct fd_shaderbuf_stateobj *so =
-      &ctx->shaderbuf[PIPE_SHADER_COMPUTE];
+      &ctx->shaderbuf[MESA_SHADER_COMPUTE];
    struct fd_batch *batch, *save_batch = NULL;
 
    if (!fd_render_condition_check(pctx))
@@ -577,8 +578,8 @@ fd_launch_grid(struct pipe_context *pctx,
    u_foreach_bit (i, so->enabled_mask & ~so->writable_mask)
       resource_read(batch, so->sb[i].buffer);
 
-   u_foreach_bit (i, ctx->shaderimg[PIPE_SHADER_COMPUTE].enabled_mask) {
-      struct pipe_image_view *img = &ctx->shaderimg[PIPE_SHADER_COMPUTE].si[i];
+   u_foreach_bit (i, ctx->shaderimg[MESA_SHADER_COMPUTE].enabled_mask) {
+      struct pipe_image_view *img = &ctx->shaderimg[MESA_SHADER_COMPUTE].si[i];
       if (img->access & PIPE_IMAGE_ACCESS_WRITE)
          resource_written(batch, img->resource);
       else
@@ -586,12 +587,12 @@ fd_launch_grid(struct pipe_context *pctx,
    }
 
    /* UBO's are read */
-   u_foreach_bit (i, ctx->constbuf[PIPE_SHADER_COMPUTE].enabled_mask)
-      resource_read(batch, ctx->constbuf[PIPE_SHADER_COMPUTE].cb[i].buffer);
+   u_foreach_bit (i, ctx->constbuf[MESA_SHADER_COMPUTE].enabled_mask)
+      resource_read(batch, ctx->constbuf[MESA_SHADER_COMPUTE].cb[i].buffer);
 
    /* Mark textures as being read */
-   u_foreach_bit (i, ctx->tex[PIPE_SHADER_COMPUTE].valid_textures)
-      resource_read(batch, ctx->tex[PIPE_SHADER_COMPUTE].textures[i]->texture);
+   u_foreach_bit (i, ctx->tex[MESA_SHADER_COMPUTE].valid_textures)
+      resource_read(batch, ctx->tex[MESA_SHADER_COMPUTE].textures[i]->texture);
 
    /* For global buffers, we don't really know if read or written, so assume
     * the worst:

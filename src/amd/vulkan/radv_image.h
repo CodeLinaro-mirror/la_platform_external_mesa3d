@@ -64,6 +64,11 @@ struct radv_image {
     */
    uint64_t tc_compat_zrange_offset;
 
+   /* Metadata for the HiZ workaround on GFX12 with both depth and stencil planes. It's used to
+    * track whether HiZ metadata are in-sync with main image data, per-level.
+    */
+   uint64_t hiz_metadata_offset;
+
    /* For VK_ANDROID_native_buffer, the WSI image owns the memory, */
    VkDeviceMemory owned_memory;
 
@@ -126,6 +131,22 @@ static inline bool
 radv_dcc_enabled(const struct radv_image *image, unsigned level)
 {
    return radv_image_has_dcc(image) && level < image->planes[0].surface.num_meta_levels;
+}
+
+/**
+ * Return whether the image can compress DCC on image stores (GFX10+).
+ *
+ * Note that this can have mixed performance implications, see
+ * https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/6796#note_643299
+ *
+ * This function assumes the image uses DCC compression.
+ */
+static inline bool
+radv_image_compress_dcc_on_image_stores(const struct radv_device *device, const struct radv_image *image)
+{
+   const struct radv_physical_device *pdev = radv_device_physical(device);
+
+   return ac_surface_supports_dcc_image_stores(pdev->info.gfx_level, &image->planes[0].surface);
 }
 
 /**
@@ -194,16 +215,77 @@ radv_tc_compat_htile_enabled(const struct radv_image *image, unsigned level)
 static inline bool
 radv_image_tile_stencil_disabled(const struct radv_device *device, const struct radv_image *image)
 {
+   if (vk_format_has_stencil(image->vk.format))
+      return false;
+
    const struct radv_physical_device *pdev = radv_device_physical(device);
 
-   if (pdev->info.gfx_level >= GFX9) {
-      return !vk_format_has_stencil(image->vk.format) && !radv_image_has_vrs_htile(device, image);
-   } else {
-      /* Due to a hw bug, TILE_STENCIL_DISABLE must be set to 0 for
-       * the TC-compat ZRANGE issue even if no stencil is used.
-       */
-      return !vk_format_has_stencil(image->vk.format) && !radv_image_is_tc_compat_htile(image);
-   }
+   /* Need to use the base and delta Z encoding for the workaround. */
+   if (pdev->info.has_htile_tc_z_clear_bug_without_stencil && radv_image_is_tc_compat_htile(image))
+      return false;
+
+   return !radv_image_has_vrs_htile(device, image);
+}
+
+/**
+ * Return whether the image requires setting ZRANGE_PRECISION based on the last depth clear value to work around the
+ * hardware bug that may cause the HTILE depth clear value used by the TC to be changed.
+ */
+static inline bool
+radv_image_has_tc_compat_zrange_metadata(const struct radv_device *device, const struct radv_image *image)
+{
+   if (!radv_image_is_tc_compat_htile(image))
+      return false;
+
+   const struct radv_physical_device *pdev = radv_device_physical(device);
+
+   return radv_image_tile_stencil_disabled(device, image) ? pdev->info.has_htile_tc_z_clear_bug_without_stencil
+                                                          : pdev->info.has_htile_tc_z_clear_bug_with_stencil;
+}
+
+/**
+ * Return whether the image can decompress HTILE on image stores (ie. write the uncompressed DWORD
+ * to HTILE) when the descriptor sets COMPRESSION_EN=1.
+ */
+static inline bool
+radv_image_decompress_htile_on_image_stores(const struct radv_device *device, const struct radv_image *image)
+{
+   const struct radv_physical_device *pdev = radv_device_physical(device);
+
+   if (!radv_image_has_htile(image))
+      return false;
+
+   /* This is supported on GFX10-10.3 but according to PAL there are issues. */
+   if (pdev->info.gfx_level < GFX11)
+      return false;
+
+   /* Only single-sampled images are supported. */
+   if (image->vk.samples > 1)
+      return false;
+
+   /* Only depth or stencil (not both) images are supported. */
+   if (image->vk.aspects == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))
+      return false;
+
+   return true;
+}
+
+/**
+ * Return whether the image has HiZ for depth surfaces (GFX12).
+ */
+static inline bool
+radv_image_has_hiz(const struct radv_image *image)
+{
+   return image->planes[0].surface.flags & RADEON_SURF_Z_OR_SBUFFER && image->planes[0].surface.u.gfx9.zs.hiz.offset;
+}
+
+/**
+ * Return whether the image has HiZ metadata to implement a workaround (GFX12).
+ */
+static inline bool
+radv_image_has_hiz_metadata(const struct radv_image *image)
+{
+   return radv_image_has_hiz(image) && image->hiz_metadata_offset;
 }
 
 static inline bool
@@ -262,43 +344,40 @@ radv_get_ds_clear_value_va(const struct radv_image *image, uint32_t base_level)
    return va;
 }
 
+static inline uint64_t
+radv_get_hiz_metadata_va(const struct radv_image *image, uint32_t base_level)
+{
+   assert(image->hiz_metadata_offset != 0);
+
+   uint64_t va = image->bindings[0].addr;
+   va += image->hiz_metadata_offset + base_level * 4;
+   return va;
+}
+
 static inline uint32_t
 radv_get_htile_initial_value(const struct radv_device *device, const struct radv_image *image)
 {
-   uint32_t initial_value;
-
    if (radv_image_tile_stencil_disabled(device, image)) {
-      /* Z only (no stencil):
-       *
-       * |31     18|17      4|3     0|
-       * +---------+---------+-------+
-       * |  Max Z  |  Min Z  | ZMask |
-       */
-      initial_value = 0xfffc000f;
+      return HTILE_Z_UNCOMPRESSED;
    } else {
-      /* Z and stencil:
-       *
-       * |31       12|11 10|9    8|7   6|5   4|3     0|
-       * +-----------+-----+------+-----+-----+-------+
-       * |  Z Range  |     | SMem | SR1 | SR0 | ZMask |
-       *
-       * SR0/SR1 contains the stencil test results. Initializing
-       * SR0/SR1 to 0x3 means the stencil test result is unknown.
-       *
-       * Z, stencil and 4 bit VRS encoding:
-       * |31       12|11        10|9    8|7          6|5   4|3     0|
-       * +-----------+------------+------+------------+-----+-------+
-       * |  Z Range  | VRS y-rate | SMem | VRS x-rate | SR0 | ZMask |
-       */
       if (radv_image_has_vrs_htile(device, image)) {
-         /* Initialize the VRS x-rate value at 0, so the hw interprets it as 1 sample. */
-         initial_value = 0xfffff33f;
+         return HTILE_ZS_VRS_UNCOMPRESSED;
       } else {
-         initial_value = 0xfffff3ff;
+         return HTILE_ZS_UNCOMPRESSED;
       }
    }
+}
 
-   return initial_value;
+static inline uint32_t
+radv_gfx12_get_hiz_initial_value(void)
+{
+   const uint16_t zmin = 0;
+   const uint16_t zmax = 0xffff;
+
+   /* The first component is the minimum value accross the s-tile, and the second component is the
+    * maximum value.
+    */
+   return zmin | (zmax << 16);
 }
 
 static inline bool
@@ -312,8 +391,6 @@ radv_image_get_iterate256(const struct radv_device *device, struct radv_image *i
 
 bool radv_are_formats_dcc_compatible(const struct radv_physical_device *pdev, const void *pNext, VkFormat format,
                                      VkImageCreateFlags flags, bool *sign_reinterpret);
-
-bool radv_image_use_dcc_image_stores(const struct radv_device *device, const struct radv_image *image);
 
 bool radv_image_use_dcc_predication(const struct radv_device *device, const struct radv_image *image);
 
@@ -376,7 +453,7 @@ enum radv_fmask_compression radv_layout_fmask_compression(const struct radv_devi
 unsigned radv_image_queue_family_mask(const struct radv_image *image, enum radv_queue_family family,
                                       enum radv_queue_family queue_family);
 
-bool radv_image_is_renderable(const struct radv_device *device, const struct radv_image *image);
+bool radv_image_is_renderable(const struct radv_image *image);
 
 bool radv_image_is_l2_coherent(const struct radv_device *device, const struct radv_image *image,
                                const VkImageSubresourceRange *range);

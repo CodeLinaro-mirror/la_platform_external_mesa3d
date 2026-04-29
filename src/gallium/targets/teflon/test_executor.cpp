@@ -10,9 +10,6 @@
 #include <stdio.h>
 #include <vector>
 #include <gtest/gtest.h>
-#include <xtensor/xrandom.hpp>
-
-#include "util/macros.h"
 
 #include "tensorflow/lite/c/c_api.h"
 #include "tensorflow/lite/c/common.h"
@@ -21,18 +18,42 @@
 #include "test_executor.h"
 #include "tflite-schema-v2.15.0_generated.h"
 
+#include "util/os_misc.h"
+
 static float
 randf(float min, float max)
 {
    return ((max - min) * ((float)rand() / (float)RAND_MAX)) + min;
 }
 
+template<typename T>
+std::vector<T> rand(const std::vector<int>& shape, T min, T max) {
+    size_t size = 1;
+    for (int dim : shape) {
+        size *= dim;
+    }
+
+    std::vector<T> result(size);
+
+    if constexpr (std::is_integral<T>::value) {
+      std::vector<T> result(size);
+      std::generate(result.begin(), result.end(), [&]() { return rand() % (max - min + 1) + min; });
+      return result;
+    } else if constexpr (std::is_floating_point<T>::value) {
+      std::vector<T> result(size);
+      std::generate(result.begin(), result.end(), [&]() { return randf(-1.0, 1.0); });
+      return result;
+    }
+
+    return result;
+}
+
 static void
 read_model(const char *file_name, tflite::ModelT &model)
 {
    std::ostringstream file_path;
-   assert(getenv("TEFLON_TEST_DATA"));
-   file_path << getenv("TEFLON_TEST_DATA") << "/" << file_name;
+   assert(os_get_option("TEFLON_TEST_DATA"));
+   file_path << os_get_option("TEFLON_TEST_DATA") << "/" << file_name;
 
    FILE *f = fopen(file_path.str().c_str(), "rb");
    assert(f);
@@ -111,7 +132,7 @@ patch_conv2d(unsigned operation_index,
    bias_tensor->shape.data()[0] = output_channels;
 
    auto bias_data = &model->buffers[bias_buffer_index]->data;
-   xt::xarray<int32_t> bias_array = xt::random::randint<int32_t>({output_channels}, -20000, 20000);
+   std::vector<int32_t> bias_array = rand<int32_t>({output_channels}, -20000, 20000);
    bias_data->resize(bias_array.size() * sizeof(int32_t));
    memcpy(bias_data->data(), bias_array.data(), bias_array.size() * sizeof(int32_t));
 
@@ -140,7 +161,7 @@ patch_conv2d(unsigned operation_index,
    else
       weight_shape = {output_channels, weight_size, weight_size, input_channels};
 
-   xt::xarray<uint8_t> weights_array = xt::random::randint<uint8_t>(weight_shape, 0, 255);
+   std::vector<uint8_t> weights_array = rand<uint8_t>(weight_shape, 0, 255);
    weights_data->resize(weights_array.size());
    memcpy(weights_data->data(), weights_array.data(), weights_array.size());
 
@@ -250,6 +271,8 @@ add_generate_model(int input_size,
    return buf;
 }
 
+
+
 static void
 patch_fully_connected(unsigned operation_index,
                       tflite::ModelT *model,
@@ -287,7 +310,7 @@ patch_fully_connected(unsigned operation_index,
    bias_tensor->shape.data()[0] = output_channels;
 
    auto bias_data = &model->buffers[bias_buffer_index]->data;
-   xt::xarray<int32_t> bias_array = xt::random::randint<int32_t>({output_channels}, -20000, 20000);
+   std::vector<int32_t> bias_array = rand<int32_t>({output_channels}, -20000, 20000);
    bias_data->resize(bias_array.size() * sizeof(int32_t));
    memcpy(bias_data->data(), bias_array.data(), bias_array.size() * sizeof(int32_t));
 
@@ -302,7 +325,7 @@ patch_fully_connected(unsigned operation_index,
    std::vector<int> weight_shape;
    weight_shape = {output_channels, input_size};
 
-   xt::xarray<uint8_t> weights_array = xt::random::randint<uint8_t>(weight_shape, 0, 255);
+   std::vector<uint8_t> weights_array = rand<uint8_t>(weight_shape, 0, 255);
    weights_data->resize(weights_array.size());
    memcpy(weights_data->data(), weights_array.data(), weights_array.size());
 
@@ -351,7 +374,7 @@ void (*tflite_plugin_destroy_delegate)(TfLiteDelegate *delegate);
 static void
 load_delegate()
 {
-   const char *delegate_path = getenv("TEFLON_TEST_DELEGATE");
+   const char *delegate_path = os_get_option("TEFLON_TEST_DELEGATE");
    assert(delegate_path);
 
    void *delegate_lib = dlopen(delegate_path, RTLD_LAZY | RTLD_LOCAL);
@@ -372,7 +395,7 @@ load_delegate()
 bool
 cache_is_enabled(void)
 {
-   return getenv("TEFLON_ENABLE_CACHE");
+   return os_get_option("TEFLON_ENABLE_CACHE");
 }
 
 void *
@@ -432,7 +455,7 @@ run_model(TfLiteModel *model, enum executor executor, void ***input, size_t *num
          if ((*input)[i] == NULL) {
             (*input)[i] = malloc(input_tensor->bytes);
 
-            std::vector<size_t> shape;
+            std::vector<int> shape;
 
             shape.resize(input_tensor->dims->size);
             for (int j = 0; j < input_tensor->dims->size; j++)
@@ -440,12 +463,12 @@ run_model(TfLiteModel *model, enum executor executor, void ***input, size_t *num
 
             switch (input_tensor->type) {
             case kTfLiteFloat32: {
-               xt::xarray<float_t> a = xt::random::rand<float_t>(shape);
+               std::vector<float> a = rand<float>(shape, -1.0, 1.0);
                memcpy((*input)[i], a.data(), input_tensor->bytes);
                break;
             }
             default: {
-               xt::xarray<uint8_t> a = xt::random::randint<uint8_t>(shape, 0, 255);
+               std::vector<uint8_t> a = rand<uint8_t>(shape, 0, 255);
                memcpy((*input)[i], a.data(), input_tensor->bytes);
                break;
             }

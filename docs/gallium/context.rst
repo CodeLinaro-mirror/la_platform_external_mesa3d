@@ -465,6 +465,12 @@ scaled to nanoseconds, recorded after all commands issued prior to
 This query does not require a call to ``begin_query``.
 The result is an unsigned 64-bit integer.
 
+``PIPE_QUERY_TIMESTAMP_RAW`` returns a device/driver timestamp, recorded
+after all commands issued prior to ``end_query`` have been processed.
+This query does not require a call to ``begin_query``.
+The result is an unsigned 64-bit integer.  ``pipe_screen::convert_timestamp()``
+should be implemented, to covert the raw timestamp to nanoseconds, if
+this query type is supported.
 ``PIPE_QUERY_TIMESTAMP_DISJOINT`` can be used to check the
 internal timer resolution and whether the timestamp counter has become
 unreliable due to things like throttling etc. - only if this is FALSE
@@ -651,6 +657,10 @@ call to ``flush`` is required to make sure the commands are emitted to the GPU.
 
 The Gallium implementation may implicitly ``flush`` the command stream during a
 ``fence_server_sync`` or ``fence_server_signal`` call if necessary.
+
+Gallium frontends must ensure that ``fence_server_signal`` returns before calling
+``fence_server_sync`` on the same ``pipe_fence_handle`` even if those calls are made on
+a different ``pipe_context``.
 
 Resource Busy Queries
 ^^^^^^^^^^^^^^^^^^^^^

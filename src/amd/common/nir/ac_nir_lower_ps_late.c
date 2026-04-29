@@ -29,6 +29,7 @@ typedef struct {
    uint8_t colors_written;
    nir_alu_type color_type[MAX_DRAW_BUFFERS];
    bool has_dual_src_blending;
+   bool dual_src_blend_swizzle;
    bool writes_all_cbufs;
 
    /* MAX_DRAW_BUFFERS for MRT export, 1 for MRTZ export */
@@ -116,12 +117,10 @@ static bool
 gather_ps_store_output(nir_builder *b, nir_intrinsic_instr *intrin, lower_ps_state *s)
 {
    unsigned slot = nir_intrinsic_io_semantics(intrin).location;
-   unsigned dual_src_blend_index = nir_intrinsic_io_semantics(intrin).dual_source_blend_index;
    unsigned write_mask = nir_intrinsic_write_mask(intrin);
    unsigned component = nir_intrinsic_component(intrin);
-   unsigned color_index = (slot >= FRAG_RESULT_DATA0 ? slot - FRAG_RESULT_DATA0 : 0) +
-                          dual_src_blend_index;
    nir_def *store_val = intrin->src[0].ssa;
+   int color_index = mesa_frag_result_get_color_index(slot);
 
    b->cursor = nir_before_instr(&intrin->instr);
 
@@ -146,17 +145,16 @@ gather_ps_store_output(nir_builder *b, nir_intrinsic_instr *intrin, lower_ps_sta
          s->color[color_index][comp] = chan;
          break;
       default:
-         assert(slot >= FRAG_RESULT_DATA0 && slot <= FRAG_RESULT_DATA7);
+         assert(color_index != -1);
          s->color[color_index][comp] = chan;
          break;
       }
    }
 
-   if ((slot == FRAG_RESULT_COLOR || (slot >= FRAG_RESULT_DATA0 && slot <= FRAG_RESULT_DATA7)) &&
-       write_mask) {
+   if (color_index >= 0 && write_mask) {
       s->colors_written |= BITFIELD_BIT(color_index);
       s->color_type[color_index] = nir_intrinsic_src_type(intrin);
-      s->has_dual_src_blending |= dual_src_blend_index == 1;
+      s->has_dual_src_blending |= slot == FRAG_RESULT_DUAL_SRC_BLEND;
       s->writes_all_cbufs |= slot == FRAG_RESULT_COLOR;
    }
 
@@ -255,15 +253,6 @@ emit_ps_mrtz_export(nir_builder *b, lower_ps_state *s, nir_def *mrtz_alpha)
       }
    }
 
-   /* GFX6 (except OLAND and HAINAN) has a bug that it only looks at the
-    * X writemask component.
-    */
-   if (s->options->gfx_level == GFX6 &&
-       s->options->family != CHIP_OLAND &&
-       s->options->family != CHIP_HAINAN) {
-      write_mask |= 0x1;
-   }
-
    s->exp[s->exp_num++] = nir_export_amd(b, nir_vec(b, outputs, 4),
                                          .base = V_008DFC_SQ_EXP_MRTZ,
                                          .write_mask = write_mask,
@@ -276,12 +265,71 @@ get_ps_color_export_target(lower_ps_state *s)
 {
    unsigned target = V_008DFC_SQ_EXP_MRT + s->compacted_mrt_index;
 
-   if (s->options->dual_src_blend_swizzle && s->compacted_mrt_index < 2)
+   if (s->dual_src_blend_swizzle && s->compacted_mrt_index < 2)
       target += 21;
 
    s->compacted_mrt_index++;
 
    return target;
+}
+
+static void
+cse_packed_outputs(lower_ps_state *s)
+{
+   u_foreach_bit(mrt_index, s->colors_written) {
+      unsigned spi_shader_col_format = (s->spi_shader_col_format >> (mrt_index * 4)) & 0xf;
+
+      switch (spi_shader_col_format) {
+         case V_028714_SPI_SHADER_FP16_ABGR:
+         case V_028714_SPI_SHADER_UINT16_ABGR:
+         case V_028714_SPI_SHADER_SINT16_ABGR:
+         case V_028714_SPI_SHADER_UNORM16_ABGR:
+         case V_028714_SPI_SHADER_SNORM16_ABGR:
+            break;
+         default:
+            continue;
+      }
+
+      for (unsigned pck_idx = 0; pck_idx < 2; pck_idx++) {
+         nir_def *lo = s->color[mrt_index][pck_idx * 2];
+         nir_def *hi = s->color[mrt_index][pck_idx * 2 + 1];
+
+         /* Skip all/none undef components. */
+         if ((lo == NULL) == (hi == NULL))
+            continue;
+
+         /* Look for a export to another mrt/idx which uses the same
+          * format and where the non undefined component is the same.
+          * If the other component there is not undefined, use it instead
+          * of undef for the current MRT, to allow nir_opt_cse to unify both packs.
+          */
+         u_foreach_bit(other_mrt, s->colors_written) {
+            unsigned other_col_format = (s->spi_shader_col_format >> (other_mrt * 4)) & 0xf;
+            if (other_col_format != spi_shader_col_format)
+               continue;
+
+            bool found = false;
+            for (unsigned other_idx = 0; other_idx < 2; other_idx++) {
+               nir_def *other_lo = s->color[other_mrt][other_idx * 2];
+               nir_def *other_hi = s->color[other_mrt][other_idx * 2 + 1];
+
+               if (!other_lo || !other_hi)
+                  continue;
+
+               if (other_lo != lo && other_hi != hi)
+                  continue;
+
+               s->color[mrt_index][pck_idx * 2] = other_lo;
+               s->color[mrt_index][pck_idx * 2 + 1] = other_hi;
+               found = true;
+               break;
+            }
+
+            if (found)
+               break;
+         }
+      }
+   }
 }
 
 static bool
@@ -434,14 +482,20 @@ emit_ps_color_export(nir_builder *b, lower_ps_state *s, unsigned output_index, u
          if (!lo && !hi)
             continue;
 
-         lo = lo ? lo : nir_undef(b, 1, type_size);
-         hi = hi ? hi : nir_undef(b, 1, type_size);
-
-         if (nir_op_infos[pack_op].num_inputs == 2) {
-            outputs[i] = nir_build_alu2(b, pack_op, lo, hi);
+         if (pack_op == nir_op_pack_half_2x16_rtz_split && (!lo || !hi)) {
+            lo = lo ? nir_f2f16_rtz(b, lo) : nir_undef(b, 1, 16);
+            hi = hi ? nir_f2f16_rtz(b, hi) : nir_undef(b, 1, 16);
+            outputs[i] = nir_pack_32_2x16_split(b, lo, hi);
          } else {
-            nir_def *vec = nir_vec2(b, lo, hi);
-            outputs[i] = nir_build_alu1(b, pack_op, vec);
+            lo = lo ? lo : nir_undef(b, 1, type_size);
+            hi = hi ? hi : nir_undef(b, 1, type_size);
+
+            if (nir_op_infos[pack_op].num_inputs == 2) {
+               outputs[i] = nir_build_alu2(b, pack_op, lo, hi);
+            } else {
+               nir_def *vec = nir_vec2(b, lo, hi);
+               outputs[i] = nir_build_alu1(b, pack_op, vec);
+            }
          }
 
          if (s->options->gfx_level >= GFX11)
@@ -455,10 +509,14 @@ emit_ps_color_export(nir_builder *b, lower_ps_state *s, unsigned output_index, u
    }
    }
 
-   s->exp[s->exp_num++] = nir_export_amd(b, nir_vec(b, outputs, 4),
-                                         .base = target,
-                                         .write_mask = write_mask,
-                                         .flags = flags);
+   nir_intrinsic_instr *exp = nir_export_amd(b, nir_vec(b, outputs, 4),
+                                             .base = target,
+                                             .flags = flags);
+
+   /* Set the writemask explicitly because write_mask=0 means full write mask. */
+   nir_intrinsic_set_write_mask(exp, write_mask);
+
+   s->exp[s->exp_num++] = exp;
    return true;
 }
 
@@ -495,7 +553,7 @@ emit_ps_dual_src_blend_swizzle(nir_builder *b, lower_ps_state *s, unsigned first
 
    uint32_t mrt0_write_mask = nir_intrinsic_write_mask(mrt0_exp);
    uint32_t mrt1_write_mask = nir_intrinsic_write_mask(mrt1_exp);
-   uint32_t write_mask = mrt0_write_mask & mrt1_write_mask;
+   uint32_t write_mask = mrt0_write_mask | mrt1_write_mask;
 
    nir_def *mrt0_arg = mrt0_exp->src[0].ssa;
    nir_def *mrt1_arg = mrt1_exp->src[0].ssa;
@@ -565,19 +623,13 @@ emit_ps_null_export(nir_builder *b, lower_ps_state *s)
     * In Primitive Ordered Pixel Shading, however, GFX11+ explicitly uses the `done` export to exit
     * the ordered section, and before GFX11, shaders with POPS also need an export.
     * GFX11 DCC decompression also needs an export.
+    * An export also seems necessary when dual source blending is used unless CB_TARGET_MASK=0.
     */
    if (s->options->gfx_level >= GFX10 && !pops &&
        !s->options->uses_discard &&
-       !s->options->dcc_decompress_gfx11)
+       !s->options->dcc_decompress_gfx11 &&
+       !s->has_dual_src_blending)
       return;
-
-   /* The `done` export exits the POPS ordered section on GFX11+, make sure UniformMemory and
-    * ImageMemory (in SPIR-V terms) accesses from the ordered section may not be reordered below it.
-    */
-   if (s->options->gfx_level >= GFX11 && pops)
-      nir_scoped_memory_barrier(b, SCOPE_QUEUE_FAMILY, NIR_MEMORY_RELEASE,
-                                nir_var_image | nir_var_mem_ubo | nir_var_mem_ssbo |
-                                nir_var_mem_global);
 
    /* Gfx11 doesn't support null exports, and mrt0 should be exported instead. */
    unsigned target = s->options->gfx_level >= GFX11 ?
@@ -595,6 +647,7 @@ static bool
 export_ps_outputs(nir_builder *b, lower_ps_state *s)
 {
    b->cursor = nir_after_impl(b->impl);
+   b->fp_math_ctrl = nir_fp_preserve_sz_inf_nan;
 
    /* Alpha-to-coverage should be before alpha-to-one. */
    nir_def *mrtz_alpha = NULL;
@@ -636,10 +689,14 @@ export_ps_outputs(nir_builder *b, lower_ps_state *s)
          break;
       case BITFIELD_RANGE(0, 2):
          break;
+      case 0:
+         break;
       default:
          UNREACHABLE("unexpected number of color outputs for dual source blending");
       }
    }
+
+   cse_packed_outputs(s);
 
    if (s->writes_all_cbufs && s->colors_written == 0x1) {
       /* This will do nothing for color buffers with SPI_SHADER_COL_FORMAT=ZERO, so always
@@ -657,7 +714,7 @@ export_ps_outputs(nir_builder *b, lower_ps_state *s)
       for (unsigned i = 0; i < s->exp_num; i++)
          nir_instr_move(nir_after_impl(b->impl), &s->exp[i]->instr);
 
-      if (s->options->dual_src_blend_swizzle) {
+      if (s->dual_src_blend_swizzle && s->exp_num - first_color_export >= 2) {
          emit_ps_dual_src_blend_swizzle(b, s, first_color_export);
          /* Skip last export flag setting because they have been replaced by
           * a pseudo instruction.
@@ -671,21 +728,6 @@ export_ps_outputs(nir_builder *b, lower_ps_state *s)
       unsigned final_exp_flags = nir_intrinsic_flags(final_exp);
       final_exp_flags |= AC_EXP_FLAG_DONE | AC_EXP_FLAG_VALID_MASK;
       nir_intrinsic_set_flags(final_exp, final_exp_flags);
-
-      /* The `done` export exits the POPS ordered section on GFX11+, make sure UniformMemory and
-       * ImageMemory (in SPIR-V terms) accesses from the ordered section may not be reordered below
-       * it.
-       */
-      if (s->options->gfx_level >= GFX11 &&
-          (b->shader->info.fs.sample_interlock_ordered ||
-           b->shader->info.fs.sample_interlock_unordered ||
-           b->shader->info.fs.pixel_interlock_ordered ||
-           b->shader->info.fs.pixel_interlock_unordered)) {
-         b->cursor = nir_before_instr(&final_exp->instr);
-         nir_scoped_memory_barrier(b, SCOPE_QUEUE_FAMILY, NIR_MEMORY_RELEASE,
-                                   nir_var_image | nir_var_mem_ubo | nir_var_mem_ssbo |
-                                   nir_var_mem_global);
-      }
    } else {
       emit_ps_null_export(b, s);
    }
@@ -704,7 +746,8 @@ ac_nir_lower_ps_late(nir_shader *nir, const ac_nir_lower_ps_late_options *option
 
    lower_ps_state state = {
       .options = options,
-      .has_dual_src_blending = options->dual_src_blend_swizzle,
+      .has_dual_src_blending = options->dual_src_blend,
+      .dual_src_blend_swizzle = options->dual_src_blend && options->gfx_level >= GFX11,
       .spi_shader_col_format = options->spi_shader_col_format,
    };
 

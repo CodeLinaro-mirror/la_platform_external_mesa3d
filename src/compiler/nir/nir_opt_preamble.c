@@ -144,7 +144,6 @@ can_move_intrinsic(nir_intrinsic_instr *instr, opt_preamble_ctx *ctx)
    case nir_intrinsic_load_work_dim:
    case nir_intrinsic_load_num_workgroups:
    case nir_intrinsic_load_ray_launch_size:
-   case nir_intrinsic_load_sbt_base_amd:
    case nir_intrinsic_load_is_indexed_draw:
    case nir_intrinsic_load_viewport_scale:
    case nir_intrinsic_load_user_clip_plane:
@@ -180,6 +179,7 @@ can_move_intrinsic(nir_intrinsic_instr *instr, opt_preamble_ctx *ctx)
    case nir_intrinsic_load_cull_any_enabled_amd:
    case nir_intrinsic_load_cull_small_triangle_precision_amd:
    case nir_intrinsic_load_vbo_base_agx:
+   case nir_intrinsic_load_push_data_intel:
       return true;
 
    /* Intrinsics which can be moved depending on hardware */
@@ -515,7 +515,7 @@ replace_for_block(nir_builder *b, opt_preamble_ctx *ctx,
             nir_before_block_after_phis(nir_cursor_current_block(b->cursor));
 
          nir_def *repl = nir_if_phi(b, then_def, else_def);
-         clone = repl->parent_instr;
+         clone = nir_def_instr(repl);
 
          _mesa_hash_table_insert(remap_table, &phi->def, repl);
       } else {
@@ -931,8 +931,7 @@ nir_opt_preamble(nir_shader *shader, const nir_opt_preamble_options *options,
     * we did.
     */
    ctx.reconstructed_ifs = _mesa_pointer_set_create(NULL);
-   ctx.reconstructed_defs = calloc(BITSET_WORDS(impl->ssa_alloc),
-                                   sizeof(BITSET_WORD));
+   ctx.reconstructed_defs = BITSET_CALLOC(impl->ssa_alloc);
    analyze_reconstructed(&ctx, impl);
 
    /* If we make progress analyzing speculation, we need to re-analyze

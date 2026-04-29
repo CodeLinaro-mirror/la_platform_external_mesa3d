@@ -81,14 +81,14 @@ struct lbvh_main_args {
    VOID_REF bvh;
    REF(key_id_pair) src_ids;
    VOID_REF node_info;
-   uint32_t id_count;
+   REF(vk_ir_header) header;
    uint32_t internal_node_base;
 };
 
 struct lbvh_generate_ir_args {
    VOID_REF bvh;
    VOID_REF node_info;
-   VOID_REF header;
+   REF(vk_ir_header) header;
    uint32_t internal_node_base;
 };
 
@@ -108,6 +108,14 @@ struct ploc_args {
    VOID_REF ids_0;
    VOID_REF ids_1;
    uint32_t internal_node_offset;
+};
+
+struct hploc_args {
+   REF(vk_ir_header) header;
+   VOID_REF bvh;
+   REF(key_id_pair) ids;
+   VOID_REF ranges;
+   uint32_t internal_node_base;
 };
 
 #endif

@@ -195,7 +195,7 @@ int32_t DrmVirtGpuDevice::init(int32_t descriptor) {
 
         ret = drmIoctl(mDeviceHandle, DRM_IOCTL_VIRTGPU_GETPARAM, &get_param);
         if (ret) {
-            mesa_logd("virtgpu backend not enabling %s", params[i].name);
+            mesa_logd("Could not query virtgpu param from device: %s", params[i].name);
             continue;
         }
 
@@ -215,10 +215,6 @@ int32_t DrmVirtGpuDevice::init(int32_t descriptor) {
         case kCapsetGfxStreamVulkan:
             get_caps.size = sizeof(struct vulkanCapset);
             get_caps.addr = (unsigned long long)&mCaps.vulkanCapset;
-            break;
-        case kCapsetGfxStreamMagma:
-            get_caps.size = sizeof(struct magmaCapset);
-            get_caps.addr = (unsigned long long)&mCaps.magmaCapset;
             break;
         case kCapsetGfxStreamGles:
             get_caps.size = sizeof(struct glesCapset);
@@ -244,7 +240,7 @@ int32_t DrmVirtGpuDevice::init(int32_t descriptor) {
         mCaps.vulkanCapset.blobAlignment = 4096;
     }
 
-    uint64_t guest_page_size = 0;
+    uint64_t guest_page_size = 4096;
     os_get_page_size(&guest_page_size);
     mCaps.vulkanCapset.blobAlignment =
         std::max((uint32_t)guest_page_size, mCaps.vulkanCapset.blobAlignment);

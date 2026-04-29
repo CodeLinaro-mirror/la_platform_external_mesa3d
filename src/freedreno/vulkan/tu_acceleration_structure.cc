@@ -135,7 +135,7 @@ get_bvh_layout(VkGeometryTypeKHR geometry_type,
    offset += (internal_count + leaf_count) * sizeof(uint32_t);
 
    /* The BVH and hence bvh_offset needs 64 byte alignment for RT nodes. */
-   offset = ALIGN(offset, 64);
+   offset = align64(offset, 64);
    layout->bvh_offset = offset;
 
    offset += internal_count * sizeof(struct tu_internal_node) +
@@ -234,11 +234,6 @@ encode(VkCommandBuffer commandBuffer,
    tu_dispatch_unaligned_indirect(commandBuffer,
                                   intermediate_header_addr +
                                   offsetof(struct vk_ir_header, ir_internal_node_count));
-
-   *(VkDeviceSize *)
-      util_sparse_array_get(&device->accel_struct_ranges,
-                            vk_acceleration_structure_get_va(dst)) = dst->size;
-
 }
 
 static VkResult
@@ -357,7 +352,7 @@ const struct vk_acceleration_structure_build_ops tu_as_build_ops = {
    .encode_as = { encode, header },
 };
 
-struct radix_sort_vk_target_config tu_radix_sort_config = {
+const struct radix_sort_vk_target_config tu_radix_sort_config_128 = {
    .keyval_dwords = 2,
    .init = { .workgroup_size_log2 = 8, },
    .fill = { .workgroup_size_log2 = 8, .block_rows = 8 },
@@ -378,16 +373,41 @@ struct radix_sort_vk_target_config tu_radix_sort_config = {
    .nonsequential_dispatch = false,
 };
 
+const struct radix_sort_vk_target_config tu_radix_sort_config_64 = {
+   .keyval_dwords = 2,
+   .init = { .workgroup_size_log2 = 8, },
+   .fill = { .workgroup_size_log2 = 8, .block_rows = 8 },
+   .histogram = {
+      .workgroup_size_log2 = 8,
+      .subgroup_size_log2 = 6,
+      .block_rows = 14, /* TODO tune this */
+   },
+   .prefix = {
+      .workgroup_size_log2 = 8,
+      .subgroup_size_log2 = 6,
+   },
+   .scatter = {
+      .workgroup_size_log2 = 8,
+      .subgroup_size_log2 = 6,
+      .block_rows = 14, /* TODO tune this */
+   },
+   .nonsequential_dispatch = false,
+};
+
 static VkResult
 init_radix_sort(struct tu_device *device)
 {
    if (!device->radix_sort) {
       mtx_lock(&device->radix_sort_mutex);
       if (!device->radix_sort) {
+         const struct radix_sort_vk_target_config *cfg =
+            device->physical_device->info->props.supports_double_threadsize ?
+            &tu_radix_sort_config_128 :
+            &tu_radix_sort_config_64;
          device->radix_sort =
             vk_create_radix_sort_u64(tu_device_to_handle(device),
                                      &device->vk.alloc,
-                                     VK_NULL_HANDLE, tu_radix_sort_config);
+                                     VK_NULL_HANDLE, *cfg);
          if (!device->radix_sort) {
             /* TODO plumb through the error here */
             mtx_unlock(&device->radix_sort_mutex);
@@ -444,7 +464,7 @@ tu_CmdBuildAccelerationStructuresKHR(VkCommandBuffer commandBuffer, uint32_t inf
    tu_save_compute_state(cmd, &state);
 
    struct vk_acceleration_structure_build_args args = {
-      .subgroup_size = 128,
+      .subgroup_size = device->physical_device->info->props.supports_double_threadsize ? 128 : 64,
       .bvh_bounds_offset = offsetof(tu_accel_struct_header, aabb),
       .emit_markers = false,
       .radix_sort = device->radix_sort,
@@ -598,7 +618,7 @@ tu_GetAccelerationStructureBuildSizesKHR(VkDevice _device, VkAccelerationStructu
    init_radix_sort(device);
 
    struct vk_acceleration_structure_build_args args = {
-      .subgroup_size = 128,
+      .subgroup_size = device->physical_device->info->props.supports_double_threadsize ? 128 : 64,
       .radix_sort = device->radix_sort,
    };
 

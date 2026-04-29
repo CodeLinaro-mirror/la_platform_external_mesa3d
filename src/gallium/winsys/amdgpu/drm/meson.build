@@ -19,6 +19,6 @@ libamdgpuwinsys = static_library(
   ],
   gnu_symbol_visibility : 'hidden',
   link_with : libamdgpu_addrlib,
-  dependencies : [dep_llvm, dep_libdrm_amdgpu, idep_amdgfxregs_h, idep_mesautil],
+  dependencies : [dep_llvm, dep_libdrm_amdgpu, idep_amd_generated_headers, idep_mesautil],
   c_args : c_args
 )

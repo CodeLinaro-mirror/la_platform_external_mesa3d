@@ -507,11 +507,12 @@ isl_device_get_supported_tilings(const struct isl_device *dev)
  *
  * This function always returns non-zero, as ISL_SAMPLE_COUNT_1_BIT is always
  * supported.
+ * Note: update nir_shader_compiler_options.max_samples when changing this.
  */
 isl_sample_count_mask_t ATTRIBUTE_CONST
 isl_device_get_sample_counts(const struct isl_device *dev)
 {
-   if (ISL_GFX_VER(dev) >= 9) {
+   if (ISL_GFX_VER(dev) >= 9 && ISL_GFX_VER(dev) < 30) {
       return ISL_SAMPLE_COUNT_1_BIT |
              ISL_SAMPLE_COUNT_2_BIT |
              ISL_SAMPLE_COUNT_4_BIT |
@@ -932,18 +933,6 @@ static const uint8_t acm_tile64_3d_8bpp_swiz[16] = REV16(
  * BSpec 58767, 58786
  */
 
-static const uint8_t xe2_tile64_2d_128_64bpp_swiz[16] = REV16(
-   V(5), U(9), U(8), U(7), V(4), V(3), U(6), V(2), U(5), U(4), V(1), V(0), U(3), U(2), U(1), U(0)
-);
-
-static const uint8_t xe2_tile64_2d_32_16bpp_swiz[16] = REV16(
-   V(6), V(5), U(8), U(7), V(4), V(3), U(6), V(2), U(5), U(4), V(1), V(0), U(3), U(2), U(1), U(0)
-);
-
-static const uint8_t xe2_tile64_2d_8bpp_swiz[16] = REV16(
-   V(7), V(6), V(5), U(7), V(4), V(3), U(6), V(2), U(5), U(4), V(1), V(0), U(3), U(2), U(1), U(0)
-);
-
 static const uint8_t xe2_tile64_2d_128bpp_2msaa_swiz[16] = REV16(
    V(4), U(9), U(8), U(7), V(3), V(2), U(6), S(0), U(5), U(4), V(1), V(0), U(3), U(2), U(1), U(0)
 );
@@ -1301,18 +1290,43 @@ isl_tiling_get_info(enum isl_tiling tiling,
          };
 
 #undef YS_OR_YF
+         /* From the ICL PRMs Volume 5: Memory Data Formats, "Compressed
+          * Multisampled Surfaces":
+          *
+          *    Tiling for CMS and UMS Surfaces
+          *
+          *    Multisampled CMS and UMS use a modified table from
+          *    non-mulitsampled 2D surfaces.
+          *
+          *    [...]
+          *
+          *    TileYS: In addition to u and v, the sample slice index “ss” is
+          *    included in the address swizzling according to the following
+          *    table.
+          *
+          *    [...]
+          *
+          *    TileYF: In addition to u and v, the sample slice index “ss” is
+          *    included in the address swizzling according to the following
+          *    table.
+          *
+          * IMS surfaces don't use the MSAA swizzles for Yf/Ys.
+          */
+         const uint32_t sample_idx =
+            (msaa_layout == ISL_MSAA_LAYOUT_INTERLEAVED) ? 0 :
+            (ffs(samples) - 1);
 
          switch (format_bpb) {
          case 128:
          case 64:
-            SET_SWIZ(_128_64bpp_swiz[ffs(samples) - 1], tiling_bits);
+            SET_SWIZ(_128_64bpp_swiz[sample_idx], tiling_bits);
             break;
          case 32:
          case 16:
-            SET_SWIZ(_32_16bpp_swiz[ffs(samples) - 1], tiling_bits);
+            SET_SWIZ(_32_16bpp_swiz[sample_idx], tiling_bits);
             break;
          case 8:
-            SET_SWIZ(_8bpp_swiz[ffs(samples) - 1], tiling_bits);
+            SET_SWIZ(_8bpp_swiz[sample_idx], tiling_bits);
             break;
          default:
             UNREACHABLE("Unsupported format size");
@@ -1454,14 +1468,14 @@ isl_tiling_get_info(enum isl_tiling tiling,
             switch (format_bpb) {
             case 128:
             case  64:
-               SET_SWIZ(xe2_tile64_2d_128_64bpp_swiz, 16);
+               SET_SWIZ(acm_tile64_2d_128_64bpp_swiz, 16);
                break;
             case  32:
             case  16:
-               SET_SWIZ(xe2_tile64_2d_32_16bpp_swiz, 16);
+               SET_SWIZ(acm_tile64_2d_32_16bpp_swiz, 16);
                break;
             case   8:
-               SET_SWIZ(xe2_tile64_2d_8bpp_swiz, 16);
+               SET_SWIZ(acm_tile64_2d_8bpp_swiz, 16);
                break;
             default:
                UNREACHABLE("Unsupported format size.");
@@ -1573,12 +1587,58 @@ isl_tiling_get_info(enum isl_tiling tiling,
 
 #undef SET_SWIZ
 
+   uint32_t max_miptail_levels = tiling_max_mip_tail(tiling, dim, samples);
+   if (dim == ISL_SURF_DIM_3D && format_bpb == 64) {
+      /* Apply a workaround from isl_choose_miptail_start_level() more
+       * broadly. Enables tests with block compressed images to pass. A number
+       * of these tests simply perform uploads and downloads, so presumably
+       * this issue affects uncompressed formats as well.
+       */
+      if (tiling == ISL_TILING_SKL_Yf) {
+         max_miptail_levels = MIN2(max_miptail_levels, 2);
+      } else if (tiling == ISL_TILING_SKL_Ys) {
+         max_miptail_levels = MIN2(max_miptail_levels, 6);
+      }
+   }
+
+   if (dim == ISL_SURF_DIM_3D && format_bpb == 128) {
+      /* Apply a workaround from isl_choose_miptail_start_level() more
+       * broadly. Enables tests with block compressed images to pass. A number
+       * of these tests simply perform uploads and downloads, so presumably
+       * this issue affects uncompressed formats as well.
+       *
+       * Enables other tests to pass when compression is disabled.
+       */
+      if (tiling == ISL_TILING_SKL_Yf ||
+          tiling == ISL_TILING_ICL_Yf) {
+         max_miptail_levels = MIN2(max_miptail_levels, 2);
+      } else if (tiling == ISL_TILING_SKL_Ys ||
+                 tiling == ISL_TILING_ICL_Ys) {
+         max_miptail_levels = MIN2(max_miptail_levels, 6);
+      }
+   }
+
+   if (dim == ISL_SURF_DIM_2D && format_bpb == 128) {
+      /* Apply a workaround from isl_choose_miptail_start_level() more
+       * broadly. Enables tests with block compressed images to pass. A number
+       * of these tests simply perform uploads and downloads, so presumably
+       * this issue affects uncompressed formats as well.
+       */
+      if (tiling == ISL_TILING_SKL_Yf ||
+          tiling == ISL_TILING_ICL_Yf) {
+        max_miptail_levels = MIN2(max_miptail_levels, 7);
+      } else if (tiling == ISL_TILING_SKL_Ys ||
+                 tiling == ISL_TILING_ICL_Ys) {
+        max_miptail_levels = MIN2(max_miptail_levels, 11);
+      }
+   }
+
    *tile_info = (struct isl_tile_info) {
       .tiling = tiling,
       .format_bpb = format_bpb,
       .logical_extent_el = logical_el,
       .phys_extent_B = phys_B,
-      .max_miptail_levels = tiling_max_mip_tail(tiling, dim, samples),
+      .max_miptail_levels = max_miptail_levels,
       .swiz = swiz,
       .swiz_count = swiz_count,
    };
@@ -1629,123 +1689,6 @@ isl_color_value_is_zero_one(union isl_color_value value,
 #undef RETURN_FALSE_IF_NOT_0_1
 
    return true;
-}
-
-/**
- * @param[out] tiling is set only on success
- */
-static bool
-isl_surf_choose_tiling(const struct isl_device *dev,
-                       const struct isl_surf_init_info *restrict info,
-                       enum isl_tiling *tiling)
-{
-   isl_tiling_flags_t tiling_flags = info->tiling_flags;
-
-   /* HiZ surfaces always use the HiZ tiling */
-   if (info->usage & ISL_SURF_USAGE_HIZ_BIT) {
-      assert(isl_format_is_hiz(info->format));
-      assert(tiling_flags == ISL_TILING_HIZ_BIT);
-      *tiling = isl_tiling_flag_to_enum(tiling_flags);
-      return true;
-   }
-
-   /* CCS surfaces always use the CCS tiling */
-   if (info->usage & ISL_SURF_USAGE_CCS_BIT) {
-      assert(isl_format_get_layout(info->format)->txc == ISL_TXC_CCS);
-      assert(tiling_flags == ISL_TILING_CCS_BIT);
-      *tiling = isl_tiling_flag_to_enum(tiling_flags);
-      return true;
-   }
-
-   if (ISL_GFX_VERX10(dev) >= 200) {
-      isl_gfx20_filter_tiling(dev, info, &tiling_flags);
-   } else if (ISL_GFX_VERX10(dev) >= 125) {
-      isl_gfx125_filter_tiling(dev, info, &tiling_flags);
-   } else if (ISL_GFX_VER(dev) >= 6) {
-      isl_gfx6_filter_tiling(dev, info, &tiling_flags);
-   } else {
-      isl_gfx4_filter_tiling(dev, info, &tiling_flags);
-   }
-
-   #define CHOOSE(__tiling) \
-      do { \
-         if (tiling_flags & (1u << (__tiling))) { \
-            *tiling = (__tiling); \
-            return true; \
-          } \
-      } while (0)
-
-   /* Of the tiling modes remaining, choose the one that offers the best
-    * performance.
-    */
-
-   if (info->dim == ISL_SURF_DIM_1D) {
-      /* Prefer linear for 1D surfaces because they do not benefit from
-       * tiling. To the contrary, tiling leads to wasted memory and poor
-       * memory locality due to the swizzling and alignment restrictions
-       * required in tiled surfaces.
-       */
-      CHOOSE(ISL_TILING_LINEAR);
-   }
-
-   if (intel_needs_workaround(dev->info, 22015614752) &&
-       _isl_surf_info_supports_ccs(dev, info->format, info->usage) &&
-       (info->usage & ISL_SURF_USAGE_MULTI_ENGINE_PAR_BIT) &&
-       (info->levels > 1 || info->depth > 1 || info->array_len > 1)) {
-      /* There are issues with multiple engines accessing the same CCS
-       * cacheline in parallel. This can happen if this image has multiple
-       * subresources. If possible, avoid such conflicts by picking a tiling
-       * that will increase the subresource alignment to 64k. If we can't use
-       * such a tiling, we'll prevent CCS from being enabled later on via
-       * isl_surf_supports_ccs.
-       */
-      CHOOSE(ISL_TILING_64);
-   }
-
-   /* For sparse images, prefer the formats that use the standard block
-    * shapes.
-    */
-   if (info->usage & ISL_SURF_USAGE_SPARSE_BIT) {
-      CHOOSE(ISL_TILING_64_XE2);
-      CHOOSE(ISL_TILING_64);
-      CHOOSE(ISL_TILING_ICL_Ys);
-      CHOOSE(ISL_TILING_SKL_Ys);
-   }
-
-   /* Choose suggested 4K tilings first, then 64K tilings:
-    *
-    * Then following quotes can be found in the SKL PRMs,
-    *   Volume 5: Memory Views, Address Tiling Function Introduction
-    * and from the ATS-M PRMs,
-    *   Volume 5: Memory Data Formats, Address Tiling Function Introduction
-    *
-    *    "TileY: Used for most tiled surfaces when TR_MODE=TR_NONE."
-    *    "Tile4: 4KB tiling mode based on previously-supported TileY"
-    *    "TileYF: 4KB tiling mode based on TileY"
-    *    "TileYS: 64KB tiling mode based on TileY"
-    *    "Tile64: 64KB tiling mode which support standard-tiling including
-    *     Mip Tails"
-    *
-    * When TileYF and TileYS are used TR_MODE != TR_NONE.
-    */
-   CHOOSE(ISL_TILING_Y0);
-   CHOOSE(ISL_TILING_4);
-   CHOOSE(ISL_TILING_SKL_Yf);
-   CHOOSE(ISL_TILING_ICL_Yf);
-   CHOOSE(ISL_TILING_SKL_Ys);
-   CHOOSE(ISL_TILING_ICL_Ys);
-   CHOOSE(ISL_TILING_64);
-   CHOOSE(ISL_TILING_64_XE2);
-
-   CHOOSE(ISL_TILING_X);
-   CHOOSE(ISL_TILING_W);
-   CHOOSE(ISL_TILING_LINEAR);
-
-   #undef CHOOSE
-
-   /* No tiling mode accommodates the inputs. */
-   assert(tiling_flags == 0);
-   return notify_failure(info, "no supported tiling");
 }
 
 static bool
@@ -2300,10 +2243,15 @@ isl_choose_miptail_start_level(const struct isl_device *dev,
       return 15;
    }
 
+   assert(isl_tiling_is_64(tile_info->tiling) ||
+          isl_tiling_is_std_y(tile_info->tiling));
+   assert(info->samples == 1);
+
+   uint32_t max_miptail_levels = tile_info->max_miptail_levels;
+
    if ((ISL_GFX_VER(dev) == 9 ||
         intel_needs_workaround(dev->info, 1207137018)) &&
        info->dim == ISL_SURF_DIM_3D &&
-       isl_tiling_is_std_y(tile_info->tiling) &&
        _isl_surf_info_supports_ccs(dev, info->format, info->usage)) {
       /* From the workarounds section in the SKL PRM:
        *
@@ -2318,18 +2266,18 @@ isl_choose_miptail_start_level(const struct isl_device *dev,
        *     value of RENDER_SURFACE_STATE.Mip Tail Start LOD to a mip that
        *     larger than those present in the surface (i.e. 15)"
        *
-       * Referred to as Wa_1207137018 on ICL+. Disable miptails as suggested.
+       * Referred to as Wa_1207137018 on ICL+. Use a narrower workaround
+       * described in the HSD.
        */
-      return 15;
+      if (tile_info->tiling == ISL_TILING_SKL_Yf ||
+          tile_info->tiling == ISL_TILING_ICL_Yf) {
+         max_miptail_levels = MIN2(max_miptail_levels, 2);
+      } else {
+         max_miptail_levels = MIN2(max_miptail_levels, 6);
+      }
    }
 
-   assert(isl_tiling_is_64(tile_info->tiling) ||
-          isl_tiling_is_std_y(tile_info->tiling));
-   assert(info->samples == 1);
-
-   uint32_t max_miptail_levels = tile_info->max_miptail_levels;
-
-   if (max_miptail_levels > 11 &&
+   if (info->dim != ISL_SURF_DIM_3D &&
        _isl_surf_info_supports_ccs(dev, info->format, info->usage)) {
       /* SKL PRMs, Volume 5: Memory Views, Tiling and Mip Tails for 2D
        * Surfaces:
@@ -2339,7 +2287,12 @@ isl_choose_miptail_start_level(const struct isl_device *dev,
        *
        * Reduce the slot consumption to keep compression enabled.
        */
-      max_miptail_levels = 11;
+      if (tile_info->tiling == ISL_TILING_SKL_Yf ||
+          tile_info->tiling == ISL_TILING_ICL_Yf) {
+         max_miptail_levels = MIN2(max_miptail_levels, 7);
+      } else {
+         max_miptail_levels = MIN2(max_miptail_levels, 11);
+      }
    }
 
    /* Start with the minimum number of levels that will fit in the tile */
@@ -2348,12 +2301,6 @@ isl_choose_miptail_start_level(const struct isl_device *dev,
 
    /* Account for the specified minimum */
    min_miptail_start = MAX(min_miptail_start, info->min_miptail_start_level);
-
-   struct isl_extent3d level0_extent_el = {
-      .w = isl_align_div_npot(info->width, fmtl->bw),
-      .h = isl_align_div_npot(info->height, fmtl->bh),
-      .d = isl_align_div_npot(info->depth, fmtl->bd),
-   };
 
    /* The first miptail slot takes up the entire right side of the tile. So,
     * the extent is just the distance from the offset of the first level to
@@ -2374,9 +2321,14 @@ isl_choose_miptail_start_level(const struct isl_device *dev,
    /* Now find the first level that fits the maximum miptail size requirement.
     */
    for (uint32_t s = min_miptail_start; s < info->levels; s++) {
-      if (isl_minify(level0_extent_el.w, s) <= miptail_level0_extent_el.w &&
-          isl_minify(level0_extent_el.h, s) <= miptail_level0_extent_el.h &&
-          isl_minify(level0_extent_el.d, s) <= miptail_level0_extent_el.d)
+      struct isl_extent3d level_s_extent_el = {
+         .w = isl_align_div_npot(isl_minify(info->width, s), fmtl->bw),
+         .h = isl_align_div_npot(isl_minify(info->height, s), fmtl->bh),
+         .d = isl_align_div_npot(isl_minify(info->depth, s), fmtl->bd),
+      };
+      if (level_s_extent_el.w <= miptail_level0_extent_el.w &&
+          level_s_extent_el.h <= miptail_level0_extent_el.h &&
+          level_s_extent_el.d <= miptail_level0_extent_el.d)
          return s;
    }
 
@@ -2402,9 +2354,23 @@ isl_calc_array_pitch_el_rows_gfx4_2d(
 
    switch (array_pitch_span) {
    case ISL_ARRAY_PITCH_SPAN_COMPACT:
-      pitch_sa_rows = isl_align_npot(phys_slice0_sa->h, image_align_sa->h);
+      /* If we have a request for a particular array pitch, inflate the physical
+       * image size to accomodate that pitch.
+       */
+      if (info->array_pitch_B) {
+         assert(ISL_GFX_VER(dev) >= 8);
+         uint32_t tiled_aligned_row_pitch_B =
+            align((fmtl->bpb / 8) * phys_slice0_sa->w, tile_info->phys_extent_B.width);
+         assert(info->array_pitch_B % tiled_aligned_row_pitch_B == 0);
+         pitch_sa_rows = DIV_ROUND_UP(
+            info->array_pitch_B, tiled_aligned_row_pitch_B);
+         assert(pitch_sa_rows % image_align_sa->h == 0);
+      } else {
+         pitch_sa_rows = isl_align_npot(phys_slice0_sa->h, image_align_sa->h);
+      }
       break;
    case ISL_ARRAY_PITCH_SPAN_FULL: {
+      assert(!info->array_pitch_B);
       /* The QPitch equation is found in the Broadwell PRM >> Volume 5:
        * Memory Views >> Common Surface Formats >> Surface Layout >> 2D
        * Surfaces >> Surface Arrays.
@@ -2895,8 +2861,7 @@ isl_calc_row_pitch_alignment(const struct isl_device *dev,
             if (tile_info->format_bpb > 32 ||
                 surf_info->width > 256 ||
                 surf_info->height > 256) {
-               assert(tile_info->phys_extent_B.width == 128);
-               return 512;
+               return MAX(tile_info->phys_extent_B.width, 512);
             }
          }
       }
@@ -3323,8 +3288,20 @@ isl_calc_base_alignment(const struct isl_device *dev,
        *
        *     "For Linear memory, this field specifies the stride in chunks of
        *     64 bytes (1 cache line)."
+       *
+       * From the ATSM PRM Vol 2d,
+       * MFX_REFERENCE_PICTURE_BASE_ADDR::MFXReferencePictureAddress:
+       *
+       *     "Specifies the 64 byte aligned reference frame buffer addresses"
+       *
+       * From the ATSM PRM Vol 2a,
+       * HCP_PIPE_BUF_ADDR_STATE::ReferencePictureBaseAddress,
+       * AVP_PIPE_BUF_ADDR_STATE::ReferenceFrameBufferBaseAddress:
+       *
+       *     "Format: SplitBaseAddress64ByteAligned"
        */
-      if (isl_surf_usage_is_display(info->usage))
+      if (isl_surf_usage_is_display(info->usage) ||
+          (info->usage & ISL_SURF_USAGE_VIDEO_DECODE_BIT))
          base_alignment_B = MAX(base_alignment_B, 64);
    } else {
       const uint32_t tile_size_B = tile_info->phys_extent_B.width *
@@ -3383,13 +3360,21 @@ isl_calc_base_alignment(const struct isl_device *dev,
    if (info->usage & ISL_SURF_USAGE_SPARSE_BIT)
       base_alignment_B = MAX(base_alignment_B, 64 * 1024);
 
+   /* ATS-M PRM Vol 2d, MFX_PIPE_BUF_ADDR_STATE::PostDeblockingDestinationAddress:
+    *
+    *     "Specifies the 4K byte aligned frame buffer address for outputting
+    *      the post-loop filtered reconstructed YUV picture"
+    */
+   if (info->usage & ISL_SURF_USAGE_VIDEO_DECODE_BIT)
+      base_alignment_B = MAX(base_alignment_B, 4 * 1024);
+
    return base_alignment_B;
 }
 
-bool
-isl_surf_init_s(const struct isl_device *dev,
-                struct isl_surf *surf,
-                const struct isl_surf_init_info *restrict info)
+static bool
+isl_surf_init_s_with_tiling(const struct isl_device *dev,
+                            struct isl_surf *surf,
+                            const struct isl_surf_init_info *restrict info)
 {
    /* Some sanity checks */
    assert(!(info->usage & ISL_SURF_USAGE_CPB_BIT) ||
@@ -3404,9 +3389,7 @@ isl_surf_init_s(const struct isl_device *dev,
       .a = info->array_len,
    };
 
-   enum isl_tiling tiling;
-   if (!isl_surf_choose_tiling(dev, info, &tiling))
-      return false;
+   const enum isl_tiling tiling = isl_tiling_flag_to_enum(info->tiling_flags);
 
    const enum isl_dim_layout dim_layout =
       isl_surf_choose_dim_layout(dev, info->dim, tiling, info->usage);
@@ -3483,6 +3466,227 @@ isl_surf_init_s(const struct isl_device *dev,
    };
 
    return true;
+}
+
+bool
+isl_surf_init_s(const struct isl_device *dev,
+                struct isl_surf *surf,
+                const struct isl_surf_init_info *restrict info)
+{
+   /* Choose the tiling. */
+   struct isl_surf_init_info info_one_tiling = *info;
+   isl_tiling_flags_t tiling_flags = info->tiling_flags;
+
+   #define CHOOSE(__tiling) \
+      do { \
+         if (tiling_flags & (1u << (__tiling))) { \
+            info_one_tiling.tiling_flags = 1 << __tiling; \
+            return isl_surf_init_s_with_tiling(dev, surf, &info_one_tiling); \
+          } \
+      } while (0)
+
+   /* HiZ surfaces always use the HiZ tiling */
+   if (info->usage & ISL_SURF_USAGE_HIZ_BIT) {
+      assert(isl_format_is_hiz(info->format));
+      assert(tiling_flags == ISL_TILING_HIZ_BIT);
+      CHOOSE(ISL_TILING_HIZ);
+   }
+
+   /* CCS surfaces always use the CCS tiling */
+   if (info->usage & ISL_SURF_USAGE_CCS_BIT) {
+      assert(isl_format_get_layout(info->format)->txc == ISL_TXC_CCS);
+      assert(tiling_flags == ISL_TILING_CCS_BIT);
+      CHOOSE(ISL_TILING_CCS);
+   }
+
+   if (ISL_GFX_VERX10(dev) >= 200) {
+      isl_gfx20_filter_tiling(dev, info, &tiling_flags);
+   } else if (ISL_GFX_VERX10(dev) >= 125) {
+      isl_gfx125_filter_tiling(dev, info, &tiling_flags);
+   } else if (ISL_GFX_VER(dev) >= 6) {
+      isl_gfx6_filter_tiling(dev, info, &tiling_flags);
+   } else {
+      isl_gfx4_filter_tiling(dev, info, &tiling_flags);
+   }
+
+   /* Of the tiling modes remaining, choose the one that offers the best
+    * performance.
+    */
+   if (info->dim == ISL_SURF_DIM_1D) {
+      /* Prefer linear for 1D surfaces because they do not benefit from
+       * tiling. To the contrary, tiling leads to wasted memory and poor
+       * memory locality due to the swizzling and alignment restrictions
+       * required in tiled surfaces.
+       */
+      CHOOSE(ISL_TILING_LINEAR);
+   }
+
+   /* For sparse images, prefer the formats that use the standard block
+    * shapes.
+    */
+   if (info->usage & ISL_SURF_USAGE_SPARSE_BIT) {
+      CHOOSE(ISL_TILING_64_XE2);
+      CHOOSE(ISL_TILING_64);
+      CHOOSE(ISL_TILING_ICL_Ys);
+      CHOOSE(ISL_TILING_SKL_Ys);
+   }
+
+   /* Choose one of the suggested tilings:
+    *
+    * The following quotes can be found in the SKL PRMs,
+    *   Volume 5: Memory Views, Address Tiling Function Introduction
+    * and from the ATS-M PRMs,
+    *   Volume 5: Memory Data Formats, Address Tiling Function Introduction
+    *
+    *    "TileY: Used for most tiled surfaces when TR_MODE=TR_NONE."
+    *    "Tile4: 4KB tiling mode based on previously-supported TileY"
+    *    "TileYF: 4KB tiling mode based on TileY"
+    *    "TileYS: 64KB tiling mode based on TileY"
+    *    "Tile64: 64KB tiling mode which support standard-tiling including
+    *     Mip Tails"
+    */
+   isl_tiling_flags_t suggested_tilings = ISL_TILING_Y0_BIT     |
+                                          ISL_TILING_4_BIT      |
+                                          ISL_TILING_SKL_Yf_BIT |
+                                          ISL_TILING_ICL_Yf_BIT |
+                                          ISL_TILING_SKL_Ys_BIT |
+                                          ISL_TILING_ICL_Ys_BIT |
+                                          ISL_TILING_64_BIT     |
+                                          ISL_TILING_64_XE2_BIT;
+
+   surf->size_B = 0;
+
+   u_foreach_bit(tiling, suggested_tilings & tiling_flags) {
+      struct isl_surf tmp_surf = {};
+      info_one_tiling.tiling_flags = 1 << tiling;
+      if (!isl_surf_init_s_with_tiling(dev, &tmp_surf, &info_one_tiling))
+         continue;
+
+      if (surf->size_B == 0) {
+         *surf = tmp_surf;
+      } else if (isl_surf_supports_ccs(dev, &tmp_surf) !=
+                 isl_surf_supports_ccs(dev, surf)) {
+         if (isl_surf_supports_ccs(dev, &tmp_surf)) {
+            print_info(&info_one_tiling, "Enabled CCS support.");
+            *surf = tmp_surf;
+         }
+      } else if ((info->usage & ISL_SURF_USAGE_PREFER_4K_ALIGNMENT) &&
+                 tmp_surf.alignment_B != surf->alignment_B) {
+         if (tmp_surf.alignment_B == 4096) {
+            print_info(&info_one_tiling, "Enabled preferred alignment.");
+            *surf = tmp_surf;
+         }
+      } else if (tmp_surf.size_B < surf->size_B) {
+         print_info(&info_one_tiling, "Saved %d 4KB page(s).",
+                    (int)(surf->size_B - tmp_surf.size_B) / 4096);
+         *surf = tmp_surf;
+      }
+   }
+
+   if (surf->size_B != 0)
+      return true;
+
+   CHOOSE(ISL_TILING_X);
+   CHOOSE(ISL_TILING_W);
+   CHOOSE(ISL_TILING_LINEAR);
+
+   #undef CHOOSE
+   return notify_failure(info, "no supported tiling");
+}
+
+bool
+isl_surf_init_interleaved_arrays(const struct isl_device *dev,
+                                 uint32_t total_surf,
+                                 struct isl_surf **surfs,
+                                 uint32_t *surfs_offsets,
+                                 const struct isl_surf_init_info *infos)
+{
+   /* Adjusting the array pitch is only supported on GFX 8+ */
+   assert(ISL_GFX_VER(dev) >= 8);
+   assert(total_surf <= ISL_SURF_MAX_INTERLEAVED_ARRAYS);
+
+   /* Do a first pass to gather uninterleave surface layouts */
+   bool result = true;
+   struct isl_surf uninterleaved_surfs[ISL_SURF_MAX_INTERLEAVED_ARRAYS];
+   uint32_t offset_align_B[ISL_SURF_MAX_INTERLEAVED_ARRAYS];
+   for (uint32_t i = 0; i < total_surf; i++)
+      result &= isl_surf_init_s(dev, &uninterleaved_surfs[i], &infos[i]);
+
+   if (!result)
+      return result;
+
+   /* Compute a single slice pitch by adding up each of the surface's slice
+    * size. Take care to align the each surface to its alignment requirement
+    * and align the size of each slice to a full tile.
+    */
+   uint64_t array_pitch_B = 0;
+   for (uint32_t i = 0; i < total_surf; i++) {
+      struct isl_tile_info tile_info;
+      isl_surf_get_tile_info(&uninterleaved_surfs[i], &tile_info);
+
+      if (i > 0) {
+         /* Combining surfaces with different alignments, row pitches, or tiling
+          * is not handled properly, as NV12+TileY is the only layout currently
+          * supported by the driver in this type of surface.
+          *
+          * See this commit for a version that doesn't have this restriction:
+          * https://gitlab.freedesktop.org/mesa/mesa/-/commit/3c37183265f11e2ee6bc6d4d95e1580a41673636
+          */
+         assert(uninterleaved_surfs[0].alignment_B == uninterleaved_surfs[i].alignment_B);
+         assert(uninterleaved_surfs[0].row_pitch_B == uninterleaved_surfs[i].row_pitch_B);
+         assert(uninterleaved_surfs[0].tiling == uninterleaved_surfs[i].tiling);
+
+         offset_align_B[i] = uninterleaved_surfs[i].alignment_B;
+
+         /* If its a multi-planar video coding surface, make sure each offset
+          * is also aligned to a multiple of 16 * row_pitch_B relative to the
+          * first surface.
+          *
+          * SKL PRM Vol 2a, MFX_SURFACE_STATE::YOffsetForUCb:
+          *
+          *     "For PLANAR_420 and PLANAR_422 surface formats, this field
+          *      must be multiple of 16 pixels"
+          */
+         if (uninterleaved_surfs[i].usage & ISL_SURF_USAGE_VIDEO_DECODE_BIT) {
+            offset_align_B[i] =
+               isl_lcm_u32(offset_align_B[i],
+                           uninterleaved_surfs[0].row_pitch_B * 16);
+         }
+
+         array_pitch_B = isl_align_npot(array_pitch_B, offset_align_B[i]);
+      }
+
+      array_pitch_B +=
+         uninterleaved_surfs[i].row_pitch_B *
+         align(uninterleaved_surfs[i].array_pitch_el_rows, tile_info.logical_extent_el.h);
+   }
+   for (uint32_t i = 0; i < total_surf; i++) {
+      array_pitch_B = align(array_pitch_B, uninterleaved_surfs[i].alignment_B);
+   }
+
+   /* Recreate the surfaces using the computed interleaved array pitch. */
+   uint64_t offset = 0;
+   for (uint32_t i = 0; i < total_surf; i++) {
+      struct isl_surf_init_info interleaved_info = infos[i];
+      interleaved_info.array_pitch_B = array_pitch_B;
+
+      result &= isl_surf_init_s(dev, surfs[i], &interleaved_info);
+
+      struct isl_tile_info tile_info;
+      isl_surf_get_tile_info(&uninterleaved_surfs[i], &tile_info);
+
+      if (i > 0) {
+         offset = isl_align_npot(offset, offset_align_B[i]);
+      }
+
+      surfs_offsets[i] = offset;
+
+      offset += (uint64_t)uninterleaved_surfs[i].row_pitch_B *
+         align(uninterleaved_surfs[i].array_pitch_el_rows,
+               tile_info.logical_extent_el.h);
+   }
+
+   return result;
 }
 
 /* Returns divisor+1 if divisor >= num. */
@@ -3611,6 +3815,9 @@ isl_surf_get_hiz_surf(const struct isl_device *dev,
    if (!isl_surf_usage_is_depth(surf->usage))
       return false;
 
+   if (surf->usage & ISL_SURF_USAGE_SPARSE_BIT)
+      return false;
+
    /* From the Sandy Bridge PRM, Vol 2 Part 1,
     * 3DSTATE_DEPTH_BUFFER::Hierarchical Depth Buffer Enable,
     *
@@ -3682,6 +3889,9 @@ isl_surf_get_mcs_surf(const struct isl_device *dev,
    if (surf->usage & ISL_SURF_USAGE_DISABLE_AUX_BIT)
       return false;
 
+   if (surf->usage & ISL_SURF_USAGE_SPARSE_BIT)
+      return false;
+
    /* It must be multisampled with an array layout */
    if (surf->msaa_layout != ISL_MSAA_LAYOUT_ARRAY)
       return false;
@@ -3710,11 +3920,18 @@ isl_surf_get_mcs_surf(const struct isl_device *dev,
       UNREACHABLE("Invalid sample count");
    }
 
+   /* isl_genX(surf_fill_state_s) will assert on us if the QPitch is not
+    * aligned by the main surface's vertical alignment. Align the height of
+    * the image so that the QPitch follows.
+    */
+   const uint32_t aligned_height = isl_align(surf->logical_level0_px.height,
+                                             surf->image_alignment_el.height);
+
    return isl_surf_init(dev, mcs_surf,
                         .dim = ISL_SURF_DIM_2D,
                         .format = mcs_format,
                         .width = surf->logical_level0_px.width,
-                        .height = surf->logical_level0_px.height,
+                        .height = aligned_height,
                         .depth = 1,
                         .levels = 1,
                         .array_len = surf->logical_level0_px.array_len,
@@ -3728,12 +3945,23 @@ _isl_surf_info_supports_ccs(const struct isl_device *dev,
                             enum isl_format format,
                             isl_surf_usage_flags_t usage)
 {
-   if (!isl_format_supports_ccs_d(dev->info, format) &&
-       !isl_format_supports_ccs_e(dev->info, format))
-      return false;
 
-   /* CCS is only for color images on Gfx7-11 */
-   if (ISL_GFX_VER(dev) <= 11 && isl_surf_usage_is_depth_or_stencil(usage))
+   /* On ICL and prior, CCS is only for RGB images.
+    * RGB images must support either CCS_D or CCS_E.
+    */
+   if (isl_format_is_yuv(format) ||
+       isl_surf_usage_is_depth_or_stencil(usage)) {
+      if (ISL_GFX_VER(dev) <= 11)
+         return false;
+   } else {
+      if (!isl_format_supports_ccs_d(dev->info, format) &&
+          !isl_format_supports_ccs_e(dev->info, format))
+         return false;
+   }
+
+   /* With depth surfaces on gfx12, HIZ is required for CCS. */
+   if (ISL_GFX_VER(dev) == 12 && isl_surf_usage_is_depth(usage) &&
+       INTEL_DEBUG(DEBUG_NO_HIZ))
       return false;
 
    /* If the surface will be used for transfering data between the GPU and
@@ -3741,6 +3969,19 @@ _isl_surf_info_supports_ccs(const struct isl_device *dev,
     */
    if (usage & ISL_SURF_USAGE_STAGING_BIT)
       return false;
+
+   /* Xe2 and newer don't require additional space to be allocated by the
+    * driver for plain CCS, so we can trivially allow sparse.
+    */
+   if (ISL_GFX_VER(dev) < 20 && (usage & ISL_SURF_USAGE_SPARSE_BIT)) {
+      if (dev->info->has_flat_ccs) {
+         /* Here we can allow STC_CCS for the same reason. */
+         if (!isl_surf_usage_is_stencil(usage))
+            return false;
+      } else {
+         return false;
+      }
+   }
 
    if (usage & ISL_SURF_USAGE_DISABLE_AUX_BIT)
       return false;
@@ -3753,8 +3994,7 @@ _isl_surf_info_supports_ccs(const struct isl_device *dev,
 
 bool
 isl_surf_supports_ccs(const struct isl_device *dev,
-                      const struct isl_surf *surf,
-                      const struct isl_surf *hiz_or_mcs_surf)
+                      const struct isl_surf *surf)
 {
    if (!_isl_surf_info_supports_ccs(dev, surf->format, surf->usage))
       return false;
@@ -3805,10 +4045,6 @@ isl_surf_supports_ccs(const struct isl_device *dev,
    if (ISL_GFX_VER(dev) >= 9 && surf->tiling == ISL_TILING_X)
       return false;
 
-   /* TODO: add CCS support for Ys/Yf */
-   if (isl_tiling_is_std_y(surf->tiling))
-      return false;
-
    /* Wa_22015614752: There are issues with multiple engines accessing
     * the same CCS cacheline in parallel. This can happen if this image
     * has multiple subresources. Such conflicts can be avoided with
@@ -3828,75 +4064,51 @@ isl_surf_supports_ccs(const struct isl_device *dev,
    }
 
    if (ISL_GFX_VER(dev) == 12) {
-      if (isl_surf_usage_is_stencil(surf->usage)) {
-         /* HiZ and MCS aren't allowed with stencil */
-         assert(hiz_or_mcs_surf == NULL || hiz_or_mcs_surf->size_B == 0);
+      /* Multi-sampled stencil cannot have CCS */
+      if (isl_surf_usage_is_stencil(surf->usage) && surf->samples > 1)
+         return false;
 
-         /* Multi-sampled stencil cannot have CCS */
-         if (surf->samples > 1)
-            return false;
-      } else if (isl_surf_usage_is_depth(surf->usage)) {
-         const struct isl_surf *hiz_surf = hiz_or_mcs_surf;
-
-         /* With depth surfaces, HIZ is required for CCS. */
-         if (hiz_surf == NULL || hiz_surf->size_B == 0)
-            return false;
-
-         assert(hiz_surf->usage & ISL_SURF_USAGE_HIZ_BIT);
-         assert(hiz_surf->tiling == ISL_TILING_HIZ);
-         assert(isl_format_is_hiz(hiz_surf->format));
-      } else if (surf->samples > 1) {
-         const struct isl_surf *mcs_surf = hiz_or_mcs_surf;
-
-         /* With multisampled color, CCS requires MCS */
-         if (mcs_surf == NULL || mcs_surf->size_B == 0)
-            return false;
-
-         assert(mcs_surf->usage & ISL_SURF_USAGE_MCS_BIT);
-         assert(isl_format_is_mcs(mcs_surf->format));
-      } else {
-         /* Single-sampled color can't have MCS or HiZ */
-         assert(hiz_or_mcs_surf == NULL || hiz_or_mcs_surf->size_B == 0);
-
-         /* From Bspec 49252, Render Decompression:
-          *
-          *    "Compressed displayable surfaces must be 16KB aligned and have
-          *    pitches padded to multiple of 4 tiles."
-          *
-          * The drm_fourcc.h header doesn't require the aligned address for
-          * compressed dmabufs, but it does require the aligned pitch.
-          */
-         if (isl_surf_usage_is_display(surf->usage)) {
-            assert(surf->tiling == ISL_TILING_4 ||
-                   surf->tiling == ISL_TILING_Y0);
-            if (surf->row_pitch_B % 512 != 0)
-               return false;
-         }
-
-         /* From BSpec 44930,
-          *
-          *    "Compression of 3D Ys surfaces with 64 or 128 bpp is not
-          *    supported in Gen12. Moreover, "Render Target Fast-clear Enable"
-          *    command is not supported for any 3D Ys surfaces. except when
-          *    Surface is a Procdural Texture."
-          *
-          * It's not clear where the exception applies, but either way, we
-          * don't support Procedural Textures.
-          */
-         if (surf->dim == ISL_SURF_DIM_3D &&
-             surf->tiling == ISL_TILING_ICL_Ys &&
-             isl_format_get_layout(surf->format)->bpb >= 64)
+      /* From Bspec 49252, Render Decompression:
+       *
+       *    "Compressed displayable surfaces must be 16KB aligned and have
+       *    pitches padded to multiple of 4 tiles."
+       *
+       * The drm_fourcc.h header doesn't require the aligned address for
+       * compressed dmabufs, but it does require the aligned pitch.
+       */
+      if (isl_surf_usage_is_display(surf->usage)) {
+         assert(surf->tiling == ISL_TILING_4 ||
+                surf->tiling == ISL_TILING_Y0);
+         if (surf->row_pitch_B % 512 != 0)
             return false;
       }
+
+      /* From BSpec 44930,
+       *
+       *    "Compression of 3D Ys surfaces with 64 or 128 bpp is not
+       *    supported in Gen12. Moreover, "Render Target Fast-clear Enable"
+       *    command is not supported for any 3D Ys surfaces. except when
+       *    Surface is a Procdural Texture."
+       *
+       * It's not clear where the exception applies, but either way, we
+       * don't support Procedural Textures.
+       */
+      if (surf->dim == ISL_SURF_DIM_3D &&
+          surf->tiling == ISL_TILING_ICL_Ys &&
+          isl_format_get_layout(surf->format)->bpb >= 64)
+         return false;
+
+      /* The simulator says that Yf-tiling does not support compression.
+       * Actual hardware hangs and fails CTS tests with this enabled.
+       */
+      if (surf->tiling == ISL_TILING_ICL_Yf)
+         return false;
    } else if (ISL_GFX_VER(dev) < 12) {
       if (surf->samples > 1)
          return false;
 
       /* CCS is only for color images on Gfx7-11 */
       assert(!isl_surf_usage_is_depth_or_stencil(surf->usage));
-
-      /* We're single-sampled color so having HiZ or MCS makes no sense */
-      assert(hiz_or_mcs_surf == NULL || hiz_or_mcs_surf->size_B == 0);
 
       /* The PRM doesn't say this explicitly, but fast-clears don't appear to
        * work for 3D textures until gfx9 where the layout of 3D textures
@@ -3933,7 +4145,7 @@ isl_surf_get_ccs_surf(const struct isl_device *dev,
                       struct isl_surf *ccs_surf,
                       uint32_t row_pitch_B)
 {
-   if (!isl_surf_supports_ccs(dev, surf, NULL))
+   if (!isl_surf_supports_ccs(dev, surf))
       return false;
 
    enum isl_format ccs_format;
@@ -4015,6 +4227,9 @@ isl_surf_get_ccs_surf(const struct isl_device *dev,
       break;                                       \
    case 300:                                       \
       isl_gfx30_##func(__VA_ARGS__);               \
+      break;                                       \
+   case 350:                                       \
+      isl_gfx35_##func(__VA_ARGS__);               \
       break;                                       \
    default:                                        \
       UNREACHABLE("Unknown hardware generation");  \
@@ -4577,8 +4792,21 @@ isl_surf_get_image_surf(const struct isl_device *dev,
    /* Even for cube maps there will be only single face, therefore drop the
     * corresponding flag if present.
     */
-   const isl_surf_usage_flags_t usage =
+   isl_surf_usage_flags_t usage =
       surf->usage & (~ISL_SURF_USAGE_CUBE_BIT);
+
+   if (!util_is_aligned(*offset_B, surf->alignment_B)) {
+      /* Aux-tt alignment only applies to the beginning of the resource. */
+      usage |= ISL_SURF_USAGE_NO_AUX_TT_ALIGNMENT_BIT;
+
+      /* The sparse flag can be dropped if only opaque binds are supported. */
+      usage &= ~ISL_SURF_USAGE_SPARSE_BIT;
+
+      /* Sequential use by multiple engines comes with alignment requirements
+       * that should be ignored.
+       */
+      usage &= ~ISL_SURF_USAGE_MULTI_ENGINE_SEQ_BIT;
+   }
 
    bool ok UNUSED;
    ok = isl_surf_init(dev, image_surf,

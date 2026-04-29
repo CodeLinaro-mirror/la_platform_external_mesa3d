@@ -1,0 +1,335 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "tgsi_aa_point_c_impl",
+    srcs: [
+        "tgsi_aa_point.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_build_c_impl",
+    srcs: [
+        "tgsi_build.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_dump_c_impl",
+    srcs: [
+        "tgsi_dump.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_dynamic_indexing_c_impl",
+    srcs: [
+        "tgsi_dynamic_indexing.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_exec_c_impl",
+    srcs: [
+        "tgsi_exec.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_from_mesa_c_impl",
+    srcs: [
+        "tgsi_from_mesa.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_info_c_impl",
+    srcs: [
+        "tgsi_info.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_iterate_c_impl",
+    srcs: [
+        "tgsi_iterate.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_lowering_c_impl",
+    srcs: [
+        "tgsi_lowering.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_parse_c_impl",
+    srcs: [
+        "tgsi_parse.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_point_sprite_c_impl",
+    srcs: [
+        "tgsi_point_sprite.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_sanity_c_impl",
+    srcs: [
+        "tgsi_sanity.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_scan_c_impl",
+    srcs: [
+        "tgsi_scan.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_strings_c_impl",
+    srcs: [
+        "tgsi_strings.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_text_c_impl",
+    srcs: [
+        "tgsi_text.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_transform_c_impl",
+    srcs: [
+        "tgsi_transform.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_two_side_c_impl",
+    srcs: [
+        "tgsi_two_side.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_ureg_c_impl",
+    srcs: [
+        "tgsi_ureg.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_util_c_impl",
+    srcs: [
+        "tgsi_util.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_vpos_c_impl",
+    srcs: [
+        "tgsi_vpos.c",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_aa_point_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_build_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_dump_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_exec_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_from_mesa_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_info_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_info_opcodes_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_iterate_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_lowering_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_opcode_tmp_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_parse_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_point_sprite_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_sanity_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_scan_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_strings_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_text_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_transform_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_two_side_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_ureg_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_util_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}

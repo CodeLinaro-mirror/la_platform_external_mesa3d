@@ -81,6 +81,7 @@ static const struct debug_named_value fd_debug_options[] = {
    {"nohw",      FD_DBG_NOHW,     "Disable submitting commands to the HW"},
    {"nosbin",    FD_DBG_NOSBIN,   "Execute GMEM bins in raster order instead of 'S' pattern"},
    {"stomp",     FD_DBG_STOMP,    "Enable register stomper"},
+   {"abort",     FD_DBG_ABORT,    "Abort on GPU reset"},
    DEBUG_NAMED_VALUE_END
 };
 /* clang-format on */
@@ -131,6 +132,12 @@ fd_screen_get_timestamp(struct pipe_screen *pscreen)
    }
 }
 
+static uint64_t
+fd_screen_convert_timestamp(struct pipe_screen *pscreen, uint64_t raw_timestamp)
+{
+   return ticks_to_ns(raw_timestamp);
+}
+
 static void
 fd_screen_destroy(struct pipe_screen *pscreen)
 {
@@ -141,6 +148,11 @@ fd_screen_destroy(struct pipe_screen *pscreen)
 
    if (screen->tess_bo)
       fd_bo_del(screen->tess_bo);
+
+   for (int i = 0; i < ARRAY_SIZE(screen->pvtmem); i++) {
+      if (screen->pvtmem[i].bo)
+         fd_bo_del(screen->pvtmem[i].bo);
+   }
 
    if (screen->pipe)
       fd_pipe_del(screen->pipe);
@@ -181,7 +193,7 @@ get_memory_size(struct fd_screen *screen)
    if (fd_device_version(screen->dev) >= FD_VERSION_VA_SIZE) {
       uint64_t va_size;
       if (!fd_pipe_get_param(screen->pipe, FD_VA_SIZE, &va_size)) {
-         system_memory = MIN2(system_memory, va_size);
+         system_memory = MIN2(system_memory / 2, va_size);
       }
    }
 
@@ -203,20 +215,20 @@ fd_query_memory_info(struct pipe_screen *pscreen,
 static void
 fd_init_shader_caps(struct fd_screen *screen)
 {
-   for (unsigned i = 0; i <= PIPE_SHADER_COMPUTE; i++) {
+   for (unsigned i = 0; i <= MESA_SHADER_COMPUTE; i++) {
       struct pipe_shader_caps *caps =
          (struct pipe_shader_caps *)&screen->base.shader_caps[i];
 
       switch (i) {
-      case PIPE_SHADER_TESS_CTRL:
-      case PIPE_SHADER_TESS_EVAL:
-      case PIPE_SHADER_GEOMETRY:
+      case MESA_SHADER_TESS_CTRL:
+      case MESA_SHADER_TESS_EVAL:
+      case MESA_SHADER_GEOMETRY:
          if (!is_a6xx(screen))
             continue;
-         if (screen->info->a6xx.is_a702)
+         if (screen->info->props.is_a702)
             continue;
          break;
-      case PIPE_SHADER_COMPUTE:
+      case MESA_SHADER_COMPUTE:
          if (!has_compute(screen))
             continue;
          break;
@@ -231,11 +243,11 @@ fd_init_shader_caps(struct fd_screen *screen)
 
       caps->max_control_flow_depth = 8; /* XXX */
 
-      caps->max_inputs = is_a6xx(screen) && i != PIPE_SHADER_GEOMETRY ?
-         screen->info->a6xx.vs_max_inputs_count : 16;
+      caps->max_inputs = is_a6xx(screen) && i != MESA_SHADER_GEOMETRY ?
+         screen->info->props.vs_max_inputs_count : 16;
 
       caps->max_outputs =
-         (is_a6xx(screen) && !screen->info->a6xx.is_a702) ? 32 : 16;
+         (is_a6xx(screen) && !screen->info->props.is_a702) ? 32 : 16;
 
       caps->max_temps = 64; /* Max native temporaries. */
 
@@ -261,7 +273,7 @@ fd_init_shader_caps(struct fd_screen *screen)
       caps->int16 =
       caps->fp16 =
          (is_a5xx(screen) || is_a6xx(screen)) &&
-         (i == PIPE_SHADER_COMPUTE || i == PIPE_SHADER_FRAGMENT) &&
+         (i == MESA_SHADER_COMPUTE || i == MESA_SHADER_FRAGMENT) &&
          !FD_DBG(NOFP16);
       caps->glsl_16bit_load_dst = true;
 
@@ -271,9 +283,9 @@ fd_init_shader_caps(struct fd_screen *screen)
       caps->supported_irs =
          (1 << PIPE_SHADER_IR_NIR) |
          /* tgsi_to_nir doesn't support all stages: */
-         COND(i == PIPE_SHADER_VERTEX ||
-              i == PIPE_SHADER_FRAGMENT ||
-              i == PIPE_SHADER_COMPUTE,
+         COND(i == MESA_SHADER_VERTEX ||
+              i == MESA_SHADER_FRAGMENT ||
+              i == MESA_SHADER_COMPUTE,
               1 << PIPE_SHADER_IR_TGSI);
 
       if (is_a6xx(screen)) {
@@ -302,7 +314,7 @@ fd_init_shader_caps(struct fd_screen *screen)
           * but images also need texture state for read access
           * (isam/isam.3d)
           */
-         if (i == PIPE_SHADER_FRAGMENT || i == PIPE_SHADER_COMPUTE) {
+         if (i == MESA_SHADER_FRAGMENT || i == MESA_SHADER_COMPUTE) {
             caps->max_shader_buffers =
             caps->max_shader_images = 24;
          }
@@ -313,31 +325,31 @@ fd_init_shader_caps(struct fd_screen *screen)
 static void
 fd_init_compute_caps(struct fd_screen *screen)
 {
-   const struct fd_dev_info *info = screen->info;
    struct pipe_compute_caps *caps =
       (struct pipe_compute_caps *)&screen->base.compute_caps;
 
    if (!has_compute(screen))
       return;
 
+   /* all things that support compute are ir3 (no a2xx compute): */
+
    struct ir3_compiler *compiler = screen->compiler;
+   const nir_shader_compiler_options *options =
+      ir3_get_compiler_options(compiler);
 
    caps->address_bits = screen->gen >= 5 ? 64 : 32;
 
    caps->grid_dimension = 3;
 
-   caps->max_grid_size[0] =
-   caps->max_grid_size[1] =
-   caps->max_grid_size[2] = 65535;
+   caps->max_grid_size[0] = options->max_workgroup_count[0];
+   caps->max_grid_size[1] = options->max_workgroup_count[1];
+   caps->max_grid_size[2] = options->max_workgroup_count[2];
 
    caps->max_block_size[0] = 1024;
    caps->max_block_size[1] = 1024;
    caps->max_block_size[2] = 64;
 
-   caps->max_threads_per_block = info->threadsize_base * info->max_waves;
-
-   if (is_a6xx(screen) && info->a6xx.supports_double_threadsize)
-      caps->max_threads_per_block *= 2;
+   caps->max_threads_per_block = options->max_workgroup_invocations;
 
    caps->max_global_size = screen->ram_size;
 
@@ -364,6 +376,12 @@ fd_init_screen_caps(struct fd_screen *screen)
    /* this is probably not totally correct.. but it's a start: */
 
    /* Supported features (boolean caps). */
+   if (is_a6xx(screen)) {
+      /* Direct upload is slightly faster without TC, and indirect causes
+       * regression on at least a3xx.
+       */
+      caps->prefer_real_buffer_in_constbuf0 = true;
+   }
    caps->npot_textures = true;
    caps->mixed_framebuffer_sizes = true;
    caps->anisotropic_filter = true;
@@ -380,6 +398,7 @@ fd_init_screen_caps(struct fd_screen *screen)
    caps->glsl_tess_levels_as_inputs = true;
    caps->texture_mirror_clamp_to_edge = true;
    caps->gl_spirv = true;
+   caps->cl_gl_sharing = true;
    caps->fbfetch_coherent = true;
    caps->has_const_bw = true;
 
@@ -444,10 +463,10 @@ fd_init_screen_caps(struct fd_screen *screen)
 
    caps->sampler_reduction_minmax =
    caps->sampler_reduction_minmax_arb =
-      is_a6xx(screen) && screen->info->a6xx.has_sampler_minmax;
+      is_a6xx(screen) && screen->info->props.has_sampler_minmax;
 
    caps->programmable_sample_locations =
-      is_a6xx(screen) && screen->info->a6xx.has_sample_locations;
+      is_a6xx(screen) && screen->info->props.has_sample_locations;
 
    caps->polygon_offset_clamp = is_a4xx(screen) || is_a5xx(screen) || is_a6xx(screen);
 
@@ -487,7 +506,7 @@ fd_init_screen_caps(struct fd_screen *screen)
    caps->doubles = is_ir3(screen);
 
    if (is_a6xx(screen)) {
-      if (screen->info->a6xx.is_a702) {
+      if (screen->info->props.is_a702) {
          /* a702 family is a special case, no gs/tess: */
          caps->glsl_feature_level = 140;
          caps->essl_feature_level = 310;
@@ -546,7 +565,7 @@ fd_init_screen_caps(struct fd_screen *screen)
 
    caps->max_viewports = is_a6xx(screen) ? 16 : 1;
 
-   caps->max_varyings = (is_a6xx(screen) && !screen->info->a6xx.is_a702) ? 31 : 16;
+   caps->max_varyings = (is_a6xx(screen) && !screen->info->props.is_a702) ? 31 : 16;
 
    /* We don't really have a limit on this, it all goes into the main
     * memory buffer. Needs to be at least 120 / 4 (minimum requirement
@@ -573,7 +592,7 @@ fd_init_screen_caps(struct fd_screen *screen)
        * the frontend clip-plane lowering.  So we handle this in the backend
        *
        */
-      screen->base.shader_caps[PIPE_SHADER_GEOMETRY].max_instructions ? 1 :
+      screen->base.shader_caps[MESA_SHADER_GEOMETRY].max_instructions ? 1 :
       /* On a3xx, there is HW support for GL user clip planes that
        * occasionally has to fall back to shader key-based lowering to clip
        * distances in the VS, and we don't support clip distances so that is
@@ -594,7 +613,7 @@ fd_init_screen_caps(struct fd_screen *screen)
 
    /* Stream output. */
    caps->max_vertex_streams =
-      (is_a6xx(screen) && !screen->info->a6xx.is_a702) ?  /* has SO + GS */
+      (is_a6xx(screen) && !screen->info->props.is_a702) ?  /* has SO + GS */
          PIPE_MAX_SO_BUFFERS : 0;
    caps->max_stream_output_buffers = is_ir3(screen) ? PIPE_MAX_SO_BUFFERS : 0;
    caps->stream_output_pause_resume =
@@ -673,12 +692,14 @@ fd_init_screen_caps(struct fd_screen *screen)
    caps->max_texture_anisotropy = 16.0f;
    caps->max_texture_lod_bias = 15.0f;
 
-   caps->shader_clock = is_a6xx(screen);
+   if (is_a6xx(screen)) {
+      caps->shader_clock = true;
+   }
 }
 
 static const struct nir_shader_compiler_options *
 fd_get_compiler_options(struct pipe_screen *pscreen,
-                        enum pipe_shader_type shader)
+                        mesa_shader_stage shader)
 {
    struct fd_screen *screen = fd_screen(pscreen);
 
@@ -845,6 +866,22 @@ fd_screen_get_fd(struct pipe_screen *pscreen)
    return fd_device_fd(screen->dev);
 }
 
+static void
+__debug_init(void)
+{
+   fd_mesa_debug = debug_get_option_fd_mesa_debug();
+
+   if (FD_DBG(NOBIN))
+      fd_binning_enabled = false;
+}
+
+static void
+fd_screen_debug_init(void)
+{
+   static util_once_flag once = UTIL_ONCE_FLAG_INIT;
+   util_call_once(&once, __debug_init);
+}
+
 struct pipe_screen *
 fd_screen_create(int fd,
                  const struct pipe_screen_config *config,
@@ -858,10 +895,7 @@ fd_screen_create(int fd,
    struct pipe_screen *pscreen;
    uint64_t val;
 
-   fd_mesa_debug = debug_get_option_fd_mesa_debug();
-
-   if (FD_DBG(NOBIN))
-      fd_binning_enabled = false;
+   fd_screen_debug_init();
 
    if (!screen)
       return NULL;
@@ -972,6 +1006,8 @@ fd_screen_create(int fd,
          !driQueryOptionb(config->options, "disable_throttling");
    screen->driconf.dual_color_blend_by_location =
          driQueryOptionb(config->options, "dual_color_blend_by_location");
+   if (driQueryOptionb(config->options, "disable_explicit_sync_heuristic"))
+      fd_device_disable_explicit_sync_heuristic(dev);
 
    struct sysinfo si;
    sysinfo(&si);
@@ -991,17 +1027,6 @@ fd_screen_create(int fd,
    screen->dev_info = info;
    screen->info = &screen->dev_info;
 
-   /* explicitly checking for GPU revisions that are known to work.  This
-    * may be overly conservative for a3xx, where spoofing the gpu_id with
-    * the blob driver seems to generate identical cmdstream dumps.  But
-    * on a2xx, there seem to be small differences between the GPU revs
-    * so it is probably better to actually test first on real hardware
-    * before enabling:
-    *
-    * If you have a different adreno version, feel free to add it to one
-    * of the cases below and see what happens.  And if it works, please
-    * send a patch ;-)
-    */
    switch (screen->gen) {
    case 2:
       fd2_screen_init(pscreen);
@@ -1017,6 +1042,7 @@ fd_screen_create(int fd,
       break;
    case 6:
    case 7:
+   case 8:
       fd6_screen_init(pscreen);
       break;
    default:
@@ -1071,6 +1097,9 @@ fd_screen_create(int fd,
 
    pscreen->get_timestamp = fd_screen_get_timestamp;
 
+   if (is_a6xx(screen))
+      pscreen->convert_timestamp = fd_screen_convert_timestamp;
+
    pscreen->fence_reference = _fd_fence_ref;
    pscreen->fence_finish = fd_pipe_fence_finish;
    pscreen->fence_get_fd = fd_pipe_fence_get_fd;
@@ -1105,7 +1134,7 @@ fd_screen_aux_context_get(struct pipe_screen *pscreen)
    simple_mtx_lock(&screen->aux_ctx_lock);
 
    if (!screen->aux_ctx) {
-      screen->aux_ctx = pscreen->context_create(pscreen, NULL, 0);
+      screen->aux_ctx = pscreen->context_create(pscreen, NULL, FD_CONTEXT_FLAG_AUX);
    }
 
    return fd_context(screen->aux_ctx);

@@ -11,6 +11,7 @@
 #include "amd_family.h"
 #include "compiler/shader_enums.h"
 #include "util/format/u_format.h"
+#include "util/u_math.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -36,23 +37,16 @@ extern "C" {
 /* An extension of gl_access_qualifier describing other aspects of memory operations
  * for code generation.
  */
-enum {
-   /* Only one of LOAD/STORE/ATOMIC can be set. */
-   ACCESS_TYPE_LOAD            = BITFIELD_BIT(27),
-   ACCESS_TYPE_STORE           = BITFIELD_BIT(28),
-   ACCESS_TYPE_ATOMIC          = BITFIELD_BIT(29),
-
-   /* This access is expected to use an SMEM instruction if source operands are non-divergent.
-    * Only loads can set this.
-    */
-   ACCESS_TYPE_SMEM            = BITFIELD_BIT(30),
-
+enum ac_access_type {
+   ac_access_type_load,
+   ac_access_type_store,
    /* Whether a store offset or size alignment is less than 4. */
-   ACCESS_MAY_STORE_SUBDWORD   = BITFIELD_BIT(31),
+   ac_access_type_store_subdword,
+   ac_access_type_atomic,
 };
 
-/* GFX6-11. The meaning of these enums is different between chips. They match LLVM definitions,
- * but they can also be used by ACO. Use ac_get_hw_cache_flags to get these.
+/* GFX6-11. The meaning of these enums is different between chips.
+ * Use ac_get_hw_cache_flags to get these.
  */
 enum ac_cache_flags
 {
@@ -155,12 +149,10 @@ enum gfx12_speculative_data_read
 union ac_hw_cache_flags
 {
    struct {
-      /* This matches LLVM, but it can also be used by ACO for translation of ac_memop_flags. */
       uint8_t temporal_hint:3;   /* gfx12_{load,store,atomic}_temporal_hint */
       uint8_t scope:2;           /* gfx12_scope */
-      uint8_t _reserved:1;
       uint8_t swizzled:1;        /* for swizzled buffer access (attribute ring) */
-      uint8_t _pad:1;
+      uint8_t _already_reserved_for_future:2;
    } gfx12;
 
    uint8_t value; /* ac_cache_flags (GFX6-11) or the gfx12 structure */
@@ -243,6 +235,8 @@ enum ac_descriptor_type
    AC_DESC_PLANE_2,
 };
 
+struct ac_compiler_info;
+
 unsigned ac_get_spi_shader_z_format(bool writes_z, bool writes_stencil, bool writes_samplemask,
                                     bool writes_mrt0_alpha);
 
@@ -253,10 +247,10 @@ uint32_t ac_vgt_gs_mode(unsigned gs_max_vert_out, enum amd_gfx_level gfx_level);
 unsigned ac_get_tbuffer_format(enum amd_gfx_level gfx_level, unsigned dfmt, unsigned nfmt);
 
 const struct ac_vtx_format_info *ac_get_vtx_format_info_table(enum amd_gfx_level level,
-                                                              enum radeon_family family);
+                                                              bool has_alpha_adjust_bug);
 
 const struct ac_vtx_format_info *ac_get_vtx_format_info(enum amd_gfx_level level,
-                                                        enum radeon_family family,
+                                                        bool has_alpha_adjust_bug,
                                                         enum pipe_format fmt);
 
 unsigned ac_get_safe_fetch_size(const enum amd_gfx_level gfx_level, const struct ac_vtx_format_info* vtx_info,
@@ -282,7 +276,7 @@ void ac_compute_late_alloc(const struct radeon_info *info, bool ngg, bool ngg_cu
 
 unsigned ac_compute_cs_workgroup_size(const uint16_t sizes[3], bool variable, unsigned max);
 
-unsigned ac_compute_lshs_workgroup_size(enum amd_gfx_level gfx_level, gl_shader_stage stage,
+unsigned ac_compute_lshs_workgroup_size(enum amd_gfx_level gfx_level, mesa_shader_stage stage,
                                         unsigned tess_num_patches,
                                         unsigned tess_patch_in_vtx,
                                         unsigned tess_patch_out_vtx);
@@ -290,7 +284,7 @@ unsigned ac_compute_lshs_workgroup_size(enum amd_gfx_level gfx_level, gl_shader_
 unsigned ac_compute_ngg_workgroup_size(unsigned es_verts, unsigned gs_inst_prims,
                                        unsigned max_vtx_out, unsigned prim_amp_factor);
 
-uint32_t ac_compute_num_tess_patches(const struct radeon_info *info, uint32_t num_tcs_input_cp,
+uint32_t ac_compute_num_tess_patches(const struct ac_compiler_info *info, uint32_t num_tcs_input_cp,
                                      uint32_t num_tcs_output_cp, uint32_t num_mem_tcs_outputs,
                                      uint32_t num_mem_tcs_patch_outputs, uint32_t lds_per_patch,
                                      uint32_t wave_size, bool tess_uses_primid);
@@ -304,7 +298,7 @@ void ac_get_scratch_tmpring_size(const struct radeon_info *info, unsigned num_sc
                                  unsigned bytes_per_wave, uint32_t *tmpring_size);
 
 unsigned
-ac_ngg_get_scratch_lds_size(gl_shader_stage stage,
+ac_ngg_get_scratch_lds_size(mesa_shader_stage stage,
                             unsigned workgroup_size,
                             unsigned wave_size,
                             bool streamout_enabled,
@@ -312,7 +306,8 @@ ac_ngg_get_scratch_lds_size(gl_shader_stage stage,
                             bool compact_primitives);
 
 union ac_hw_cache_flags ac_get_hw_cache_flags(enum amd_gfx_level gfx_level,
-                                              enum gl_access_qualifier access);
+                                              enum gl_access_qualifier access,
+                                              enum ac_access_type type);
 
 unsigned ac_get_all_edge_flag_bits(enum amd_gfx_level gfx_level);
 
@@ -340,11 +335,29 @@ typedef struct {
 } ac_ngg_subgroup_info;
 
 bool
-ac_ngg_compute_subgroup_info(enum amd_gfx_level gfx_level, gl_shader_stage es_stage, bool is_gs,
-                             enum mesa_prim input_prim, unsigned gs_vertices_out, unsigned gs_invocations,
-                             unsigned max_workgroup_size, unsigned wave_size, unsigned esgs_vertex_stride,
-                             unsigned ngg_lds_vertex_size, unsigned ngg_lds_scratch_size, bool tess_turns_off_ngg,
+ac_ngg_compute_subgroup_info(enum amd_gfx_level gfx_level, mesa_shader_stage es_stage, bool is_gs,
+                             enum mesa_prim input_prim, unsigned gs_vertices_out,
+                             unsigned gs_invocations, unsigned target_workgroup_size,
+                             unsigned max_workgroup_size, unsigned wave_size,
+                             unsigned esgs_vertex_stride, unsigned ngg_lds_vertex_size,
+                             unsigned ngg_lds_scratch_size, bool tess_turns_off_ngg,
                              unsigned max_esgs_lds_padding, ac_ngg_subgroup_info *out);
+
+static unsigned inline
+ac_shader_get_lds_alloc_granularity(enum amd_gfx_level gfx_level)
+{
+   return gfx_level >= GFX10_3 ? 1024 : gfx_level >= GFX7 ? 512 : 256;
+}
+
+static unsigned inline
+ac_shader_encode_lds_size(unsigned lds_size, enum amd_gfx_level gfx_level, mesa_shader_stage stage)
+{
+   unsigned lds_increment = ac_shader_get_lds_alloc_granularity(gfx_level);
+   lds_size = align(lds_size, lds_increment);
+
+   unsigned lds_encode_granularity = gfx_level >= GFX11 && stage == MESA_SHADER_FRAGMENT ? 1024 : gfx_level >= GFX7 ? 512 : 256;
+   return lds_size / lds_encode_granularity;
+}
 
 #ifdef __cplusplus
 }

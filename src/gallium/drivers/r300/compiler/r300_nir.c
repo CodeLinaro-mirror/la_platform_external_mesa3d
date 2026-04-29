@@ -128,12 +128,40 @@ remove_clip_vertex(nir_builder *b, nir_instr *instr, UNUSED void *_)
    if (deref->deref_type == nir_deref_type_var &&
        deref->var->data.mode == nir_var_shader_out &&
        deref->var->data.location == VARYING_SLOT_CLIP_VERTEX) {
-       nir_foreach_use_safe(src, &deref->def) {
-          nir_instr_remove(nir_src_parent_instr(src));
-       }
-       nir_instr_remove(instr);
-       return true;
+      nir_foreach_use_safe (src, &deref->def) {
+         nir_instr_remove(nir_src_parent_instr(src));
+      }
+      nir_instr_remove(instr);
+      return true;
    }
+   return false;
+}
+
+static bool
+r300_alu_to_scalar_filter_cb(const nir_instr *instr, const void *data)
+{
+   if (instr->type != nir_instr_type_alu)
+      return false;
+
+   nir_alu_instr *alu = nir_instr_as_alu(instr);
+   switch (alu->op) {
+   case nir_op_ball_fequal2:
+   case nir_op_ball_fequal3:
+   case nir_op_ball_fequal4:
+   case nir_op_bany_fnequal2:
+   case nir_op_bany_fnequal3:
+   case nir_op_bany_fnequal4:
+   case nir_op_ball_iequal2:
+   case nir_op_ball_iequal3:
+   case nir_op_ball_iequal4:
+   case nir_op_bany_inequal2:
+   case nir_op_bany_inequal3:
+   case nir_op_bany_inequal4:
+      return true;
+   default:
+      break;
+   }
+
    return false;
 }
 
@@ -147,12 +175,12 @@ r300_optimize_nir(struct nir_shader *s, struct r300_screen *screen)
       if (nir_shader_instructions_pass(s, remove_clip_vertex,
                                        nir_metadata_control_flow, NULL)) {
          unsigned clip_vertex_location = 0;
-         nir_foreach_variable_with_modes(var, s, nir_var_shader_out) {
+         nir_foreach_variable_with_modes (var, s, nir_var_shader_out) {
             if (var->data.location == VARYING_SLOT_CLIP_VERTEX) {
                clip_vertex_location = var->data.driver_location;
             }
          }
-         nir_foreach_variable_with_modes(var, s, nir_var_shader_out) {
+         nir_foreach_variable_with_modes (var, s, nir_var_shader_out) {
             if (var->data.driver_location > clip_vertex_location) {
                var->data.driver_location--;
             }
@@ -168,7 +196,8 @@ r300_optimize_nir(struct nir_shader *s, struct r300_screen *screen)
       progress = false;
       NIR_PASS(_, s, nir_lower_vars_to_ssa);
 
-      NIR_PASS(progress, s, nir_copy_prop);
+      NIR_PASS(progress, s, nir_lower_alu_to_scalar, r300_alu_to_scalar_filter_cb, NULL);
+      NIR_PASS(progress, s, nir_opt_copy_prop);
       NIR_PASS(progress, s, r300_nir_lower_flrp);
       NIR_PASS(progress, s, nir_opt_algebraic);
       if (s->info.stage == MESA_SHADER_VERTEX) {

@@ -26,6 +26,7 @@
 
 #include "anv_private.h"
 #include "anv_measure.h"
+#include "anv_nir.h"
 
 #include "genxml/gen_macros.h"
 #include "genxml/genX_pack.h"
@@ -35,31 +36,16 @@
 
 #include "genX_mi_builder.h"
 
-static void
-cmd_buffer_alloc_gfx_push_constants(struct anv_cmd_buffer *cmd_buffer)
+static VkShaderStageFlags
+batch_emit_push_constants(struct anv_batch *batch,
+                          struct anv_device *device,
+                          VkShaderStageFlags stages)
 {
-   struct anv_cmd_graphics_state *gfx = &cmd_buffer->state.gfx;
-   VkShaderStageFlags stages = gfx->active_stages;
-
-   /* In order to avoid thrash, we assume that vertex and fragment stages
-    * always exist.  In the rare case where one is missing *and* the other
-    * uses push concstants, this may be suboptimal.  However, avoiding stalls
-    * seems more important.
-    */
-   stages |= VK_SHADER_STAGE_FRAGMENT_BIT;
-   if (anv_gfx_has_stage(gfx, MESA_SHADER_VERTEX))
-      stages |= VK_SHADER_STAGE_VERTEX_BIT;
-
-   if (stages == cmd_buffer->state.gfx.push_constant_stages)
-      return;
-
    unsigned push_constant_kb;
-
-   const struct intel_device_info *devinfo = cmd_buffer->device->info;
-   if (anv_gfx_has_stage(gfx, MESA_SHADER_MESH))
-      push_constant_kb = devinfo->mesh_max_constant_urb_size_kb;
+   if (stages & VK_SHADER_STAGE_MESH_BIT_EXT)
+      push_constant_kb = device->info->mesh_max_constant_urb_size_kb;
    else
-      push_constant_kb = devinfo->max_constant_urb_size_kb;
+      push_constant_kb = device->info->max_constant_urb_size_kb;
 
    const unsigned num_stages =
       util_bitcount(stages & VK_SHADER_STAGE_ALL_GRAPHICS);
@@ -75,8 +61,7 @@ cmd_buffer_alloc_gfx_push_constants(struct anv_cmd_buffer *cmd_buffer)
    uint32_t kb_used = 0;
    for (int i = MESA_SHADER_VERTEX; i < MESA_SHADER_FRAGMENT; i++) {
       const unsigned push_size = (stages & (1 << i)) ? size_per_stage : 0;
-      anv_batch_emit(&cmd_buffer->batch,
-                     GENX(3DSTATE_PUSH_CONSTANT_ALLOC_VS), alloc) {
+      anv_batch_emit(batch, GENX(3DSTATE_PUSH_CONSTANT_ALLOC_VS), alloc) {
          alloc._3DCommandSubOpcode  = 18 + i;
          alloc.ConstantBufferOffset = (push_size > 0) ? kb_used : 0;
          alloc.ConstantBufferSize   = push_size;
@@ -84,8 +69,7 @@ cmd_buffer_alloc_gfx_push_constants(struct anv_cmd_buffer *cmd_buffer)
       kb_used += push_size;
    }
 
-   anv_batch_emit(&cmd_buffer->batch,
-                  GENX(3DSTATE_PUSH_CONSTANT_ALLOC_PS), alloc) {
+   anv_batch_emit(batch, GENX(3DSTATE_PUSH_CONSTANT_ALLOC_PS), alloc) {
       alloc.ConstantBufferOffset = kb_used;
       alloc.ConstantBufferSize = push_constant_kb - kb_used;
    }
@@ -98,14 +82,37 @@ cmd_buffer_alloc_gfx_push_constants(struct anv_cmd_buffer *cmd_buffer)
     * program push constant command(ZERO length) without any commit between
     * them.
     */
-   anv_batch_emit(&cmd_buffer->batch, GENX(3DSTATE_CONSTANT_ALL), c) {
+   anv_batch_emit(batch, GENX(3DSTATE_CONSTANT_ALL), c) {
       /* Update empty push constants for all stages (bitmask = 11111b) */
       c.ShaderUpdateEnable = 0x1f;
-      c.MOCS = anv_mocs(cmd_buffer->device, NULL, 0);
+      c.MOCS = anv_mocs(device, NULL, 0);
    }
 #endif
 
-   cmd_buffer->state.gfx.push_constant_stages = stages;
+   return stages;
+}
+
+void
+genX(batch_emit_push_constants)(struct anv_batch *batch,
+                                struct anv_device *device,
+                                VkShaderStageFlags stages)
+{
+   batch_emit_push_constants(batch, device, stages);
+}
+
+static void
+cmd_buffer_alloc_gfx_push_constants(struct anv_cmd_buffer *cmd_buffer)
+{
+   struct anv_cmd_graphics_state *gfx = &cmd_buffer->state.gfx;
+   const VkShaderStageFlags stages =
+      genX(push_constant_alloc_stages)(gfx->active_stages);
+
+   if (cmd_buffer->state.gfx.push_constant_stages == stages)
+      return;
+
+   batch_emit_push_constants(&cmd_buffer->batch, cmd_buffer->device, stages);
+
+   gfx->push_constant_stages = stages;
 
    /* From the BDW PRM for 3DSTATE_PUSH_CONSTANT_ALLOC_VS:
     *
@@ -150,40 +157,39 @@ cmd_buffer_emit_descriptor_pointers(struct anv_cmd_buffer *cmd_buffer,
          }
       }
 
-      /* Always emit binding table pointers if we're asked to, since on SKL
-       * this is what flushes push constants. */
-      anv_batch_emit(&cmd_buffer->batch,
-                     GENX(3DSTATE_BINDING_TABLE_POINTERS_VS), btp) {
-         btp._3DCommandSubOpcode = binding_table_opcodes[s];
-         btp.PointertoVSBindingTable = cmd_buffer->state.binding_tables[s].offset;
+      if (cmd_buffer->state.binding_tables[s].alloc_size > 0) {
+         anv_batch_emit(&cmd_buffer->batch,
+                        GENX(3DSTATE_BINDING_TABLE_POINTERS_VS), btp) {
+            btp._3DCommandSubOpcode = binding_table_opcodes[s];
+            btp.PointertoVSBindingTable = cmd_buffer->state.binding_tables[s].offset;
+         }
       }
    }
 }
 
 static struct anv_address
 get_push_range_address(struct anv_cmd_buffer *cmd_buffer,
-                       const struct anv_shader_bin *shader,
+                       const struct anv_shader *shader,
                        const struct anv_push_range *range)
 {
    struct anv_cmd_graphics_state *gfx_state = &cmd_buffer->state.gfx;
    switch (range->set) {
-   case ANV_DESCRIPTOR_SET_DESCRIPTORS: {
-      /* This is a descriptor set buffer so the set index is
-       * actually given by binding->binding.  (Yes, that's
-       * confusing.)
-       */
-      struct anv_descriptor_set *set =
-         gfx_state->base.descriptors[range->index];
-      return anv_descriptor_set_address(set);
-   }
-
-   case ANV_DESCRIPTOR_SET_DESCRIPTORS_BUFFER: {
-      return anv_address_from_u64(
-         anv_cmd_buffer_descriptor_buffer_address(
-            cmd_buffer,
-            gfx_state->base.descriptor_buffers[range->index].buffer_index) +
-         gfx_state->base.descriptor_buffers[range->index].buffer_offset);
-   }
+   case ANV_DESCRIPTOR_SET_DESCRIPTORS:
+      if (shader->bind_map.layout_type == ANV_PIPELINE_DESCRIPTOR_SET_LAYOUT_TYPE_BUFFER) {
+         return anv_address_from_u64(
+            anv_cmd_buffer_descriptor_buffer_address(
+               cmd_buffer,
+               gfx_state->base.descriptor_buffers[range->index].buffer_index) +
+            gfx_state->base.descriptor_buffers[range->index].buffer_offset);
+      } else {
+         /* This is a descriptor set buffer so the set index is
+          * actually given by binding->binding.  (Yes, that's
+          * confusing.)
+          */
+         struct anv_descriptor_set *set =
+            gfx_state->base.descriptors[range->index];
+         return anv_descriptor_set_address(set);
+      }
 
    case ANV_DESCRIPTOR_SET_PUSH_CONSTANTS: {
       if (gfx_state->base.push_constants_state.alloc_size == 0) {
@@ -242,24 +248,28 @@ get_push_range_address(struct anv_cmd_buffer *cmd_buffer,
  */
 static uint32_t
 get_push_range_bound_size(struct anv_cmd_buffer *cmd_buffer,
-                          const struct anv_shader_bin *shader,
+                          const struct anv_shader *shader,
                           const struct anv_push_range *range)
 {
-   assert(shader->stage != MESA_SHADER_COMPUTE);
+   assert(shader->vk.stage != MESA_SHADER_COMPUTE);
    const struct anv_cmd_graphics_state *gfx_state = &cmd_buffer->state.gfx;
    switch (range->set) {
-   case ANV_DESCRIPTOR_SET_DESCRIPTORS: {
-      struct anv_descriptor_set *set =
-         gfx_state->base.descriptors[range->index];
-      struct anv_state state = set->desc_surface_mem;
-      assert(range->start * 32 < state.alloc_size);
-      assert((range->start + range->length) * 32 <= state.alloc_size);
-      return state.alloc_size;
-   }
-
-   case ANV_DESCRIPTOR_SET_DESCRIPTORS_BUFFER:
-      return gfx_state->base.pipeline->layout.set_layouts[
-         range->index]->descriptor_buffer_surface_size;
+   case ANV_DESCRIPTOR_SET_DESCRIPTORS:
+      if (shader->bind_map.layout_type == ANV_PIPELINE_DESCRIPTOR_SET_LAYOUT_TYPE_BUFFER) {
+         /* It's hard to bound a reference to a descriptor buffer because we
+          * don't have an actual buffer, only an address. So just return the
+          * maximum size of the heap (which bounds the largest buffer size).
+          */
+         return anv_physical_device_bindless_heap_size(
+            cmd_buffer->device->physical, true);
+      } else {
+         struct anv_descriptor_set *set =
+            gfx_state->base.descriptors[range->index];
+         struct anv_state state = set->desc_surface_mem;
+         assert(range->start * 32 < state.alloc_size);
+         assert((range->start + range->length) * 32 <= state.alloc_size);
+         return state.alloc_size;
+      }
 
    case ANV_DESCRIPTOR_SET_NULL:
    case ANV_DESCRIPTOR_SET_PUSH_CONSTANTS:
@@ -301,7 +311,7 @@ get_push_range_bound_size(struct anv_cmd_buffer *cmd_buffer,
          uint32_t bound_range = MIN2(desc->range, desc->buffer->vk.size - offset);
 
          /* Align the range for consistency */
-         bound_range = align(bound_range, ANV_UBO_ALIGNMENT);
+         bound_range = align(bound_range, ANV_UBO_BOUNDS_CHECK_ALIGNMENT);
 
          return bound_range;
       }
@@ -311,7 +321,7 @@ get_push_range_bound_size(struct anv_cmd_buffer *cmd_buffer,
 
 static void
 cmd_buffer_emit_push_constant(struct anv_cmd_buffer *cmd_buffer,
-                              gl_shader_stage stage,
+                              mesa_shader_stage stage,
                               struct anv_address *buffers,
                               unsigned buffer_count)
 {
@@ -395,7 +405,7 @@ cmd_buffer_emit_push_constant_all(struct anv_cmd_buffer *cmd_buffer,
 
    const struct anv_cmd_graphics_state *gfx = &cmd_buffer->state.gfx;
 
-   gl_shader_stage stage = vk_to_mesa_shader_stage(shader_mask);
+   mesa_shader_stage stage = vk_to_mesa_shader_stage(shader_mask);
 
    const struct anv_pipeline_bind_map *bind_map =
       &gfx->shaders[stage]->bind_map;
@@ -439,43 +449,35 @@ cmd_buffer_flush_gfx_push_constants(struct anv_cmd_buffer *cmd_buffer,
       if (!anv_gfx_has_stage(gfx, stage))
          continue;
 
-      const struct anv_shader_bin *shader = gfx->shaders[stage];
-      if (shader->prog_data->zero_push_reg) {
-         const struct anv_pipeline_bind_map *bind_map = &shader->bind_map;
-         struct anv_push_constants *push = &gfx->base.push_constants;
+      const struct anv_shader *shader = gfx->shaders[stage];
+      const struct anv_pipeline_bind_map *bind_map = &shader->bind_map;
+      struct anv_push_constants *push = &gfx->base.push_constants;
+      u_foreach_bit(r, shader->prog_data->robust_ubo_ranges) {
+         const struct anv_push_range *range = &bind_map->push_ranges[r];
 
-         push->gfx.push_reg_mask[stage] = 0;
-         /* Start of the current range in the shader, relative to the start of
-          * push constants in the shader.
-          */
-         unsigned range_start_reg = 0;
-         for (unsigned i = 0; i < 4; i++) {
-            const struct anv_push_range *range = &bind_map->push_ranges[i];
-            if (range->length == 0)
-               continue;
+         assert(range->length != 0);
+         assert(range->set < MAX_SETS);
 
-            /* Never clear this padding register as it might contain payload
-             * data.
-             */
-            if (range->set == ANV_DESCRIPTOR_SET_PER_PRIM_PADDING)
-               continue;
+         unsigned bound_size =
+            get_push_range_bound_size(cmd_buffer, shader, range);
 
-            unsigned bound_size =
-               get_push_range_bound_size(cmd_buffer, shader, range);
-            if (bound_size >= range->start * 32) {
-               unsigned bound_regs =
-                  MIN2(DIV_ROUND_UP(bound_size, 32) - range->start,
-                       range->length);
-               assert(range_start_reg + bound_regs <= 64);
-               push->gfx.push_reg_mask[stage] |=
-                  BITFIELD64_RANGE(range_start_reg, bound_regs);
-            }
+         uint8_t range_mask = 0;
 
+         /* Determine the bound length of the range in 16-byte units */
+         if (bound_size > range->start * 32) {
+            bound_size = MIN2(
+               DIV_ROUND_UP(bound_size - range->start * 32, 16),
+               2 * range->length);
+               range_mask = (uint8_t) bound_size;
+               assert(bound_size < 256);
+         }
+
+         /* Update the pushed bound length constant if it changed */
+         if (range_mask != push->gfx.push_reg_mask[stage][r]) {
+            push->gfx.push_reg_mask[stage][r] = range_mask;
             cmd_buffer->state.push_constants_dirty |=
                mesa_to_vk_shader_stage(stage);
             gfx->base.push_constants_data_dirty = true;
-
-            range_start_reg += range->length;
          }
       }
    }
@@ -502,7 +504,7 @@ cmd_buffer_flush_gfx_push_constants(struct anv_cmd_buffer *cmd_buffer,
 
       struct anv_address buffers[4] = {};
       if (anv_gfx_has_stage(gfx, stage)) {
-         const struct anv_shader_bin *shader = gfx->shaders[stage];
+         const struct anv_shader *shader = gfx->shaders[stage];
          const struct anv_pipeline_bind_map *bind_map = &shader->bind_map;
 
          /* We have to gather buffer addresses as a second step because the
@@ -584,9 +586,9 @@ cmd_buffer_flush_gfx_push_constants(struct anv_cmd_buffer *cmd_buffer,
 static inline uint64_t
 get_mesh_task_push_addr64(struct anv_cmd_buffer *cmd_buffer,
                           struct anv_cmd_graphics_state *gfx,
-                          gl_shader_stage stage)
+                          mesa_shader_stage stage)
 {
-   const struct anv_shader_bin *shader = gfx->shaders[stage];
+   const struct anv_shader *shader = gfx->shaders[stage];
    const struct anv_pipeline_bind_map *bind_map = &shader->bind_map;
    if (bind_map->push_ranges[0].length == 0)
       return 0;
@@ -603,6 +605,36 @@ get_mesh_task_push_addr64(struct anv_cmd_buffer *cmd_buffer,
          bind_map->push_ranges[0].start * 32));
 }
 
+static inline void
+fill_inline_params(uint32_t *inline_data,
+                   const struct anv_pipeline_bind_map *bind_map,
+                   struct anv_cmd_graphics_state *gfx,
+                   uint64_t push_addr64)
+{
+   const uint32_t *push_data = (const uint32_t *) &gfx->base.push_constants;
+
+   for (uint32_t i = 0; i < bind_map->inline_dwords_count; i++) {
+      switch (bind_map->inline_dwords[i]) {
+      case ANV_INLINE_DWORD_PUSH_ADDRESS_LDW:
+         inline_data[i] = push_addr64 & 0xffffffff;
+         break;
+      case ANV_INLINE_DWORD_PUSH_ADDRESS_UDW:
+         inline_data[i] = push_addr64 >> 32;
+         break;
+      case anv_drv_const_dword(gfx.mesh_provoking_vertex): {
+         const struct brw_mesh_prog_data *mesh_prog_data = get_gfx_mesh_prog_data(gfx);
+         inline_data[i] = gfx->dyn_state.mesh_provoking_vertex |
+                          ((gfx->shaders[MESA_SHADER_MESH]->kernel.offset +
+                            mesh_prog_data->wa_18019110168_mapping_offset) >> 16);
+         break;
+      }
+      default:
+         inline_data[i] = push_data[bind_map->inline_dwords[i]];
+         break;
+      }
+   }
+}
+
 static void
 cmd_buffer_flush_mesh_inline_data(struct anv_cmd_buffer *cmd_buffer,
                                   VkShaderStageFlags dirty_stages)
@@ -611,58 +643,76 @@ cmd_buffer_flush_mesh_inline_data(struct anv_cmd_buffer *cmd_buffer,
 
    if (dirty_stages & VK_SHADER_STAGE_TASK_BIT_EXT &&
        anv_gfx_has_stage(gfx, MESA_SHADER_TASK)) {
+      const struct anv_pipeline_bind_map *bind_map =
+         &gfx->shaders[MESA_SHADER_TASK]->bind_map;
       uint64_t push_addr64 =
          get_mesh_task_push_addr64(cmd_buffer, gfx, MESA_SHADER_TASK);
 
-      anv_batch_emit(&cmd_buffer->batch, GENX(3DSTATE_TASK_SHADER_DATA), data) {
-         data.InlineData[ANV_INLINE_PARAM_PUSH_ADDRESS_OFFSET / 4 + 0] = push_addr64 & 0xffffffff;
-         data.InlineData[ANV_INLINE_PARAM_PUSH_ADDRESS_OFFSET / 4 + 1] = push_addr64 >> 32;
-      }
+      anv_batch_emit(&cmd_buffer->batch, GENX(3DSTATE_TASK_SHADER_DATA), data)
+         fill_inline_params(data.InlineData, bind_map, gfx, push_addr64);
    }
 
    if (dirty_stages & VK_SHADER_STAGE_MESH_BIT_EXT &&
        anv_gfx_has_stage(gfx, MESA_SHADER_MESH)) {
+      const struct anv_pipeline_bind_map *bind_map =
+         &gfx->shaders[MESA_SHADER_MESH]->bind_map;
       uint64_t push_addr64 =
          get_mesh_task_push_addr64(cmd_buffer, gfx, MESA_SHADER_MESH);
 
-      anv_batch_emit(&cmd_buffer->batch, GENX(3DSTATE_MESH_SHADER_DATA), data) {
-         data.InlineData[ANV_INLINE_PARAM_PUSH_ADDRESS_OFFSET / 4 + 0] = push_addr64 & 0xffffffff;
-         data.InlineData[ANV_INLINE_PARAM_PUSH_ADDRESS_OFFSET / 4 + 1] = push_addr64 >> 32;
-         data.InlineData[ANV_INLINE_PARAM_MESH_PROVOKING_VERTEX / 4]   = gfx->dyn_state.mesh_provoking_vertex;
-      }
+      anv_batch_emit(&cmd_buffer->batch, GENX(3DSTATE_MESH_SHADER_DATA), data)
+         fill_inline_params(data.InlineData, bind_map, gfx, push_addr64);
    }
-
-   cmd_buffer->state.push_constants_dirty &= ~dirty_stages;
 }
 #endif
 
 ALWAYS_INLINE static void
 cmd_buffer_maybe_flush_rt_writes(struct anv_cmd_buffer *cmd_buffer,
-                                 const struct anv_graphics_pipeline *pipeline)
+                                 struct anv_cmd_graphics_state *gfx,
+                                 const struct vk_dynamic_graphics_state *dyn)
 {
-   if (!anv_pipeline_has_stage(pipeline, MESA_SHADER_FRAGMENT))
+   if (!anv_gfx_has_stage(gfx, MESA_SHADER_FRAGMENT))
       return;
 
-   UNUSED bool need_rt_flush = false;
-   for (uint32_t rt = 0; rt < pipeline->num_color_outputs; rt++) {
-      /* No writes going to this render target so it won't affect the RT cache
-       */
-      if (pipeline->color_output_mapping[rt] == ANV_COLOR_OUTPUT_UNUSED)
-         continue;
+   /* Count the number of color attachments in the binding table */
+   const struct anv_pipeline_bind_map *bind_map =
+      &gfx->shaders[MESA_SHADER_FRAGMENT]->bind_map;
 
-      /* No change */
-      if (cmd_buffer->state.gfx.color_output_mapping[rt] ==
-          pipeline->color_output_mapping[rt])
-         continue;
-
-      cmd_buffer->state.gfx.color_output_mapping[rt] =
-         pipeline->color_output_mapping[rt];
-      need_rt_flush = true;
-      cmd_buffer->state.descriptors_dirty |= VK_SHADER_STAGE_FRAGMENT_BIT;
+   /* Build a map of fragment color output to attachment */
+   uint8_t rt_to_att[MAX_RTS];
+   memset(rt_to_att, ANV_COLOR_OUTPUT_DISABLED, MAX_RTS);
+   for (uint32_t i = 0; i < gfx->color_att_count; i++) {
+      if (dyn->cal.color_map[i] != MESA_VK_ATTACHMENT_UNUSED)
+         rt_to_att[dyn->cal.color_map[i]] = i;
    }
 
-#if GFX_VER >= 11
+   /* For each fragment shader output if not unused apply the remapping to
+    * pipeline->color_output_mapping
+    */
+   UNUSED bool need_rt_flush = false;
+   for (unsigned rt = 0; rt < MIN2(bind_map->surface_count, MAX_RTS); rt++) {
+      if (bind_map->surface_to_descriptor[rt].set !=
+          ANV_DESCRIPTOR_SET_COLOR_ATTACHMENTS)
+         break;
+
+      uint32_t index = bind_map->surface_to_descriptor[rt].index;
+      if (index == ANV_COLOR_OUTPUT_UNUSED)
+         continue;
+
+      if (index == ANV_COLOR_OUTPUT_DISABLED &&
+          gfx->color_output_mapping[rt] != index) {
+         gfx->color_output_mapping[rt] = index;
+         need_rt_flush = true;
+      } else if (gfx->color_output_mapping[rt] != rt_to_att[rt])  {
+         gfx->color_output_mapping[rt] = rt_to_att[rt];
+         need_rt_flush = true;
+      }
+   }
+
    if (need_rt_flush) {
+      anv_cmd_buffer_dirty_descriptors(cmd_buffer,
+                                       VK_SHADER_STAGE_FRAGMENT_BIT,
+                                       "render target remap");
+#if GFX_VER >= 11
       /* The PIPE_CONTROL command description says:
        *
        *    "Whenever a Binding Table Index (BTI) used by a Render Target Message
@@ -679,11 +729,12 @@ cmd_buffer_maybe_flush_rt_writes(struct anv_cmd_buffer *cmd_buffer,
        * in the shader always send the color.
        */
       anv_add_pending_pipe_bits(cmd_buffer,
-                                ANV_PIPE_RENDER_TARGET_CACHE_FLUSH_BIT |
-                                ANV_PIPE_STALL_AT_SCOREBOARD_BIT,
+                                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                ANV_PIPE_RT_BTI_CHANGE,
                                 "change RT due to shader outputs");
-   }
 #endif
+   }
 }
 
 ALWAYS_INLINE static void
@@ -743,8 +794,6 @@ cmd_buffer_flush_gfx_state(struct anv_cmd_buffer *cmd_buffer)
 {
    struct anv_device *device = cmd_buffer->device;
    struct anv_cmd_graphics_state *gfx = &cmd_buffer->state.gfx;
-   struct anv_graphics_pipeline *pipeline =
-      anv_pipeline_to_graphics(gfx->base.pipeline);
    const struct vk_dynamic_graphics_state *dyn =
       &cmd_buffer->vk.dynamic_graphics_state;
 
@@ -756,7 +805,7 @@ cmd_buffer_flush_gfx_state(struct anv_cmd_buffer *cmd_buffer)
 
    genX(cmd_buffer_emit_hashing_mode)(cmd_buffer, UINT_MAX, UINT_MAX, 1);
 
-   genX(flush_descriptor_buffers)(cmd_buffer, &cmd_buffer->state.gfx.base);
+   genX(flush_descriptor_buffers)(cmd_buffer, &gfx->base, gfx->active_stages);
 
    genX(flush_pipeline_select_3d)(cmd_buffer);
 
@@ -765,16 +814,29 @@ cmd_buffer_flush_gfx_state(struct anv_cmd_buffer *cmd_buffer)
        *
        * Apply task URB workaround when switching from task to primitive.
        */
-      if (anv_pipeline_is_primitive(pipeline)) {
+      if (!anv_gfx_has_stage(gfx, MESA_SHADER_MESH)) {
          genX(apply_task_urb_workaround)(cmd_buffer);
-      } else if (anv_pipeline_has_stage(pipeline, MESA_SHADER_TASK)) {
+      } else if (anv_gfx_has_stage(gfx, MESA_SHADER_TASK)) {
          cmd_buffer->state.gfx.used_task_shader = true;
       }
    }
 
    if (BITSET_TEST(dyn->dirty, MESA_VK_DYNAMIC_COLOR_ATTACHMENT_MAP) ||
        (cmd_buffer->state.gfx.dirty & ANV_CMD_DIRTY_PS))
-      cmd_buffer_maybe_flush_rt_writes(cmd_buffer, pipeline);
+      cmd_buffer_maybe_flush_rt_writes(cmd_buffer, gfx, dyn);
+
+   /* With Wa_14024015672, RHWO is initially disabled. We enable it for MSAA
+    * draws and disable for single sample  unless explicitly disabled via
+    * drirc key.
+    */
+#if INTEL_WA_14024015672_GFX_VER
+   if (intel_needs_workaround(device->info, 14024015672) &&
+       BITSET_TEST(dyn->dirty, MESA_VK_DYNAMIC_MS_RASTERIZATION_SAMPLES)) {
+      cmd_buffer->state.pending_rhwo_optimization_enabled =
+         !device->physical->instance->intel_enable_wa_14024015672_msaa &&
+         dyn->ms.rasterization_samples > 1;
+   }
+#endif
 
    /* Apply any pending pipeline flushes we may have.  We want to apply them
     * now because, if any of those flushes are for things like push constants,
@@ -799,19 +861,30 @@ cmd_buffer_flush_gfx_state(struct anv_cmd_buffer *cmd_buffer)
 
    const bool any_dynamic_state_dirty =
       vk_dynamic_graphics_state_any_dirty(dyn);
-   uint32_t descriptors_dirty = cmd_buffer->state.descriptors_dirty &
-                                gfx->active_stages;
 
-   descriptors_dirty |=
+   cmd_buffer->state.descriptors_dirty |=
       genX(cmd_buffer_flush_push_descriptors)(cmd_buffer,
                                               &cmd_buffer->state.gfx.base);
 
-   if (!cmd_buffer->state.gfx.dirty && !descriptors_dirty &&
+   uint32_t descriptors_dirty = cmd_buffer->state.descriptors_dirty &
+                                gfx->active_stages;
+   cmd_buffer->state.descriptors_pointers_dirty |=
+      descriptors_dirty & VK_SHADER_STAGE_ALL_GRAPHICS;
+   uint32_t descriptors_pointers_dirty =
+      cmd_buffer->state.descriptors_pointers_dirty & gfx->active_stages;
+
+   /* Because we're pushing UBOs, we have to push whenever either descriptors
+    * or push constants is dirty.
+    */
+   uint32_t push_constants_dirty =
+      (cmd_buffer->state.push_constants_dirty |
+       cmd_buffer->state.descriptors_dirty) & gfx->active_stages;
+
+   if (!cmd_buffer->state.gfx.dirty &&
+       !descriptors_dirty &&
+       !descriptors_pointers_dirty &&
        !any_dynamic_state_dirty &&
-       ((cmd_buffer->state.push_constants_dirty &
-         (VK_SHADER_STAGE_ALL_GRAPHICS |
-          VK_SHADER_STAGE_TASK_BIT_EXT |
-          VK_SHADER_STAGE_MESH_BIT_EXT)) == 0))
+       !push_constants_dirty)
       return;
 
    if (cmd_buffer->state.gfx.dirty & ANV_CMD_DIRTY_XFB_ENABLE) {
@@ -823,6 +896,8 @@ cmd_buffer_flush_gfx_state(struct anv_cmd_buffer *cmd_buffer)
        */
       if (intel_needs_workaround(device->info, 16011411144)) {
          anv_add_pending_pipe_bits(cmd_buffer,
+                                   VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
+                                   VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
                                    ANV_PIPE_CS_STALL_BIT,
                                    "before SO_BUFFER change WA");
          genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
@@ -858,12 +933,16 @@ cmd_buffer_flush_gfx_state(struct anv_cmd_buffer *cmd_buffer)
       if (intel_needs_workaround(device->info, 16011411144)) {
          /* Wa_16011411144: also CS_STALL after touching SO_BUFFER change */
          anv_add_pending_pipe_bits(cmd_buffer,
+                                   VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
+                                   VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
                                    ANV_PIPE_CS_STALL_BIT,
                                    "after SO_BUFFER change WA");
          genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
       } else if (GFX_VER >= 10) {
          /* CNL and later require a CS stall after 3DSTATE_SO_BUFFER */
          anv_add_pending_pipe_bits(cmd_buffer,
+                                   VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
+                                   VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
                                    ANV_PIPE_CS_STALL_BIT,
                                    "after 3DSTATE_SO_BUFFER call");
       }
@@ -874,23 +953,35 @@ cmd_buffer_flush_gfx_state(struct anv_cmd_buffer *cmd_buffer)
       genX(cmd_buffer_flush_gfx_runtime_state)(cmd_buffer);
 
    /* Flush the HW state into the commmand buffer */
-   if (!BITSET_IS_EMPTY(cmd_buffer->state.gfx.dyn_state.dirty))
+   if (!BITSET_IS_EMPTY(cmd_buffer->state.gfx.dyn_state.emit_dirty))
       genX(cmd_buffer_flush_gfx_hw_state)(cmd_buffer);
 
    /* If the pipeline changed, we may need to re-allocate push constant space
     * in the URB.
     */
-   if (cmd_buffer->state.gfx.dirty & ANV_CMD_DIRTY_PUSH_CONSTANT_SHADERS) {
+   if (cmd_buffer->state.gfx.dirty & ANV_CMD_DIRTY_PUSH_CONSTANT_SHADERS)
       cmd_buffer_alloc_gfx_push_constants(cmd_buffer);
 
-      /* Also add the relocations (scratch buffers) */
-      VkResult result = anv_reloc_list_append(cmd_buffer->batch.relocs,
-                                              pipeline->base.base.batch.relocs);
-      if (result != VK_SUCCESS) {
-         anv_batch_set_error(&cmd_buffer->batch, result);
-         return;
+#if GFX_VERx10 < 125
+   if (cmd_buffer->state.gfx.dirty & (ANV_CMD_DIRTY_VS |
+                                      ANV_CMD_DIRTY_HS |
+                                      ANV_CMD_DIRTY_DS |
+                                      ANV_CMD_DIRTY_GS |
+                                      ANV_CMD_DIRTY_PS)) {
+      for (unsigned s = 0; s <= MESA_SHADER_FRAGMENT; s++) {
+         if (gfx->shaders[s] == NULL)
+            continue;
+
+         /* Also add the relocations (scratch buffers) */
+         VkResult result = anv_reloc_list_append(cmd_buffer->batch.relocs,
+                                                 &gfx->shaders[s]->relocs);
+         if (result != VK_SUCCESS) {
+            anv_batch_set_error(&cmd_buffer->batch, result);
+            return;
+         }
       }
    }
+#endif
 
    /* Render targets live in the same binding table as fragment descriptors */
    if (cmd_buffer->state.gfx.dirty & ANV_CMD_DIRTY_RENDER_TARGETS)
@@ -903,51 +994,50 @@ cmd_buffer_flush_gfx_state(struct anv_cmd_buffer *cmd_buffer)
     * emitting push constants, on SKL+ we have to emit the corresponding
     * 3DSTATE_BINDING_TABLE_POINTER_* for the push constants to take effect.
     */
-   uint32_t dirty = 0;
    if (descriptors_dirty) {
-      dirty = genX(cmd_buffer_flush_descriptor_sets)(
-         cmd_buffer,
-         &cmd_buffer->state.gfx.base,
-         descriptors_dirty,
-         (const struct anv_shader_bin **)gfx->shaders,
-         ARRAY_SIZE(gfx->shaders));
-      cmd_buffer->state.descriptors_dirty &= ~dirty;
+      descriptors_pointers_dirty |=
+         genX(cmd_buffer_flush_descriptor_sets)(
+            cmd_buffer,
+            &cmd_buffer->state.gfx.base,
+            descriptors_dirty,
+            (const struct anv_shader **)gfx->shaders,
+            ARRAY_SIZE(gfx->shaders)) & VK_SHADER_STAGE_ALL_GRAPHICS;
    }
 
-   if (dirty || cmd_buffer->state.push_constants_dirty) {
-      /* Because we're pushing UBOs, we have to push whenever either
-       * descriptors or push constants is dirty.
-       */
-      dirty |= cmd_buffer->state.push_constants_dirty & gfx->active_stages;
+   push_constants_dirty = (cmd_buffer->state.push_constants_dirty |
+                           cmd_buffer->state.descriptors_dirty) & gfx->active_stages;
+   if (push_constants_dirty) {
 #if INTEL_NEEDS_WA_1604061319
       /* Testing shows that all the 3DSTATE_CONSTANT_XS need to be emitted if
        * any stage has 3DSTATE_CONSTANT_XS emitted.
        */
-      dirty |= gfx->active_stages;
+      push_constants_dirty |= gfx->active_stages;
 #endif
-      cmd_buffer_flush_gfx_push_constants(cmd_buffer,
-                                          dirty & VK_SHADER_STAGE_ALL_GRAPHICS);
+      cmd_buffer_flush_gfx_push_constants(
+         cmd_buffer,
+         push_constants_dirty & VK_SHADER_STAGE_ALL_GRAPHICS);
 #if GFX_VERx10 >= 125
       cmd_buffer_flush_mesh_inline_data(
-         cmd_buffer, dirty & (VK_SHADER_STAGE_TASK_BIT_EXT |
-                              VK_SHADER_STAGE_MESH_BIT_EXT));
+         cmd_buffer, push_constants_dirty & (VK_SHADER_STAGE_TASK_BIT_EXT |
+                                             VK_SHADER_STAGE_MESH_BIT_EXT));
 #endif
    }
 
-   if (dirty & VK_SHADER_STAGE_ALL_GRAPHICS) {
-      cmd_buffer_emit_descriptor_pointers(cmd_buffer,
-                                          dirty & VK_SHADER_STAGE_ALL_GRAPHICS);
-   }
+   if (descriptors_pointers_dirty)
+      cmd_buffer_emit_descriptor_pointers(cmd_buffer, descriptors_pointers_dirty);
 
 #if GFX_VER >= 20
    if (cmd_buffer->state.gfx.dirty & ANV_CMD_DIRTY_INDIRECT_DATA_STRIDE) {
       anv_batch_emit(&cmd_buffer->batch, GENX(STATE_BYTE_STRIDE), sb_stride) {
-         sb_stride.ByteStride = cmd_buffer->state.gfx.indirect_data_stride;
-         sb_stride.ByteStrideEnable = !cmd_buffer->state.gfx.indirect_data_stride_aligned;
+         sb_stride.ByteStride = cmd_buffer->state.gfx.indirect_data_stride >> 2;
+         sb_stride.ByteStrideEnable =
+            cmd_buffer->state.gfx.indirect_data_stride_aligned == U_TRISTATE_NO;
       }
    }
 #endif
 
+   cmd_buffer->state.descriptors_dirty &= ~descriptors_dirty;
+   cmd_buffer->state.descriptors_pointers_dirty &= ~descriptors_pointers_dirty;
    cmd_buffer->state.gfx.dirty = 0;
 }
 
@@ -982,23 +1072,13 @@ anv_use_generated_draws(const struct anv_cmd_buffer *cmd_buffer, uint32_t count)
 ALWAYS_INLINE static void
 cmd_buffer_pre_draw_wa(struct anv_cmd_buffer *cmd_buffer)
 {
+   UNUSED const struct anv_device *device = cmd_buffer->device;
+   UNUSED const struct anv_instance *instance =
+      device->physical->instance;
    UNUSED const bool protected = cmd_buffer->vk.pool->flags &
                                  VK_COMMAND_POOL_CREATE_PROTECTED_BIT;
-   UNUSED struct anv_graphics_pipeline *pipeline =
-      anv_pipeline_to_graphics(cmd_buffer->state.gfx.base.pipeline);
-   UNUSED struct anv_device *device = cmd_buffer->device;
-   UNUSED struct anv_instance *instance = device->physical->instance;
-
-#define DEBUG_SHADER_HASH(stage) do {                                   \
-      if (unlikely(                                                     \
-             (instance->debug & ANV_DEBUG_SHADER_HASH) &&               \
-             anv_pipeline_has_stage(pipeline, stage))) {                \
-         mi_store(&b,                                                   \
-                  mi_mem32(device->workaround_address),                 \
-                  mi_imm(pipeline->base.shaders[stage]->                \
-                         prog_data->source_hash));                      \
-      }                                                                 \
-   } while (0)
+   UNUSED struct anv_cmd_graphics_state *gfx = &cmd_buffer->state.gfx;
+   UNUSED struct anv_gfx_dynamic_state *hw_state = &gfx->dyn_state;
 
    struct mi_builder b;
    if (unlikely(instance->debug & ANV_DEBUG_SHADER_HASH)) {
@@ -1006,18 +1086,35 @@ cmd_buffer_pre_draw_wa(struct anv_cmd_buffer *cmd_buffer)
       mi_builder_set_mocs(&b, isl_mocs(&device->isl_dev, 0, false));
    }
 
+#define DEBUG_SHADER_HASH(stage) do {                                   \
+      if (unlikely(instance->debug & ANV_DEBUG_SHADER_HASH)) {          \
+         mi_store(&b,                                                   \
+                  mi_mem32(device->workaround_address),                 \
+                  mi_imm(gfx->shaders[stage]->prog_data->source_hash)); \
+      }                                                                 \
+   } while (0)
+
+#define anv_batch_emit_gfx(batch, cmd, name) ({                         \
+      void *__dst = anv_batch_emit_dwords(                              \
+         batch, __anv_cmd_length(cmd));                                 \
+      memcpy(__dst, hw_state->packed.name,                              \
+             4 * __anv_cmd_length(cmd));                                \
+      VG(VALGRIND_CHECK_MEM_IS_DEFINED(                                 \
+            __dst, __anv_cmd_length(cmd) * 4));                         \
+      __dst;                                                            \
+   })
+
 #if INTEL_WA_16011107343_GFX_VER
    if (intel_needs_workaround(cmd_buffer->device->info, 16011107343) &&
-       anv_pipeline_has_stage(pipeline, MESA_SHADER_TESS_CTRL)) {
+       anv_gfx_has_stage(gfx, MESA_SHADER_TESS_CTRL)) {
       DEBUG_SHADER_HASH(MESA_SHADER_TESS_CTRL);
-      anv_batch_emit_pipeline_state_protected(&cmd_buffer->batch, pipeline,
-                                              final.hs, protected);
+      anv_batch_emit_gfx(&cmd_buffer->batch, GENX(3DSTATE_HS), hs);
    }
 #endif
 
 #if INTEL_WA_22018402687_GFX_VER
    if (intel_needs_workaround(cmd_buffer->device->info, 22018402687) &&
-       anv_pipeline_has_stage(pipeline, MESA_SHADER_TESS_EVAL)) {
+       anv_gfx_has_stage(gfx, MESA_SHADER_TESS_EVAL)) {
       DEBUG_SHADER_HASH(MESA_SHADER_TESS_EVAL);
       /* Wa_22018402687:
        *   In any 3D enabled context, just before any Tessellation enabled
@@ -1031,13 +1128,13 @@ cmd_buffer_pre_draw_wa(struct anv_cmd_buffer *cmd_buffer)
        * said switch, as it matters at the HW level, and can be triggered even
        * across processes, so we apply the Wa at all times.
        */
-      anv_batch_emit_pipeline_state_protected(&cmd_buffer->batch, pipeline,
-                                              final.ds, protected);
+      anv_batch_emit_gfx(&cmd_buffer->batch, GENX(3DSTATE_DS), ds);
    }
 #endif
 
    genX(emit_breakpoint)(&cmd_buffer->batch, cmd_buffer->device, true);
 
+#undef anv_batch_emit_gfx
 #undef DEBUG_SHADER_HASH
 }
 
@@ -1606,6 +1703,7 @@ void genX(CmdDrawIndirectByteCountEXT)(
    mi_store(&b, mi_reg32(GFX7_3DPRIM_VERTEX_COUNT), count);
 
    mi_store(&b, mi_reg32(GFX7_3DPRIM_START_VERTEX), mi_imm(firstVertex));
+   assert(((uint64_t)instanceCount * gfx->instance_multiplier <= UINT32_MAX));
    mi_store(&b, mi_reg32(GFX7_3DPRIM_INSTANCE_COUNT),
             mi_imm(instanceCount * gfx->instance_multiplier));
    mi_store(&b, mi_reg32(GFX7_3DPRIM_START_INSTANCE), mi_imm(firstInstance));
@@ -1843,7 +1941,7 @@ cmd_buffer_set_indirect_stride(struct anv_cmd_buffer *cmd_buffer,
       UNREACHABLE("unhandled cmd type");
    }
 
-   bool aligned = stride == data_stride;
+   enum u_tristate aligned = u_tristate_make(stride == data_stride);
 
 #if GFX_VER >= 20
    /* The stride can change as long as it matches the default command stride
@@ -1857,7 +1955,7 @@ cmd_buffer_set_indirect_stride(struct anv_cmd_buffer *cmd_buffer,
       gfx_state->indirect_data_stride = stride;
       gfx_state->indirect_data_stride_aligned = aligned;
       gfx_state->dirty |= ANV_CMD_DIRTY_INDIRECT_DATA_STRIDE;
-   } else if (!gfx_state->indirect_data_stride_aligned &&
+   } else if (gfx_state->indirect_data_stride_aligned == U_TRISTATE_NO &&
               gfx_state->indirect_data_stride != stride) {
       gfx_state->indirect_data_stride = stride;
       gfx_state->indirect_data_stride_aligned = aligned;
@@ -2313,6 +2411,8 @@ void genX(CmdBeginTransformFeedbackEXT)(
     *    commands are processed. This will likely require a pipeline flush."
     */
    anv_add_pending_pipe_bits(cmd_buffer,
+                             VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT,
+                             VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
                              ANV_PIPE_CS_STALL_BIT,
                              "begin transform feedback");
    genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
@@ -2365,6 +2465,8 @@ void genX(CmdEndTransformFeedbackEXT)(
     *    commands are processed. This will likely require a pipeline flush."
     */
    anv_add_pending_pipe_bits(cmd_buffer,
+                             VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT,
+                             VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
                              ANV_PIPE_CS_STALL_BIT,
                              "end transform feedback");
    genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);

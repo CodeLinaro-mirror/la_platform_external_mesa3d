@@ -45,7 +45,6 @@ enum VirtGpuCapset {
     kCapsetVenus = 4,
     kCapsetCrossDomain = 5,
     kCapsetDrm = 6,
-    kCapsetGfxStreamMagma = 7,
     kCapsetGfxStreamGles = 8,
     kCapsetGfxStreamComposer = 9,
 };
@@ -130,7 +129,7 @@ struct VirtGpuPciBusInfo {
     uint8_t function;
 };
 
-#define INVALID_DESCRIPTOR -1
+constexpr int32_t INVALID_DESCRIPTOR = -1;
 
 class VirtGpuResourceMapping;
 class VirtGpuResource;

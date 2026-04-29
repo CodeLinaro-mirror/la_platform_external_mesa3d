@@ -46,15 +46,8 @@ get_pipeline_gfx(struct radv_device *device, struct radv_image *image, VkPipelin
       .sampleLocationsEnable = false,
    };
 
-   const VkGraphicsPipelineCreateInfoRADV radv_info = {
-      .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO_RADV,
-      .depth_compress_disable = true,
-      .stencil_compress_disable = true,
-   };
-
    const VkGraphicsPipelineCreateInfo pipeline_create_info = {
       .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-      .pNext = &radv_info,
       .stageCount = 2,
       .pStages =
          (VkPipelineShaderStageCreateInfo[]){
@@ -162,24 +155,34 @@ radv_process_depth_image_layer(struct radv_cmd_buffer *cmd_buffer, struct radv_i
    width = u_minify(image->vk.extent.width, range->baseMipLevel + level);
    height = u_minify(image->vk.extent.height, range->baseMipLevel + level);
 
+   const VkImageViewUsageCreateInfo iview_usage_info = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO,
+      .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+   };
+
    radv_image_view_init(&iview, device,
                         &(VkImageViewCreateInfo){
                            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                           .pNext = &iview_usage_info,
+                           .flags = VK_IMAGE_VIEW_CREATE_DRIVER_INTERNAL_BIT_MESA,
                            .image = radv_image_to_handle(image),
                            .viewType = radv_meta_get_view_type(image),
                            .format = image->vk.format,
                            .subresourceRange =
                               {
-                                 .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+                                 .aspectMask = range->aspectMask,
                                  .baseMipLevel = range->baseMipLevel + level,
                                  .levelCount = 1,
                                  .baseArrayLayer = range->baseArrayLayer + layer,
                                  .layerCount = 1,
                               },
                         },
-                        NULL);
+                        &(struct radv_image_view_extra_create_info){
+                           .depth_compress_disable = !!(range->aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT),
+                           .stencil_compress_disable = !!(range->aspectMask & VK_IMAGE_ASPECT_STENCIL_BIT),
+                        });
 
-   const VkRenderingAttachmentInfo depth_att = {
+   const VkRenderingAttachmentInfo att = {
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
       .imageView = radv_image_view_to_handle(&iview),
       .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
@@ -187,40 +190,36 @@ radv_process_depth_image_layer(struct radv_cmd_buffer *cmd_buffer, struct radv_i
       .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
    };
 
-   const VkRenderingAttachmentInfo stencil_att = {
-      .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-      .imageView = radv_image_view_to_handle(&iview),
-      .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-      .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
-      .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-   };
-
-   const VkRenderingInfo rendering_info = {
+   VkRenderingInfo rendering_info = {
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-      .flags = VK_RENDERING_INPUT_ATTACHMENT_NO_CONCURRENT_WRITES_BIT_MESA,
+      .flags = VK_RENDERING_LOCAL_READ_CONCURRENT_ACCESS_CONTROL_BIT_KHR,
       .renderArea = {.offset = {0, 0}, .extent = {width, height}},
       .layerCount = 1,
-      .pDepthAttachment = &depth_att,
-      .pStencilAttachment = &stencil_att,
    };
+
+   if (range->aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT)
+      rendering_info.pDepthAttachment = &att;
+   if (range->aspectMask & VK_IMAGE_ASPECT_STENCIL_BIT)
+      rendering_info.pStencilAttachment = &att;
 
    radv_CmdBeginRendering(radv_cmd_buffer_to_handle(cmd_buffer), &rendering_info);
 
    radv_CmdDraw(radv_cmd_buffer_to_handle(cmd_buffer), 3, 1, 0, 0);
 
-   radv_CmdEndRendering(radv_cmd_buffer_to_handle(cmd_buffer));
+   const VkRenderingEndInfoKHR end_info = {
+      .sType = VK_STRUCTURE_TYPE_RENDERING_END_INFO_KHR,
+   };
+
+   radv_CmdEndRendering2KHR(radv_cmd_buffer_to_handle(cmd_buffer), &end_info);
 
    radv_image_view_finish(&iview);
 }
 
 static void
 radv_process_depth_stencil(struct radv_cmd_buffer *cmd_buffer, struct radv_image *image,
-                           const VkImageSubresourceRange *subresourceRange,
-                           struct radv_sample_locations_state *sample_locs)
+                           const VkImageSubresourceRange *subresourceRange, const VkSampleLocationsInfoEXT *sample_locs)
 {
    struct radv_device *device = radv_cmd_buffer_device(cmd_buffer);
-   struct radv_meta_saved_state saved_state;
-   VkCommandBuffer cmd_buffer_h = radv_cmd_buffer_to_handle(cmd_buffer);
    VkPipelineLayout layout;
    VkPipeline pipeline;
    VkResult result;
@@ -231,9 +230,7 @@ radv_process_depth_stencil(struct radv_cmd_buffer *cmd_buffer, struct radv_image
       return;
    }
 
-   radv_meta_save(&saved_state, cmd_buffer, RADV_META_SAVE_GRAPHICS_PIPELINE | RADV_META_SAVE_RENDER);
-
-   radv_CmdBindPipeline(radv_cmd_buffer_to_handle(cmd_buffer), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+   radv_meta_bind_graphics_pipeline(cmd_buffer, pipeline);
 
    if (sample_locs) {
       assert(image->vk.create_flags & VK_IMAGE_CREATE_SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_BIT_EXT);
@@ -242,12 +239,7 @@ radv_process_depth_stencil(struct radv_cmd_buffer *cmd_buffer, struct radv_image
        * automatic layout transitions, otherwise the depth decompress
        * pass uses the default HW locations.
        */
-      radv_CmdSetSampleLocationsEXT(cmd_buffer_h, &(VkSampleLocationsInfoEXT){
-                                                     .sampleLocationsPerPixel = sample_locs->per_pixel,
-                                                     .sampleLocationGridSize = sample_locs->grid_size,
-                                                     .sampleLocationsCount = sample_locs->count,
-                                                     .pSampleLocations = sample_locs->locations,
-                                                  });
+      radv_meta_set_sample_locations(cmd_buffer, sample_locs);
    }
 
    for (uint32_t l = 0; l < vk_image_subresource_level_count(&image->vk, subresourceRange); ++l) {
@@ -259,22 +251,12 @@ radv_process_depth_stencil(struct radv_cmd_buffer *cmd_buffer, struct radv_image
       uint32_t width = u_minify(image->vk.extent.width, subresourceRange->baseMipLevel + l);
       uint32_t height = u_minify(image->vk.extent.height, subresourceRange->baseMipLevel + l);
 
-      radv_CmdSetViewport(
-         cmd_buffer_h, 0, 1,
-         &(VkViewport){.x = 0, .y = 0, .width = width, .height = height, .minDepth = 0.0f, .maxDepth = 1.0f});
-
-      radv_CmdSetScissor(cmd_buffer_h, 0, 1,
-                         &(VkRect2D){
-                            .offset = {0, 0},
-                            .extent = {width, height},
-                         });
+      radv_meta_set_viewport_and_scissor(cmd_buffer, 0, 0, width, height);
 
       for (uint32_t s = 0; s < vk_image_subresource_layer_count(&image->vk, subresourceRange); s++) {
          radv_process_depth_image_layer(cmd_buffer, image, subresourceRange, l, s);
       }
    }
-
-   radv_meta_restore(&saved_state, cmd_buffer);
 }
 
 static VkResult
@@ -346,7 +328,6 @@ radv_expand_depth_stencil_compute(struct radv_cmd_buffer *cmd_buffer, struct rad
                                   const VkImageSubresourceRange *subresourceRange)
 {
    struct radv_device *device = radv_cmd_buffer_device(cmd_buffer);
-   struct radv_meta_saved_state saved_state;
    struct radv_image_view load_iview = {0};
    struct radv_image_view store_iview = {0};
    VkPipelineLayout layout;
@@ -361,9 +342,7 @@ radv_expand_depth_stencil_compute(struct radv_cmd_buffer *cmd_buffer, struct rad
       return;
    }
 
-   radv_meta_save(&saved_state, cmd_buffer, RADV_META_SAVE_DESCRIPTORS | RADV_META_SAVE_COMPUTE_PIPELINE);
-
-   radv_CmdBindPipeline(radv_cmd_buffer_to_handle(cmd_buffer), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+   radv_meta_bind_compute_pipeline(cmd_buffer, pipeline);
 
    for (uint32_t l = 0; l < vk_image_subresource_level_count(&image->vk, subresourceRange); l++) {
       uint32_t width, height;
@@ -376,9 +355,16 @@ radv_expand_depth_stencil_compute(struct radv_cmd_buffer *cmd_buffer, struct rad
       height = u_minify(image->vk.extent.height, subresourceRange->baseMipLevel + l);
 
       for (uint32_t s = 0; s < vk_image_subresource_layer_count(&image->vk, subresourceRange); s++) {
+         const VkImageViewUsageCreateInfo src_iview_usage_info = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO,
+            .usage = VK_IMAGE_USAGE_STORAGE_BIT,
+         };
+
          radv_image_view_init(&load_iview, device,
                               &(VkImageViewCreateInfo){
                                  .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                                 .pNext = &src_iview_usage_info,
+                                 .flags = VK_IMAGE_VIEW_CREATE_DRIVER_INTERNAL_BIT_MESA,
                                  .image = radv_image_to_handle(image),
                                  .viewType = VK_IMAGE_VIEW_TYPE_2D,
                                  .format = image->vk.format,
@@ -389,9 +375,17 @@ radv_expand_depth_stencil_compute(struct radv_cmd_buffer *cmd_buffer, struct rad
                                                       .layerCount = 1},
                               },
                               &(struct radv_image_view_extra_create_info){.enable_compression = true});
+
+         const VkImageViewUsageCreateInfo dst_iview_usage_info = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO,
+            .usage = VK_IMAGE_USAGE_STORAGE_BIT,
+         };
+
          radv_image_view_init(&store_iview, device,
                               &(VkImageViewCreateInfo){
                                  .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                                 .pNext = &dst_iview_usage_info,
+                                 .flags = VK_IMAGE_VIEW_CREATE_DRIVER_INTERNAL_BIT_MESA,
                                  .image = radv_image_to_handle(image),
                                  .viewType = VK_IMAGE_VIEW_TYPE_2D,
                                  .format = image->vk.format,
@@ -401,7 +395,7 @@ radv_expand_depth_stencil_compute(struct radv_cmd_buffer *cmd_buffer, struct rad
                                                       .baseArrayLayer = subresourceRange->baseArrayLayer + s,
                                                       .layerCount = 1},
                               },
-                              &(struct radv_image_view_extra_create_info){.disable_compression = true});
+                              NULL);
 
          radv_meta_bind_descriptors(
             cmd_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, layout, 2,
@@ -431,24 +425,13 @@ radv_expand_depth_stencil_compute(struct radv_cmd_buffer *cmd_buffer, struct rad
          radv_image_view_finish(&store_iview);
       }
    }
-
-   radv_meta_restore(&saved_state, cmd_buffer);
-
-   cmd_buffer->state.flush_bits |= RADV_CMD_FLAG_CS_PARTIAL_FLUSH | RADV_CMD_FLAG_INV_VCACHE |
-                                   radv_src_access_flush(cmd_buffer, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                                                         VK_ACCESS_2_SHADER_WRITE_BIT, 0, image, subresourceRange);
-
-   /* Initialize the HTILE metadata as "fully expanded". */
-   uint32_t htile_value = radv_get_htile_initial_value(device, image);
-
-   cmd_buffer->state.flush_bits |= radv_clear_htile(cmd_buffer, image, subresourceRange, htile_value, false);
 }
 
 void
 radv_expand_depth_stencil(struct radv_cmd_buffer *cmd_buffer, struct radv_image *image,
-                          const VkImageSubresourceRange *subresourceRange,
-                          struct radv_sample_locations_state *sample_locs)
+                          const VkImageSubresourceRange *subresourceRange, const VkSampleLocationsInfoEXT *sample_locs)
 {
+   const struct radv_device *device = radv_cmd_buffer_device(cmd_buffer);
    struct radv_barrier_data barrier = {0};
 
    barrier.layout_transitions.depth_stencil_expand = 1;
@@ -456,8 +439,21 @@ radv_expand_depth_stencil(struct radv_cmd_buffer *cmd_buffer, struct radv_image 
 
    if (cmd_buffer->qf == RADV_QUEUE_GENERAL) {
       radv_process_depth_stencil(cmd_buffer, image, subresourceRange, sample_locs);
+
+      cmd_buffer->state.flush_bits |= RADV_CMD_FLAG_FLUSH_AND_INV_DB | RADV_CMD_FLAG_FLUSH_AND_INV_DB_META;
    } else {
       assert(cmd_buffer->qf == RADV_QUEUE_COMPUTE);
       radv_expand_depth_stencil_compute(cmd_buffer, image, subresourceRange);
+
+      cmd_buffer->state.flush_bits |= RADV_CMD_FLAG_CS_PARTIAL_FLUSH | RADV_CMD_FLAG_INV_VCACHE |
+                                      radv_src_access_flush(cmd_buffer, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                                                            VK_ACCESS_2_SHADER_WRITE_BIT, 0, image, subresourceRange);
+
+      if (!radv_image_decompress_htile_on_image_stores(device, image)) {
+         /* Initialize the HTILE metadata as "fully expanded". */
+         uint32_t htile_value = radv_get_htile_initial_value(device, image);
+
+         cmd_buffer->state.flush_bits |= radv_clear_htile(cmd_buffer, image, subresourceRange, htile_value, false);
+      }
    }
 }

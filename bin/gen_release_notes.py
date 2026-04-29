@@ -226,8 +226,8 @@ async def gather_bugs(version: str) -> typing.List[str]:
     loop = asyncio.get_event_loop()
     async with aiohttp.ClientSession(loop=loop) as session:
         results = await asyncio.gather(*[get_bug(session, i) for i in issues])
-    typing.cast(typing.Tuple[str, ...], results)
-    bugs = list(results)
+    # Remove duplicates.
+    bugs = sorted(set(results))
     if not bugs:
         bugs = ['None']
     return bugs
@@ -385,5 +385,5 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
     loop.run_until_complete(main())

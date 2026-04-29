@@ -3,26 +3,7 @@
  * © Copyright 2018 Alyssa Rosenzweig
  * Copyright © 2014-2017 Broadcom
  * Copyright (C) 2017 Intel Corporation
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
+ * SPDX-License-Identifier: MIT
  */
 
 #include <errno.h>
@@ -47,24 +28,24 @@
 #include "util/u_surface.h"
 #include "util/u_upload_mgr.h"
 #include "util/u_vbuf.h"
-#include "util/perf/cpu_trace.h"
 
-#include "clc/pan_compile.h"
+#include "compiler/pan_compiler.h"
 #include "compiler/nir/nir_serialize.h"
-#include "util/pan_lower_framebuffer.h"
 #include "decode.h"
 #include "pan_device.h"
 #include "pan_fence.h"
 #include "pan_screen.h"
+#include "pan_trace.h"
 #include "pan_util.h"
 
 static void
 panfrost_clear(struct pipe_context *pipe, unsigned buffers,
+               uint32_t color_clear_mask, uint8_t stencil_clear_mask,
                const struct pipe_scissor_state *scissor_state,
                const union pipe_color_union *color, double depth,
                unsigned stencil)
 {
-   MESA_TRACE_FUNC();
+   PAN_TRACE_FUNC(PAN_TRACE_GL_CONTEXT);
 
    if (!panfrost_render_condition_check(pan_context(pipe)))
       return;
@@ -97,7 +78,7 @@ panfrost_clear(struct pipe_context *pipe, unsigned buffers,
 bool
 panfrost_writes_point_size(struct panfrost_context *ctx)
 {
-   struct panfrost_compiled_shader *vs = ctx->prog[PIPE_SHADER_VERTEX];
+   struct panfrost_compiled_shader *vs = ctx->prog[MESA_SHADER_VERTEX];
    assert(vs != NULL);
 
    return vs->info.vs.writes_point_size && ctx->active_prim == MESA_PRIM_POINTS;
@@ -109,7 +90,7 @@ void
 panfrost_flush(struct pipe_context *pipe, struct pipe_fence_handle **fence,
                unsigned flags)
 {
-   MESA_TRACE_FUNC();
+   PAN_TRACE_FUNC(PAN_TRACE_GL_CONTEXT);
 
    struct panfrost_context *ctx = pan_context(pipe);
    struct panfrost_device *dev = pan_device(pipe->screen);
@@ -179,9 +160,13 @@ panfrost_get_blend(struct panfrost_batch *batch, unsigned rti)
    struct pipe_surface *surf = &batch->key.cbufs[rti];
    enum pipe_format fmt = surf->format;
 
+   bool is_float = util_format_is_float(fmt);
+   bool fixed_function = is_float ? info.fixed_function_float
+                                  : info.fixed_function;
+
    /* Use fixed-function if the equation permits, the format is blendable,
     * and no more than one unique constant is accessed */
-   if (info.fixed_function && dev->blendable_formats[fmt].internal &&
+   if (fixed_function && dev->blendable_formats[fmt].internal &&
        !blend->base.alpha_to_one &&
        pan_blend_is_homogenous_constant(info.constant_mask,
                                         ctx->blend_color.color)) {
@@ -208,10 +193,11 @@ panfrost_get_blend(struct panfrost_batch *batch, unsigned rti)
 
    pan_blend.rts[rti].format = fmt;
    pan_blend.rts[rti].nr_samples = nr_samples;
+   pan_blend.rts[rti].equation.is_float = is_float;
    memcpy(pan_blend.constants, ctx->blend_color.color,
           sizeof(pan_blend.constants));
 
-   struct panfrost_compiled_shader *ss = ctx->prog[PIPE_SHADER_FRAGMENT];
+   struct panfrost_compiled_shader *ss = ctx->prog[MESA_SHADER_FRAGMENT];
 
    /* Default for Midgard */
    nir_alu_type col0_type = nir_type_float32;
@@ -249,7 +235,7 @@ panfrost_bind_rasterizer_state(struct pipe_context *pctx, void *hwcso)
 
 static void
 panfrost_set_shader_images(struct pipe_context *pctx,
-                           enum pipe_shader_type shader, unsigned start_slot,
+                           mesa_shader_stage shader, unsigned start_slot,
                            unsigned count, unsigned unbind_num_trailing_slots,
                            const struct pipe_image_view *iviews)
 {
@@ -313,7 +299,7 @@ panfrost_bind_vertex_elements_state(struct pipe_context *pctx, void *hwcso)
 
 static void
 panfrost_bind_sampler_states(struct pipe_context *pctx,
-                             enum pipe_shader_type shader, unsigned start_slot,
+                             mesa_shader_stage shader, unsigned start_slot,
                              unsigned num_sampler, void **sampler)
 {
    struct panfrost_context *ctx = pan_context(pctx);
@@ -338,21 +324,20 @@ panfrost_set_vertex_buffers(struct pipe_context *pctx, unsigned num_buffers,
    struct panfrost_context *ctx = pan_context(pctx);
 
    util_set_vertex_buffers_mask(ctx->vertex_buffers, &ctx->vb_mask, buffers,
-                                num_buffers, true);
+                                num_buffers);
 
    ctx->dirty |= PAN_DIRTY_VERTEX;
 }
 
 static void
 panfrost_set_constant_buffer(struct pipe_context *pctx,
-                             enum pipe_shader_type shader, uint index,
-                             bool take_ownership,
+                             mesa_shader_stage shader, uint index,
                              const struct pipe_constant_buffer *buf)
 {
    struct panfrost_context *ctx = pan_context(pctx);
    struct panfrost_constant_buffer *pbuf = &ctx->constant_buffer[shader];
 
-   util_copy_constant_buffer(&pbuf->cb[index], buf, take_ownership);
+   util_copy_constant_buffer(&pbuf->cb[index], buf);
 
    unsigned mask = (1 << index);
 
@@ -376,7 +361,7 @@ panfrost_set_stencil_ref(struct pipe_context *pctx,
 
 static void
 panfrost_set_sampler_views(struct pipe_context *pctx,
-                           enum pipe_shader_type shader, unsigned start_slot,
+                           mesa_shader_stage shader, unsigned start_slot,
                            unsigned num_views,
                            unsigned unbind_num_trailing_slots,
                            struct pipe_sampler_view **views)
@@ -394,12 +379,18 @@ panfrost_set_sampler_views(struct pipe_context *pctx,
       if (view)
          new_nr = p + 1;
 
+      if (view && view->target == PIPE_BUFFER)
+         BITSET_SET(ctx->texture_buffer[shader].mask, p);
+      else
+         BITSET_CLEAR(ctx->texture_buffer[shader].mask, p);
+
       pipe_sampler_view_reference(
          (struct pipe_sampler_view **)&ctx->sampler_views[shader][p], view);
    }
 
    for (; i < num_views + unbind_num_trailing_slots; i++) {
       unsigned p = i + start_slot;
+      BITSET_CLEAR(ctx->texture_buffer[shader].mask, p);
       pipe_sampler_view_reference(
          (struct pipe_sampler_view **)&ctx->sampler_views[shader][p], NULL);
    }
@@ -414,8 +405,14 @@ panfrost_set_sampler_views(struct pipe_context *pctx,
     * set sampler views */
    if (new_nr == 0) {
       for (i = 0; i < start_slot; ++i) {
-         if (ctx->sampler_views[shader][i])
+         struct pipe_sampler_view *view =
+            (struct pipe_sampler_view *)ctx->sampler_views[shader][i];
+         if (view)
             new_nr = i + 1;
+         if (view && view->target == PIPE_BUFFER)
+            BITSET_SET(ctx->texture_buffer[shader].mask, i);
+         else
+            BITSET_CLEAR(ctx->texture_buffer[shader].mask, i);
       }
    }
 
@@ -424,7 +421,7 @@ panfrost_set_sampler_views(struct pipe_context *pctx,
 
 static void
 panfrost_set_shader_buffers(struct pipe_context *pctx,
-                            enum pipe_shader_type shader, unsigned start,
+                            mesa_shader_stage shader, unsigned start,
                             unsigned count,
                             const struct pipe_shader_buffer *buffers,
                             unsigned writable_bitmask)
@@ -536,6 +533,8 @@ panfrost_render_condition(struct pipe_context *pipe, struct pipe_query *query,
 static void
 panfrost_destroy(struct pipe_context *pipe)
 {
+   PAN_TRACE_FUNC(PAN_TRACE_GL_CONTEXT);
+
    struct panfrost_context *panfrost = pan_context(pipe);
    struct panfrost_device *dev = pan_device(pipe->screen);
 
@@ -785,7 +784,7 @@ panfrost_get_query_result(struct pipe_context *pipe, struct pipe_query *q,
 
    case PIPE_QUERY_TIMESTAMP_DISJOINT: {
       vresult->timestamp_disjoint.frequency =
-         dev->kmod.props.timestamp_frequency;
+         dev->kmod.dev->props.timestamp_frequency;
       vresult->timestamp_disjoint.disjoint = false;
       break;
    }
@@ -965,7 +964,8 @@ panfrost_fence_server_sync(struct pipe_context *pctx,
 {
    struct panfrost_device *dev = pan_device(pctx->screen);
    struct panfrost_context *ctx = pan_context(pctx);
-   int fd = -1, ret;
+   ASSERTED int ret;
+   int fd = -1;
    assert(!value);
 
    ret = drmSyncobjExportSyncFile(panfrost_device_fd(dev), f->syncobj, &fd);
@@ -975,13 +975,31 @@ panfrost_fence_server_sync(struct pipe_context *pctx,
    close(fd);
 }
 
+static const struct debug_named_value panfrost_prio_options[] = {
+   {"low",        PIPE_CONTEXT_LOW_PRIORITY,       "low prio"},
+   {"high",       PIPE_CONTEXT_HIGH_PRIORITY,      "high prio"},
+   {"rt",         PIPE_CONTEXT_REALTIME_PRIORITY,  "real-time prio"},
+   DEBUG_NAMED_VALUE_END
+};
+
 struct pipe_context *
 panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 {
+   PAN_TRACE_FUNC(PAN_TRACE_GL_CONTEXT);
+
    struct panfrost_context *ctx = rzalloc(NULL, struct panfrost_context);
 
    if (!ctx)
       return NULL;
+
+   unsigned prio =
+      debug_get_flags_option("PAN_MESA_PRIO", panfrost_prio_options, 0);
+
+   if (prio) {
+      flags &= (PIPE_CONTEXT_LOW_PRIORITY | PIPE_CONTEXT_HIGH_PRIORITY |
+                PIPE_CONTEXT_REALTIME_PRIORITY);
+      flags |= prio;
+   }
 
    ctx->flags = flags;
 
@@ -1103,7 +1121,7 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
    assert(!ret);
 
    ctx->printf.bo =
-      panfrost_bo_create(dev, LIBPAN_PRINTF_BUFFER_SIZE, 0, "Printf Buffer");
+      panfrost_bo_create(dev, PAN_PRINTF_BUFFER_SIZE, 0, "Printf Buffer");
 
    if (ctx->printf.bo == NULL)
       goto failed;

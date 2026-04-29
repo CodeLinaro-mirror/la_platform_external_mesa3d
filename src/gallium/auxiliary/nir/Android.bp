@@ -1,0 +1,79 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "nir_draw_helpers_c_impl",
+    srcs: [
+        "nir_draw_helpers.c",
+    ],
+}
+
+filegroup {
+    name: "nir_to_tgsi_c_impl",
+    srcs: [
+        "nir_to_tgsi.c",
+    ],
+}
+
+filegroup {
+    name: "nir_to_tgsi_info_c_impl",
+    srcs: [
+        "nir_to_tgsi_info.c",
+    ],
+}
+
+filegroup {
+    name: "tgsi_to_nir_c_impl",
+    srcs: [
+        "tgsi_to_nir.c",
+    ],
+}
+
+cc_library_headers {
+    name: "nir_draw_helpers_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "nir_to_tgsi_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "nir_to_tgsi_info_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "tgsi_to_nir_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}

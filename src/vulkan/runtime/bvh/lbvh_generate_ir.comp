@@ -23,18 +23,6 @@
 
 #version 460
 
-#extension GL_GOOGLE_include_directive : require
-
-#extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
-#extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
-#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
-#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
-#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
-#extension GL_EXT_scalar_block_layout : require
-#extension GL_EXT_buffer_reference : require
-#extension GL_EXT_buffer_reference2 : require
-#extension GL_KHR_memory_scope_semantics : require
-
 #include "vk_build_interface.h"
 
 layout(local_size_x_id = SUBGROUP_SIZE_ID, local_size_y = 1, local_size_z = 1) in;
@@ -50,6 +38,10 @@ void
 main(void)
 {
    uint32_t global_id = gl_GlobalInvocationID.x;
+
+   uint32_t internal_node_count = max(DEREF(args.header).active_leaf_count, 2) - 1;
+   if (global_id >= internal_node_count)
+      return;
 
    uint32_t idx = global_id;
 
@@ -75,8 +67,7 @@ main(void)
       /* We allocate nodes on demand with the atomic here to ensure children come before their
        * parents, which is a requirement of the encoder.
        */
-      uint32_t dst_idx =
-         atomicAdd(DEREF(REF(vk_ir_header)(args.header)).ir_internal_node_count, 1);
+      uint32_t dst_idx = atomicAdd(DEREF(args.header).ir_internal_node_count, 1);
 
       uint32_t current_offset = args.internal_node_base + dst_idx * SIZEOF(vk_ir_box_node);
       uint32_t current_id = pack_ir_node_id(current_offset, vk_ir_node_internal);

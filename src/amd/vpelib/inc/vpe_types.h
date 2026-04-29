@@ -1,4 +1,4 @@
-/* Copyright 2022 Advanced Micro Devices, Inc.
+/* Copyright 2022-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -106,13 +106,14 @@ enum vpe_status {
  *         emitted must by synchronized with handler
  */
 enum vpe_event_id {
-    VPE_EVENT_CHECK_SUPPORT, /**< Event emitted by vpe_check_support.
-                                  Params:
-                                          UInt32 num_streams,
-                                          UInt32 target_rect.width,
-                                          UInt32 target_rect.height,
-                                          UInt32 target_rect.height
-                               */
+    VPE_EVENT_CHECK_SUPPORT,     /**< Event emitted by vpe_check_support.
+                                      Params:
+                                              UInt32 num_streams,
+                                              UInt32 target_rect.width,
+                                              UInt32 target_rect.height,
+                                              UInt32 target_rect.height */
+    VPE_EVENT_PLANE_DESC_INPUT,  /**< Event emitted by vpe_plane_desc_input */
+    VPE_EVENT_PLANE_DESC_OUTPUT, /**< Event emitted by vpe_plane_desc_output */
 
     VPE_EVENT_MAX_ID         /**< Max ID represents the number of event IDs supported */
 };
@@ -205,6 +206,7 @@ struct mpc_color_caps {
     uint32_t shared_3d_lut       : 1; /**< can be in either dpp or mpc, but single instance */
     uint32_t global_alpha        : 1; /**< e.g. top plane 30 %. bottom 70 % */
     uint32_t top_bottom_blending : 1; /**< two-layer blending */
+
 };
 
 /** @struct vpe_color_caps
@@ -234,6 +236,8 @@ struct vpe_caps {
     uint32_t v_mirror_support       : 1; /**< vertical mirror support */
     uint32_t is_apu                 : 1; /**< is APU */
     uint32_t bg_color_check_support : 1; /**< background color check support */
+
+    uint32_t prefer_external_scaler_coef : 1; /**< prefer external scaler coeff */
 
     /** resource capability */
     struct {
@@ -450,6 +454,7 @@ struct vpe_debug_options {
         uint32_t skip_optimal_tap_check   : 1; /**< Skip optimal tap check */
         uint32_t disable_lut_caching      : 1; /**< disable config caching for all luts */
         uint32_t disable_performance_mode : 1; /**< disable performance mode */
+        uint32_t reserved : 8;
     } flags;                                  /**< debug flags */
 
     // valid only if the corresponding flag is set
@@ -651,7 +656,9 @@ struct vpe_color_adjust {
 struct vpe_surface_info {
 
     struct vpe_plane_address     address;     /**< Address */
-    enum vpe_swizzle_mode_values swizzle;     /**< Swizzle mode */
+    union {
+        enum vpe_swizzle_mode_values swizzle; /**< Swizzle mode */
+    };
 
     struct vpe_plane_size         plane_size; /**< Pitch */
     struct vpe_plane_dcc_param    dcc;        /**< DCC parameters */
@@ -744,7 +751,8 @@ struct vpe_tonemap_params {
     enum vpe_color_primaries   lut_out_gamut;        /**< Output color primary */
     uint16_t                   input_pq_norm_factor; /**< Perceptual Quantizer normalization
                                                         factor. */
-    uint16_t                   lut_dim;              /**< Size of one dimension of the 3D-LUT */
+    uint16_t                   lut_dim;              /**< Size of one dimension of the 3D-LUT data*/
+    uint16_t                   lut_container_dim;    /**< Size of one dimension of the 3D-LUT container*/
     /** @brief 3D LUT settings
      */
     union {

@@ -35,6 +35,7 @@
 #include "ir.h"
 #include "ir_visitor.h"
 #include "compiler/glsl_types.h"
+#include "util/hash_table.h"
 
 struct assignment_entry {
    ir_exec_node link;
@@ -44,6 +45,8 @@ struct assignment_entry {
 class ir_variable_refcount_entry
 {
 public:
+   DECLARE_LINEAR_ALLOC_CXX_OPERATORS(ir_variable_refcount_entry,,)
+
    ir_variable_refcount_entry(ir_variable *var);
 
    ir_variable *var; /* The key: the variable's pointer. */
@@ -88,9 +91,9 @@ public:
    /**
     * Hash table mapping ir_variable to ir_variable_refcount_entry.
     */
-   struct hash_table *ht;
+   struct hash_table ht;
 
-   void *mem_ctx;
+   linear_ctx *linalloc;
 
    bool global;
 };

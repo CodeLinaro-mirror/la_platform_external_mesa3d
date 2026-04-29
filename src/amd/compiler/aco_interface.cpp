@@ -31,7 +31,8 @@ validate(Program* program)
 }
 
 static std::string
-get_disasm_string(Program* program, std::vector<uint32_t>& code, unsigned exec_size)
+get_disasm_string(Program* program, enum radeon_family family, std::vector<uint32_t>& code,
+                  unsigned exec_size)
 {
    std::string disasm;
 
@@ -40,8 +41,8 @@ get_disasm_string(Program* program, std::vector<uint32_t>& code, unsigned exec_s
    struct u_memstream mem;
    if (u_memstream_open(&mem, &data, &disasm_size)) {
       FILE* const memf = u_memstream_get(&mem);
-      if (check_print_asm_support(program)) {
-         print_asm(program, code, exec_size / 4u, memf);
+      if (check_print_asm_support(program, family)) {
+         print_asm(program, family, code, exec_size / 4u, memf);
       } else {
          fprintf(memf, "Shader disassembly is not supported in the current configuration"
 #if !AMD_LLVM_AVAILABLE
@@ -129,7 +130,7 @@ aco_postprocess_shader(const struct aco_compiler_options* options,
    /* Register Allocation */
    register_allocation(program.get());
 
-   if (validate_ra(program.get())) {
+   if ((debug_flags & DEBUG_VALIDATE_RA) && validate_ra(program.get())) {
       aco_print_program(program.get(), stderr);
       abort();
    } else if (options->dump_ir) {
@@ -144,6 +145,8 @@ aco_postprocess_shader(const struct aco_compiler_options* options,
       validate(program.get());
    }
 
+   spill_preserved(program.get());
+
    /* Lower to HW Instructions */
    ssa_elimination(program.get());
    lower_to_hw_instr(program.get());
@@ -156,6 +159,8 @@ aco_postprocess_shader(const struct aco_compiler_options* options,
    /* Schedule hardware instructions for ILP */
    if (!options->optimisations_disabled && !(debug_flags & DEBUG_NO_SCHED_ILP))
       schedule_ilp(program.get());
+
+   disable_wqm(program.get());
 
    if (program->needs_fp_mode_insertion)
       insert_fp_mode(program.get());
@@ -197,9 +202,6 @@ aco_compile_shader_part(const struct aco_compiler_options* options,
    program->collect_statistics = options->record_stats;
    memset(&program->statistics, 0, sizeof(program->statistics));
 
-   program->debug.func = options->debug.func;
-   program->debug.private_data = options->debug.private_data;
-
    program->is_prolog = is_prolog;
    program->is_epilog = !is_prolog;
 
@@ -215,7 +217,7 @@ aco_compile_shader_part(const struct aco_compiler_options* options,
 
    std::string disasm;
    if (options->record_asm)
-      disasm = get_disasm_string(program.get(), code, exec_size);
+      disasm = get_disasm_string(program.get(), options->family, code, exec_size);
 
    (*build_binary)(binary, config.num_sgprs, config.num_vgprs, code.data(), code.size(),
                    disasm.data(), disasm.size());
@@ -236,9 +238,6 @@ aco_compile_shader(const struct aco_compiler_options* options, const struct aco_
    program->collect_statistics = options->record_stats;
    memset(&program->statistics, 0, sizeof(program->statistics));
 
-   program->debug.func = options->debug.func;
-   program->debug.private_data = options->debug.private_data;
-
    /* Instruction Selection */
    select_program(program.get(), shader_count, shaders, &config, options, info, args);
 
@@ -258,7 +257,7 @@ aco_compile_shader(const struct aco_compiler_options* options, const struct aco_
 
    std::string disasm;
    if (options->record_asm)
-      disasm = get_disasm_string(program.get(), code, exec_size);
+      disasm = get_disasm_string(program.get(), options->family, code, exec_size);
 
    (*build_binary)(binary, &config, llvm_ir.c_str(), llvm_ir.size(), disasm.c_str(), disasm.size(),
                    &program->statistics, exec_size, code.data(), code.size(), symbols.data(),
@@ -268,8 +267,8 @@ aco_compile_shader(const struct aco_compiler_options* options, const struct aco_
 void
 aco_compile_rt_prolog(const struct aco_compiler_options* options,
                       const struct aco_shader_info* info, const struct ac_shader_args* in_args,
-                      const struct ac_shader_args* out_args, aco_callback* build_prolog,
-                      void** binary)
+                      const struct ac_arg* descriptors, unsigned raygen_param_count,
+                      nir_parameter* raygen_params, aco_callback* build_prolog, void** binary)
 {
    init();
 
@@ -280,7 +279,8 @@ aco_compile_rt_prolog(const struct aco_compiler_options* options,
    program->debug.func = NULL;
    program->debug.private_data = NULL;
 
-   select_rt_prolog(program.get(), &config, options, info, in_args, out_args);
+   select_rt_prolog(program.get(), &config, options, info, in_args, descriptors, raygen_param_count,
+                    raygen_params);
    validate(program.get());
    insert_waitcnt(program.get());
    insert_NOPs(program.get());
@@ -301,7 +301,7 @@ aco_compile_rt_prolog(const struct aco_compiler_options* options,
 
    std::string disasm;
    if (options->record_asm)
-      disasm = get_disasm_string(program.get(), code, exec_size);
+      disasm = get_disasm_string(program.get(), options->family, code, exec_size);
 
    (*build_prolog)(binary, &config, NULL, 0, disasm.c_str(), disasm.size(), NULL, exec_size,
                    code.data(), code.size(), NULL, 0, NULL, 0);
@@ -339,7 +339,7 @@ aco_compile_vs_prolog(const struct aco_compiler_options* options,
 
    std::string disasm;
    if (options->record_asm)
-      disasm = get_disasm_string(program.get(), code, exec_size);
+      disasm = get_disasm_string(program.get(), options->family, code, exec_size);
 
    (*build_prolog)(binary, config.num_sgprs, config.num_vgprs, code.data(), code.size(),
                    disasm.data(), disasm.size());
@@ -401,7 +401,7 @@ aco_compile_trap_handler(const struct aco_compiler_options* options,
 
    std::string disasm;
    if (options->record_asm)
-      disasm = get_disasm_string(program.get(), code, exec_size);
+      disasm = get_disasm_string(program.get(), options->family, code, exec_size);
 
    (*build_binary)(binary, &config, NULL, 0, disasm.c_str(), disasm.size(), NULL, exec_size,
                    code.data(), code.size(), NULL, 0, NULL, 0);
@@ -438,52 +438,6 @@ aco_is_gpu_supported(const struct radeon_info* info)
    }
 }
 
-bool
-aco_nir_op_supports_packed_math_16bit(const nir_alu_instr* alu)
-{
-   switch (alu->op) {
-   case nir_op_f2f16: {
-      nir_shader* shader = nir_cf_node_get_function(&alu->instr.block->cf_node)->function->shader;
-      unsigned execution_mode = shader->info.float_controls_execution_mode;
-      return (shader->options->force_f2f16_rtz && !nir_is_rounding_mode_rtne(execution_mode, 16)) ||
-             nir_is_rounding_mode_rtz(execution_mode, 16);
-   }
-   case nir_op_fadd:
-   case nir_op_fsub:
-   case nir_op_fmul:
-   case nir_op_ffma:
-   case nir_op_fdiv:
-   case nir_op_flrp:
-   case nir_op_fabs:
-   case nir_op_fneg:
-   case nir_op_fsat:
-   case nir_op_fmin:
-   case nir_op_fmax:
-   case nir_op_f2f16_rtz:
-   case nir_op_iabs:
-   case nir_op_iadd:
-   case nir_op_iadd_sat:
-   case nir_op_uadd_sat:
-   case nir_op_isub:
-   case nir_op_isub_sat:
-   case nir_op_usub_sat:
-   case nir_op_ineg:
-   case nir_op_imul:
-   case nir_op_imin:
-   case nir_op_imax:
-   case nir_op_umin:
-   case nir_op_umax:
-   case nir_op_extract_u8:
-   case nir_op_extract_i8:
-   case nir_op_ishl:
-   case nir_op_ishr:
-   case nir_op_ushr: return true;
-   case nir_op_u2u16:
-   case nir_op_i2i16: return alu->src[0].src.ssa->bit_size == 8;
-   default: return false;
-   }
-}
-
 void
 aco_print_asm(const struct radeon_info *info, unsigned wave_size,
               uint32_t *binary, unsigned num_dw)
@@ -492,9 +446,8 @@ aco_print_asm(const struct radeon_info *info, unsigned wave_size,
    aco::Program prog;
 
    prog.gfx_level = info->gfx_level;
-   prog.family = info->family;
    prog.wave_size = wave_size;
    prog.blocks.push_back(aco::Block());
 
-   aco::print_asm(&prog, binarray, num_dw, stderr);
+   aco::print_asm(&prog, info->family, binarray, num_dw, stderr);
 }

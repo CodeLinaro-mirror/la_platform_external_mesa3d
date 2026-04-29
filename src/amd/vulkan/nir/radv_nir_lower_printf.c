@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "radv_debug_nir.h"
 #include "radv_nir.h"
-#include "radv_printf.h"
 
 #include "util/u_printf.h"
 
@@ -18,7 +18,7 @@ pass(nir_builder *b, nir_intrinsic_instr *instr, void *state)
    if (instr->intrinsic != nir_intrinsic_printf)
       return false;
 
-   u_printf_info *info = &b->shader->printf_info[nir_intrinsic_fmt_idx(instr)];
+   u_printf_info *info = &b->shader->printf_info[nir_intrinsic_fmt_idx(instr) - 1];
 
    nir_def **args = malloc(info->num_args * sizeof(nir_def *));
 

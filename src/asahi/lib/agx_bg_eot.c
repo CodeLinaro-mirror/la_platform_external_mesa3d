@@ -67,7 +67,13 @@ build_background_op(nir_builder *b, enum agx_bg_eot_op op, unsigned rt,
                     unsigned nr, bool msaa, bool layered)
 {
    if (op == AGX_BG_LOAD) {
-      nir_def *coord = nir_u2u32(b, nir_load_pixel_coord(b));
+      nir_def *coord = nir_load_pixel_coord(b);
+
+      /* MSAA/array lowerings assume 32-bit coordinates, could be lifted but
+       * that's going to need more work.
+       */
+      if (layered || msaa)
+         coord = nir_u2u32(b, coord);
 
       if (layered) {
          coord = nir_vec3(b, nir_channel(b, coord, 0), nir_channel(b, coord, 1),
@@ -76,9 +82,8 @@ build_background_op(nir_builder *b, enum agx_bg_eot_op op, unsigned rt,
 
       b->shader->info.fs.uses_sample_shading |= msaa;
 
-      nir_def *tex = nir_build_tex(
-         b, msaa ? nir_texop_txf_ms : nir_texop_txf, coord,
-         .ms_index = msaa ? nir_load_sample_id(b) : NULL,
+      nir_def *tex = nir_txf(
+         b, coord, .ms_index = msaa ? nir_load_sample_id(b) : NULL,
          .texture_index = rt * 2,
          .dim = msaa ? GLSL_SAMPLER_DIM_MS : GLSL_SAMPLER_DIM_2D,
          .is_array = layered,

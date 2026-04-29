@@ -2,25 +2,7 @@
  * Copyright (C) 2017-2019 Alyssa Rosenzweig
  * Copyright (C) 2017-2019 Connor Abbott
  * Copyright (C) 2019 Collabora, Ltd.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 
 #include "decode.h"
@@ -34,9 +16,6 @@
 #include <genxml/gen_macros.h>
 #include <sys/mman.h>
 
-#include "compiler/bifrost/disassemble.h"
-#include "compiler/valhall/disassemble.h"
-#include "midgard/disassemble.h"
 #include "util/set.h"
 #include "pan_format.h"
 
@@ -71,6 +50,35 @@ pandecode_midgard_tiler_descriptor(struct pandecode_context *ctx,
 #endif
 
 #if PAN_ARCH >= 5
+static const char *
+block_format_string(enum mali_block_format block_format)
+{
+   switch (block_format) {
+#if PAN_ARCH >= 7
+   case MALI_BLOCK_FORMAT_NO_WRITE:
+#else
+   case MALI_BLOCK_FORMAT_TILED_LINEAR:
+#endif
+   case MALI_BLOCK_FORMAT_TILED_U_INTERLEAVED:
+      return "U-Tiled";
+   case MALI_BLOCK_FORMAT_LINEAR:
+      return "Linear";
+#if PAN_ARCH >= 10
+   case MALI_BLOCK_FORMAT_INTERLEAVED_64K:
+      return "Interleaved 64K";
+#endif
+   case MALI_BLOCK_FORMAT_AFBC:
+      return "AFBC";
+#if PAN_ARCH >= 7
+   case MALI_BLOCK_FORMAT_AFBC_TILED:
+      return "AFBC-Tiled";
+#endif
+   default:
+      UNREACHABLE("unsupported block format");
+      return "???";
+   }
+}
+
 static void
 pandecode_rt(struct pandecode_context *ctx, unsigned index, uint64_t gpu_va)
 {
@@ -95,7 +103,8 @@ pandecode_rt(struct pandecode_context *ctx, unsigned index, uint64_t gpu_va)
    }
 #endif
 
-   switch (rt.rgb.writeback_block_format) {
+   enum mali_block_format writeback_block_format = rt.rgb.writeback_block_format;
+   switch (writeback_block_format) {
 #if PAN_ARCH >= 7
    case MALI_BLOCK_FORMAT_NO_WRITE:
 #else
@@ -103,19 +112,18 @@ pandecode_rt(struct pandecode_context *ctx, unsigned index, uint64_t gpu_va)
 #endif
    case MALI_BLOCK_FORMAT_TILED_U_INTERLEAVED:
    case MALI_BLOCK_FORMAT_LINEAR:
+#if PAN_ARCH >= 10
+   case MALI_BLOCK_FORMAT_INTERLEAVED_64K:
+#endif
       if (rt.rgb.yuv_enable) {
          DUMP_UNPACKED(ctx, YUV_RENDER_TARGET, rt.yuv,
                        "%s YUV Color Render Target %d:\n",
-                       rt.rgb.writeback_block_format == MALI_BLOCK_FORMAT_LINEAR
-                          ? "Linear"
-                          : "U-Tiled",
+                       block_format_string(writeback_block_format),
                        index);
       } else {
          DUMP_UNPACKED(ctx, RGB_RENDER_TARGET, rt.rgb,
                        "%s RGB Color Render Target %d:\n",
-                       rt.rgb.writeback_block_format == MALI_BLOCK_FORMAT_LINEAR
-                          ? "Linear"
-                          : "U-Tiled",
+                       block_format_string(writeback_block_format),
                        index);
       }
       break;
@@ -126,7 +134,9 @@ pandecode_rt(struct pandecode_context *ctx, unsigned index, uint64_t gpu_va)
 #if PAN_ARCH >= 6
       if (rt.rgb.yuv_enable) {
          DUMP_UNPACKED(ctx, AFBC_YUV_RENDER_TARGET, rt.afbc_yuv,
-                       "AFBC YUV Color Render Target %d:\n", index);
+                       "%s YUV Color Render Target %d:\n",
+                       block_format_string(writeback_block_format),
+                       index);
          break;
       }
 #else
@@ -134,9 +144,12 @@ pandecode_rt(struct pandecode_context *ctx, unsigned index, uint64_t gpu_va)
 #endif
 
       DUMP_UNPACKED(ctx, AFBC_RGB_RENDER_TARGET, rt.afbc_rgb,
-                    "AFBC RGB Color Render Target %d:\n", index);
+                    "%s RGB Color Render Target %d:\n",
+                    block_format_string(writeback_block_format),
+                    index);
       break;
    }
+
 }
 
 static void
@@ -250,7 +263,9 @@ GENX(pandecode_fbd)(struct pandecode_context *ctx, uint64_t gpu_va,
       pan_unpack(dcd, DRAW, draw);
       pandecode_log(ctx, "Pre frame 0 @%" PRIx64 " (mode=%d):\n",
                     params.frame_shader_dcds, params.pre_frame_0);
+      ctx->indent++;
       GENX(pandecode_dcd)(ctx, &draw, job_type_param, gpu_id);
+      ctx->indent--;
    }
 
    if (params.pre_frame_1 != MALI_PRE_POST_FRAME_SHADER_MODE_NEVER) {
@@ -259,7 +274,9 @@ GENX(pandecode_fbd)(struct pandecode_context *ctx, uint64_t gpu_va,
       pan_unpack(dcd, DRAW, draw);
       pandecode_log(ctx, "Pre frame 1 @%" PRIx64 ":\n",
                     params.frame_shader_dcds + (1 * dcd_size));
+      ctx->indent++;
       GENX(pandecode_dcd)(ctx, &draw, job_type_param, gpu_id);
+      ctx->indent--;
    }
 
    if (params.post_frame != MALI_PRE_POST_FRAME_SHADER_MODE_NEVER) {
@@ -267,7 +284,9 @@ GENX(pandecode_fbd)(struct pandecode_context *ctx, uint64_t gpu_va,
          ctx, dcd, params.frame_shader_dcds + (2 * dcd_size));
       pan_unpack(dcd, DRAW, draw);
       pandecode_log(ctx, "Post frame:\n");
+      ctx->indent++;
       GENX(pandecode_dcd)(ctx, &draw, job_type_param, gpu_id);
+      ctx->indent--;
    }
 #else
    DUMP_SECTION(ctx, FRAMEBUFFER, LOCAL_STORAGE, fb, "Local Storage:\n");
@@ -565,14 +584,16 @@ GENX(pandecode_shader)(struct pandecode_context *ctx, uint64_t addr,
 
 static unsigned
 pandecode_buffer(struct pandecode_context *ctx,
-                 const struct mali_buffer_packed *cl, uint64_t addr)
+                 const struct mali_buffer_packed *cl, uint64_t addr,
+                 uint64_t end_of_entry_addr)
 {
    pan_unpack(cl, BUFFER, buffer)
       ;
    DUMP_UNPACKED(ctx, BUFFER, buffer, "Buffer @%" PRIx64 ":\n", addr);
 
-   /* If the address is the following descriptor, this descriptor is an IUB. */
-   if (buffer.address == (addr + 0x20)) {
+   /* If the address is the following descriptor and is within the resource
+    * entry, this descriptor is an IUB. */
+   if (buffer.address == (addr + 0x20) && buffer.address < end_of_entry_addr) {
       assert((buffer.size % 0x20) == 0);
 
       const uint8_t *cl_bytes = (uint8_t *)cl;
@@ -621,7 +642,7 @@ pandecode_resources(struct pandecode_context *ctx, uint64_t addr, unsigned size)
          break;
       case MALI_DESCRIPTOR_TYPE_BUFFER:
          i += pandecode_buffer(ctx, (const struct mali_buffer_packed *)&cl[i],
-                               addr + i);
+                               addr + i, addr + size);
          break;
       default:
          fprintf(ctx->dump_stream, "Unknown descriptor type %X\n", header.type);

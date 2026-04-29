@@ -253,7 +253,7 @@ print_cache_flags(enum amd_gfx_level gfx_level, const T& instr, FILE* output)
             fprintf(output, " non_temporal");
          if (instr.cache.gfx12.temporal_hint & gfx12_atomic_accum_deferred_scope)
             fprintf(output, " accum_deferred_scope");
-      } else if (instr.definitions.empty()) {
+      } else if (!instr.definitions.empty()) {
          switch (instr.cache.gfx12.temporal_hint) {
          case gfx12_load_regular_temporal: break;
          case gfx12_load_non_temporal: fprintf(output, " non_temporal"); break;
@@ -826,7 +826,7 @@ print_vopd_instr(enum amd_gfx_level gfx_level, const Instruction* instr, FILE* o
 }
 
 static void
-print_block_kind(uint16_t kind, FILE* output)
+print_block_kind(uint32_t kind, FILE* output)
 {
    if (kind & block_kind_uniform)
       fprintf(output, "uniform, ");
@@ -836,6 +836,8 @@ print_block_kind(uint16_t kind, FILE* output)
       fprintf(output, "loop-preheader, ");
    if (kind & block_kind_loop_header)
       fprintf(output, "loop-header, ");
+   else if (kind & block_kind_loop_latch)
+      fprintf(output, "loop-latch, ");
    if (kind & block_kind_loop_exit)
       fprintf(output, "loop-exit, ");
    if (kind & block_kind_continue)
@@ -858,6 +860,8 @@ print_block_kind(uint16_t kind, FILE* output)
       fprintf(output, "export_end, ");
    if (kind & block_kind_end_with_regs)
       fprintf(output, "end_with_regs, ");
+   if (kind & block_kind_contains_call)
+      fprintf(output, "contains_call, ");
 }
 
 static void
@@ -958,7 +962,18 @@ aco_print_block(enum amd_gfx_level gfx_level, const Block* block, FILE* output, 
       if (flags & print_perf_info)
          fprintf(output, "(%3u clk)   ", instr->pass_flags);
 
-      aco_print_instr(gfx_level, instr.get(), output, flags);
+      if (instr->opcode == aco_opcode::p_parallelcopy &&
+          instr->definitions.size() == instr->operands.size() && instr->definitions.size() > 2) {
+         fprintf(output, "p_parallelcopy");
+         for (unsigned i = 0; i < instr->definitions.size(); i++) {
+            fprintf(output, "\n\t   ");
+            print_definition(&instr->definitions[i], output, flags);
+            fprintf(output, " = ");
+            aco_print_operand(&instr->operands[i], output, flags);
+         }
+      } else {
+         aco_print_instr(gfx_level, instr.get(), output, flags);
+      }
       fprintf(output, "\n");
    }
 }
@@ -1031,7 +1046,9 @@ aco_print_instr(enum amd_gfx_level gfx_level, const Instruction* instr, FILE* ou
 
       if (instr->opcode == aco_opcode::v_fma_mix_f32 ||
           instr->opcode == aco_opcode::v_fma_mixlo_f16 ||
-          instr->opcode == aco_opcode::v_fma_mixhi_f16) {
+          instr->opcode == aco_opcode::v_fma_mixhi_f16 ||
+          instr->opcode == aco_opcode::p_v_fma_mixlo_f16_rtz ||
+          instr->opcode == aco_opcode::p_v_fma_mixhi_f16_rtz) {
          const VALU_instruction& vop3p = instr->valu();
          abs = vop3p.abs;
          neg = vop3p.neg;

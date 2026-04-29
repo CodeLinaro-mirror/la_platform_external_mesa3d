@@ -187,7 +187,7 @@ anv_slab_bo_free(struct anv_device *device, struct anv_bo *bo)
    }
 
    bo->refcount = 0;
-   pb_slab_free(get_slabs(device, bo->size), &bo->slab_entry);
+   pb_slab_free(get_slabs(device, bo->actual_size), &bo->slab_entry);
 }
 
 static unsigned heap_max_get(struct anv_device *device)
@@ -293,7 +293,7 @@ anv_slab_alloc(void *priv,
       struct anv_bo *bo = &slab->entries[i];
       uint64_t offset = intel_48b_address(slab->bo->offset);
 
-      offset += (i * entry_size);
+      offset += ((uint64_t)i * entry_size);
 
       bo->name = "slab_child";
       bo->gem_handle = slab->bo->gem_handle;

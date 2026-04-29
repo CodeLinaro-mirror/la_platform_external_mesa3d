@@ -13,14 +13,16 @@ gen_xml_files = [
   'gen110.xml',
   'gen120.xml',
   'gen125.xml',
-  'gen200.xml',
-  'gen300.xml',
+  'xe2.xml',
+  'xe3.xml',
+  'xe3p.xml',
 ]
 
 gen_xml_rt_files = [
   'gen125_rt.xml',
-  'gen200_rt.xml',
-  'gen300_rt.xml',
+  'xe2_rt.xml',
+  'xe3_rt.xml',
+  'xe3p_rt.xml',
 ]
 
 gen_pack_header_deps = files('intel_genxml.py', 'util.py')
@@ -54,6 +56,8 @@ genX_bits_included_symbols = [
   '3DSTATE_SO_BUFFER::Stream Offset',
   '3DSTATE_CPSIZE_CONTROL_BUFFER::Surface Base Address',
   '3DSTATE_CPSIZE_CONTROL_BUFFER::Surface Pitch',
+  'COMPUTE_WALKER::body',
+  'EXECUTE_INDIRECT_DISPATCH::body',
   # structures
   'RENDER_SURFACE_STATE::Surface Base Address',
   'RENDER_SURFACE_STATE::Surface Pitch',

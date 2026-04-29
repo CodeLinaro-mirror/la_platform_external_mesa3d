@@ -48,6 +48,7 @@ enum blorp_op {
    BLORP_OP_HIZ_AMBIGUATE,
    BLORP_OP_HIZ_CLEAR,
    BLORP_OP_HIZ_RESOLVE,
+   BLORP_OP_HIZ_PARTIAL_RESOLVE,
    BLORP_OP_MCS_AMBIGUATE,
    BLORP_OP_MCS_COLOR_CLEAR,
    BLORP_OP_MCS_PARTIAL_RESOLVE,
@@ -219,6 +220,12 @@ struct blorp_surf
     */
    struct blorp_address clear_color_addr;
 
+   /* Whether or not the indirect clear color contains a replicated pixel
+    * value. Allows blorp_copy() to widen the surface format of compressed
+    * sources for increased performance on gfx12.
+    */
+   bool has_replicated_pixel;
+
    /* Only allowed for simple 2D non-MSAA surfaces */
    uint32_t tile_x_sa, tile_y_sa;
 };
@@ -248,10 +255,16 @@ blorp_blit(struct blorp_batch *batch,
            enum blorp_filter filter,
            bool mirror_x, bool mirror_y);
 
+/* Returns the format the blorp_copy() call can be assumed to use if it
+ * receives a blorp surface which enables lossless compression.
+ */
 enum isl_format
 blorp_copy_get_color_format(const struct isl_device *isl_dev,
                             enum isl_format surf_format);
 
+/* Returns the format the blorp_copy() call can be assumed to use if it
+ * receives a blorp surface which enables lossless compression.
+ */
 void
 blorp_copy_get_formats(const struct isl_device *isl_dev,
                        const struct isl_surf *src_surf,

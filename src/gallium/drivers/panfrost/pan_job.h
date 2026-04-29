@@ -1,26 +1,7 @@
 /*
  * Copyright (C) 2019 Alyssa Rosenzweig
  * Copyright (C) 2014-2017 Broadcom
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef __PAN_JOB_H__
@@ -121,19 +102,19 @@ struct panfrost_batch {
 
    /* Cached descriptors */
    uint64_t viewport;
-   uint64_t rsd[PIPE_SHADER_TYPES];
-   uint64_t textures[PIPE_SHADER_TYPES];
-   uint64_t samplers[PIPE_SHADER_TYPES];
-   uint64_t attribs[PIPE_SHADER_TYPES];
-   uint64_t attrib_bufs[PIPE_SHADER_TYPES];
-   uint64_t uniform_buffers[PIPE_SHADER_TYPES];
-   uint64_t push_uniforms[PIPE_SHADER_TYPES];
+   uint64_t rsd[MESA_SHADER_STAGES];
+   uint64_t textures[MESA_SHADER_STAGES];
+   uint64_t samplers[MESA_SHADER_STAGES];
+   uint64_t attribs[MESA_SHADER_STAGES];
+   uint64_t attrib_bufs[MESA_SHADER_STAGES];
+   uint64_t uniform_buffers[MESA_SHADER_STAGES];
+   uint64_t push_uniforms[MESA_SHADER_STAGES];
    uint64_t depth_stencil;
    uint64_t blend;
 
-   unsigned nr_push_uniforms[PIPE_SHADER_TYPES];
-   unsigned nr_uniform_buffers[PIPE_SHADER_TYPES];
-   unsigned nr_varying_attribs[PIPE_SHADER_TYPES];
+   unsigned nr_push_uniforms[MESA_SHADER_STAGES];
+   unsigned nr_uniform_buffers[MESA_SHADER_STAGES];
+   unsigned nr_varying_attribs[MESA_SHADER_STAGES];
 
    /* Varying related pointers */
    struct {
@@ -152,16 +133,16 @@ struct panfrost_batch {
    unsigned scissor[2];
    float minimum_z, maximum_z;
 
-   /* Avalon: struct mali_viewport_packed */
-   unsigned avalon_viewport[4];
+   /* 5th Gen: struct mali_viewport_packed */
+   unsigned fifthgen_viewport[4];
 
    /* Used on Valhall only. Midgard includes attributes in-band with
     * attributes, wildly enough.
     */
-   uint64_t images[PIPE_SHADER_TYPES];
+   uint64_t images[MESA_SHADER_STAGES];
 
    /* SSBOs. */
-   uint64_t ssbos[PIPE_SHADER_TYPES];
+   uint64_t ssbos[MESA_SHADER_STAGES];
 
    /* On Valhall, these are properties of the batch. On Bifrost, they are
     * per draw.
@@ -203,19 +184,19 @@ panfrost_get_fresh_batch_for_fbo(struct panfrost_context *ctx,
                                  const char *reason);
 
 void panfrost_batch_add_bo(struct panfrost_batch *batch, struct panfrost_bo *bo,
-                           enum pipe_shader_type stage);
+                           mesa_shader_stage stage);
 
 void panfrost_batch_write_bo(struct panfrost_batch *batch,
                              struct panfrost_bo *bo,
-                             enum pipe_shader_type stage);
+                             mesa_shader_stage stage);
 
 void panfrost_batch_read_rsrc(struct panfrost_batch *batch,
                               struct panfrost_resource *rsrc,
-                              enum pipe_shader_type stage);
+                              mesa_shader_stage stage);
 
 void panfrost_batch_write_rsrc(struct panfrost_batch *batch,
                                struct panfrost_resource *rsrc,
-                               enum pipe_shader_type stage);
+                               mesa_shader_stage stage);
 
 bool panfrost_any_batch_reads_rsrc(struct panfrost_context *ctx,
                                    struct panfrost_resource *rsrc);
@@ -225,7 +206,7 @@ bool panfrost_any_batch_writes_rsrc(struct panfrost_context *ctx,
 
 struct panfrost_bo *panfrost_batch_create_bo(struct panfrost_batch *batch,
                                              size_t size, uint32_t create_flags,
-                                             enum pipe_shader_type stage,
+                                             mesa_shader_stage stage,
                                              const char *label);
 
 void panfrost_flush_all_batches(struct panfrost_context *ctx,

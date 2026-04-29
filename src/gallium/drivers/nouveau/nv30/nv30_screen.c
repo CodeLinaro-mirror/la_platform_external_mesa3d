@@ -54,7 +54,7 @@ nv30_init_shader_caps(struct nv30_screen *screen)
    struct nouveau_object *eng3d = screen->eng3d;
 
    struct pipe_shader_caps *caps =
-      (struct pipe_shader_caps *)&screen->base.base.shader_caps[PIPE_SHADER_VERTEX];
+      (struct pipe_shader_caps *)&screen->base.base.shader_caps[MESA_SHADER_VERTEX];
 
    caps->max_instructions =
    caps->max_alu_instructions = (eng3d->oclass >= NV40_3D_CLASS) ? 512 : 256;
@@ -68,7 +68,7 @@ nv30_init_shader_caps(struct nv30_screen *screen)
    caps->max_temps = (eng3d->oclass >= NV40_3D_CLASS) ? 32 : 13;
    caps->supported_irs = (1 << PIPE_SHADER_IR_NIR) | (1 << PIPE_SHADER_IR_TGSI);
 
-   caps = (struct pipe_shader_caps *)&screen->base.base.shader_caps[PIPE_SHADER_FRAGMENT];
+   caps = (struct pipe_shader_caps *)&screen->base.base.shader_caps[MESA_SHADER_FRAGMENT];
 
    caps->max_instructions =
    caps->max_alu_instructions =
@@ -351,7 +351,6 @@ static const nir_shader_compiler_options nv30_base_compiler_options = {
    .lower_fmod = true,
    .lower_fpow = true, /* In hardware as of nv40 FS */
    .lower_uniforms_to_ubo = true,
-   .lower_vector_cmp = true,
    .force_indirect_unrolling = nir_var_all,
    .force_indirect_unrolling_sampler = true,
    .max_unroll_iterations = 32,

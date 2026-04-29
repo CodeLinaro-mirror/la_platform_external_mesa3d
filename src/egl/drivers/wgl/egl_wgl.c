@@ -46,7 +46,7 @@
 #include <pipe/p_state.h>
 
 #include "util/u_call_once.h"
-#include "mapi/glapi/glapi.h"
+#include "mesa/glapi/glapi/glapi.h"
 #include "dispatch.h"
 
 #include <GL/mesa_glinterop.h>
@@ -640,7 +640,7 @@ wgl_create_window_surface(_EGLDisplay *disp, _EGLConfig *conf,
    const struct stw_pixelformat_info *stw_conf = wgl_conf->stw_config[1]
                                                     ? wgl_conf->stw_config[1]
                                                     : wgl_conf->stw_config[0];
-   wgl_surf->fb = stw_framebuffer_create(
+   wgl_surf->fb = stw_framebuffer_create(NULL,
       native_window, stw_conf, STW_FRAMEBUFFER_EGL_WINDOW, &wgl_dpy->base);
    if (!wgl_surf->fb) {
       free(wgl_surf);

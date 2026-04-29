@@ -760,9 +760,9 @@ etna_ml_subgraph_create(struct pipe_context *pcontext,
    list_inithead(&operations);
 
    subgraph->base.context = pcontext;
-   util_dynarray_init(&subgraph->operations, NULL);
+   subgraph->operations = UTIL_DYNARRAY_INIT;
 
-   util_dynarray_init(&subgraph->tensors, NULL);
+   subgraph->tensors = UTIL_DYNARRAY_INIT;
    if (!util_dynarray_resize(&subgraph->tensors, struct etna_ml_tensor*, tensor_count))
       return NULL;
    memset(util_dynarray_begin(&subgraph->tensors), 0, subgraph->tensors.size);
@@ -785,7 +785,7 @@ etna_ml_subgraph_create(struct pipe_context *pcontext,
             continue;
       }
 
-      util_dynarray_append(&subgraph->operations, struct etna_vip_instruction, instruction);
+      util_dynarray_append(&subgraph->operations, instruction);
    }
 
    list_for_each_entry_safe(struct etna_operation, operation, &operations, link) {

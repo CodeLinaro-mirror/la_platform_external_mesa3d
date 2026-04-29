@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <algorithm>
 #include <cstdio>
 #include <fcntl.h>
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
 #include <sys/mman.h>
-#include <xtensor/xrandom.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -17,6 +17,8 @@
 #include <vector>
 #include "tensorflow/lite/c/c_api.h"
 #include "test_executor.h"
+
+#include "util/os_misc.h"
 
 #define TEST_CONV2D          1
 #define TEST_DEPTHWISE       1
@@ -39,13 +41,6 @@ std::vector<int> fc_channels{23, 46, 128, 256, 512};
 std::vector<int> fc_size{128, 1280, 25088, 62720};
 
 static void
-set_seed(unsigned seed)
-{
-   srand(seed);
-   xt::random::seed(seed);
-}
-
-static void
 test_model(void *buf, size_t buf_size, std::string cache_dir, unsigned tolerance)
 {
    void **input = NULL;
@@ -62,7 +57,7 @@ test_model(void *buf, size_t buf_size, std::string cache_dir, unsigned tolerance
    run_model(model, EXECUTOR_CPU, &input, &num_inputs, &cpu_output, &output_sizes, &output_types, &num_outputs, cache_dir);
    run_model(model, EXECUTOR_NPU, &input, &num_inputs, &npu_output, &output_sizes, &output_types, &num_outputs, cache_dir);
 
-   char *dump_output = getenv("TEFLON_DUMP_OUTPUT");
+   const char *dump_output = os_get_option("TEFLON_DUMP_OUTPUT");
    if (dump_output && atoi(dump_output) == 1) {
       for (unsigned i = 0; i < num_outputs; i++) {
          char name[250];
@@ -138,8 +133,42 @@ test_model(void *buf, size_t buf_size, std::string cache_dir, unsigned tolerance
             }
             break;
          }
+         case kTfLiteInt16: {
+            int16_t *cpu = ((int16_t **)cpu_output)[i];
+            int16_t *npu = ((int16_t **)npu_output)[i];
+            if (abs(cpu[j] - npu[j]) > tolerance) {
+               std::cout << "CPU: ";
+               for (int k = 0; k < std::min(int(output_sizes[i]), 24); k++)
+                  std::cout << std::setfill('0') << std::setw(4) << std::hex << int(cpu[k] & 0xffff) << " ";
+               std::cout << "\n";
+               std::cout << "NPU: ";
+               for (int k = 0; k < std::min(int(output_sizes[i]), 24); k++)
+                  std::cout << std::setfill('0') << std::setw(4) << std::hex << int(npu[k] & 0xffff) << " ";
+               std::cout << "\n";
+
+               FAIL() << "Output at " << j << " from the NPU (" << std::setfill('0') << std::setw(4) << std::hex << int(npu[j] & 0xffff) << ") doesn't match that from the CPU (" << std::setfill('0') << std::setw(4) << std::hex << int(cpu[j] & 0xffff) << ").";
+            }
+            break;
+         }
+         case kTfLiteUInt16: {
+            uint16_t *cpu = ((uint16_t **)cpu_output)[i];
+            uint16_t *npu = ((uint16_t **)npu_output)[i];
+            if (abs(cpu[j] - npu[j]) > tolerance) {
+               std::cout << "CPU: ";
+               for (int k = 0; k < std::min(int(output_sizes[i]), 24); k++)
+                  std::cout << std::setfill('0') << std::setw(4) << std::hex << int(cpu[k]) << " ";
+               std::cout << "\n";
+               std::cout << "NPU: ";
+               for (int k = 0; k < std::min(int(output_sizes[i]), 24); k++)
+                  std::cout << std::setfill('0') << std::setw(4) << std::hex << int(npu[k]) << " ";
+               std::cout << "\n";
+
+               FAIL() << "Output at " << j << " from the NPU (" << std::setfill('0') << std::setw(4) << std::hex << int(npu[j]) << ") doesn't match that from the CPU (" << std::setfill('0') << std::setw(4) << std::hex << int(cpu[j]) << ").";
+            }
+            break;
+         }
          default:
-            assert(!"Unsupported data type for output tensor");
+            FAIL() << "Unsupported data type for output tensor";
          }
       }
    }
@@ -175,7 +204,7 @@ test_model_file(std::string file_name, unsigned tolerance, bool use_cache)
       cache_dir << path.stem().string();
    }
 
-   set_seed(4);
+   srand(4);
 
    struct stat sb;
    int model_fd = open(file_name.c_str(), O_RDONLY);
@@ -200,7 +229,7 @@ test_conv(int input_size, int weight_size, int input_channels, int output_channe
    if (weight_size > input_size)
       GTEST_SKIP();
 
-   set_seed(seed);
+   srand(seed);
 
    if (cache_is_enabled()) {
       if (access(model_cache.str().c_str(), F_OK) == 0) {
@@ -245,7 +274,7 @@ test_add(int input_size, int weight_size, int input_channels, int output_channel
    if (weight_size > input_size)
       GTEST_SKIP();
 
-   set_seed(seed);
+   srand(seed);
 
    if (cache_is_enabled()) {
       if (access(model_cache.str().c_str(), F_OK) == 0) {
@@ -284,7 +313,7 @@ test_fully_connected(int input_size, int output_channels, bool is_signed, int se
    model_cache << cache_dir.str() << "/"
                << "model.tflite";
 
-   set_seed(seed);
+   srand(seed);
 
    if (cache_is_enabled()) {
       if (access(model_cache.str().c_str(), F_OK) == 0) {
@@ -513,8 +542,8 @@ TEST_P(Models, Op)
    std::ostringstream file_path;
    auto test_name = GetParam();
    test_name.replace(test_name.find("_"), 1, "/");
-   assert(getenv("TEFLON_TEST_DATA"));
-   file_path << getenv("TEFLON_TEST_DATA") << "/models/" << test_name << ".tflite";
+   assert(os_get_option("TEFLON_TEST_DATA"));
+   file_path << os_get_option("TEFLON_TEST_DATA") << "/models/" << test_name << ".tflite";
 
    test_model_file(file_path.str(), TOLERANCE, true);
 }
@@ -522,9 +551,9 @@ TEST_P(Models, Op)
 std::vector<std::string>
 get_model_files(void)
 {
-   assert(getenv("TEFLON_TEST_DATA"));
+   assert(os_get_option("TEFLON_TEST_DATA"));
    std::stringstream dir;
-   dir << getenv("TEFLON_TEST_DATA") << "/models";
+   dir << os_get_option("TEFLON_TEST_DATA") << "/models";
 
    std::vector<std::string> paths;
    std::filesystem::recursive_directory_iterator b(dir.str());
@@ -579,7 +608,7 @@ main(int argc, char **argv)
       int depthwise = atoi(argv[n++]);
       int seed = atoi(argv[n++]);
 
-      set_seed(seed);
+      srand(seed);
 
       buf = conv2d_generate_model(input_size, weight_size,
                                   input_channels, output_channels,

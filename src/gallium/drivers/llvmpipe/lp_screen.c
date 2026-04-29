@@ -38,6 +38,7 @@
 #include "draw/draw_context.h"
 #include "gallivm/lp_bld_type.h"
 #include "gallivm/lp_bld_nir.h"
+#include "gallivm/lp_bld_init.h"
 #include "util/disk_cache.h"
 #include "util/hex.h"
 #include "util/os_misc.h"
@@ -127,16 +128,16 @@ llvmpipe_init_shader_caps(struct pipe_screen *screen)
       struct pipe_shader_caps *caps = (struct pipe_shader_caps *)&screen->shader_caps[i];
 
       switch (i) {
-      case PIPE_SHADER_FRAGMENT:
-      case PIPE_SHADER_COMPUTE:
-      case PIPE_SHADER_MESH:
-      case PIPE_SHADER_TASK:
+      case MESA_SHADER_FRAGMENT:
+      case MESA_SHADER_COMPUTE:
+      case MESA_SHADER_MESH:
+      case MESA_SHADER_TASK:
          gallivm_init_shader_caps(caps);
          break;
-      case PIPE_SHADER_TESS_CTRL:
-      case PIPE_SHADER_TESS_EVAL:
-      case PIPE_SHADER_VERTEX:
-      case PIPE_SHADER_GEOMETRY:
+      case MESA_SHADER_TESS_CTRL:
+      case MESA_SHADER_TESS_EVAL:
+      case MESA_SHADER_VERTEX:
+      case MESA_SHADER_GEOMETRY:
          draw_init_shader_caps(caps);
 
          if (debug_get_bool_option("DRAW_USE_LLVM", true)) {
@@ -211,6 +212,7 @@ llvmpipe_init_screen_caps(struct pipe_screen *screen)
 #if defined(HAVE_LIBDRM) && defined(HAVE_LINUX_UDMABUF_H)
    caps->native_fence_fd = lscreen->dummy_sync_fd != -1;
 #endif
+   caps->prefer_real_buffer_in_constbuf0 = true;
    caps->npot_textures = true;
    caps->mixed_framebuffer_sizes = true;
    caps->mixed_color_depth_bits = true;
@@ -268,7 +270,7 @@ llvmpipe_init_screen_caps(struct pipe_screen *screen)
    caps->vertex_color_unclamped = true;
    caps->vertex_color_clamped = true;
    caps->glsl_feature_level_compatibility =
-   caps->glsl_feature_level = 450;
+   caps->glsl_feature_level = 460;
    caps->compute = true;
    caps->user_vertex_buffers = true;
    caps->tgsi_texcoord = true;
@@ -360,6 +362,7 @@ llvmpipe_init_screen_caps(struct pipe_screen *screen)
    caps->memobj = true;
 #endif
    caps->sampler_reduction_minmax = true;
+   caps->programmable_sample_locations = true;
    caps->texture_query_samples = true;
    caps->shader_group_vote = true;
    caps->shader_ballot = true;
@@ -368,6 +371,7 @@ llvmpipe_init_screen_caps(struct pipe_screen *screen)
    caps->texture_multisample = true;
    caps->sample_shading = true;
    caps->gl_spirv = true;
+   caps->depth_bounds_test = true;
    caps->post_depth_coverage = true;
    caps->shader_clock = true;
    caps->packed_uniforms = true;
@@ -388,6 +392,66 @@ llvmpipe_init_screen_caps(struct pipe_screen *screen)
    caps->max_point_size_aa = LP_MAX_POINT_WIDTH; /* arbitrary */
    caps->max_texture_anisotropy = 16.0; /* not actually signficant at this time */
    caps->max_texture_lod_bias = 16.0; /* arbitrary */
+
+   caps->shader_subgroup_supported_stages = BITFIELD_MASK(MESA_SHADER_MESH_STAGES);
+   caps->shader_subgroup_supported_features = PIPE_SHADER_SUBGROUP_FEATURE_MASK;
+
+   caps->mesh_shader = true;
+
+   caps->mesh.max_task_work_group_total_count = 4194304;
+   caps->mesh.max_mesh_work_group_total_count = 4194304;
+   caps->mesh.max_mesh_work_group_invocations = 1024;
+   caps->mesh.max_task_work_group_invocations = 1024;
+   caps->mesh.max_task_payload_size = 16384;
+   caps->mesh.max_task_shared_memory_size = 32768;
+   caps->mesh.max_mesh_shared_memory_size = 28672;
+   caps->mesh.max_task_payload_and_shared_memory_size = 32768;
+   caps->mesh.max_mesh_payload_and_shared_memory_size = 32768;
+   caps->mesh.max_mesh_output_memory_size = 32768;
+   caps->mesh.max_mesh_payload_and_output_memory_size = 16384 * 28672;
+   caps->mesh.max_mesh_output_vertices = 256;
+   caps->mesh.max_mesh_output_primitives = 256;
+   caps->mesh.max_mesh_output_components = 128;
+   caps->mesh.max_mesh_output_layers = 9;
+   caps->mesh.max_mesh_multiview_view_count = 1;
+   caps->mesh.mesh_output_per_vertex_granularity = 1;
+   caps->mesh.mesh_output_per_primitive_granularity = 1;
+
+   caps->mesh.max_preferred_task_work_group_invocations = 64;
+   caps->mesh.max_preferred_mesh_work_group_invocations = 128;
+   caps->mesh.mesh_prefers_local_invocation_vertex_output = true;
+   caps->mesh.mesh_prefers_local_invocation_primitive_output = true;
+   caps->mesh.mesh_prefers_compact_vertex_output = true;
+   caps->mesh.mesh_prefers_compact_primitive_output = false;
+
+   for (unsigned i = 0; i < 3; i++) {
+      caps->mesh.max_task_work_group_count[i] = 65536;
+      caps->mesh.max_mesh_work_group_count[i] = 65536;
+      caps->mesh.max_task_work_group_size[i] = 1024;
+      caps->mesh.max_mesh_work_group_size[i] = 1024;
+   }
+
+   caps->mesh.pipeline_statistic_queries = true;
+}
+
+
+static void
+llvmpipe_get_sample_pixel_grid(struct pipe_screen *pscreen,
+                               unsigned sample_count,
+                               unsigned *width, unsigned *height)
+{
+   switch (sample_count) {
+   case 0:
+   case 1:
+   case 2:
+   case 4:
+   case 8:
+      *width = 1;
+      *height = 1;
+      break;
+   default:
+      UNREACHABLE("illegal sample count");
+   }
 }
 
 
@@ -460,7 +524,6 @@ static const struct nir_shader_compiler_options gallivm_nir_options = {
    .max_unroll_iterations = 32,
    .lower_to_scalar = true,
    .lower_uniforms_to_ubo = true,
-   .lower_vector_cmp = true,
    .lower_device_index_to_zero = true,
    .support_16bit_alu = true,
    .lower_fisnormal = true,
@@ -468,14 +531,14 @@ static const struct nir_shader_compiler_options gallivm_nir_options = {
    .lower_fminmax_signed_zero = true,
    .driver_functions = true,
    .scalarize_ddx = true,
-   .support_indirect_inputs = (uint8_t)BITFIELD_MASK(PIPE_SHADER_TYPES),
-   .support_indirect_outputs = (uint8_t)BITFIELD_MASK(PIPE_SHADER_TYPES),
+   .support_indirect_inputs = (uint8_t)BITFIELD_MASK(MESA_SHADER_STAGES),
+   .support_indirect_outputs = (uint8_t)BITFIELD_MASK(MESA_SHADER_STAGES),
 };
 
 
 static void
 llvmpipe_finalize_nir(struct pipe_screen *screen,
-                      struct nir_shader *nir)
+                      struct nir_shader *nir, bool optimize)
 {
    lp_build_opt_nir(nir);
 }
@@ -598,8 +661,16 @@ llvmpipe_is_format_supported(struct pipe_screen *_screen,
           target == PIPE_TEXTURE_CUBE ||
           target == PIPE_TEXTURE_CUBE_ARRAY);
 
-   if (sample_count != 0 && sample_count != 1 && sample_count != 4)
+   static_assert(LP_MAX_SAMPLES == 8, "Code below assumes support up to 8x");
+   switch (sample_count) {
+   case 0:
+   case 1:
+   case 4:
+   case 8:
+      break;
+   default:
       return false;
+   }
 
    if (bind & (PIPE_BIND_RENDER_TARGET | PIPE_BIND_SHADER_IMAGE))
       if (!lp_storage_render_image_format_supported(format))
@@ -804,11 +875,11 @@ update_cache_sha1_cpu(struct mesa_sha1 *ctx)
    const struct util_cpu_caps_t *cpu_caps = util_get_cpu_caps();
    /*
     * Don't need the cpu cache affinity stuff. The rest
-    * is contained in first 4 dwords.
+    * is contained in first 5 dwords.
     */
    STATIC_ASSERT(offsetof(struct util_cpu_caps_t, num_L3_caches)
-                 == 4 * sizeof(uint32_t));
-   _mesa_sha1_update(ctx, cpu_caps, 4 * sizeof(uint32_t));
+                 == 5 * sizeof(uint32_t));
+   _mesa_sha1_update(ctx, cpu_caps, 5 * sizeof(uint32_t));
 }
 
 
@@ -817,8 +888,8 @@ lp_disk_cache_create(struct llvmpipe_screen *screen)
 {
    struct mesa_sha1 ctx;
    unsigned gallivm_perf = gallivm_get_perf_flags();
-   unsigned char sha1[20];
-   char cache_id[20 * 2 + 1];
+   unsigned char sha1[SHA1_DIGEST_LENGTH];
+   char cache_id[SHA1_DIGEST_STRING_LENGTH];
    _mesa_sha1_init(&ctx);
 
    if (!disk_cache_get_function_identifier(lp_disk_cache_create, &ctx) ||
@@ -828,7 +899,7 @@ lp_disk_cache_create(struct llvmpipe_screen *screen)
    _mesa_sha1_update(&ctx, &gallivm_perf, sizeof(gallivm_perf));
    update_cache_sha1_cpu(&ctx);
    _mesa_sha1_final(&ctx, sha1);
-   mesa_bytes_to_hex(cache_id, sha1, 20);
+   mesa_bytes_to_hex(cache_id, sha1, SHA1_DIGEST_LENGTH);
 
    screen->disk_shader_cache = disk_cache_create("llvmpipe", cache_id, 0);
 }
@@ -858,7 +929,7 @@ llvmpipe_screen_get_fd(struct pipe_screen *_screen)
 void
 lp_disk_cache_find_shader(struct llvmpipe_screen *screen,
                           struct lp_cached_code *cache,
-                          unsigned char ir_sha1_cache_key[20])
+                          unsigned char ir_sha1_cache_key[SHA1_DIGEST_LENGTH])
 {
    unsigned char sha1[CACHE_KEY_SIZE];
 
@@ -882,7 +953,7 @@ lp_disk_cache_find_shader(struct llvmpipe_screen *screen,
 void
 lp_disk_cache_insert_shader(struct llvmpipe_screen *screen,
                             struct lp_cached_code *cache,
-                            unsigned char ir_sha1_cache_key[20])
+                            unsigned char ir_sha1_cache_key[SHA1_DIGEST_LENGTH])
 {
    unsigned char sha1[CACHE_KEY_SIZE];
 
@@ -959,6 +1030,7 @@ llvmpipe_create_screen(struct sw_winsys *winsys)
    screen->base.get_device_vendor = llvmpipe_get_vendor; // TODO should be the CPU vendor
    screen->base.get_screen_fd = llvmpipe_screen_get_fd;
    screen->base.is_format_supported = llvmpipe_is_format_supported;
+   screen->base.get_sample_pixel_grid = llvmpipe_get_sample_pixel_grid;
 
    screen->base.context_create = llvmpipe_create_context;
    screen->base.flush_frontbuffer = llvmpipe_flush_frontbuffer;
@@ -983,7 +1055,7 @@ llvmpipe_create_screen(struct sw_winsys *winsys)
                                               screen->num_threads);
    screen->num_threads = MIN2(screen->num_threads, LP_MAX_THREADS);
 
-   for (unsigned i = 0; i < PIPE_SHADER_MESH_TYPES; i++)
+   for (unsigned i = 0; i < MESA_SHADER_MESH_STAGES; i++)
       screen->base.nir_options[i] = &gallivm_nir_options;
 
 #if defined(HAVE_LIBDRM) && defined(HAVE_LINUX_UDMABUF_H)
@@ -1001,6 +1073,11 @@ llvmpipe_create_screen(struct sw_winsys *winsys)
    util_vma_heap_init(&screen->mem_heap, alignment, UINT64_MAX - alignment);
    screen->mem_heap.alloc_high = false;
    screen->fd_mem_alloc = os_create_anonymous_file(0, "allocation fd");
+   if (screen->fd_mem_alloc == -1) {
+      mesa_loge("Failed to create anonymous file for memory allocations\n");
+      llvmpipe_destroy_screen(&screen->base);
+      return NULL;
+   }
 #endif
 
    snprintf(screen->renderer_string, sizeof(screen->renderer_string),
