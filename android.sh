@@ -130,7 +130,7 @@ mkdir -p "$MESON_DIR"
 declare MESON_INI="$MESON_DIR/meson.ini"
 # SDK version. There is no specific reason to use exactly this value, it is just
 # the latest available for the oldest supported NDK (see the prerequisites).
-declare MESON_INI_SDK="31"
+declare MESON_INI_SDK="35"
 # "c" and "cpp" properties: prefix for the clang binaries.
 declare -A MESON_INI_COMPILER=(
     ["arm"]="armv7a-linux-androideabi$MESON_INI_SDK"
