@@ -50,7 +50,7 @@ struct YYLTYPE;
  */
 class ast_node {
 public:
-   DECLARE_LINEAR_ZALLOC_CXX_OPERATORS(ast_node);
+   DECLARE_LINEAR_ZALLOC_CXX_OPERATORS(ast_node,,);
 
    /**
     * Print an AST node in something approximating the original GLSL code
@@ -667,6 +667,11 @@ struct ast_type_qualifier {
          unsigned non_coherent:1;
          /** \} */
 
+         /** \name Qualifiers for GL_EXT_shader_pixel_local_storage */
+         /** \{ */
+         unsigned pixel_local_storage:2;
+         /** \} */
+
          /** \name Layout qualifiers for NV_compute_shader_derivatives */
          /** \{ */
          unsigned derivative_group:1;
@@ -677,6 +682,11 @@ struct ast_type_qualifier {
           * qualifier is used.
           */
          unsigned viewport_relative:1;
+
+         /** GL_EXT_mesh_shader */
+         unsigned task_payload:1;
+         unsigned per_primitive:1;
+         unsigned max_primitives:1;
       }
       /** \brief Set of flags, accessed by name. */
       q;
@@ -724,6 +734,9 @@ struct ast_type_qualifier {
 
    /** Maximum output vertices in GLSL 1.50 geometry shaders. */
    ast_layout_expression *max_vertices;
+
+   /** Maximum output primitives in mesh shader. */
+   ast_layout_expression *max_primitives;
 
    /** Stream in GLSL 1.50 geometry shaders. */
    ast_expression *stream;
@@ -1211,8 +1224,6 @@ public:
    ast_node *condition;
    ast_expression *rest_expression;
 
-   ir_exec_list rest_instructions;
-
    ast_node *body;
 
    /**
@@ -1324,6 +1335,22 @@ public:
 
 
 /**
+ * AST node representing a declaration of the output layout for mesh shaders.
+ */
+class ast_ms_output_layout : public ast_node
+{
+public:
+   ast_ms_output_layout(const struct YYLTYPE &locp)
+   {
+      set_location(locp);
+   }
+
+   virtual ir_rvalue *hir(ir_exec_list *instructions,
+                          struct _mesa_glsl_parse_state *state);
+};
+
+
+/**
  * AST node representing a declaration of the input layout for geometry
  * shaders.
  */
@@ -1345,14 +1372,14 @@ private:
 
 
 /**
- * AST node representing a decalaration of the input layout for compute
- * shaders.
+ * AST node representing a decalaration of the input layout for compute,
+ * task and mesh shaders.
  */
-class ast_cs_input_layout : public ast_node
+class ast_cs_ms_input_layout : public ast_node
 {
 public:
-   ast_cs_input_layout(const struct YYLTYPE &locp,
-                       ast_layout_expression *const *local_size)
+   ast_cs_ms_input_layout(const struct YYLTYPE &locp,
+                          ast_layout_expression *const *local_size)
    {
       for (int i = 0; i < 3; i++) {
          this->local_size[i] = local_size[i];
@@ -1392,8 +1419,7 @@ _mesa_ast_field_selection_to_hir(const ast_expression *expr,
 				 struct _mesa_glsl_parse_state *state);
 
 extern ir_rvalue *
-_mesa_ast_array_index_to_hir(void *mem_ctx,
-			     struct _mesa_glsl_parse_state *state,
+_mesa_ast_array_index_to_hir(struct _mesa_glsl_parse_state *state,
 			     ir_rvalue *array, ir_rvalue *idx,
 			     YYLTYPE &loc, YYLTYPE &idx_loc);
 

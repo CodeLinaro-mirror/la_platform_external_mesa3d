@@ -1,0 +1,105 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "font_c_impl",
+    srcs: [
+        "font.c",
+    ],
+}
+
+filegroup {
+    name: "hud_context_c_impl",
+    srcs: [
+        "hud_context.c",
+    ],
+}
+
+filegroup {
+    name: "hud_cpu_c_impl",
+    srcs: [
+        "hud_cpu.c",
+    ],
+}
+
+filegroup {
+    name: "hud_cpufreq_c_impl",
+    srcs: [
+        "hud_cpufreq.c",
+    ],
+}
+
+filegroup {
+    name: "hud_diskstat_c_impl",
+    srcs: [
+        "hud_diskstat.c",
+    ],
+}
+
+filegroup {
+    name: "hud_driver_query_c_impl",
+    srcs: [
+        "hud_driver_query.c",
+    ],
+}
+
+filegroup {
+    name: "hud_fps_c_impl",
+    srcs: [
+        "hud_fps.c",
+    ],
+}
+
+filegroup {
+    name: "hud_nic_c_impl",
+    srcs: [
+        "hud_nic.c",
+    ],
+}
+
+filegroup {
+    name: "hud_sensors_temp_c_impl",
+    srcs: [
+        "hud_sensors_temp.c",
+    ],
+}
+
+cc_library_headers {
+    name: "font_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "hud_context_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "hud_private_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}

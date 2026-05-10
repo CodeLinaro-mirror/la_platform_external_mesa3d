@@ -1,63 +1,27 @@
-// Mesa 3-D graphics library
-//
-// Copyright (C) 2010-2011 Chia-I Wu <olvaffe@gmail.com>
-// Copyright (C) 2010-2011 LunarG Inc.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the "Software"),
-// to deal in the Software without restriction, including without limitation
-// the rights to use, copy, modify, merge, publish, distribute, sublicense,
-// and/or sell copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-// DEALINGS IN THE SOFTWARE.
-
-// *** THIS PACKAGE HAS SPECIAL LICENSING CONDITIONS.  PLEASE
-//     CONSULT THE OWNERS AND opensource-licensing@google.com BEFORE
-//     DEPENDING ON IT IN YOUR PROJECT. ***
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
 
 package {
+    // See: http://go/android-license-faq
     default_applicable_licenses: ["external_mesa3d_license"],
 }
 
-// Added automatically by a large-scale-change that took the approach of
-// 'apply every license found to every target'. While this makes sure we respect
-// every license restriction, it may not be entirely correct.
-//
-// e.g. GPL in an MIT project might only apply to the contrib/ directory.
-//
-// Please consider splitting the single license below into multiple licenses,
-// taking care not to lose any license_kind information, and overriding the
-// default license using the 'licenses: [...]' property on targets as needed.
-//
-// For unused files, consider creating a 'fileGroup' with "//visibility:private"
-// to attach the license to, and including a comment whether the files may be
-// used in the current project.
-// See: http://go/android-license-faq
 license {
     name: "external_mesa3d_license",
     visibility: [":__subpackages__"],
     license_kinds: [
-        "SPDX-license-identifier-Apache-2.0",
-        "SPDX-license-identifier-BSD",
-        "SPDX-license-identifier-BSL-1.0",
-        "SPDX-license-identifier-GPL",
-        "SPDX-license-identifier-GPL-2.0",
-        "SPDX-license-identifier-ISC",
         "SPDX-license-identifier-MIT",
-        "SPDX-license-identifier-Unlicense",
-        "legacy_by_exception_only", // by exception only
-        "legacy_notice",
-        "legacy_unencumbered",
+        "SPDX-license-identifier-Apache-2.0",
+        "SPDX-license-identifier-GPL-1.0-or-later",
+        "SPDX-license-identifier-GPL-2.0-only",
     ],
     license_text: [
         "LICENSE",
@@ -65,191 +29,673 @@ license {
 }
 
 cc_defaults {
-    name: "mesa_version_defaults",
-    cflags: ["-DPACKAGE_VERSION=\"24.2\""],
-}
-
-python_binary_host {
-    name: "git_sha1_gen",
-    main: "bin/git_sha1_gen.py",
-    srcs: [
-        "bin/git_sha1_gen.py",
+    name: "_trial_msvc",
+    vendor: true,
+    host_supported: true,
+    cflags: [
+        "-Werror=gnu-empty-initializer",
+        "-Werror=pointer-arith",
+        "-Werror=vla",
+        "-Wgnu-pointer-arith",
     ],
 }
 
-genrule {
-    name: "git_sha1_header",
-    out: ["git_sha1.h"],
-    tools: ["git_sha1_gen"],
-    cmd: "MESA_GIT_SHA1_OVERRIDE=(git-l33t9876) python3 $(location git_sha1_gen) " +
-        "--output $(location git_sha1.h)",
-}
-
 cc_defaults {
-    name: "mesa_flagged_defaults",
-    cflags: select(soong_config_variable("gfxstream", "mesa3d_platforms"), {
-        // Android surfaceless build
-        "none": [
-            "-UANDROID",
-            "-U__ANDROID__",
-            "-DLINUX_GUEST_BUILD",
+    name: "aosp_mesa3d_c_link_args",
+    vendor: true,
+    ldflags: select(os(), {
+        "android": [
+            "-Wl,-plugin-opt=-emulated-tls=0",
         ],
-        // The default when variable is not set is Android
-        default: [
-            "-DVK_USE_PLATFORM_ANDROID_KHR",
-        ],
+        default: [],
     }),
 }
 
+cc_defaults {
+    name: "aosp_mesa3d_c_project_args",
+    vendor: true,
+    host_supported: true,
+    cflags: [
+        "-DAMD_LLVM_AVAILABLE=1",
+        "-DDRAW_LLVM_AVAILABLE=1",
+        "-DENABLE_SHADER_CACHE",
+        "-DETIME=ETIMEDOUT",
+        "-DGALLIVM_USE_ORCJIT=0",
+        "-DGLAPI_EXPORT_PROTO_ENTRY_POINTS=1",
+        "-DHAS_SCHED_GETAFFINITY",
+        "-DHAS_SCHED_H",
+        "-DHAVE_CET_H",
+        "-DHAVE_COMPRESSION",
+        "-DHAVE_DIRENT_D_TYPE",
+        "-DHAVE_DLADDR",
+        "-DHAVE_DLFCN_H",
+        "-DHAVE_DL_ITERATE_PHDR",
+        "-DHAVE_DRI2",
+        "-DHAVE_ENDIAN_H",
+        "-DHAVE_FLOCK",
+        "-DHAVE_FMEMOPEN",
+        "-DHAVE_FUNC_ATTRIBUTE_ALIAS",
+        "-DHAVE_FUNC_ATTRIBUTE_COLD",
+        "-DHAVE_FUNC_ATTRIBUTE_CONST",
+        "-DHAVE_FUNC_ATTRIBUTE_FLATTEN",
+        "-DHAVE_FUNC_ATTRIBUTE_FORMAT",
+        "-DHAVE_FUNC_ATTRIBUTE_MALLOC",
+        "-DHAVE_FUNC_ATTRIBUTE_NORETURN",
+        "-DHAVE_FUNC_ATTRIBUTE_OPTIMIZE",
+        "-DHAVE_FUNC_ATTRIBUTE_PACKED",
+        "-DHAVE_FUNC_ATTRIBUTE_PURE",
+        "-DHAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL",
+        "-DHAVE_FUNC_ATTRIBUTE_UNUSED",
+        "-DHAVE_FUNC_ATTRIBUTE_VISIBILITY",
+        "-DHAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT",
+        "-DHAVE_FUNC_ATTRIBUTE_WEAK",
+        "-DHAVE_GFX_COMPUTE",
+        "-DHAVE_GNU_QSORT_R",
+        "-DHAVE_ISSIGNALING",
+        "-DHAVE_LIBDRM",
+        "-DHAVE_LINUX_FUTEX_H",
+        "-DHAVE_MKOSTEMP",
+        "-DHAVE_OPENGL=0",
+        "-DHAVE_OPENGL_ES_1=1",
+        "-DHAVE_OPENGL_ES_2=1",
+        "-DHAVE_POLL_H",
+        "-DHAVE_POSIX_FALLOCATE",
+        "-DHAVE_POSIX_MEMALIGN",
+        "-DHAVE_PTHREAD",
+        "-DHAVE_RANDOM_R",
+        "-DHAVE_RENDERDOC_INTEGRATION=true",
+        "-DHAVE_STRTOD_L",
+        "-DHAVE_STRTOF",
+        "-DHAVE_STRTOK_R",
+        "-DHAVE_STRUCT_TIMESPEC",
+        "-DHAVE_SYSCONF",
+        "-DHAVE_SYS_INOTIFY_H",
+        "-DHAVE_SYS_SHM_H",
+        "-DHAVE_ZSTD",
+        "-DHAVE___BUILTIN_ADD_OVERFLOW",
+        "-DHAVE___BUILTIN_BSWAP32",
+        "-DHAVE___BUILTIN_BSWAP64",
+        "-DHAVE___BUILTIN_CLZ",
+        "-DHAVE___BUILTIN_CLZLL",
+        "-DHAVE___BUILTIN_CTZ",
+        "-DHAVE___BUILTIN_EXPECT",
+        "-DHAVE___BUILTIN_FFS",
+        "-DHAVE___BUILTIN_FFSLL",
+        "-DHAVE___BUILTIN_IA32_CLFLUSHOPT",
+        "-DHAVE___BUILTIN_POPCOUNT",
+        "-DHAVE___BUILTIN_POPCOUNTLL",
+        "-DHAVE___BUILTIN_TYPES_COMPATIBLE_P",
+        "-DHAVE___BUILTIN_UNREACHABLE",
+        "-DLLVM_IS_SHARED=1",
+        "-DMAJOR_IN_SYSMACROS",
+        "-DMESA_DEBUG=0",
+        "-DMESA_LLVM_VERSION_STRING=\"16.0\"",
+        "-DMESA_SYSTEM_HAS_KMS_DRM=1",
+        "-DPACKAGE_BUGREPORT=\"https://gitlab.freedesktop.org/mesa/mesa/-/issues\"",
+        "-DPACKAGE_VERSION=\"26.1.0-devel\"",
+        "-DTHREAD_SANITIZER=0",
+        "-DUSE_GCC_ATOMIC_BUILTINS",
+        "-DUSE_LIBGLVND=0",
+        "-DVIDEO_CODEC_AV1DEC=1",
+        "-DVIDEO_CODEC_AV1ENC=1",
+        "-DVIDEO_CODEC_H264DEC=0",
+        "-DVIDEO_CODEC_H264ENC=0",
+        "-DVIDEO_CODEC_H265DEC=0",
+        "-DVIDEO_CODEC_H265ENC=0",
+        "-DVIDEO_CODEC_JPEGDEC=1",
+        "-DVIDEO_CODEC_MPEG12DEC=1",
+        "-DVIDEO_CODEC_VC1DEC=0",
+        "-DVIDEO_CODEC_VP9DEC=1",
+        "-D_GNU_SOURCE",
+        "-D__STDC_CONSTANT_MACROS",
+        "-D__STDC_FORMAT_MACROS",
+        "-D__STDC_LIMIT_MACROS",
+        "-Qunused-arguments",
+        "-Werror=empty-body",
+        "-Werror=format",
+        "-Werror=implicit-function-declaration",
+        "-Werror=incompatible-pointer-types",
+        "-Werror=int-conversion",
+        "-Werror=missing-prototypes",
+        "-Werror=return-type",
+        "-Werror=thread-safety",
+        "-Wformat-security",
+        "-Wimplicit-fallthrough",
+        "-Wmisleading-indentation",
+        "-Wno-error=maybe-uninitialized",
+        "-Wno-format-truncation",
+        "-Wno-microsoft-enum-value",
+        "-Wno-missing-field-initializers",
+        "-Wno-unknown-pragmas",
+        "-Wno-unused-function",
+        "-fdata-sections",
+        "-ffunction-sections",
+        "-fno-common",
+        "-fno-math-errno",
+        "-fno-trapping-math",
+    ] + select(os(), {
+        "android": [
+            "-DANDROID_API_LEVEL=35",
+            "-DHAVE_ANDROID_PLATFORM",
+            "-DHAVE_GETRANDOM",
+            "-DHAVE_LINUX_UDMABUF_H",
+            "-DHAVE_MEMFD_CREATE",
+            "-DHAVE_REALLOCARRAY",
+            "-DHAVE_SYS_SYSCTL_H",
+            "-DHAVE_THRD_CREATE",
+            "-DHAVE_XLOCALE_H",
+            "-fno-emulated-tls",
+        ],
+        "linux_musl": [
+            "-DHAVE_REALLOCARRAY",
+        ],
+        "linux_glibc": [
+            "-DHAVE_XLOCALE_H",
+        ],
+        default: [],
+    }) + select((os(), soong_config_variable("aosp_mesa3d", "perfetto")), {
+        ("android", "true"): [
+            "-DHAVE_PERFETTO",
+        ],
+        (default, default): [],
+    }) + select(arch(), {
+        "arm64": [
+            "-DHAVE_UINT128",
+        ],
+        "x86_64": [
+            "-DHAVE_UINT128",
+            "-DUSE_SSE41",
+        ],
+        "x86": [
+            "-DUSE_SSE41",
+        ],
+        default: [],
+    }) + select((arch(), os()), {
+        ("x86", "android"): [
+            "-mfpmath=sse",
+            "-msse2",
+            "-mstackrealign",
+        ],
+        (default, default): [],
+    }) + select((arch(), os(), soong_config_variable("aosp_mesa3d", "perfetto")), {
+        ("x86_64", "linux_glibc", default): [
+            "-DALLOW_KCMP",
+            "-DHAVE_SECURE_GETENV",
+            "-D__INTRODUCED_IN(api_level)=",
+        ],
+        ("x86_64", "linux_musl", default): [
+            "-DALLOW_KCMP",
+            "-DHAVE_SECURE_GETENV",
+            "-D__INTRODUCED_IN(api_level)=",
+        ],
+        ("arm64", "linux_musl", default): [
+            "-DALLOW_KCMP",
+            "-DHAVE_SECURE_GETENV",
+            "-D__INTRODUCED_IN(api_level)=",
+        ],
+        (default, default, default): [],
+    }),
+    target: {
+        host: {
+            compile_multilib: "64",
+        },
+    },
+}
+
+cc_defaults {
+    name: "aosp_mesa3d_cpp_link_args",
+    vendor: true,
+    ldflags: select(os(), {
+        "android": [
+            "-Wl,-plugin-opt=-emulated-tls=0",
+        ],
+        default: [],
+    }),
+}
+
+cc_defaults {
+    name: "aosp_mesa3d_cpp_project_args",
+    vendor: true,
+    host_supported: true,
+    cppflags: [
+        "-DAMD_LLVM_AVAILABLE=1",
+        "-DDRAW_LLVM_AVAILABLE=1",
+        "-DENABLE_SHADER_CACHE",
+        "-DETIME=ETIMEDOUT",
+        "-DGALLIVM_USE_ORCJIT=0",
+        "-DGLAPI_EXPORT_PROTO_ENTRY_POINTS=1",
+        "-DHAS_SCHED_GETAFFINITY",
+        "-DHAS_SCHED_H",
+        "-DHAVE_CET_H",
+        "-DHAVE_COMPRESSION",
+        "-DHAVE_DIRENT_D_TYPE",
+        "-DHAVE_DLADDR",
+        "-DHAVE_DLFCN_H",
+        "-DHAVE_DL_ITERATE_PHDR",
+        "-DHAVE_DRI2",
+        "-DHAVE_ENDIAN_H",
+        "-DHAVE_FLOCK",
+        "-DHAVE_FMEMOPEN",
+        "-DHAVE_FUNC_ATTRIBUTE_ALIAS",
+        "-DHAVE_FUNC_ATTRIBUTE_COLD",
+        "-DHAVE_FUNC_ATTRIBUTE_CONST",
+        "-DHAVE_FUNC_ATTRIBUTE_FLATTEN",
+        "-DHAVE_FUNC_ATTRIBUTE_FORMAT",
+        "-DHAVE_FUNC_ATTRIBUTE_MALLOC",
+        "-DHAVE_FUNC_ATTRIBUTE_NORETURN",
+        "-DHAVE_FUNC_ATTRIBUTE_OPTIMIZE",
+        "-DHAVE_FUNC_ATTRIBUTE_PACKED",
+        "-DHAVE_FUNC_ATTRIBUTE_PURE",
+        "-DHAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL",
+        "-DHAVE_FUNC_ATTRIBUTE_UNUSED",
+        "-DHAVE_FUNC_ATTRIBUTE_VISIBILITY",
+        "-DHAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT",
+        "-DHAVE_FUNC_ATTRIBUTE_WEAK",
+        "-DHAVE_GFX_COMPUTE",
+        "-DHAVE_GNU_QSORT_R",
+        "-DHAVE_ISSIGNALING",
+        "-DHAVE_LIBDRM",
+        "-DHAVE_LINUX_FUTEX_H",
+        "-DHAVE_MKOSTEMP",
+        "-DHAVE_OPENGL=0",
+        "-DHAVE_OPENGL_ES_1=1",
+        "-DHAVE_OPENGL_ES_2=1",
+        "-DHAVE_POLL_H",
+        "-DHAVE_POSIX_FALLOCATE",
+        "-DHAVE_POSIX_MEMALIGN",
+        "-DHAVE_PTHREAD",
+        "-DHAVE_RANDOM_R",
+        "-DHAVE_RENDERDOC_INTEGRATION=true",
+        "-DHAVE_STRTOD_L",
+        "-DHAVE_STRTOF",
+        "-DHAVE_STRTOK_R",
+        "-DHAVE_STRUCT_TIMESPEC",
+        "-DHAVE_SYSCONF",
+        "-DHAVE_SYS_INOTIFY_H",
+        "-DHAVE_SYS_SHM_H",
+        "-DHAVE_ZSTD",
+        "-DHAVE___BUILTIN_ADD_OVERFLOW",
+        "-DHAVE___BUILTIN_BSWAP32",
+        "-DHAVE___BUILTIN_BSWAP64",
+        "-DHAVE___BUILTIN_CLZ",
+        "-DHAVE___BUILTIN_CLZLL",
+        "-DHAVE___BUILTIN_CTZ",
+        "-DHAVE___BUILTIN_EXPECT",
+        "-DHAVE___BUILTIN_FFS",
+        "-DHAVE___BUILTIN_FFSLL",
+        "-DHAVE___BUILTIN_IA32_CLFLUSHOPT",
+        "-DHAVE___BUILTIN_POPCOUNT",
+        "-DHAVE___BUILTIN_POPCOUNTLL",
+        "-DHAVE___BUILTIN_TYPES_COMPATIBLE_P",
+        "-DHAVE___BUILTIN_UNREACHABLE",
+        "-DLLVM_IS_SHARED=1",
+        "-DMAJOR_IN_SYSMACROS",
+        "-DMESA_DEBUG=0",
+        "-DMESA_LLVM_VERSION_STRING=\"16.0\"",
+        "-DMESA_SYSTEM_HAS_KMS_DRM=1",
+        "-DPACKAGE_BUGREPORT=\"https://gitlab.freedesktop.org/mesa/mesa/-/issues\"",
+        "-DPACKAGE_VERSION=\"26.1.0-devel\"",
+        "-DTHREAD_SANITIZER=0",
+        "-DUSE_GCC_ATOMIC_BUILTINS",
+        "-DUSE_LIBGLVND=0",
+        "-DVIDEO_CODEC_AV1DEC=1",
+        "-DVIDEO_CODEC_AV1ENC=1",
+        "-DVIDEO_CODEC_H264DEC=0",
+        "-DVIDEO_CODEC_H264ENC=0",
+        "-DVIDEO_CODEC_H265DEC=0",
+        "-DVIDEO_CODEC_H265ENC=0",
+        "-DVIDEO_CODEC_JPEGDEC=1",
+        "-DVIDEO_CODEC_MPEG12DEC=1",
+        "-DVIDEO_CODEC_VC1DEC=0",
+        "-DVIDEO_CODEC_VP9DEC=1",
+        "-D_GNU_SOURCE",
+        "-D__STDC_CONSTANT_MACROS",
+        "-D__STDC_FORMAT_MACROS",
+        "-D__STDC_LIMIT_MACROS",
+        "-Qunused-arguments",
+        "-Werror=empty-body",
+        "-Werror=format",
+        "-Werror=return-type",
+        "-Wformat-security",
+        "-Wmisleading-indentation",
+        "-Wno-error=maybe-uninitialized",
+        "-Wno-format-truncation",
+        "-Wno-microsoft-enum-value",
+        "-Wno-missing-field-initializers",
+        "-Wno-non-virtual-dtor",
+        "-Wno-unknown-pragmas",
+        "-fdata-sections",
+        "-ffunction-sections",
+        "-fno-math-errno",
+        "-fno-trapping-math",
+    ] + select(os(), {
+        "android": [
+            "-DANDROID_API_LEVEL=35",
+            "-DHAVE_ANDROID_PLATFORM",
+            "-DHAVE_GETRANDOM",
+            "-DHAVE_LINUX_UDMABUF_H",
+            "-DHAVE_MEMFD_CREATE",
+            "-DHAVE_REALLOCARRAY",
+            "-DHAVE_SYS_SYSCTL_H",
+            "-DHAVE_THRD_CREATE",
+            "-DHAVE_XLOCALE_H",
+            "-fno-emulated-tls",
+        ],
+        "linux_musl": [
+            "-DHAVE_REALLOCARRAY",
+        ],
+        "linux_glibc": [
+            "-DHAVE_XLOCALE_H",
+        ],
+        default: [],
+    }) + select((os(), soong_config_variable("aosp_mesa3d", "perfetto")), {
+        ("android", "true"): [
+            "-DHAVE_PERFETTO",
+        ],
+        (default, default): [],
+    }) + select(arch(), {
+        "arm64": [
+            "-DHAVE_UINT128",
+        ],
+        "x86_64": [
+            "-DHAVE_UINT128",
+            "-DUSE_SSE41",
+        ],
+        "x86": [
+            "-DUSE_SSE41",
+        ],
+        default: [],
+    }) + select((arch(), os()), {
+        ("x86", "android"): [
+            "-mfpmath=sse",
+            "-msse2",
+            "-mstackrealign",
+        ],
+        (default, default): [],
+    }) + select((arch(), os(), soong_config_variable("aosp_mesa3d", "perfetto")), {
+        ("x86_64", "linux_glibc", default): [
+            "-DALLOW_KCMP",
+            "-DHAVE_SECURE_GETENV",
+            "-D__INTRODUCED_IN(api_level)=",
+        ],
+        ("x86_64", "linux_musl", default): [
+            "-DALLOW_KCMP",
+            "-DHAVE_SECURE_GETENV",
+            "-D__INTRODUCED_IN(api_level)=",
+        ],
+        ("arm64", "linux_musl", default): [
+            "-DALLOW_KCMP",
+            "-DHAVE_SECURE_GETENV",
+            "-D__INTRODUCED_IN(api_level)=",
+        ],
+        (default, default, default): [],
+    }),
+    target: {
+        host: {
+            compile_multilib: "64",
+        },
+    },
+}
+
+cc_defaults {
+    name: "clflushopt_args",
+    vendor: true,
+    host_supported: true,
+    cflags: select(arch(), {
+        "x86_64": [
+            "-mclflushopt",
+        ],
+        "x86": [
+            "-mclflushopt",
+        ],
+        default: [],
+    }),
+}
+
+cc_defaults {
+    name: "ld_args_bsymbolic",
+    vendor: true,
+    host_supported: true,
+    ldflags: [
+        "-Wl,-Bsymbolic",
+    ],
+}
+
+cc_defaults {
+    name: "ld_args_gc_sections",
+    vendor: true,
+    host_supported: true,
+    ldflags: [
+        "-Wl,--gc-sections",
+    ],
+}
+
+cc_defaults {
+    name: "no_override_init_args",
+    vendor: true,
+    host_supported: true,
+    cflags: [
+        "-Wno-initializer-overrides",
+        "-Wno-override-init",
+    ],
+}
+
+cc_defaults {
+    name: "sse41_args",
+    vendor: true,
+    host_supported: true,
+    cflags: select(arch(), {
+        "x86_64": [
+            "-msse4.1",
+        ],
+        "x86": [
+            "-msse4.1",
+        ],
+        default: [],
+    }),
+}
+
+rust_defaults {
+    name: "rust_2024_lint_args",
+    vendor: true,
+    host_supported: true,
+    flags: [
+        "-Dunsafe_op_in_unsafe_fn",
+    ],
+}
+
+rust_defaults {
+    name: "rust_global_args",
+    vendor: true,
+    host_supported: true,
+    flags: [
+        "-Aclippy::collapsible_else_if",
+        "-Aclippy::needless_lifetimes",
+        "-Aclippy::question_mark",
+    ],
+}
+
+/*
+ * This is a special handwritten template for gfxstream compatibility.
+ * Parts of the Android tree, notably:
+ *
+ *    - hardware/google/gfxstream
+ *    - device/generic/goldfish
+ *
+ * have a dependency on this code.  They **shouldn't**, but they do.
+ * This dependency may be removed when:
+ *
+ *    - gfxstream does testing Github, rather than Android
+ *    - gfxstream GLES is deleted
+ *    - out-of-tree goldfish drivers are remove in favor of virtio
+ *
+ */
+
 cc_library_headers {
     name: "mesa_common_headers",
-    defaults: ["mesa_flagged_defaults"],
     vendor_available: true,
     host_supported: true,
     export_include_dirs: [
         "src",
         "include",
     ],
-    visibility: [":__subpackages__"],
 }
 
-// This needs to be kept in sync with Android.common.mk
+cc_library_headers {
+    name: "mesa_src_headers",
+    vendor_available: true,
+    host_supported: true,
+    export_include_dirs: [
+        "src",
+    ],
+}
+
+cc_library_headers {
+    name: "mesa_gfxstream_virtgpu",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        "src/gfxstream/guest/platform/include",
+    ],
+}
+
+cc_library_headers {
+    name: "virtgpu_kumquat_ffi_headers_mesa3d",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        "src/virtio/virtgpu_kumquat_ffi/include",
+    ],
+}
+
+cc_library_headers {
+    name: "mesa_gfxstream_guest_android_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        "src/gfxstream/guest/android",
+    ],
+}
+
+/*
+ * This is such a hack, when you consider hardware/google/aemu.
+ */
+cc_library_headers {
+    name: "mesa_gfxstream_aemu_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        "src/gfxstream/aemu/include",
+    ],
+}
+
 cc_defaults {
-    name: "mesa_common_defaults",
-    defaults: [
-        "mesa_version_defaults",
-        "mesa_flagged_defaults",
+    name: "mesa_platform_virtgpu_defaults",
+    vendor: true,
+    header_libs: [
+        "inc_platform_virtgpu",
+        "inc_src",
+        "mesa_gfxstream_virtgpu",
+        "mesa_src_headers",
     ],
-    // uncomment to keep the debug symbols
-    // strip: { none: true, },
-    header_libs: ["mesa_common_headers"],
-    cflags: [
-        "-Wno-error",
-        "-Werror=incompatible-pointer-types",
-        "-Wno-unused-parameter",
-        "-Wno-pointer-arith",
-        "-Wno-missing-field-initializers",
-        "-Wno-initializer-overrides",
-        "-Wno-mismatched-tags",
-        // PACKAGE_VERSION is in mesa_version_defaults
-        "-DPACKAGE_BUGREPORT=\"https://bugs.freedesktop.org/enter_bug.cgi?product=Mesa\"",
-        // XXX: The following __STDC_*_MACROS defines should not be needed.
-        // It's likely due to a bug elsewhere, but let's temporarily add them
-        // here to fix the radeonsi build.
-        "-DENABLE_SHADER_CACHE",
-        "-D__STDC_CONSTANT_MACROS",
-        "-D__STDC_LIMIT_MACROS",
-        "-DHAVE___BUILTIN_EXPECT",
-        "-DHAVE___BUILTIN_FFS",
-        "-DHAVE___BUILTIN_FFSLL",
-        "-DHAVE_DLFCN_H",
-        "-DHAVE_FUNC_ATTRIBUTE_FLATTEN",
-        "-DHAVE_FUNC_ATTRIBUTE_UNUSED",
-        "-DHAVE_FUNC_ATTRIBUTE_FORMAT",
-        "-DHAVE_FUNC_ATTRIBUTE_PACKED",
-        "-DHAVE_FUNC_ATTRIBUTE_ALIAS",
-        "-DHAVE_FUNC_ATTRIBUTE_NORETURN",
-        "-DHAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL",
-        "-DHAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT",
-        "-DHAVE___BUILTIN_CTZ",
-        "-DHAVE___BUILTIN_POPCOUNT",
-        "-DHAVE___BUILTIN_POPCOUNTLL",
-        "-DHAVE___BUILTIN_CLZ",
-        "-DHAVE___BUILTIN_CLZLL",
-        "-DHAVE___BUILTIN_UNREACHABLE",
-        "-DHAVE_PERFETTO",
-        "-DANDROID_LIBPERFETTO",
-        "-DHAVE_PTHREAD=1",
-        "-DHAVE_DLADDR",
-        "-DHAVE_DL_ITERATE_PHDR",
-        "-DHAVE_LINUX_FUTEX_H",
-        "-DHAVE_ENDIAN_H",
-        "-DMAJOR_IN_SYSMACROS",
-        "-DMESA_DEBUG=0",
-        "-fvisibility=hidden",
-        "-fno-math-errno",
-        "-fno-trapping-math",
-        "-Werror",
-        "-Wno-#warnings",
-        "-Wno-asm-operand-widths",
-        "-Wno-cast-calling-convention",
-        "-Wno-constant-logical-operand",
-        "-Wno-enum-conversion",
-        "-Wno-format",
-        "-Wno-gnu-variable-sized-type-not-at-end",
-        "-Wno-implicit-fallthrough",
-        "-Wno-implicit-int",
-        "-Wno-incompatible-pointer-types",
-        "-Wno-missing-braces",
-        "-Wno-overloaded-virtual",
-        "-Wno-self-assign",
-        "-Wno-shift-negative-value",
-        "-Wno-sign-compare",
-        "-Wno-sometimes-uninitialized",
-        "-Wno-switch",
-        "-Wno-typedef-redefinition",
-        "-Wno-uninitialized",
-        "-Wno-implicit-const-int-float-conversion",
-        "-Wno-sync-alignment",
-        "-Wno-implicit-function-declaration",
-        "-Wno-constant-conversion",
-        // This warning can be re-enabled after updating to newer llvm version.
-        "-Wno-unnecessary-virtual-specifier",
-        "-DHAVE_TIMESPEC_GET",
-        "-DHAVE_STRUCT_TIMESPEC",
-        "-DMESA_LLVM_VERSION_STRING=\"16.0.0\"",
-        "-DDRAW_LLVM_AVAILABLE=1",
-        "-DHAVE_LIBDRM",
-        "-DHAVE_COMPRESSION",
-        "-DHAVE_ZSTD",
+    whole_static_libs: [
+        "mesa_platform_virtgpu",
     ],
-    c_std: "c11",
-    shared_libs: ["libdrm"],
-    cppflags: [
-        "-D__STDC_CONSTANT_MACROS",
-        "-D__STDC_FORMAT_MACROS",
-        "-D__STDC_LIMIT_MACROS",
-        "-Wno-error=non-virtual-dtor",
-        "-Wno-non-virtual-dtor",
+    shared_libs: [
+        "libdrm",
     ],
-    arch: {
-        arm: {
-            cflags: ["-DNO_FORMAT_ASM"],
-        },
-        arm64: {
-            cflags: ["-DNO_FORMAT_ASM"],
+    export_shared_lib_headers: [
+        "libdrm",
+    ],
+    target: {
+        android: {
+            shared_libs: [
+                "libsync",
+            ],
         },
     },
-    multilib: {
-        lib32: {
-            cflags: ["-DDEFAULT_DRIVER_DIR=\"/vendor/lib/dri\""],
-        },
-        lib64: {
-            cflags: ["-DDEFAULT_DRIVER_DIR=\"/vendor/lib64/dri\""],
-        },
-    },
-    product_variables: {
-        platform_sdk_version: {
-            cflags: ["-DANDROID_API_LEVEL=%d"],
-        },
-    },
+}
+
+cc_library_headers {
+    name: "mesa_gfxstream_guest_iostream",
+    vendor: true,
+    host_supported: true,
+    shared_libs: [
+        "liblog",
+    ],
+    export_shared_lib_headers: [
+        "liblog",
+    ],
+    export_include_dirs: [
+        "src/gfxstream/guest/iostream/include",
+    ],
+}
+
+cc_library_static {
+    name: "mesa_platform_virtgpu",
+    vendor: true,
+    host_supported: true,
+    whole_static_libs: [
+        "platform_virtgpu",
+        "platform_virtgpu_kumquat",
+        "vulkan_util",
+        "platform_virtgpu_drm",
+        "libvirtgpu_kumquat_ffi",
+        "gfxstream_vulkan_mapper",
+    ],
+    shared_libs: [
+        "libdrm",
+    ],
+    export_shared_lib_headers: [
+        "libdrm",
+    ],
     target: {
         host: {
-            cflags: [
-                "-D_GNU_SOURCE",
-                "-DHAVE_SECURE_GETENV",
-            ],
+            compile_multilib: "64",
         },
         android: {
-            cflags: [
-                "-DHAVE_GETTID",
-                "-DHAVE_REALLOCARRAY",
+            shared_libs: [
+                "libsync",
             ],
         },
-        linux_musl: {
-            cflags: [
-                "-DHAVE_REALLOCARRAY",
-            ],
+    },
+}
+
+cc_library_static {
+    name: "mesa_gfxstream_connection_manager",
+    vendor: true,
+    host_supported: true,
+    whole_static_libs: ["connection_manager"],
+    export_include_dirs: ["src/gfxstream/guest/connection-manager"],
+    target: {
+        host: {
+            compile_multilib: "64",
+        },
+    },
+}
+
+cc_library_static {
+    name: "mesa_goldfish_address_space",
+    vendor: true,
+    host_supported: true,
+    whole_static_libs: ["goldfish_address_space"],
+    export_include_dirs: ["src/gfxstream/guest/GoldfishAddressSpace/include"],
+    target: {
+        host: {
+            compile_multilib: "64",
+        },
+    },
+}
+
+cc_library_static {
+    name: "mesa_gfxstream_guest_android",
+    vendor: true,
+    host_supported: true,
+    whole_static_libs: ["gfxstream_android"],
+    export_include_dirs: ["src/gfxstream/guest/android/include"],
+    target: {
+        host: {
+            compile_multilib: "64",
         },
     },
 }

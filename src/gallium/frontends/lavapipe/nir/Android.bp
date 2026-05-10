@@ -1,0 +1,71 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "lvp_nir_lower_cooperative_matrix_c_impl",
+    srcs: [
+        "lvp_nir_lower_cooperative_matrix.c",
+    ],
+}
+
+filegroup {
+    name: "lvp_nir_lower_exec_graph_c_impl",
+    srcs: [
+        "lvp_nir_lower_exec_graph.c",
+    ],
+}
+
+filegroup {
+    name: "lvp_nir_lower_input_attachments_c_impl",
+    srcs: [
+        "lvp_nir_lower_input_attachments.c",
+    ],
+}
+
+filegroup {
+    name: "lvp_nir_lower_pipeline_layout_c_impl",
+    srcs: [
+        "lvp_nir_lower_pipeline_layout.c",
+    ],
+}
+
+filegroup {
+    name: "lvp_nir_lower_ray_queries_c_impl",
+    srcs: [
+        "lvp_nir_lower_ray_queries.c",
+    ],
+}
+
+filegroup {
+    name: "lvp_nir_lower_sparse_residency_c_impl",
+    srcs: [
+        "lvp_nir_lower_sparse_residency.c",
+    ],
+}
+
+filegroup {
+    name: "lvp_nir_opt_robustness_c_impl",
+    srcs: [
+        "lvp_nir_opt_robustness.c",
+    ],
+}
+
+filegroup {
+    name: "lvp_nir_ray_tracing_c_impl",
+    srcs: [
+        "lvp_nir_ray_tracing.c",
+    ],
+}

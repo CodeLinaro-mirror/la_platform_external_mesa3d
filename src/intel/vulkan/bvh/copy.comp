@@ -5,17 +5,6 @@
 
 #version 460
 
-#extension GL_GOOGLE_include_directive : require
-
-#extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
-#extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
-#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
-#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
-#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
-#extension GL_EXT_scalar_block_layout : require
-#extension GL_EXT_buffer_reference : require
-#extension GL_EXT_buffer_reference2 : require
-
 layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
 
 #include "anv_build_interface.h"
@@ -76,7 +65,7 @@ main(void)
    REF(anv_accel_struct_header) header = REF(anv_accel_struct_header)(copy_src_addr);
 
    uint64_t instance_base = args.src_addr + SIZEOF(vk_accel_struct_serialization_header);
-   uint64_t instance_offset = SIZEOF(anv_accel_struct_header);
+   uint64_t instance_offset = DEREF(header).instance_leaves_offset;
 
    /* We store the address of instance_leaf after bvh header */
    uint64_t instance_end = DEREF(header).instance_count * SIZEOF(uint64_t);

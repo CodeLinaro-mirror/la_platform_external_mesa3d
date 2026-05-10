@@ -97,3 +97,7 @@ program@execute@amdgcn-f16-inline-immediates@add integer 64
 
 # Vulkan Video isn't supported, since video isn't part of the gpu
 dEQP-VK.video.*
+
+# Generates too many immediates due to loop unrolling
+KHR-GLES31.core.geometry_shader.limits.max_output_components
+KHR-GL46.geometry_shader.limits.max_output_components

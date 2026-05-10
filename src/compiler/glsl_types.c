@@ -1506,6 +1506,9 @@ glsl_record_compare(const glsl_type *a, const glsl_type *b, bool match_name,
       if (a->fields.structure[i].xfb_stride
           != b->fields.structure[i].xfb_stride)
          return false;
+      if (a->fields.structure[i].per_primitive
+          != b->fields.structure[i].per_primitive)
+         return false;
    }
 
    return true;
@@ -3234,6 +3237,9 @@ decode_type_from_blob(struct blob_reader *blob)
    case GLSL_TYPE_INT:
    case GLSL_TYPE_FLOAT:
    case GLSL_TYPE_FLOAT16:
+   case GLSL_TYPE_BFLOAT16:
+   case GLSL_TYPE_FLOAT_E4M3FN:
+   case GLSL_TYPE_FLOAT_E5M2:
    case GLSL_TYPE_DOUBLE:
    case GLSL_TYPE_UINT8:
    case GLSL_TYPE_INT8:

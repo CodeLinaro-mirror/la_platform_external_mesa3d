@@ -13,7 +13,6 @@ and show the job(s) logs.
 """
 
 import argparse
-import os
 import re
 import sys
 import time
@@ -26,19 +25,19 @@ from typing import Callable, Dict, TYPE_CHECKING, Iterable, Literal, Optional, T
 
 import gitlab
 import gitlab.v4.objects
-from colorama import Fore, Style
 from gitlab_common import (
     GITLAB_URL,
     TOKEN_DIR,
     get_gitlab_pipeline_from_url,
     get_gitlab_project,
     get_token_from_default_dir,
+    is_gitlab_job,
     pretty_duration,
-    print_once,
     read_token,
     wait_for_pipeline,
 )
 from gitlab_gql import GitlabGQL, create_job_needs_dag, filter_dag, print_dag, print_formatted_list
+from rich.console import Console
 
 if TYPE_CHECKING:
     from gitlab_gql import Dag
@@ -47,23 +46,22 @@ REFRESH_WAIT_LOG = 10
 REFRESH_WAIT_JOBS = 6
 MAX_ENABLE_JOB_ATTEMPTS = 3
 
-URL_START = "\033]8;;"
-URL_END = "\033]8;;\a"
-
-STATUS_COLORS = {
-    "created": "",
-    "running": Fore.BLUE,
-    "success": Fore.GREEN,
-    "failed": Fore.RED,
-    "canceled": Fore.MAGENTA,
-    "canceling": Fore.MAGENTA,
-    "manual": "",
-    "pending": "",
-    "skipped": "",
-}
+STATUS_COLORS = defaultdict(lambda: "", {
+    "running": "[blue]",
+    "success": "[green]",
+    "failed": "[red]",
+    "canceled": "[magenta]",
+    "canceling": "[magenta]",
+})
 
 COMPLETED_STATUSES = frozenset({"success", "failed"})
 RUNNING_STATUSES = frozenset({"created", "pending", "running"})
+
+if is_gitlab_job():
+    console = Console(highlight=False, no_color=False, color_system="truecolor", width=120)
+else:
+    console = Console(highlight=False)
+print = console.print
 
 
 def print_job_status(
@@ -86,13 +84,12 @@ def print_job_status(
 
     duration = job_duration(job)
 
-    print_once(
-        STATUS_COLORS[job.status]
-        + f"{jtype:{type_field_pad}} "  # U+1F78B Round target
-        + link2print(job.web_url, job.name, name_field_pad)
-        + (f" has new status: {job.status}" if new_status else f" {job.status}")
-        + (f" ({pretty_duration(duration)})" if job.started_at else "")
-        + Style.RESET_ALL
+    print(
+        f"{STATUS_COLORS[job.status]}"
+        f"{jtype:{type_field_pad}} "  # U+1F78B Round target
+        f"{link2print(job.web_url, job.name, name_field_pad)} " +
+        (f" has new status: {job.status}" if new_status else f" {job.status}") +
+        (f" ({pretty_duration(duration)})" if job.started_at else "")
     )
 
 
@@ -114,6 +111,9 @@ def job_duration(job: gitlab.v4.objects.ProjectPipelineJob) -> float:
 
 def pretty_wait(sec: int) -> None:
     """shows progressbar in dots"""
+    if is_gitlab_job():
+        time.sleep(sec)
+        return
     for val in range(sec, 0, -1):
         print(f"⏲  {val:2d} seconds", end="\r")  # U+23F2 Timer clock
         time.sleep(1)
@@ -145,11 +145,11 @@ def run_target_job(
 def monitor_pipeline(
     project: gitlab.v4.objects.Project,
     pipeline: gitlab.v4.objects.ProjectPipeline,
-    target_jobs_regex: re.Pattern,
-    include_stage_regex: re.Pattern,
-    exclude_stage_regex: re.Pattern,
+    job_filter: callable,
     dependencies: set[str],
     stress: int,
+    inhibit_single_target_trace: int = False,
+    polling_period: int = REFRESH_WAIT_JOBS,
 ) -> tuple[Optional[int], Optional[int], Dict[str, Dict[int, Tuple[float, str, str]]]]:
     """Monitors pipeline and delegate canceling jobs"""
     statuses: dict[str, str] = defaultdict(str)
@@ -167,17 +167,18 @@ def monitor_pipeline(
     if stress:
         # When stress test, it is necessary to collect this information before start.
         for job in pipeline.jobs.list(all=True, include_retried=True):
-            if target_jobs_regex.fullmatch(job.name) and \
-               include_stage_regex.fullmatch(job.stage) and \
-               not exclude_stage_regex.fullmatch(job.stage) and \
-               job.status in COMPLETED_STATUSES:
+            if job_filter(
+                job_name=job.name,
+                job_stage=job.stage,
+                job_tags=job.tag_list,
+            ) and job.status in COMPLETED_STATUSES:
                 execution_times[job.name][job.id] = (job_duration(job), job.status, job.web_url)
 
     # jobs_waiting is a list of job names that are waiting for status update.
     # It occurs when a job that we want to run depends on another job that is not yet finished.
     jobs_waiting = []
-    # Dictionary to track the number of attempts made for each job
-    enable_attempts: dict[int, int] = {}
+    # Dictionary to track the number of attempts made for each job for a given status
+    enable_attempts: dict[tuple[int, str], int] = {}
     # FIXME: This function has too many parameters, consider refactoring.
     enable_job_fn = partial(
         enable_job,
@@ -191,9 +192,11 @@ def monitor_pipeline(
         jobs_waiting.clear()
         for job in sorted(pipeline.jobs.list(all=True), key=lambda j: j.name):
             job = cast(gitlab.v4.objects.ProjectPipelineJob, job)
-            if target_jobs_regex.fullmatch(job.name) and \
-               include_stage_regex.fullmatch(job.stage) and \
-               not exclude_stage_regex.fullmatch(job.stage):
+            if job_filter(
+                job_name=job.name,
+                job_stage=job.stage,
+                job_tags=job.tag_list,
+            ):
                 run_target_job(
                     job,
                     enable_job_fn,
@@ -235,24 +238,23 @@ def monitor_pipeline(
                     f"* {job_name:{name_field_pad}} succ: {n_succeed}; "
                     f"fail: {n_failed}; "
                     f"total: {n_total_seen} of {stress}",
-                    flush=False,
                 )
                 if stress < 0 or n_total_completed < stress:
                     enough = False
 
             if not enough:
-                pretty_wait(REFRESH_WAIT_JOBS)
+                pretty_wait(polling_period)
                 continue
 
         if jobs_waiting:
-            print(f"{Fore.YELLOW}Waiting for jobs to update status:")
-            print_formatted_list(jobs_waiting, indentation=8)
-            print(Style.RESET_ALL, end='')
-            pretty_wait(REFRESH_WAIT_JOBS)
+            print(f"[yellow]Waiting for jobs to update status:")
+            print_formatted_list(jobs_waiting, indentation=8, color="[yellow]")
+            pretty_wait(polling_period)
             continue
 
         if (
-            stress in [0, 1]
+            not inhibit_single_target_trace
+            and stress in [0, 1]
             and len(target_statuses) == 1
             and RUNNING_STATUSES.intersection(target_statuses.values())
         ):
@@ -269,23 +271,20 @@ def monitor_pipeline(
             and not RUNNING_STATUSES.intersection(target_statuses.values())
         ):
             print(
-                Fore.RED,
-                "Target in skipped state, aborting. Failed dependencies:",
-                deps_failed,
-                Fore.RESET,
+                f"[red]Target in skipped state, aborting. Failed dependencies:{deps_failed}"
             )
             return None, 1, execution_times
 
         if skip_follow_statuses.issuperset(target_statuses.values()):
             return None, 0, execution_times
 
-        pretty_wait(REFRESH_WAIT_JOBS)
+        pretty_wait(polling_period)
 
 
 def enable_job(
     project: gitlab.v4.objects.Project,
     job: gitlab.v4.objects.ProjectPipelineJob,
-    enable_attempts: dict[int, int],
+    enable_attempts: dict[tuple[int, str], int],
     action_type: Literal["target", "dep", "retry"],
     jobs_waiting: list[str] = list,
 ) -> bool:
@@ -293,7 +292,7 @@ def enable_job(
     Enable a job to run.
     :param project: The GitLab project.
     :param job: The job to enable.
-    :param enable_attempts: A dictionary to track the number of attempts made for each job.
+    :param enable_attempts: A dictionary to track the number of attempts made for each job for a give status.
     :param action_type: The type of action to perform.
     :param jobs_waiting:
     :return: True if the job was enabled, False otherwise.
@@ -311,14 +310,20 @@ def enable_job(
         return False
 
     # Get current attempt number
-    attempt_count = enable_attempts.get(job.id, 0)
+    attempt_count = enable_attempts.get((job.id, job.status), 0)
     # Check if we've exceeded max attempts to avoid infinite loop
-    if attempt_count >= MAX_ENABLE_JOB_ATTEMPTS:
-        raise RuntimeError(
-            f"Maximum enabling attempts ({MAX_ENABLE_JOB_ATTEMPTS}) reached for job {job.name} "
-            f"({link2print(job.web_url, job.id)}). Giving up."
+    if attempt_count == MAX_ENABLE_JOB_ATTEMPTS:
+        print(
+            f"[yellow]WARNING: "
+            f"Maximum enabling attempts ({MAX_ENABLE_JOB_ATTEMPTS}) reached for job {job.name} in {job.status} status"
+            f"({link2print(job.web_url, job.id)})."
         )
-    enable_attempts[job.id] = attempt_count + 1
+        enable_attempts[(job.id, job.status)] = attempt_count + 1
+        return False
+    elif attempt_count > MAX_ENABLE_JOB_ATTEMPTS:
+        return False
+
+    enable_attempts[(job.id, job.status)] = attempt_count + 1
 
     pjob = project.jobs.get(job.id, lazy=True)
 
@@ -348,9 +353,7 @@ def enable_job(
     type_field_pad = len(jtype) if len(jtype) > type_field_pad else type_field_pad
     name_field_pad = len(job_name) if len(job_name) > name_field_pad else name_field_pad
     print(
-        Fore.MAGENTA +
-        f"{jtype:{type_field_pad}} {job.name:{name_field_pad}} manually enabled" +
-        Style.RESET_ALL
+        f"[magenta]{jtype:{type_field_pad}} {job.name:{name_field_pad}} manually enabled"
     )
 
     return True
@@ -412,11 +415,11 @@ def print_log(
         # GitLab's REST API doesn't offer pagination for logs, so we have to refetch it all
         lines = job.trace().decode().splitlines()
         for line in lines[printed_lines:]:
-            print(line)
+            print(line, markup=False)
         printed_lines = len(lines)
 
         if job.status in COMPLETED_STATUSES:
-            print(Fore.GREEN + f"Job finished: {job.web_url}" + Style.RESET_ALL)
+            print(f"[green]Job finished: {job.web_url}")
             return
         pretty_wait(REFRESH_WAIT_LOG)
 
@@ -426,7 +429,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Tool to trigger a subset of container jobs "
         + "and monitor the progress of a test job",
-        epilog="Example: mesa-monitor.py --rev $(git rev-parse HEAD) "
+        epilog="Example: %(prog)s --rev $(git rev-parse HEAD) "
         + '--target ".*traces" ',
     )
     parser.add_argument(
@@ -466,11 +469,23 @@ def parse_args() -> argparse.Namespace:
         nargs=argparse.ONE_OR_MORE,
     )
     parser.add_argument(
+        "--job-tags",
+        metavar="job-tags",
+        help="Job tags to require when searching for target jobs. If multiple "
+             "values are passed, eg. `--job-tags 'foo.*' 'bar'`, the job will "
+             "need to have a tag matching `foo.*` *and* a tag matching `bar` "
+             "to qualify. Passing `--job-tags '.*'` makes sure the job has "
+             "a tag defined, while not passing `--job-tags` also allows "
+             "untagged jobs.",
+        default=[],
+        nargs=argparse.ONE_OR_MORE,
+    )
+    parser.add_argument(
         "--token",
         metavar="token",
         type=str,
         default=get_token_from_default_dir(),
-        help="Use the provided GitLab token or token file, "
+        help="Use the provided GitLab token (with `api` scope) or token file, "
              f"otherwise it's read from {TOKEN_DIR / 'gitlab-token'}",
     )
     parser.add_argument(
@@ -498,6 +513,18 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Exit after printing target jobs and dependencies",
     )
+    parser.add_argument(
+        "--no-job-log",
+        action="store_true",
+        help="When there is only one target job, inhibit the job trace output in the console.",
+    )
+    parser.add_argument(
+        "--polling-period",
+        type=int,
+        default=REFRESH_WAIT_JOBS,
+        help=f"Specify the waiting seconds between monitor loops. (Default: {REFRESH_WAIT_JOBS})",
+     )
+
 
     mutex_group1 = parser.add_mutually_exclusive_group()
     mutex_group1.add_argument(
@@ -539,23 +566,19 @@ def print_detected_jobs(
 ) -> None:
     def print_job_set(color: str, kind: str, job_set: Iterable[str]):
         job_list = list(job_set)
-        print(color + f"Running {len(job_list)} {kind} jobs:")
-        print_formatted_list(job_list, indentation=8)
-        print(Style.RESET_ALL)
+        print(f"{color}Running {len(job_list)} {kind} jobs:")
+        print_formatted_list(job_list, indentation=8, color=color)
 
-    print(Fore.YELLOW + "Detected target job and its dependencies:")
-    print_dag(target_dep_dag, indentation=8)
-    print(Style.RESET_ALL)
-    print_job_set(Fore.MAGENTA, "dependency", dependency_jobs)
-    print_job_set(Fore.BLUE, "target", target_jobs)
+    print("[yellow]Detected target job and its dependencies:")
+    print_dag(target_dep_dag, indentation=8, color="[yellow]")
+    print_job_set("[magenta]", "dependency", dependency_jobs)
+    print_job_set("[blue]", "target", target_jobs)
 
 
 def find_dependencies(
     server: str,
     token: str | None,
-    target_jobs_regex: re.Pattern,
-    include_stage_regex: re.Pattern,
-    exclude_stage_regex: re.Pattern,
+    job_filter: callable,
     project_path: str,
     iid: int
 ) -> set[str]:
@@ -588,9 +611,9 @@ def find_dependencies(
         gql_instance, {"projectPath": project_path.path_with_namespace, "iid": iid}
     )
 
-    target_dep_dag = filter_dag(dag, target_jobs_regex, include_stage_regex, exclude_stage_regex)
+    target_dep_dag = filter_dag(dag, job_filter)
     if not target_dep_dag:
-        print(Fore.RED + "The job(s) were not found in the pipeline." + Fore.RESET)
+        print("[red]The job(s) were not found in the pipeline.")
         sys.exit(1)
 
     dependency_jobs = set(chain.from_iterable(d["needs"] for d in target_dep_dag.values()))
@@ -627,15 +650,19 @@ def __job_duration_record(dict_item: tuple) -> str:
     """
     job_id = f"{dict_item[0]}"  # dictionary key
     job_duration, job_status, job_url = dict_item[1]  # dictionary value, the tuple
-    return (f"{STATUS_COLORS[job_status]}"
-            f"{link2print(job_url, job_id)}: {pretty_duration(job_duration):>8}"
-            f"{Style.RESET_ALL}")
+    return (
+        f"{STATUS_COLORS[job_status]}"
+        f"{link2print(job_url, job_id)}: {pretty_duration(job_duration):>8}"
+    )
 
 
 def link2print(url: str, text: str, text_pad: int = 0) -> str:
     text = str(text)
     text_pad = len(text) if text_pad < 1 else text_pad
-    return f"{URL_START}{url}\a{text:{text_pad}}{URL_END}"
+    if console.is_terminal:
+        return f"[link={url}]{text:{text_pad}}[/link]"
+    else:
+        return f"{text:{text_pad}}"
 
 
 def main() -> None:
@@ -700,7 +727,7 @@ def main() -> None:
         target = '|'.join(args.target)
         target = target.strip()
 
-        print("🞋 target job: " + Fore.BLUE + target + Style.RESET_ALL)  # U+1F78B Round target
+        print(f"🞋 target job: [blue]{target}")  # U+1F78B Round target
 
         # Implicitly include `parallel:` jobs
         target = f'({target})' + r'( \d+/\d+)?'
@@ -710,23 +737,46 @@ def main() -> None:
         include_stage = '|'.join(args.include_stage)
         include_stage = include_stage.strip()
 
-        print("🞋 target from stages: " + Fore.BLUE + include_stage + Style.RESET_ALL)  # U+1F78B Round target
+        print(f"🞋 target from stages: [blue]{include_stage}")  # U+1F78B Round target
 
         include_stage_regex = re.compile(include_stage)
 
         exclude_stage = '|'.join(args.exclude_stage)
         exclude_stage = exclude_stage.strip()
 
-        print("🞋 target excluding stages: " + Fore.BLUE + exclude_stage + Style.RESET_ALL)  # U+1F78B Round target
+        print(f"🞋 target excluding stages: [blue]{exclude_stage}")  # U+1F78B Round target
 
         exclude_stage_regex = re.compile(exclude_stage)
+
+        print(f"🞋 target jobs with tags: [blue]{str(args.job_tags)}")  # U+1F78B Round target
+        job_tags_regexes = [re.compile(job_tag) for job_tag in args.job_tags]
+
+        def job_filter(
+            job_name: str,
+            job_stage: str,
+            job_tags: set[str],
+        ) -> bool:
+            """
+            Apply user-specified filters to a job, and return whether the
+            filters allow that job (True) or not (False).
+            """
+            if not target_jobs_regex.fullmatch(job_name):
+                return False
+            if not include_stage_regex.fullmatch(job_stage):
+                return False
+            if exclude_stage_regex.fullmatch(job_stage):
+                return False
+            if not all(
+                any(job_tags_regex.fullmatch(tag) for tag in job_tags)
+                for job_tags_regex in job_tags_regexes
+            ):
+                return False
+            return True
 
         deps = find_dependencies(
             server=args.server,
             token=token,
-            target_jobs_regex=target_jobs_regex,
-            include_stage_regex=include_stage_regex,
-            exclude_stage_regex=exclude_stage_regex,
+            job_filter=job_filter,
             iid=pipe.iid,
             project_path=cur_project
         )
@@ -737,11 +787,11 @@ def main() -> None:
         target_job_id, ret, exec_t = monitor_pipeline(
             cur_project,
             pipe,
-            target_jobs_regex,
-            include_stage_regex,
-            exclude_stage_regex,
+            job_filter,
             deps,
-            args.stress
+            args.stress,
+            args.no_job_log,
+            args.polling_period,
         )
 
         if target_job_id:

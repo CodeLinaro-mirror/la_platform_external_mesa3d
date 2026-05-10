@@ -1,0 +1,216 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "vl_codec_c_impl",
+    srcs: [
+        "vl_codec.c",
+    ],
+}
+
+filegroup {
+    name: "vl_compositor_c_impl",
+    srcs: [
+        "vl_compositor.c",
+    ],
+}
+
+filegroup {
+    name: "vl_compositor_cs_c_impl",
+    srcs: [
+        "vl_compositor_cs.c",
+    ],
+}
+
+filegroup {
+    name: "vl_compositor_gfx_c_impl",
+    srcs: [
+        "vl_compositor_gfx.c",
+    ],
+}
+
+filegroup {
+    name: "vl_csc_c_impl",
+    srcs: [
+        "vl_csc.c",
+    ],
+}
+
+filegroup {
+    name: "vl_deint_filter_c_impl",
+    srcs: [
+        "vl_deint_filter.c",
+    ],
+}
+
+filegroup {
+    name: "vl_deint_filter_cs_c_impl",
+    srcs: [
+        "vl_deint_filter_cs.c",
+    ],
+}
+
+filegroup {
+    name: "vl_mpeg12_bitstream_c_impl",
+    srcs: [
+        "vl_mpeg12_bitstream.c",
+    ],
+}
+
+filegroup {
+    name: "vl_stubs_c_impl",
+    srcs: [
+        "vl_stubs.c",
+    ],
+}
+
+filegroup {
+    name: "vl_vertex_buffers_c_impl",
+    srcs: [
+        "vl_vertex_buffers.c",
+    ],
+}
+
+filegroup {
+    name: "vl_video_buffer_c_impl",
+    srcs: [
+        "vl_video_buffer.c",
+    ],
+}
+
+filegroup {
+    name: "vl_winsys_drm_c_impl",
+    srcs: [
+        "vl_winsys_drm.c",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_codec_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_compositor_cs_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_compositor_gfx_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_compositor_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_csc_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_defines_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_deint_filter_cs_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_deint_filter_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_mpeg12_bitstream_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_types_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_vertex_buffers_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_video_buffer_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "vl_winsys_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}

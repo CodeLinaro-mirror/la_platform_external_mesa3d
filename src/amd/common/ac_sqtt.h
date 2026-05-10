@@ -15,10 +15,10 @@
 #include "ac_pm4.h"
 #include "ac_rgp.h"
 #include "amd_family.h"
+#include "util/simple_mtx.h"
 
 #define SQTT_BUFFER_ALIGN_SHIFT 12
 
-struct radeon_cmdbuf;
 struct radeon_info;
 
 /**
@@ -34,9 +34,10 @@ struct radeon_info;
  * around each command needed. The primary user of this is RGP.
  */
 struct ac_sqtt {
-   struct radeon_cmdbuf *start_cs[2];
-   struct radeon_cmdbuf *stop_cs[2];
-   /* struct radeon_winsys_bo or struct pb_buffer */
+   /* Only used by RadeonSI */
+   void *start_cs[2];
+   void *stop_cs[2];
+   /* VkBuffer or struct si_resource */
    void *bo;
    uint64_t buffer_va;
    void *ptr;
@@ -44,6 +45,10 @@ struct ac_sqtt {
    int start_frame;
    char *trigger_file;
    bool instruction_timing_enabled;
+
+   /* Shader/memory clock frequencies in Mhz sampled at trace time. */
+   uint32_t trace_shader_core_clock;
+   uint32_t trace_memory_clock;
 
    uint32_t cmdbuf_ids_per_queue[AMD_NUM_IP_TYPES];
 
@@ -57,6 +62,8 @@ struct ac_sqtt {
    struct rgp_clock_calibration rgp_clock_calibration;
 
    struct hash_table_u64 *pipeline_bos;
+
+   simple_mtx_t lock;
 };
 
 struct ac_sqtt_data_info {
@@ -84,6 +91,9 @@ struct ac_sqtt_trace {
    const struct rgp_queue_info *rgp_queue_info;
    const struct rgp_queue_event *rgp_queue_event;
    const struct rgp_clock_calibration *rgp_clock_calibration;
+
+   uint32_t trace_shader_core_clock;
+   uint32_t trace_memory_clock;
 
    uint32_t num_traces;
    struct ac_sqtt_data_se traces[SQTT_MAX_TRACES];
@@ -258,7 +268,6 @@ enum rgp_sqtt_marker_general_api_type
    ApiCmdDrawMeshTasksIndirectCountEXT = 48,
    ApiCmdDrawMeshTasksIndirectEXT = 49,
 
-   ApiRayTracingSeparateCompiled = 0x800000,
    ApiInvalid = 0xffffffff
 };
 
@@ -328,6 +337,9 @@ enum rgp_sqtt_marker_event_type
    EventCmdDrawMeshTasksIndirectCountEXT = 42,
    EventCmdDrawMeshTasksIndirectEXT = 43,
    EventUnknown = 0x7fff,
+
+   EventRayTracingSeparateCompiled = 0x800000,
+
    EventInvalid = 0xffffffff
 };
 
@@ -539,6 +551,10 @@ bool ac_sqtt_add_code_object_loader_event(struct ac_sqtt *sqtt, uint64_t pipelin
 
 bool ac_sqtt_add_clock_calibration(struct ac_sqtt *sqtt, uint64_t cpu_timestamp,
                                    uint64_t gpu_timestamp);
+
+void ac_sqtt_set_gpu_trace_clocks(struct ac_sqtt *sqtt,
+                                  uint32_t trace_shader_core_clock,
+                                  uint32_t trace_memory_clock);
 
 bool ac_check_profile_state(const struct radeon_info *info);
 

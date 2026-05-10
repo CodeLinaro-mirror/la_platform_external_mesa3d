@@ -309,7 +309,7 @@ genX(emit_so_memcpy_init)(struct anv_memcpy_state *state,
 
       const struct intel_l3_config *cfg = intel_get_default_l3_config(device->info);
       genX(emit_l3_config)(batch, device, cfg);
-      genX(emit_pipeline_select)(batch, _3D, device);
+      genX(emit_pipeline_select)(batch, _3D, device, false);
 
       /* Dummy URB config, will trigger URB reemission */
       struct intel_urb_config urb_cfg_in = { 0 };
@@ -318,11 +318,14 @@ genX(emit_so_memcpy_init)(struct anv_memcpy_state *state,
 }
 
 void
-genX(emit_so_memcpy_fini)(struct anv_memcpy_state *state)
+genX(emit_so_memcpy_fini)(struct anv_memcpy_state *state,
+                          bool wait_completion)
 {
-   genX(emit_apply_pipe_flushes)(state->batch, state->device, _3D,
-                                 ANV_PIPE_END_OF_PIPE_SYNC_BIT,
-                                 NULL);
+   if (wait_completion) {
+      genX(batch_emit_pipe_control)(state->batch, state->device->info, _3D,
+                                    ANV_PIPE_END_OF_PIPE_SYNC_BIT,
+                                    "Post GPU memcpy wait");
+   }
 
    if (state->cmd_buffer) {
       /* Flag all the instructions emitted by the memcpy. */
@@ -333,33 +336,33 @@ genX(emit_so_memcpy_fini)(struct anv_memcpy_state *state)
       genX(cmd_buffer_ensure_wa_14018283232)(state->cmd_buffer, false);
 #endif
 
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_URB);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VF_STATISTICS);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VF);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VF_TOPOLOGY);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VERTEX_INPUT);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VF_SGVS);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_URB);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VF_STATISTICS);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VF);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VF_TOPOLOGY);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VERTEX_INPUT);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VF_SGVS);
 #if GFX_VER >= 11
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VF_SGVS_2);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VF_SGVS_2);
 #endif
 #if GFX_VER >= 12
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_PRIMITIVE_REPLICATION);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_PRIMITIVE_REPLICATION);
 #endif
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_SO_DECL_LIST);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_STREAMOUT);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_SAMPLE_MASK);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_MULTISAMPLE);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_SF);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_SBE);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_VS);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_HS);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_DS);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_TE);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_GS);
-      BITSET_SET(hw_state->dirty, ANV_GFX_STATE_PS);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_SO_DECL_LIST);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_STREAMOUT);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_SAMPLE_MASK);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_MULTISAMPLE);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_SF);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_SBE);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_VS);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_HS);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_DS);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_TE);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_GS);
+      BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_PS);
       if (state->cmd_buffer->device->vk.enabled_extensions.EXT_mesh_shader) {
-         BITSET_SET(hw_state->dirty, ANV_GFX_STATE_MESH_CONTROL);
-         BITSET_SET(hw_state->dirty, ANV_GFX_STATE_TASK_CONTROL);
+         BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_MESH_CONTROL);
+         BITSET_SET(hw_state->emit_dirty, ANV_GFX_STATE_TASK_CONTROL);
       }
 
       state->cmd_buffer->state.gfx.dirty |=
@@ -375,7 +378,11 @@ genX(emit_so_memcpy_fini)(struct anv_memcpy_state *state)
 void
 genX(emit_so_memcpy_end)(struct anv_memcpy_state *state)
 {
-#if INTEL_WA_16013994831_GFX_VER
+   genX(batch_emit_pipe_control)(state->batch, state->device->info, _3D,
+                                 ANV_PIPE_END_OF_PIPE_SYNC_BIT,
+                                 "Post GPU memcpy wait");
+
+ #if INTEL_WA_16013994831_GFX_VER
    /* Turn preemption back on when we're done */
    if (intel_needs_workaround(state->device->info, 16013994831))
       genX(batch_set_preemption)(state->batch, state->device, _3D, true);
@@ -396,29 +403,12 @@ genX(emit_so_memcpy)(struct anv_memcpy_state *state,
        anv_gfx8_9_vb_cache_range_needs_workaround(&state->vb_bound,
                                                   &state->vb_dirty,
                                                   src, size)) {
-      genX(emit_apply_pipe_flushes)(state->batch, state->device, _3D,
+      genX(batch_emit_pipe_control)(state->batch, state->device->info, _3D,
                                     ANV_PIPE_CS_STALL_BIT |
                                     ANV_PIPE_VF_CACHE_INVALIDATE_BIT,
-                                    NULL);
+                                    "Gfx9 VB cache workaround");
       memset(&state->vb_dirty, 0, sizeof(state->vb_dirty));
    }
 
    emit_so_memcpy(state, dst, src, size);
-}
-
-void
-genX(cmd_buffer_so_memcpy)(struct anv_cmd_buffer *cmd_buffer,
-                           struct anv_address dst, struct anv_address src,
-                           uint32_t size)
-{
-   if (size == 0)
-      return;
-
-   struct anv_memcpy_state state;
-   genX(emit_so_memcpy_init)(&state,
-                             cmd_buffer->device,
-                             cmd_buffer,
-                             &cmd_buffer->batch);
-   emit_so_memcpy(&state, dst, src, size);
-   genX(emit_so_memcpy_fini)(&state);
 }

@@ -9,6 +9,7 @@
 #include "sfn_alu_defines.h"
 #include "sfn_debug.h"
 #include "sfn_instr.h"
+#include "sfn_instr_alu.h"
 #include "sfn_valuefactory.h"
 #include "util/macros.h"
 #include "util/u_math.h"
@@ -48,7 +49,7 @@ VirtualValue::VirtualValue(int sel, int chan, Pin pin):
     m_pins(pin)
 {
 #if __cpp_exceptions >= 199711L
-   ASSERT_OR_THROW(m_sel < virtual_register_base || pin != pin_fully,
+   ASSERT_OR_THROW(m_sel < g_registers_end || pin != pin_fully,
                    "Register is virtual but pinned to sel");
 #endif
 }
@@ -238,6 +239,27 @@ void
 Register::accept(ConstRegisterVisitor& visitor) const
 {
    visitor.visit(*this);
+}
+
+bool
+Register::can_switch_to_chan(int c)
+{
+   if (pin() != pin_free && pin() != pin_group)
+      return false;
+
+   int free_mask = BITSET_BIT(c);
+   for (auto p : parents()) {
+      auto alu = p->as_alu();
+      if (alu)
+         free_mask &= alu->allowed_dest_chan_mask();
+   }
+
+   for (auto u : uses()) {
+      free_mask &= u->allowed_src_chan_mask();
+      if (!free_mask)
+         return false;
+   }
+   return true;
 }
 
 void
@@ -908,7 +930,17 @@ LocalArray::element(size_t offset, PVirtualValue indirect, uint32_t chan)
    if (indirect) {
       class ResolveDirectArrayElement : public ConstRegisterVisitor {
       public:
-         void visit(const Register& value) { (void)value; };
+         void visit(const Register& value)
+         {
+            if (value.has_flag(Register::ssa)) {
+               assert(value.parents().size() == 1);
+               auto p = (*value.parents().begin())->as_alu();
+               if (p && p->can_propagate_src()) {
+                  auto& s = p->src(0);
+                  s.accept(*this);
+               }
+            }
+         }
          void visit(const LocalArray& value)
          {
             (void)value;
@@ -921,7 +953,20 @@ LocalArray::element(size_t offset, PVirtualValue indirect, uint32_t chan)
             offset = value.value();
             is_contant = true;
          }
-         void visit(const InlineConstant& value) { (void)value; }
+         void visit(const InlineConstant& value)
+         {
+            switch (value.sel()) {
+            case ALU_SRC_0:
+               offset = 0;
+               is_contant = true;
+               break;
+            case ALU_SRC_1_INT:
+               offset = 1;
+               is_contant = true;
+               break;
+            default:;
+            }
+         }
 
          ResolveDirectArrayElement():
              offset(0),

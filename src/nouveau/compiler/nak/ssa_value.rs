@@ -67,6 +67,12 @@ impl fmt::Display for SSAValue {
     }
 }
 
+impl fmt::Debug for SSAValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
 #[derive(Clone, Eq, Hash, PartialEq)]
 struct SSAValueArray<const SIZE: usize> {
     v: [SSAValue; SIZE],
@@ -151,7 +157,7 @@ pub struct SSARef {
 
 #[cfg(target_arch = "x86_64")]
 const _: () = {
-    debug_assert!(std::mem::size_of::<SSARef>() == 16);
+    debug_assert!(size_of::<SSARef>() == 16);
 };
 
 impl SSARef {
@@ -201,49 +207,6 @@ impl SSARef {
                 Self::cold();
                 x.comps()
             }
-        }
-    }
-
-    /// Returns the register file for this SSA reference, if all SSA values have
-    /// the same register file.
-    pub fn file(&self) -> Option<RegFile> {
-        let comps = usize::from(self.comps());
-        let file = self[0].file();
-        for i in 1..comps {
-            if self[i].file() != file {
-                return None;
-            }
-        }
-        Some(file)
-    }
-
-    /// Returns true if this SSA reference is known to be uniform.
-    pub fn is_uniform(&self) -> bool {
-        for ssa in &self[..] {
-            if !ssa.is_uniform() {
-                return false;
-            }
-        }
-        true
-    }
-
-    pub fn is_gpr(&self) -> bool {
-        for ssa in &self[..] {
-            if !ssa.is_gpr() {
-                return false;
-            }
-        }
-        true
-    }
-
-    pub fn is_predicate(&self) -> bool {
-        if self[0].is_predicate() {
-            true
-        } else {
-            for ssa in &self[..] {
-                debug_assert!(!ssa.is_predicate());
-            }
-            false
         }
     }
 
@@ -337,6 +300,12 @@ impl fmt::Display for SSARef {
     }
 }
 
+impl HasRegFile for SSARef {
+    fn file(&self) -> RegFile {
+        (&self[..]).file()
+    }
+}
+
 #[test]
 fn test_ssa_ref_round_trip() {
     for len in 1..16 {
@@ -345,7 +314,7 @@ fn test_ssa_ref_round_trip() {
             .collect();
 
         let ssa_ref = SSARef::new(&vec);
-        assert!(&ssa_ref[..] == &vec[..]);
+        assert_eq!(ssa_ref[..], vec[..]);
     }
 }
 
@@ -378,5 +347,17 @@ impl SSAValueAllocator {
     /// Allocates multiple SSA values and returns them as an SSA reference.
     pub fn alloc_vec(&mut self, file: RegFile, comps: u8) -> SSARef {
         SSARef::from_iter((0..comps).map(|_| self.alloc(file)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ssa_value_print() {
+        let ssa = SSAValue::new(RegFile::UPred, 42);
+        assert_eq!(format!("{}", ssa), "%up42");
+        assert_eq!(format!("{:?}", ssa), "%up42");
     }
 }

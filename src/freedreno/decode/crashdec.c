@@ -20,6 +20,7 @@
 
 
 #include "crashdec.h"
+#include "cffdec.h"
 
 static FILE *in;
 bool verbose;
@@ -84,6 +85,8 @@ replacestr(char *line, const char *find, const char *replace)
 static char *lastline;
 static char *pushedline;
 
+static void decode_finalize(void);
+
 static const char *
 popline(void)
 {
@@ -97,8 +100,10 @@ popline(void)
    free(lastline);
 
    size_t n = 0;
-   if (getline(&r, &n, in) < 0)
+   if (getline(&r, &n, in) < 0) {
+      decode_finalize();
       exit(0);
+   }
 
    /* Handle section name typo's from earlier kernels: */
    r = replacestr(r, "CP_MEMPOOOL", "CP_MEMPOOL");
@@ -220,6 +225,42 @@ parseline_nowhitespace(const char *line, const char *fmt, ...)
          pushline();                                                           \
          break;                                                                \
       } else
+
+/*
+ * Helpers to decode pipe-id, etc
+ */
+
+static uint32_t
+statetype_id(const char *name)
+{
+   if (!is_a7xx())
+      return 0;
+   return enumval("a7xx_statetype_id", name);
+}
+
+static uint32_t
+pipe_id(const char *name)
+{
+   if (!name)
+      return 0;
+   return enumval("adreno_pipe", name);
+}
+
+static uint32_t
+debugbus_id(const char *name)
+{
+   if (!is_a7xx())
+      return 0;
+   return enumval("a7xx_debugbus_id", name);
+}
+
+static uint32_t
+cluster_id(const char *name)
+{
+   if (!is_a7xx() || !name)
+      return 0;
+   return enumval("a7xx_cluster", name);
+}
 
 /*
  * Decode ringbuffer section:
@@ -381,6 +422,52 @@ valid_header(uint32_t pkt)
    }
 }
 
+/**
+ * Simplified version of the parsing loop in dump_commands(), which simply
+ * looks for "IB" type packets and logs the target cmdstream buffers.
+ */
+static void
+parse_ibs(uint32_t *dwords, uint32_t sizedwords)
+{
+   int dwords_left = sizedwords;
+   uint32_t count = 0; /* dword count including packet header */
+   uint32_t val;
+
+   while (dwords_left > 0) {
+      if (pkt_is_regwrite(dwords[0], &val, &count)) {
+         /* ignore */
+      } else if (pkt_is_opcode(dwords[0], &val, &count)) {
+         const char *name = pktname(val);
+         if (!strcmp(name, "CP_INDIRECT_BUFFER")) {
+            uint64_t ibaddr;
+            uint32_t ibsize;
+
+            parse_cp_indirect(&dwords[1], count - 1, &ibaddr, &ibsize);
+
+            /* map gpuaddr back to hostptr: */
+            void *ptr = hostptr(ibaddr);
+            snapshot_ib(ibaddr, ptr, ibsize);
+         }
+         // TODO CP_SET_DRAW_STATE and others?
+      } else if (pkt_is_type2(dwords[0])) {
+         /* no-op */
+         count = 1;
+      } else {
+         printf("bad type! %08x\n", dwords[0]);
+         /* for 5xx+ we can do a passable job of looking for start of next valid
+          * packet: */
+         if (options.info->chip >= 5) {
+            count = find_next_packet(dwords, dwords_left);
+         } else {
+            return;
+         }
+      }
+
+      dwords += count;
+      dwords_left -= count;
+   }
+}
+
 static void
 dump_cmdstream(void)
 {
@@ -481,7 +568,13 @@ dump_cmdstream(void)
       options.ibs[0].size = cmdszdw;
 
       handle_prefetch(buf, cmdszdw);
-      dump_commands(buf, cmdszdw, 0);
+
+      if (snapshot) {
+         parse_ibs(buf, cmdszdw);
+      } else {
+         dump_commands(buf, cmdszdw, 0);
+      }
+
       free(buf);
    }
 }
@@ -553,7 +646,9 @@ decode_bos(void)
             dump_hex_ascii(buf, size, 1);
 
          add_buffer(iova, size, buf);
-         snapshot_gpu_object(iova, size, buf);
+
+         if (size <= 0x40000)
+            snapshot_gpu_object(iova, size, buf);
 
          continue;
       }
@@ -650,7 +745,8 @@ decode_clusters(void)
       } else if (startswith_nowhitespace(line, "- location:")) {
          parseline_nowhitespace(line, "- location: %u", &location);
       } else if (startswith_nowhitespace(line, "- pipe:")) {
-         snapshot_cluster_regs(pipe_name, cluster_name, context, location);
+         snapshot_cluster_regs(pipe_id(pipe_name), cluster_id(cluster_name),
+                               context, location);
 
          free(pipe_name);
          parseline_nowhitespace(line, "- pipe: %ms", &pipe_name);
@@ -674,7 +770,10 @@ decode_clusters(void)
       printf("%s", line);
    }
 
-   snapshot_cluster_regs(pipe_name, cluster_name, context, location);
+   if (reg_buf.count) {
+      snapshot_cluster_regs(pipe_id(pipe_name), cluster_id(cluster_name),
+                            context, location);
+   }
 
    free(cluster_name);
    free(pipe_name);
@@ -858,7 +957,9 @@ decode_indexed_registers(void)
             dump_cp_ucode_dbg(buf);
 
          if (!strcmp(name, "CP_MEM_POOL_DBG"))
-            dump_cp_mem_pool(buf);
+            dump_cp_mem_pool(buf, false);
+         if (!strcmp(name, "CP_BV_MEM_POOL_DBG"))
+            dump_cp_mem_pool(buf, true);
 
          if (dump)
             dump_hex_ascii(buf, 4 * sizedwords, 1);
@@ -935,7 +1036,8 @@ decode_shader_blocks(void)
          if (dump)
             dump_hex_ascii(buf, 4 * sizedwords, 1);
 
-         snapshot_shader_block(type, pipe, sp, usptp, location, buf, sizedwords);
+         snapshot_shader_block(statetype_id(type), pipe_id(pipe),
+                               sp, usptp, location, buf, sizedwords);
 
          free(buf);
 
@@ -975,7 +1077,7 @@ decode_debugbus(void)
 
          if (dump)
             dump_hex_ascii(buf, 4 * sizedwords, 1);
-         snapshot_debugbus(block, buf, sizedwords);
+         snapshot_debugbus(debugbus_id(block), buf, sizedwords);
 
          free(buf);
 
@@ -1069,12 +1171,6 @@ decode(void)
          decode_gmu_hfi();
       } else if (startswith(line, "registers:")) {
          decode_registers();
-
-         /* after we've recorded buffer contents, and CP register values,
-          * we can take a stab at decoding the cmdstream:
-          */
-         if (!snapshot)
-            dump_cmdstream();
       } else if (startswith(line, "registers-gmu:")) {
          decode_gmu_registers();
       } else if (startswith(line, "indexed-registers:")) {
@@ -1085,9 +1181,22 @@ decode(void)
          decode_clusters();
       } else if (startswith(line, "debugbus:")) {
          decode_debugbus();
-         do_snapshot();
       }
    }
+}
+
+static void
+decode_finalize(void)
+{
+   snapshot_linux.ptbase = ptbase;
+
+   /* Dump cmdstream at the end after we know we've decoded all sections that might
+    * contain reg vals needed for locating the cmdstream:
+    */
+   dump_cmdstream();
+
+   /* If we are exporting snapshot, finalize it now: */
+   do_snapshot();
 }
 
 /*
@@ -1142,6 +1251,8 @@ cleanup(void)
    if (interactive) {
       pager_close();
    }
+
+   cffdec_finish();
 }
 
 int
@@ -1165,6 +1276,10 @@ main(int argc, char **argv)
          break;
       case 'f':
          in = fopen(optarg, "r");
+         if (!in) {
+            perror("fopen");
+            return 1;
+         }
          break;
       case 'l':
          lookback = atoi(optarg);
@@ -1191,6 +1306,7 @@ main(int argc, char **argv)
 
    if (snapshot) {
       freopen("/dev/null", "w", stdout);
+      verbose = false;
    } else if (interactive) {
       pager_open();
    }

@@ -85,6 +85,7 @@ enum fd_debug_flag {
    FD_DBG_NOHW         = BITFIELD_BIT(28),
    FD_DBG_NOSBIN       = BITFIELD_BIT(29),
    FD_DBG_STOMP        = BITFIELD_BIT(30),
+   FD_DBG_ABORT        = BITFIELD_BIT(31),
 };
 /* clang-format on */
 
@@ -100,7 +101,7 @@ extern bool fd_binning_enabled;
 #define DBG(fmt, ...)                                                          \
    do {                                                                        \
       if (FD_DBG(MSGS))                                                        \
-         mesa_logi("%5d: %s:%d: " fmt, ((pid_t)syscall(SYS_gettid)),           \
+         mesa_logd("%5d: %s:%d: " fmt, ((pid_t)syscall(SYS_gettid)),           \
                                         __func__, __LINE__,                    \
                                         ##__VA_ARGS__);                        \
    } while (0)
@@ -323,11 +324,10 @@ OUT_RINGP(struct fd_ringbuffer *ring, uint32_t data, struct util_dynarray *buf)
       DBG("ring[%p]: OUT_RINGP  %04x:  %08x", ring,
           (uint32_t)(ring->cur - ring->start), data);
    }
-   util_dynarray_append(buf, struct fd_cs_patch,
-                        ((struct fd_cs_patch){
-                           .cs = ring->cur++,
-                           .val = data,
-                        }));
+   util_dynarray_append(buf, ((struct fd_cs_patch){
+            .cs = ring->cur++,
+            .val = data,
+         }));
 }
 
 static inline void
@@ -458,7 +458,7 @@ fd_clamp_buffer_size(enum pipe_format format, uint32_t size,
  */
 
 static inline enum a4xx_state_block
-fd4_stage2shadersb(gl_shader_stage type)
+fd4_stage2shadersb(mesa_shader_stage type)
 {
    switch (type) {
    case MESA_SHADER_VERTEX:

@@ -117,6 +117,12 @@ target_to_index(const struct gl_query_object *q)
          return PIPE_STAT_QUERY_DS_INVOCATIONS;
       case GL_COMPUTE_SHADER_INVOCATIONS_ARB:
          return PIPE_STAT_QUERY_CS_INVOCATIONS;
+      case GL_TASK_SHADER_INVOCATIONS_EXT:
+         return PIPE_STAT_QUERY_TS_INVOCATIONS;
+      case GL_MESH_SHADER_INVOCATIONS_EXT:
+         return PIPE_STAT_QUERY_MS_INVOCATIONS;
+      case GL_MESH_PRIMITIVES_GENERATED_EXT:
+         return PIPE_STAT_QUERY_MS_PRIMITIVES;
       default:
          break;
    }
@@ -193,6 +199,9 @@ begin_query(struct gl_context *ctx, struct gl_query_object *q)
    case GL_COMPUTE_SHADER_INVOCATIONS_ARB:
    case GL_CLIPPING_INPUT_PRIMITIVES_ARB:
    case GL_CLIPPING_OUTPUT_PRIMITIVES_ARB:
+   case GL_TASK_SHADER_INVOCATIONS_EXT:
+   case GL_MESH_SHADER_INVOCATIONS_EXT:
+   case GL_MESH_PRIMITIVES_GENERATED_EXT:
       type = st->has_single_pipe_stat ? PIPE_QUERY_PIPELINE_STATISTICS_SINGLE
                                       : PIPE_QUERY_PIPELINE_STATISTICS;
       break;
@@ -331,6 +340,15 @@ get_query_result(struct pipe_context *pipe,
          break;
       case GL_CLIPPING_OUTPUT_PRIMITIVES_ARB:
          q->Result = data.pipeline_statistics.c_primitives;
+         break;
+      case GL_TASK_SHADER_INVOCATIONS_EXT:
+         q->Result = data.pipeline_statistics.ts_invocations;
+         break;
+      case GL_MESH_SHADER_INVOCATIONS_EXT:
+         q->Result = data.pipeline_statistics.ms_invocations;
+         break;
+      case GL_MESH_PRIMITIVES_GENERATED_EXT:
+         q->Result = data.pipeline_statistics.ms_primitives;
          break;
       default:
          UNREACHABLE("invalid pipeline statistics counter");
@@ -562,6 +580,24 @@ get_query_binding_point(struct gl_context *ctx, GLenum target, GLuint index)
       else
          return NULL;
 
+   case GL_TASK_SHADER_INVOCATIONS_EXT:
+      if (_mesa_has_EXT_mesh_shader(ctx))
+         return &ctx->Query.task_shader_invocations;
+      else
+         return NULL;
+
+   case GL_MESH_SHADER_INVOCATIONS_EXT:
+      if (_mesa_has_EXT_mesh_shader(ctx))
+         return &ctx->Query.mesh_shader_invocations;
+      else
+         return NULL;
+
+   case GL_MESH_PRIMITIVES_GENERATED_EXT:
+      if (_mesa_has_EXT_mesh_shader(ctx))
+         return &ctx->Query.mesh_primitives_generated;
+      else
+         return NULL;
+
    default:
       return NULL;
    }
@@ -615,20 +651,8 @@ _mesa_CreateQueries(GLenum target, GLsizei n, GLuint *ids)
 {
    GET_CURRENT_CONTEXT(ctx);
 
-   switch (target) {
-   case GL_SAMPLES_PASSED:
-   case GL_ANY_SAMPLES_PASSED:
-   case GL_ANY_SAMPLES_PASSED_CONSERVATIVE:
-   case GL_TIME_ELAPSED:
-   case GL_TIMESTAMP:
-   case GL_PRIMITIVES_GENERATED:
-   case GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN:
-   case GL_TRANSFORM_FEEDBACK_STREAM_OVERFLOW:
-   case GL_TRANSFORM_FEEDBACK_OVERFLOW:
-      break;
-   default:
-      _mesa_error(ctx, GL_INVALID_ENUM, "glCreateQueries(invalid target = %s)",
-                  _mesa_enum_to_string(target));
+   if (target != GL_TIMESTAMP && !get_query_binding_point(ctx, target, 0)) {
+      _mesa_error(ctx, GL_INVALID_ENUM, "glCreateQueries(target)");
       return;
    }
 
@@ -757,7 +781,7 @@ _mesa_BeginQueryIndexed(GLenum target, GLuint index, GLuint id)
 
    q = _mesa_lookup_query_object(ctx, id);
    if (!q) {
-      if (ctx->API != API_OPENGL_COMPAT) {
+      if (!_mesa_is_desktop_gl_compat(ctx)) {
          _mesa_error(ctx, GL_INVALID_OPERATION,
                      "glBeginQuery{Indexed}(non-gen name)");
          return;
@@ -1072,6 +1096,15 @@ _mesa_GetQueryIndexediv(GLenum target, GLuint index, GLenum pname,
          case GL_CLIPPING_OUTPUT_PRIMITIVES:
             *params = ctx->Const.QueryCounterBits.ClOutPrimitives;
             break;
+         case GL_TASK_SHADER_INVOCATIONS_EXT:
+            *params = ctx->Const.QueryCounterBits.TsInvocations;
+            break;
+         case GL_MESH_SHADER_INVOCATIONS_EXT:
+            *params = ctx->Const.QueryCounterBits.MsInvocations;
+            break;
+         case GL_MESH_PRIMITIVES_GENERATED_EXT:
+            *params = ctx->Const.QueryCounterBits.MeshPrimitivesGenerated;
+            break;
          default:
             _mesa_problem(ctx,
                           "Unknown target in glGetQueryIndexediv(target = %s)",
@@ -1380,6 +1413,16 @@ _mesa_init_queryobj(struct gl_context *ctx)
       ctx->Const.QueryCounterBits.ComputeInvocations = 0;
       ctx->Const.QueryCounterBits.ClInPrimitives = 0;
       ctx->Const.QueryCounterBits.ClOutPrimitives = 0;
+   }
+
+   if (screen->caps.mesh_shader && screen->caps.mesh.pipeline_statistic_queries) {
+      ctx->Const.QueryCounterBits.TsInvocations = 64;
+      ctx->Const.QueryCounterBits.MsInvocations = 64;
+      ctx->Const.QueryCounterBits.MeshPrimitivesGenerated = 64;
+   } else {
+      ctx->Const.QueryCounterBits.TsInvocations = 0;
+      ctx->Const.QueryCounterBits.MsInvocations = 0;
+      ctx->Const.QueryCounterBits.MeshPrimitivesGenerated = 0;
    }
 }
 

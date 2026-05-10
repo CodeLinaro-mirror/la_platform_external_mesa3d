@@ -96,13 +96,12 @@ interp_fs_input(nir_builder *b, unsigned num_components, uint32_t addr,
 }
 
 static nir_def *
-load_sample_pos_u4_at(nir_builder *b, nir_def *sample_id,
-                      const struct nak_fs_key *fs_key)
+load_sample_pos_u4_at(nir_builder *b, nir_def *sample_id)
 {
    nir_def *loc = nir_ldc_nv(b, 1, 8,
-                             nir_imm_int(b, fs_key->sample_info_cb),
+                             nir_imm_int(b, nak_const_offsets.sample_info_cb),
                              nir_iadd_imm(b, sample_id,
-                                          fs_key->sample_locations_offset),
+                                nak_const_offsets.sample_locations_offset),
                              .align_mul = 1, .align_offset = 0);
 
    /* The rest of these calculations are in 32-bit */
@@ -113,39 +112,36 @@ load_sample_pos_u4_at(nir_builder *b, nir_def *sample_id,
 }
 
 static nir_def *
-load_pass_sample_mask_at(nir_builder *b, nir_def *sample_id,
-                         const struct nak_fs_key *fs_key)
+load_pass_sample_mask_at(nir_builder *b, nir_def *sample_id)
 {
    nir_def *offset =
       nir_imul_imm(b, sample_id, sizeof(struct nak_sample_mask));
-   offset = nir_iadd_imm(b, offset, fs_key->sample_masks_offset);
+   offset = nir_iadd_imm(b, offset, nak_const_offsets.sample_masks_offset);
 
    return nir_ldc_nv(b, 1, 8 * sizeof(struct nak_sample_mask),
-                     nir_imm_int(b, fs_key->sample_info_cb), offset,
+                     nir_imm_int(b, nak_const_offsets.sample_info_cb), offset,
                      .align_mul = sizeof(struct nak_sample_mask),
                      .align_offset = 0);
 }
 
 static nir_def *
-load_sample_pos_at(nir_builder *b, nir_def *sample_id,
-                   const struct nak_fs_key *fs_key)
+load_sample_pos_at(nir_builder *b, nir_def *sample_id)
 {
-   nir_def *loc_u4 = load_sample_pos_u4_at(b, sample_id, fs_key);
+   nir_def *loc_u4 = load_sample_pos_u4_at(b, sample_id);
    nir_def *result = nir_fmul_imm(b, nir_i2f32(b, loc_u4), 1.0 / 16.0);
 
    return result;
 }
 
 static nir_def *
-load_barycentric_offset(nir_builder *b, nir_intrinsic_instr *bary,
-                        const struct nak_fs_key *fs_key)
+load_barycentric_offset(nir_builder *b, nir_intrinsic_instr *bary)
 {
    nir_def *offset_s12;
 
    if (bary->intrinsic == nir_intrinsic_load_barycentric_coord_at_sample ||
        bary->intrinsic == nir_intrinsic_load_barycentric_at_sample) {
       nir_def *sample_id = bary->src[0].ssa;
-      nir_def *offset_u4 = load_sample_pos_u4_at(b, sample_id, fs_key);
+      nir_def *offset_u4 = load_sample_pos_u4_at(b, sample_id);
       /* The sample position we loaded is a u4 from the upper-left and the
        * sample position wanted by ipa.offset is s12
        */
@@ -253,7 +249,7 @@ lower_fs_input_intrin(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
       case nir_intrinsic_load_barycentric_coord_at_sample:
       case nir_intrinsic_load_barycentric_coord_at_offset:
          interp_loc = NAK_INTERP_LOC_OFFSET;
-         offset = load_barycentric_offset(b, intrin, ctx->fs_key);
+         offset = load_barycentric_offset(b, intrin);
          break;
       case nir_intrinsic_load_barycentric_coord_centroid:
       case nir_intrinsic_load_barycentric_coord_sample:
@@ -293,7 +289,7 @@ lower_fs_input_intrin(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
       case nir_intrinsic_load_barycentric_at_offset:
       case nir_intrinsic_load_barycentric_at_sample: {
          interp_loc = NAK_INTERP_LOC_OFFSET;
-         offset = load_barycentric_offset(b, bary, ctx->fs_key);
+         offset = load_barycentric_offset(b, bary);
          break;
       }
 
@@ -342,7 +338,7 @@ lower_fs_input_intrin(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
           * that with the coverage mask.
           */
          nir_def *sample = nir_load_sample_id(b);
-         nir_def *mask = load_pass_sample_mask_at(b, sample, ctx->fs_key);
+         nir_def *mask = load_pass_sample_mask_at(b, sample);
          mask = nir_iand(b, &intrin->def, nir_u2u32(b, mask));
          nir_def_rewrite_uses_after(&intrin->def, mask);
 
@@ -356,7 +352,7 @@ lower_fs_input_intrin(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
       break;
 
    case nir_intrinsic_load_sample_pos:
-      res = load_sample_pos_at(b, nir_load_sample_id(b), ctx->fs_key);
+      res = load_sample_pos_at(b, nir_load_sample_id(b));
       break;
 
    case nir_intrinsic_load_input_vertex: {

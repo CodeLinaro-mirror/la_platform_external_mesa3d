@@ -24,6 +24,7 @@ private:
 
    bool process_store_output(nir_intrinsic_instr *intr);
    bool process_load_input(nir_intrinsic_instr *intr);
+   void add_input_at(gl_varying_slot location, unsigned driver_location);
 
    void do_finalize() override;
 
@@ -36,11 +37,7 @@ private:
 
    bool emit_indirect_vertex_at_index(nir_intrinsic_instr *instr);
 
-   bool emit_load_per_vertex_input_direct(nir_intrinsic_instr *instr);
-
-   bool emit_load_per_vertex_input_indirect(nir_intrinsic_instr *instr);
-
-   bool load_per_vertex_input_at_addr(nir_intrinsic_instr *instr, PRegister addr);
+   bool emit_load_per_vertex_input(nir_intrinsic_instr *instr);
 
    bool load_input(UNUSED nir_intrinsic_instr *intr) override
    {

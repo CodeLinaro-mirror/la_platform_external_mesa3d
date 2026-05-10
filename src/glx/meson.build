@@ -58,7 +58,7 @@ extra_libs_libglx = []
 extra_deps_libgl = []
 extra_ld_args_libgl = []
 
-if with_dri_platform == 'drm'
+if with_dri_platform == 'drm' or with_dri_platform == 'hurd'
   files_libglx += files('dri3_glx.c', 'dri3_priv.h')
 endif
 
@@ -133,6 +133,18 @@ libgl = shared_library(
   darwin_versions : '4.0.0',
   install : true,
 )
+
+if not with_glvnd
+  pkg.generate(
+    name : 'glx',
+    description : 'Mesa GLX Library',
+    version : meson.project_version(),
+    libraries : libgl,
+    libraries_private : gl_priv_libs,
+    requires_private : gl_priv_reqs,
+    variables : ['glx_tls=yes'],
+  )
+endif
 
 if with_symbols_check
   libgl_symbols_file = with_glvnd ? 'glvnd-symbols.txt' : 'libgl-symbols.txt'

@@ -231,7 +231,7 @@ struct v3d_uncompiled_shader {
         uint32_t num_tf_specs;
 
         /* For caching */
-        unsigned char sha1[20];
+        unsigned char sha1[SHA1_DIGEST_LENGTH];
 };
 
 struct v3d_compiled_shader {
@@ -645,6 +645,11 @@ struct v3d_context {
         unsigned sample_mask;
         struct pipe_framebuffer_state framebuffer;
 
+        /* True when the framebuffer state has a format that needs software
+         * blending to be enabled.
+         */
+        bool framebuffer_soft_blend;
+
         /* Flags if we have submitted any jobs for the current framebuffer so
          * we can make skip framebuffer invalidation for cases where we had to
          * split the command list into multiple jobs for the same frame (i.e.
@@ -693,10 +698,10 @@ struct v3d_context {
 
         struct pipe_poly_stipple stipple;
         struct pipe_viewport_state viewport;
-        struct v3d_ssbo_stateobj ssbo[PIPE_SHADER_TYPES];
-        struct v3d_shaderimg_stateobj shaderimg[PIPE_SHADER_TYPES];
-        struct v3d_constbuf_stateobj constbuf[PIPE_SHADER_TYPES];
-        struct v3d_texture_stateobj tex[PIPE_SHADER_TYPES];
+        struct v3d_ssbo_stateobj ssbo[MESA_SHADER_STAGES];
+        struct v3d_shaderimg_stateobj shaderimg[MESA_SHADER_STAGES];
+        struct v3d_constbuf_stateobj constbuf[MESA_SHADER_STAGES];
+        struct v3d_texture_stateobj tex[MESA_SHADER_STAGES];
         struct v3d_vertexbuf_stateobj vertexbuf;
         struct v3d_streamout_stateobj streamout;
         struct v3d_bo *current_oq;
@@ -805,7 +810,7 @@ void v3d_set_shader_uniform_dirty_flags(struct v3d_compiled_shader *shader);
 struct v3d_cl_reloc v3d_write_uniforms(struct v3d_context *v3d,
                                        struct v3d_job *job,
                                        struct v3d_compiled_shader *shader,
-                                       enum pipe_shader_type stage);
+                                       mesa_shader_stage stage);
 
 void v3d_flush(struct pipe_context *pctx);
 void v3d_job_init(struct v3d_context *v3d);
@@ -833,20 +838,20 @@ void v3d_flush_jobs_reading_resource(struct v3d_context *v3d,
 void v3d_update_compiled_shaders(struct v3d_context *v3d, uint8_t prim_mode);
 void v3d_update_compiled_cs(struct v3d_context *v3d);
 
+bool v3d_rt_format_is_emulated(enum pipe_format f);
 bool v3d_rt_format_supported(const struct v3d_device_info *devinfo,
                              enum pipe_format f);
 bool v3d_tex_format_supported(const struct v3d_device_info *devinfo,
                               enum pipe_format f);
-uint8_t v3d_get_rt_format(const struct v3d_device_info *devinfo, enum pipe_format f);
-uint8_t v3d_get_tex_format(const struct v3d_device_info *devinfo, enum pipe_format f);
+
 uint8_t v3d_get_tex_return_size(const struct v3d_device_info *devinfo,
                                 enum pipe_format f);
 uint8_t v3d_get_tex_return_channels(const struct v3d_device_info *devinfo,
                                     enum pipe_format f);
 const uint8_t *v3d_get_format_swizzle(const struct v3d_device_info *devinfo,
                                       enum pipe_format f);
-bool v3d_format_supports_tlb_msaa_resolve(const struct v3d_device_info *devinfo,
-                                          enum pipe_format f);
+bool v3d_format_supports_tlb_resolve_and_blend(const struct v3d_device_info *devinfo,
+                                               enum pipe_format f);
 bool v3d_format_needs_tlb_rb_swap(enum pipe_format format);
 void v3d_format_get_internal_type_and_bpp(const struct v3d_device_info *devinfo,
                                           enum pipe_format format,
@@ -885,7 +890,7 @@ float v3d_get_real_line_width(struct v3d_context *v3d);
 void v3d_ensure_prim_counts_allocated(struct v3d_context *ctx);
 
 void v3d_flag_dirty_sampler_state(struct v3d_context *v3d,
-                                  enum pipe_shader_type shader);
+                                  mesa_shader_stage shader);
 
 void v3d_get_tile_buffer_size(const struct v3d_device_info *devinfo,
                               bool is_msaa,

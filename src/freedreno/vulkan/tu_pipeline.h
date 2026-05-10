@@ -38,10 +38,15 @@ enum tu_dynamic_state
 
 struct cache_entry;
 
+enum tu_lrz_blend_status {
+   TU_LRZ_BLEND_SAFE_FOR_LRZ,
+   TU_LRZ_BLEND_READS_DEST_OR_PARTIAL_WRITE,
+   TU_LRZ_BLEND_ALL_COLOR_WRITES_SKIPPED,
+};
 struct tu_lrz_blend
 {
    bool valid;
-   bool reads_dest;
+   enum tu_lrz_blend_status lrz_blend_status;
 };
 
 struct tu_bandwidth
@@ -155,7 +160,7 @@ struct tu_program_state
 };
 
 struct tu_pipeline_executable {
-   gl_shader_stage stage;
+   mesa_shader_stage stage;
 
    struct ir3_info stats;
    bool is_binning;
@@ -296,15 +301,18 @@ struct tu_pvtmem_config {
    bool per_wave;
 };
 
-template <chip CHIP>
-void
-tu6_emit_xs_config(struct tu_cs *cs,
-                   gl_shader_stage stage,
-                   const struct ir3_shader_variant *xs);
+struct tu_shader_stages {
+   const struct ir3_shader_variant *vs, *hs, *ds, *gs, *fs, *cs;
+};
 
 template <chip CHIP>
 void
-tu6_emit_shared_consts_enable(struct tu_cs *cs, bool shared_consts_enable);
+tu6_emit_xs_config(struct tu_crb &crb,
+                   struct tu_shader_stages stages);
+
+template <chip CHIP>
+void
+tu6_emit_shared_consts_enable(struct tu_crb &crb, bool shared_consts_enable);
 
 template <chip CHIP>
 void

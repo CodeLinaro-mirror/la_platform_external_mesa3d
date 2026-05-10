@@ -327,6 +327,7 @@ struct snapshot_gmu_version {
  */
 
 static FILE *snapshot;
+static uint64_t ptbase = 0x43210000;  /* We don't always have a real ttbr0, so fake it */
 
 static inline void
 snapshot_write(void *data, size_t sz)
@@ -462,7 +463,7 @@ snapshot_indexed_regs(const char *name, uint32_t *regs, uint32_t sizedwords)
 }
 
 static inline void
-snapshot_cluster_regs(const char *pipe_name, const char *cluster_name, int context,
+snapshot_cluster_regs(uint32_t pipe_id, uint32_t cluster_id, int context,
                       uint32_t location)
 {
    uint32_t count = reg_buf.count;
@@ -478,8 +479,8 @@ snapshot_cluster_regs(const char *pipe_name, const char *cluster_name, int conte
    /* TODO, 8xx should use snapshot_mvc_regs_v3: */
    struct snapshot_mvc_regs_v2 cluster_regs = {
       .ctxt_id = context,
-      .cluster_id = enumval("a7xx_cluster", cluster_name),
-      .pipe_id = enumval("a7xx_pipe", pipe_name),
+      .cluster_id = cluster_id,
+      .pipe_id = pipe_id,
       .location_id = location,
    };
 
@@ -492,13 +493,13 @@ snapshot_cluster_regs(const char *pipe_name, const char *cluster_name, int conte
 }
 
 static inline void
-snapshot_debugbus(const char *block, uint32_t *buf, uint32_t sizedwords)
+snapshot_debugbus(uint32_t block, uint32_t *buf, uint32_t sizedwords)
 {
    if (!snapshot)
       return;
 
    struct snapshot_debugbus debugbus = {
-      .id = enumval("a7xx_debugbus_id", block),
+      .id = block,
       .count = sizedwords,
    };
 
@@ -511,7 +512,7 @@ snapshot_debugbus(const char *block, uint32_t *buf, uint32_t sizedwords)
 }
 
 static inline void
-snapshot_shader_block(const char *type, const char *pipe, int sp, int usptp,
+snapshot_shader_block(uint32_t type, uint32_t pipe, int sp, int usptp,
                       int location, uint32_t *buf, uint32_t sizedwords)
 {
    if (!snapshot)
@@ -519,10 +520,10 @@ snapshot_shader_block(const char *type, const char *pipe, int sp, int usptp,
 
    /* TODO, 8xx should use snapshot_shader_v3: */
    struct snapshot_shader_v2 shader_block = {
-      .type = enumval("a7xx_statetype_id", type),
+      .type = type,
       .index = sp,
       .usptp = usptp,
-      .pipe_id = enumval("a7xx_pipe", pipe),
+      .pipe_id = pipe,
       .location = location,
       .size = sizedwords,
    };
@@ -556,6 +557,36 @@ snapshot_gpu_object(uint64_t gpuaddr, uint32_t size, uint32_t *buf)
    snapshot_write(buf, size);
 }
 
+static struct {
+   struct snapshot_ib_v2 ib;
+   uint32_t *dwords;
+} ibs[512];
+static unsigned nibs;
+
+static inline void
+snapshot_ib(uint64_t gpuaddr, uint32_t *dwords, uint32_t sizedwords)
+{
+   int idx;
+
+   if (!snapshot || !dwords)
+      return;
+
+   for (idx = 0; idx < nibs; idx++) {
+      if (ibs[idx].ib.gpuaddr == gpuaddr) {
+         ibs[idx].ib.size = MAX2(ibs[idx].ib.size, sizedwords);
+         return;
+      }
+   }
+
+   assert(idx < ARRAY_SIZE(ibs));
+   ibs[idx].ib.gpuaddr = gpuaddr;
+   ibs[idx].ib.size = sizedwords;
+   ibs[idx].ib.ptbase = ptbase;
+   ibs[idx].dwords = dwords;
+
+   nibs++;
+}
+
 static inline void
 do_snapshot(void)
 {
@@ -580,6 +611,16 @@ do_snapshot(void)
       void *buf = ringbuffers[id].buf;
 
       snapshot_write(buf, snapshot_rb[i].rbsize * 4);
+   }
+
+   for (unsigned i = 0; i < nibs; i++) {
+      snapshot_write_sect_header(
+         SNAPSHOT_SECTION_IB_V2,
+         sizeof(ibs[i].ib) + (4 * ibs[i].ib.size)
+      );
+      snapshot_write(&ibs[i].ib, sizeof(ibs[i].ib));
+      snapshot_write(ibs[i].dwords, ibs[i].ib.size * 4);
+
    }
 
    snapshot_write_sect_header(SNAPSHOT_SECTION_END, 0);

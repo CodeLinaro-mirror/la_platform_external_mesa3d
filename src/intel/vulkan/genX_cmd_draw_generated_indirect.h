@@ -96,18 +96,10 @@ genX(cmd_buffer_emit_generate_draws)(struct anv_cmd_buffer *cmd_buffer,
       ANV_STATE_NULL;
    UNUSED uint32_t wa_insts_offset = 0;
 
-#if INTEL_WA_16011107343_GFX_VER || INTEL_WA_22018402687_GFX_VER
-   struct anv_graphics_pipeline *pipeline =
-      anv_pipeline_to_graphics(gfx->base.pipeline);
-#endif
-
 #if INTEL_WA_16011107343_GFX_VER
    if (wa_16011107343) {
       memcpy(wa_insts_state.map + wa_insts_offset,
-             &pipeline->batch_data[
-                protected ?
-                pipeline->final.hs_protected.offset :
-                pipeline->final.hs.offset],
+             gfx->dyn_state.packed.hs,
              GENX(3DSTATE_HS_length) * 4);
       wa_insts_offset += GENX(3DSTATE_HS_length) * 4;
    }
@@ -116,10 +108,7 @@ genX(cmd_buffer_emit_generate_draws)(struct anv_cmd_buffer *cmd_buffer,
 #if INTEL_WA_22018402687_GFX_VER
    if (wa_22018402687) {
       memcpy(wa_insts_state.map + wa_insts_offset,
-             &pipeline->batch_data[
-                protected ?
-                pipeline->final.ds_protected.offset :
-                pipeline->final.ds.offset],
+             gfx->dyn_state.packed.ds,
              GENX(3DSTATE_DS_length) * 4);
       wa_insts_offset += GENX(3DSTATE_DS_length) * 4;
    }
@@ -184,7 +173,7 @@ genX(cmd_buffer_emit_indirect_generated_draws_init)(struct anv_cmd_buffer *cmd_b
 
    trace_intel_end_generate_draws(&cmd_buffer->trace);
 
-   struct anv_shader_bin *gen_kernel;
+   struct anv_shader_internal *gen_kernel;
    VkResult ret =
       anv_device_get_internal_shader(
          cmd_buffer->device,
@@ -520,7 +509,7 @@ genX(cmd_buffer_emit_indirect_generated_draws_inring)(struct anv_cmd_buffer *cmd
     */
    struct anv_address gen_addr = anv_batch_current_address(&cmd_buffer->batch);
 
-   struct anv_shader_bin *gen_kernel;
+   struct anv_shader_internal *gen_kernel;
    VkResult ret =
       anv_device_get_internal_shader(
          cmd_buffer->device,
@@ -559,6 +548,10 @@ genX(cmd_buffer_emit_indirect_generated_draws_inring)(struct anv_cmd_buffer *cmd
    struct anv_gen_indirect_params *params = params_state.map;
 
    anv_add_pending_pipe_bits(cmd_buffer,
+                             gen_kernel->stage == MESA_SHADER_FRAGMENT ?
+                             VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT :
+                             VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                             VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
 #if GFX_VER == 9
                              ANV_PIPE_VF_CACHE_INVALIDATE_BIT |
 #endif
@@ -608,6 +601,10 @@ genX(cmd_buffer_emit_indirect_generated_draws_inring)(struct anv_cmd_buffer *cmd
          anv_batch_current_address(&cmd_buffer->batch);
 
       anv_add_pending_pipe_bits(cmd_buffer,
+                                gen_kernel->stage == MESA_SHADER_FRAGMENT ?
+                                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT :
+                                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                                VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
                                 ANV_PIPE_STALL_AT_SCOREBOARD_BIT |
                                 ANV_PIPE_CS_STALL_BIT,
                                 "after generated draws batch");
@@ -634,6 +631,8 @@ genX(cmd_buffer_emit_indirect_generated_draws_inring)(struct anv_cmd_buffer *cmd
       mi_ensure_write_fence(&b);
 
       anv_add_pending_pipe_bits(cmd_buffer,
+                                VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                                VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
                                 ANV_PIPE_CONSTANT_CACHE_INVALIDATE_BIT,
                                 "after generated draws batch increment");
       genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
@@ -656,6 +655,8 @@ genX(cmd_buffer_emit_indirect_generated_draws_inring)(struct anv_cmd_buffer *cmd
       mi_ensure_write_fence(&b);
 
       anv_add_pending_pipe_bits(cmd_buffer,
+                                VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                                VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
                                 ANV_PIPE_CONSTANT_CACHE_INVALIDATE_BIT,
                                 "after generated draws end");
 

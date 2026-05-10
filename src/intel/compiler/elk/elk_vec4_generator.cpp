@@ -1,23 +1,6 @@
-/* Copyright © 2011 Intel Corporation
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- * IN THE SOFTWARE.
+/*
+ * Copyright © 2011 Intel Corporation
+ * SPDX-License-Identifier: MIT
  */
 
 #include "elk_vec4.h"
@@ -109,7 +92,7 @@ generate_math2_gfx4(struct elk_codegen *p,
 static void
 generate_tex(struct elk_codegen *p,
              struct elk_vue_prog_data *prog_data,
-             gl_shader_stage stage,
+             mesa_shader_stage stage,
              vec4_instruction *inst,
              struct elk_reg dst,
              struct elk_reg src,
@@ -2238,8 +2221,8 @@ generate_code(struct elk_codegen *p,
    int after_size = p->next_insn_offset;
 
    bool dump_shader_bin = elk_should_dump_shader_bin();
-   unsigned char sha1[21];
-   char sha1buf[41];
+   unsigned char sha1[SHA1_DIGEST_LENGTH + 1];
+   char sha1buf[SHA1_DIGEST_STRING_LENGTH];
 
    if (unlikely(debug_enabled || dump_shader_bin)) {
       _mesa_sha1_compute(p->store, p->next_insn_offset, sha1);

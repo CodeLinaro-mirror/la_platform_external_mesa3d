@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * Submit patches, do not hand-edit.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package {
@@ -21,16 +16,29 @@ package {
 
 cc_library_static {
     name: "mesa_util_c11",
+    vendor: true,
+    c_std: "c11",
     host_supported: true,
-    vendor_available: true,
     defaults: [
-        "mesa_common_defaults",
+        "_trial_msvc",
+        "aosp_mesa3d_c_link_args",
+        "aosp_mesa3d_c_project_args",
     ],
     header_libs: [
-        "mesa_common_headers",
+        "inc_util_c11",
     ],
     srcs: [
         "time.c",
-        "threads_posix.c",
-    ],
+    ] + select((arch(), os(), soong_config_variable("aosp_mesa3d", "perfetto")), {
+        ("x86_64", "linux_glibc", default): [
+            "threads_posix.c",
+        ],
+        ("x86_64", "linux_musl", default): [
+            "threads_posix.c",
+        ],
+        ("arm64", "linux_musl", default): [
+            "threads_posix.c",
+        ],
+        (default, default, default): [],
+    }),
 }

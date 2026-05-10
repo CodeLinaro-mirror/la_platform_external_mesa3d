@@ -90,7 +90,7 @@ fn cycle_use_swap(pc: &OpParCopy, file: RegFile) -> bool {
     }
 }
 
-fn lower_par_copy(pc: OpParCopy, sm: &dyn ShaderModel) -> MappedInstrs {
+fn lower_par_copy(pc: OpParCopy, sm: &ShaderModelInfo) -> MappedInstrs {
     let mut graph = CopyGraph::new();
     let mut vals = Vec::new();
     let mut reg_to_idx = FxHashMap::default();
@@ -258,14 +258,14 @@ impl Shader<'_> {
             match instr.op {
                 Op::ParCopy(pc) => {
                     assert!(instr.pred.is_true());
-                    let mut instrs = vec![];
+                    let mut instrs = Vec::new();
                     if DEBUG.annotate() {
-                        instrs.push(Instr::new_boxed(OpAnnotate {
+                        instrs.push(Instr::new(OpAnnotate {
                             annotation: "par_copy lowered by lower_par_copy"
                                 .into(),
                         }));
                     }
-                    match lower_par_copy(pc, sm) {
+                    match lower_par_copy(*pc, sm) {
                         MappedInstrs::None => {
                             if let Some(instr) = instrs.pop() {
                                 MappedInstrs::One(instr)

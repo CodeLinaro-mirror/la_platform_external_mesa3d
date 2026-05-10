@@ -1,0 +1,792 @@
+/*
+ * Copyright (C) 2025-2026 The Magma GPU Project
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generated via:
+ *   https://github.com/mesonbuild/meson/tree/master/mesonbuild/convert
+ *
+ * Submit patches, do not hand-edit.
+ *
+ */
+
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["external_mesa3d_license"],
+}
+
+filegroup {
+    name: "u_async_debug_c_impl",
+    srcs: [
+        "u_async_debug.c",
+    ],
+}
+
+filegroup {
+    name: "u_bitmask_c_impl",
+    srcs: [
+        "u_bitmask.c",
+    ],
+}
+
+filegroup {
+    name: "u_blitter_c_impl",
+    srcs: [
+        "u_blitter.c",
+    ],
+}
+
+filegroup {
+    name: "u_debug_describe_c_impl",
+    srcs: [
+        "u_debug_describe.c",
+    ],
+}
+
+filegroup {
+    name: "u_debug_flush_c_impl",
+    srcs: [
+        "u_debug_flush.c",
+    ],
+}
+
+filegroup {
+    name: "u_debug_image_c_impl",
+    srcs: [
+        "u_debug_image.c",
+    ],
+}
+
+filegroup {
+    name: "u_debug_refcnt_c_impl",
+    srcs: [
+        "u_debug_refcnt.c",
+    ],
+}
+
+filegroup {
+    name: "u_draw_c_impl",
+    srcs: [
+        "u_draw.c",
+    ],
+}
+
+filegroup {
+    name: "u_draw_quad_c_impl",
+    srcs: [
+        "u_draw_quad.c",
+    ],
+}
+
+filegroup {
+    name: "u_driconf_c_impl",
+    srcs: [
+        "u_driconf.c",
+    ],
+}
+
+filegroup {
+    name: "u_dump_defines_c_impl",
+    srcs: [
+        "u_dump_defines.c",
+    ],
+}
+
+filegroup {
+    name: "u_dump_state_c_impl",
+    srcs: [
+        "u_dump_state.c",
+    ],
+}
+
+filegroup {
+    name: "u_framebuffer_c_impl",
+    srcs: [
+        "u_framebuffer.c",
+    ],
+}
+
+filegroup {
+    name: "u_gen_mipmap_c_impl",
+    srcs: [
+        "u_gen_mipmap.c",
+    ],
+}
+
+filegroup {
+    name: "u_handle_table_c_impl",
+    srcs: [
+        "u_handle_table.c",
+    ],
+}
+
+filegroup {
+    name: "u_helpers_c_impl",
+    srcs: [
+        "u_helpers.c",
+    ],
+}
+
+filegroup {
+    name: "u_index_modify_c_impl",
+    srcs: [
+        "u_index_modify.c",
+    ],
+}
+
+filegroup {
+    name: "u_live_shader_cache_c_impl",
+    srcs: [
+        "u_live_shader_cache.c",
+    ],
+}
+
+filegroup {
+    name: "u_log_c_impl",
+    srcs: [
+        "u_log.c",
+    ],
+}
+
+filegroup {
+    name: "u_prim_c_impl",
+    srcs: [
+        "u_prim.c",
+    ],
+}
+
+filegroup {
+    name: "u_prim_restart_c_impl",
+    srcs: [
+        "u_prim_restart.c",
+    ],
+}
+
+filegroup {
+    name: "u_pstipple_c_impl",
+    srcs: [
+        "u_pstipple.c",
+    ],
+}
+
+filegroup {
+    name: "u_resource_c_impl",
+    srcs: [
+        "u_resource.c",
+    ],
+}
+
+filegroup {
+    name: "u_sample_positions_c_impl",
+    srcs: [
+        "u_sample_positions.c",
+    ],
+}
+
+filegroup {
+    name: "u_sampler_c_impl",
+    srcs: [
+        "u_sampler.c",
+    ],
+}
+
+filegroup {
+    name: "u_screen_c_impl",
+    srcs: [
+        "u_screen.c",
+    ],
+}
+
+filegroup {
+    name: "u_simple_shaders_c_impl",
+    srcs: [
+        "u_simple_shaders.c",
+    ],
+}
+
+filegroup {
+    name: "u_split_draw_c_impl",
+    srcs: [
+        "u_split_draw.c",
+    ],
+}
+
+filegroup {
+    name: "u_suballoc_c_impl",
+    srcs: [
+        "u_suballoc.c",
+    ],
+}
+
+filegroup {
+    name: "u_surface_c_impl",
+    srcs: [
+        "u_surface.c",
+    ],
+}
+
+filegroup {
+    name: "u_tests_c_impl",
+    srcs: [
+        "u_tests.c",
+    ],
+}
+
+filegroup {
+    name: "u_texture_c_impl",
+    srcs: [
+        "u_texture.c",
+    ],
+}
+
+filegroup {
+    name: "u_threaded_context_c_impl",
+    srcs: [
+        "u_threaded_context.c",
+    ],
+}
+
+filegroup {
+    name: "u_tile_c_impl",
+    srcs: [
+        "u_tile.c",
+    ],
+}
+
+filegroup {
+    name: "u_trace_gallium_c_impl",
+    srcs: [
+        "u_trace_gallium.c",
+    ],
+}
+
+filegroup {
+    name: "u_tracepoints_py",
+    srcs: [
+        "u_tracepoints.py",
+    ],
+}
+
+filegroup {
+    name: "u_transfer_c_impl",
+    srcs: [
+        "u_transfer.c",
+    ],
+}
+
+filegroup {
+    name: "u_transfer_helper_c_impl",
+    srcs: [
+        "u_transfer_helper.c",
+    ],
+}
+
+filegroup {
+    name: "u_upload_mgr_c_impl",
+    srcs: [
+        "u_upload_mgr.c",
+    ],
+}
+
+filegroup {
+    name: "u_vbuf_c_impl",
+    srcs: [
+        "u_vbuf.c",
+    ],
+}
+
+filegroup {
+    name: "u_vertex_state_cache_c_impl",
+    srcs: [
+        "u_vertex_state_cache.c",
+    ],
+}
+
+python_binary_host {
+    name: "u_tracepoints_py_binary",
+    main: "u_tracepoints.py",
+    srcs: [
+        ":u_trace_py",
+        ":u_tracepoints_py",
+    ],
+    libs: [
+        "mako",
+        "pyyaml",
+    ],
+}
+
+cc_library_headers {
+    name: "inc_src_gallium_auxiliary_util",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_async_debug_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_bitcast_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_bitmask_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_blend_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_blitter_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_debug_cb_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_debug_describe_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_debug_flush_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_debug_image_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_debug_refcnt_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_draw_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_draw_quad_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_driconf_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_dual_blend_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_dump_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_framebuffer_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_gen_mipmap_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_handle_table_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_helpers_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_index_modify_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_inlines_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_live_shader_cache_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_log_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_prim_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_prim_restart_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_pstipple_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_pwr8_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_range_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_rect_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_resource_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_sample_positions_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_sampler_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_screen_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_simple_shaders_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_split_draw_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_split_prim_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_sse_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_suballoc_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_surface_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_tests_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_texture_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_threaded_context_calls_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_threaded_context_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_tile_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_trace_gallium_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_transfer_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_transfer_helper_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_upload_mgr_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_vbuf_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_vertex_state_cache_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_video_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}
+
+cc_library_headers {
+    name: "u_viewport_h_headers",
+    vendor: true,
+    host_supported: true,
+    export_include_dirs: [
+        ".",
+    ],
+}

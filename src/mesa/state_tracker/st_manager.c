@@ -170,7 +170,7 @@ st_context_validate(struct st_context *st,
                     struct gl_framebuffer *stread)
 {
     if (stdraw && stdraw->stamp != st->draw_stamp) {
-       st->ctx->NewDriverState |= ST_NEW_FRAMEBUFFER;
+       ST_SET_FRAMEBUFFER_STATES(st->ctx->NewDriverState);
        _mesa_resize_framebuffer(st->ctx, stdraw,
                                 stdraw->Width,
                                 stdraw->Height);
@@ -179,7 +179,7 @@ st_context_validate(struct st_context *st,
 
     if (stread && stread->stamp != st->read_stamp) {
        if (stread != stdraw) {
-          st->ctx->NewDriverState |= ST_NEW_FRAMEBUFFER;
+          ST_SET_FRAMEBUFFER_STATES(st->ctx->NewDriverState);
           _mesa_resize_framebuffer(st->ctx, stread,
                                    stread->Width,
                                    stread->Height);
@@ -416,6 +416,7 @@ st_new_renderbuffer_fb(enum pipe_format format, unsigned samples, bool sw)
    case PIPE_FORMAT_R16G16B16A16_UNORM:
       rb->InternalFormat = GL_RGBA16;
       break;
+   case PIPE_FORMAT_R16G16B16X16_UNORM:
    case PIPE_FORMAT_R16G16B16_UNORM:
       rb->InternalFormat = GL_RGB16;
       break;
@@ -897,17 +898,17 @@ st_context_invalidate_state(struct st_context *st, unsigned flags)
    struct gl_context *ctx = st->ctx;
 
    if (flags & ST_INVALIDATE_FS_SAMPLER_VIEWS)
-      ctx->NewDriverState |= ST_NEW_FS_SAMPLER_VIEWS;
+      ST_SET_STATE(ctx->NewDriverState, ST_NEW_FS_SAMPLER_VIEWS);
    if (flags & ST_INVALIDATE_FS_CONSTBUF0)
-      ctx->NewDriverState |= ST_NEW_FS_CONSTANTS;
+      ST_SET_STATE(ctx->NewDriverState, ST_NEW_FS_CONSTANTS);
    if (flags & ST_INVALIDATE_VS_CONSTBUF0)
-      ctx->NewDriverState |= ST_NEW_VS_CONSTANTS;
+      ST_SET_STATE(ctx->NewDriverState, ST_NEW_VS_CONSTANTS);
    if (flags & ST_INVALIDATE_VERTEX_BUFFERS) {
       ctx->Array.NewVertexElements = true;
-      ctx->NewDriverState |= ST_NEW_VERTEX_ARRAYS;
+      ST_SET_STATE(ctx->NewDriverState, ST_NEW_VERTEX_ARRAYS);
    }
    if (flags & ST_INVALIDATE_FB_STATE)
-      ctx->NewDriverState |= ST_NEW_FB_STATE;
+      ST_SET_STATE(ctx->NewDriverState, ST_NEW_FB_STATE);
 }
 
 
@@ -1214,7 +1215,7 @@ st_manager_flush_frontbuffer(struct st_context *st)
       rb->defined = GL_FALSE;
 
       /* Trigger an update of rb->defined on next draw */
-      st->ctx->NewDriverState |= ST_NEW_FB_STATE;
+      ST_SET_STATE(st->ctx->NewDriverState, ST_NEW_FB_STATE);
    }
 }
 

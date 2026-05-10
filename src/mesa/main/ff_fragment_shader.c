@@ -365,7 +365,7 @@ register_state_var(struct texenv_fragment_program *p,
    free(name);
 
    var->num_state_slots = 1;
-   var->state_slots = ralloc_array(var, nir_state_slot, 1);
+   var->state_slots = ralloc_array(p->b->shader, nir_state_slot, 1);
    var->data.driver_location = loc;
    memcpy(var->state_slots[0].tokens, tokens,
           sizeof(var->state_slots[0].tokens));
@@ -762,7 +762,13 @@ load_texture(struct texenv_fragment_program *p, GLuint unit)
       return ;
    }
 
-   unsigned num_srcs = 4;
+   bool tex_is_array = false;
+   enum glsl_sampler_dim tex_dim =
+      _mesa_texture_index_to_sampler_dim(texTarget, &tex_is_array);
+
+   unsigned num_srcs = 3;
+   if (tex_dim != GLSL_SAMPLER_DIM_CUBE)
+      num_srcs++;
    if (p->state->unit[unit].shadow)
       num_srcs++;
 
@@ -773,9 +779,8 @@ load_texture(struct texenv_fragment_program *p, GLuint unit)
    tex->sampler_index = unit;
    tex->can_speculate = true;
 
-   tex->sampler_dim =
-      _mesa_texture_index_to_sampler_dim(texTarget,
-                                         &tex->is_array);
+   tex->sampler_dim = tex_dim;
+   tex->is_array = tex_is_array;
 
    tex->coord_components =
       glsl_get_sampler_dim_coordinate_components(tex->sampler_dim);
@@ -810,14 +815,18 @@ load_texture(struct texenv_fragment_program *p, GLuint unit)
                    nir_component_mask(tex->coord_components));
    tex->src[2] = nir_tex_src_for_ssa(nir_tex_src_coord, src2);
 
-   tex->src[3] = nir_tex_src_for_ssa(nir_tex_src_projector,
-                                     nir_channel(p->b, texcoord, 3));
+   unsigned next_src = 3;
+
+   if (tex->sampler_dim != GLSL_SAMPLER_DIM_CUBE) {
+      tex->src[next_src++] = nir_tex_src_for_ssa(nir_tex_src_projector,
+                                                 nir_channel(p->b, texcoord, 3));
+   }
 
    if (p->state->unit[unit].shadow) {
       tex->is_shadow = true;
       nir_def *src4 =
          nir_channel(p->b, texcoord, tex->coord_components);
-      tex->src[4] = nir_tex_src_for_ssa(nir_tex_src_comparator, src4);
+      tex->src[next_src++] = nir_tex_src_for_ssa(nir_tex_src_comparator, src4);
    }
 
    nir_def_init(&tex->instr, &tex->def, 4, 32);
@@ -925,7 +934,7 @@ emit_instructions(struct texenv_fragment_program *p)
  * current texture env/combine mode.
  */
 static nir_shader *
-create_new_program(struct state_key *key,
+create_new_program(struct gl_context *ctx, struct state_key *key,
                    struct gl_program *program,
                    const nir_shader_compiler_options *options)
 {
@@ -944,7 +953,7 @@ create_new_program(struct state_key *key,
    nir_shader *s = b.shader;
 
    s->info.separate_shader = true;
-   s->info.subgroup_size = SUBGROUP_SIZE_UNIFORM;
+   s->info.api_subgroup_size_draw_uniform = true;
    s->info.io_lowered = true;
 
    p.b = &b;
@@ -954,8 +963,10 @@ create_new_program(struct state_key *key,
 
    nir_validate_shader(b.shader, "after generating ff-vertex shader");
 
-   if (key->fog_mode)
-      NIR_PASS(_, b.shader, st_nir_lower_fog, key->fog_mode, p.state_params);
+   if (key->fog_mode) {
+      NIR_PASS(_, b.shader, st_nir_lower_fog, key->fog_mode, p.state_params,
+               ctx->Const.PackedDriverUniformStorage);
+   }
 
    _mesa_add_separate_state_parameters(program, p.state_params);
    _mesa_free_parameter_list(p.state_params);
@@ -989,7 +1000,7 @@ _mesa_get_fixed_func_fragment_program(struct gl_context *ctx)
          ctx->screen->nir_options[MESA_SHADER_FRAGMENT];
 
       nir_shader *s =
-         create_new_program(&key, prog, options);
+         create_new_program(ctx, &key, prog, options);
 
       prog->state.type = PIPE_SHADER_IR_NIR;
       prog->nir = s;

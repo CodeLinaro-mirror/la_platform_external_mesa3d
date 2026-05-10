@@ -3,11 +3,11 @@
 
 # When changing this file, you need to bump the following
 # .gitlab-ci/image-tags.yml tags:
-# DEBIAN_BASE_TAG
+# DEBIAN_TEST_BASE_TAG
 
 set -uex
 
-uncollapsed_section_start apitrace "Building apitrace"
+section_start apitrace "Building apitrace"
 
 APITRACE_VERSION="45a005875d348b055d5b88dca285c109dee90457"
 
