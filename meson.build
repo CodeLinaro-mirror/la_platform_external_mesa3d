@@ -918,12 +918,7 @@ prog_python = find_program('python3', 'python', version : '>= 3.8')
 has_mako = run_command(
   prog_python, '-c',
   '''
-try:
-  from packaging.version import Version
-except:
-  from distutils.version import StrictVersion as Version
 import mako
-assert Version(mako.__version__) >= Version("0.8.0")
   ''', check: false)
 if has_mako.returncode() != 0
   error('Python (3.x) mako module >= 0.8.0 required to build mesa.')
