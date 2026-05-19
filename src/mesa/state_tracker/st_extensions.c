@@ -1346,6 +1346,19 @@ void st_init_extensions(struct pipe_screen *screen,
                                 PIPE_SHADER_CAP_MAX_INSTRUCTIONS) > 0 &&
        (api != API_OPENGL_COMPAT || consts->GLSLVersionCompat >= 400)) {
       extensions->ARB_tessellation_shader = GL_TRUE;
+
+      /* GL_OES/EXT_tessellation_point_size now have their own fields
+       * (decoupled from ARB_tessellation_shader) so we can control them
+       * independently.  virglrenderer unconditionally emits gl_PointSize
+       * in the gl_PerVertex interface block of TCS/TES shaders regardless
+       * of whether the host GLES driver supports the extension.  On hosts
+       * where GL_OES_tessellation_point_size is absent, this causes shader
+       * compilation to fail.  Disable the extension for GLES contexts until
+       * virglrenderer properly gates its emission on host capability. */
+      if (!_mesa_is_api_gles2(api)) {
+         extensions->OES_tessellation_point_size = GL_TRUE;
+         extensions->EXT_tessellation_point_size = GL_TRUE;
+      }
    }
 
    /* OES_geometry_shader requires instancing */
