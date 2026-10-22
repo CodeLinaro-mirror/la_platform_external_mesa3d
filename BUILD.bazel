@@ -23,6 +23,22 @@ config_setting(
     ],
 )
 
+config_setting(
+    name = "is_windows_x86_64",
+    constraint_values = [
+        "@platforms//os:windows",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "is_windows_aarch64",
+    constraint_values = [
+        "@platforms//os:windows",
+        "@platforms//cpu:arm64",
+    ],
+)
+
 COMMON_DEFINES = [
     "DRAW_LLVM_AVAILABLE=1",
     "GALLIVM_USE_ORCJIT=0",
@@ -144,7 +160,6 @@ COMMON_LINUX_DEFINES = COMMON_DEFINES + COMMON_POSIX_DEFINES + [
     "MAJOR_IN_SYSMACROS",
     "MESA_SYSTEM_HAS_KMS_DRM=1",
     'PACKAGE_VERSION=\\"26.2.0-devel\\"',
-    "USE_SSE41",
     "USE_UNW_DYNAMIC_FDE",
     "WL_HIDE_DEPRECATED",
     "_FILE_OFFSET_BITS=64",
@@ -179,7 +194,6 @@ COMMON_WINDOWS_DEFINES = COMMON_DEFINES + [
     "MESA_SYSTEM_HAS_KMS_DRM=0",
     "NOMINMAX",
     'PACKAGE_VERSION=\\"26.2.0-devel\\"',
-    "USE_SSE41",
     "WIN32_LEAN_AND_MEAN",
     "_CRT_NONSTDC_NO_DEPRECATE",
     "_CRT_SECURE_NO_DEPRECATE",
@@ -191,6 +205,7 @@ COMMON_WINDOWS_DEFINES = COMMON_DEFINES + [
 COMMON_WINDOWS_MSVC_DEFINES = COMMON_WINDOWS_DEFINES + [
     "ALLOW_KCMP",
     "AMD_LLVM_AVAILABLE=0",
+    "ARM64_FPCR=0x5a20",
     "GLAPI_EXPORT_PROTO_ENTRY_POINTS=1",
     "HAVE_QSORT_S",
     "HAVE_SWRAST_DRI",
@@ -1687,6 +1702,7 @@ cc_library(
             "src/util/blake3/blake3_sse41_x86-64_unix.S",
         ],
         ":is_linux_aarch64": ["src/util/blake3/blake3_neon.c"],
+        ":is_windows_aarch64": ["src/util/blake3/blake3_neon.c"],
         "@platforms//os:macos": ["src/util/blake3/blake3_neon.c"],
         "//conditions:default": [],
     }) + ["src/util/blake3/blake3_portable.c"],
@@ -6684,6 +6700,9 @@ cc_library(
         "@platforms//os:linux": COMMON_LINUX_DEFINES,
         "@platforms//os:macos": COMMON_MACOS_DEFINES,
         "@platforms//os:windows": COMMON_WINDOWS_MSVC_DEFINES,
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//cpu:x86_64": ["USE_SSE41"],
         "//conditions:default": [],
     }),
     # buildifier: leave-alone
