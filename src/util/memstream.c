@@ -58,6 +58,8 @@ u_memstream_open(struct u_memstream *mem, char **bufp, size_t *sizep)
             mem->f = f;
             mem->bufp = bufp;
             mem->sizep = sizep;
+         } else {
+            remove(temp);
          }
       }
    }
@@ -96,10 +98,13 @@ u_memstream_close(struct u_memstream *mem)
 
 #ifdef _WIN32
    u_memstream_update_buffer(mem);
-   remove(mem->temp);
 #endif
 
    fclose(f);
+
+#if defined(_WIN32) && !defined(_GAMING_XBOX)
+   remove(mem->temp);
+#endif
 }
 
 int
