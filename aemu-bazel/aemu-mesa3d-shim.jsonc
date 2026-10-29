@@ -94,7 +94,11 @@
   // The actual set of targets you wish to generate bazel targets for.
   // These are the targets that will be exported.
   "export": [
-    "vulkan_lvp"
+    "vulkan_lvp",
+    "EGL",
+    "GLESv1_CM",
+    "GLESv2",
+    "gallium_dri"
   ],
   "exclude": []
 }
