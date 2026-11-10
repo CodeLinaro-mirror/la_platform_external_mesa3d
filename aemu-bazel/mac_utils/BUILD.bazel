@@ -1,4 +1,3 @@
-load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_python//python:defs.bzl", "py_binary")
 
 package(default_visibility = ["//visibility:public"])
@@ -6,10 +5,4 @@ package(default_visibility = ["//visibility:public"])
 py_binary(
     name = "py_llvm_config",
     srcs = ["py_llvm_config.py"],
-)
-
-cc_library(
-    name = "mtl4_compat_headers",
-    hdrs = glob(["include/Metal/*.h"]),
-    includes = ["include"],
 )
